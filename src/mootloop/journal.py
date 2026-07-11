@@ -19,6 +19,7 @@ from pathlib import Path
 from pydantic import TypeAdapter, ValidationError
 
 from mootloop.models.events import (
+    CapRaised,
     GateEvaluated,
     JournalEvent,
     RunFinished,
@@ -137,8 +138,16 @@ def fold(events: list[JournalEvent]) -> RunState:
             state.discarded[event.turn_id] = event.attempt
         elif isinstance(event, SpendRecorded):
             state.total_spend_usd += event.usd_equiv
+            state.total_input_tokens += event.input_tokens
+            state.total_cache_read += event.cache_read
+            state.total_cache_write += event.cache_write
+            state.total_output_tokens += event.output_tokens
         elif isinstance(event, RunFinished):
             state.status = event.status
+        elif isinstance(event, CapRaised):
+            state.cap_raised_to = event.to_usd
+            if state.status == "capped":
+                state.status = "running"  # reopen a graceful cap checkpoint
         elif isinstance(event, GateEvaluated):
             pass  # informational; the authoritative gate copy rides on the TurnRecord
     return state

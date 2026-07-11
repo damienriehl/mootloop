@@ -396,5 +396,47 @@ def run_drive(
     typer.echo(f"{run_id}: {state.status} ({len(state.completed_turns)} turns)")
 
 
+@run_app.command("estimate")
+def run_estimate(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    task: Annotated[str, typer.Option("--task", help="Task adapter name")] = "discovery-responses",
+    tier: Annotated[str | None, typer.Option("--tier", help="Budget tier override")] = None,
+) -> None:
+    """Pre-run cost range + per-stage breakdown (plan D5)."""
+    try:
+        resolved_tier = tier or orchestrator.matter_tier(vault_path)
+        estimate = orchestrator.estimate_run_cost(
+            vault_path, task, resolved_tier, datetime.now(UTC).date()
+        )
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    typer.echo(
+        f"Estimate — task={task} tier={estimate.tier} requests={estimate.requests}"
+    )
+    typer.echo(
+        f"  range: ${estimate.min_usd:.2f} (converge early) – "
+        f"${estimate.max_usd:.2f} (all caps)  [notional, plan mode]"
+    )
+    typer.echo(f"  {'stage':<26} {'model':<20} {'calls':>12} {'usd':>18}")
+    for row in estimate.breakdown:
+        calls = f"{row.min_calls}–{row.max_calls}"
+        usd = f"${row.min_usd:.2f}–${row.max_usd:.2f}"
+        typer.echo(f"  {row.stage:<26} {row.model:<20} {calls:>12} {usd:>18}")
+
+
+@run_app.command("raise-cap")
+def run_raise_cap(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+    to: Annotated[float, typer.Option("--to", help="New hard cap in USD")],
+) -> None:
+    """Raise a capped run's hard budget cap and reopen it for resumption (plan D5)."""
+    try:
+        orchestrator.raise_cap(vault_path, run_id, to)
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    typer.echo(f"raised cap for {run_id} to ${to:.2f} — resume with `run drive --fake`")
+
+
 if __name__ == "__main__":
     app()
