@@ -58,22 +58,66 @@ _SERVED_SETS: tuple[tuple[str, RequestType], ...] = (
 _MAX_DRIVE_PASSES = 10
 
 
-def _grounded_cited_draft(spec: TurnSpec, prompt: str) -> dict[str, Any]:
-    """A grounded draft carrying the planted citation in its answer text, so the demo
-    shows the citation lifecycle end-to-end. Mirrors the default draft's fact
-    grounding (fabrication gate passes) and keeps one objection (panel has work)."""
+def _demo_draft(spec: TurnSpec, prompt: str) -> dict[str, Any]:
+    """A grounded, completeness-PASSING draft for one request, carrying the planted
+    citation in its answer text so the demo shows the citation lifecycle end-to-end.
+
+    The answer text is shaped per request family so every deterministic *presence*
+    criterion of the LOCKED rubric (``gates/completeness.py``) is satisfied:
+
+    - ROG (MN Rule 33): restates the interrogatory before answering
+      (``mn-rog-restatement``).
+    - RFP (Heller / Rule 34(b)): states whether responsive materials are withheld
+      (``rfp-withheld-statement``).
+    - RFA (Rule 36): takes a recognized disposition — here ``deny`` — with the
+      disposition word in the answer text (``rfa-disposition``); no lack-of-knowledge
+      answer, so no reasonable-inquiry recital is required.
+
+    Common to every family: a request-specific objection (basis + a >12-char
+    specificity string) with no boilerplate general objection and no
+    "subject to and without waiving" hedge. Fact grounding mirrors the default draft
+    so the fabrication gate passes, and one objection is kept so the judge panel has
+    work to rule on.
+    """
     fact_ids = list(spec.prompt_context.get("fact_ids", []))
-    is_rfa = str(spec.request_id or "").upper().startswith("RFA")
+    request_id = str(spec.request_id or "the request")
+    family = request_id.split("-")[0].upper()
+    number = request_id.split("-")[-1] if "-" in request_id else ""
+    objection = {
+        "basis": "relevance",
+        "text": "Overbroad as to time and scope; not relevant to any claim or defense.",
+    }
+
+    if family == "RFA":
+        response_text = (
+            f"Denied. Defendant denies the matter asserted in {request_id}; the denial "
+            f"fairly meets the substance of the request. See {DEMO_CITATION}."
+        )
+        rfa_disposition: str | None = "deny"
+    elif family == "RFP":
+        response_text = (
+            f"Subject to the objection stated below, Defendant will produce the "
+            f"responsive, non-privileged documents in its possession, custody, or "
+            f"control. Responsive documents are withheld only to the extent they fall "
+            f"outside the relevant time period; nothing else is being withheld. "
+            f"See {DEMO_CITATION}."
+        )
+        rfa_disposition = None
+    else:  # ROG / interrogatory — restate before answering (MN Rule 33)
+        response_text = (
+            f"Interrogatory No. {number}: restated in full above. Subject to the "
+            f"objection stated below, Defendant answers by identifying the individuals "
+            f"and events reflected in the record. See {DEMO_CITATION}."
+        )
+        rfa_disposition = None
+
     return {
-        "response_text": (
-            f"Defendant responds to {spec.request_id or 'the request'} as stated in the "
-            f"record. See {DEMO_CITATION}."
-        ),
-        "objections": [{"basis": "relevance", "text": "Overbroad as to time and scope."}],
+        "response_text": response_text,
+        "objections": [objection],
         "candidate_citations": [],
         "fact_ids_used": fact_ids[:1] if fact_ids else [],
         "attorney_gate_items": [] if fact_ids else ["verify factual basis"],
-        "rfa_disposition": "deny" if is_rfa else None,
+        "rfa_disposition": rfa_disposition,
         "self_assessment": "Grounded in the cited fact and the record.",
     }
 
@@ -103,10 +147,14 @@ def _split_survival_judge(spec: TurnSpec, prompt: str) -> dict[str, Any]:
 def _demo_script() -> dict[ScriptKey, ScriptEntry]:
     return {
         ("judge", "judge_panel"): _split_survival_judge,
-        # Bolster AND restructure carry the citation so it survives into the
-        # operative draft of every request, restructured or not.
-        ("associate", "bolster"): _grounded_cited_draft,
-        ("associate", "restructure"): _grounded_cited_draft,
+        # Every Associate draft turn (initial draft, any partner-loop redraft, bolster,
+        # and restructure) uses the completeness-PASSING draft, so the gate ledger shows
+        # completeness=pass for every request. Each draft carries the citation so it
+        # survives into the operative draft of every request, restructured or not.
+        ("associate", "associate_draft"): _demo_draft,
+        ("associate", "partner_loop"): _demo_draft,
+        ("associate", "bolster"): _demo_draft,
+        ("associate", "restructure"): _demo_draft,
     }
 
 
