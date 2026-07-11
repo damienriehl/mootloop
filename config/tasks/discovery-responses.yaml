@@ -9,6 +9,7 @@ stages:
   - oc_attack
   - bolster
   - judge_panel
+  - restructure
   - rubric_gate
   - assemble
 
@@ -17,6 +18,9 @@ loop_caps:
   associate_partner: 2
   oc: 1
   bolster: 1
+  # Costed associate restructure pass when an objection survives a minority of the
+  # judge panel (plan Phase 6).
+  restructure: 1
 
 panels:
   judges: 3
@@ -41,6 +45,9 @@ gates:
 rubric_id: discovery-responses-v1.0
 # Final rubric gate passes iff the weighted median composite >= this threshold.
 rubric_threshold: 0.75
+# An objection surviving < this fraction of the judge panel triggers a restructure
+# pass on its request (plan Phase 6).
+restructure_threshold: 0.5
 
 deliverables:
   - draft-discovery-responses.md

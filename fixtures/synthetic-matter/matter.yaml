@@ -14,5 +14,12 @@ parties:
   - name: "Granite Supply Co."
     role: "defendant"
 our_side: "defendant"
+attorney:
+  name: "Dana R. Counsel"
+  firm: "Counsel & Associates PLLC"
+  address: "100 Division Street S, Suite 400, Northfield, MN 55057"
+  email: "dana.counsel@counsel-law.example"
+  phone: "(507) 555-0142"
+  bar_number: "0391827"
 retention:
   retention_class: "standard"

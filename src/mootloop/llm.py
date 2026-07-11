@@ -118,13 +118,15 @@ def _default_output(spec: TurnSpec) -> dict[str, Any]:
             "self_assessment": "The draft is adequate.",
         }
     if spec.output_schema_name == SCHEMA_JUDGE:
+        # Default: the objection survives (high survival -> no restructure). Tests that
+        # exercise the restructure pass script a low-survival judge (plan Phase 6).
         return {
             "rulings": [
                 {
                     "objection_basis": "relevance",
-                    "would_objection_survive": False,
-                    "reasoning": "Discovery relevance is broad.",
-                    "persuasion_notes": "Weak objection.",
+                    "would_objection_survive": True,
+                    "reasoning": "The relevance objection is properly grounded on this request.",
+                    "persuasion_notes": "Defensible objection.",
                 }
             ],
             "self_assessment": "Ruled on all objections.",

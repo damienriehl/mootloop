@@ -24,6 +24,7 @@ from mootloop.convergence import ConvergenceEvaluator, RoundState
 from mootloop.errors import TaskConfigError
 from mootloop.gates import completeness
 from mootloop.models.events import RunState
+from mootloop.models.panels import PanelResult
 from mootloop.models.requests import RequestItem, code_from_request_id
 from mootloop.models.rubric import Rubric
 from mootloop.models.run import (
@@ -32,17 +33,20 @@ from mootloop.models.run import (
     SCHEMA_JUDGE,
     SCHEMA_RUBRIC,
     DraftOutput,
+    JudgeOutput,
     PersonaName,
     RubricScoreOutput,
     TurnRecord,
     TurnSpec,
 )
 from mootloop.models.task import TaskAdapterConfig
+from mootloop.panels import fold_objection_results
 from mootloop.resources import persona_body
 from mootloop.tasks import TaskAdapter
 
 ASSEMBLE_STAGE = "assemble"
 RUBRIC_GATE_STAGE = "rubric_gate"
+RESTRUCTURE_STAGE = "restructure"
 
 # The final-panel judging lenses (plan D6 — attempt-diverse prompts, one lens each).
 _JUDGE_LENSES = ("correctness", "strategy", "grounding")
@@ -67,10 +71,19 @@ class SlotLayout:
     bolster: int
     judges: int
     rubric_panel: int  # decorrelated final rubric panel
+    restructure: int = 0  # costed post-panel restructure turns (plan Phase 6)
 
     @property
     def _block(self) -> int:
-        return 2 * self.ap + self.oc + self.bolster + self.judges + self.ap + self.rubric_panel
+        return (
+            2 * self.ap
+            + self.oc
+            + self.bolster
+            + self.judges
+            + self.ap
+            + self.rubric_panel
+            + self.restructure
+        )
 
     @property
     def base(self) -> int:
@@ -99,6 +112,9 @@ class SlotLayout:
 
     def rubric_final(self, m: int) -> int:  # m in 1..rubric_panel (final gate)
         return self._rubric_base() + self.ap + (m - 1)
+
+    def restructure_slot(self, k: int) -> int:  # k in 1..restructure (plan Phase 6)
+        return self._rubric_base() + self.ap + self.rubric_panel + (k - 1)
 
     def turn_id(self, seq: int) -> str:
         return f"{self.run_id}-t{seq:04d}"
@@ -132,6 +148,7 @@ class StageContext:
             bolster=self.config.loop_caps.bolster,
             judges=self.config.panels.judges,
             rubric_panel=self.config.panels.rubric_judges,
+            restructure=self.config.loop_caps.restructure,
         )
 
     @property
@@ -188,13 +205,39 @@ class StageContext:
                 return self.record(seq)
         return None
 
-    def operative_draft(self) -> TurnRecord | None:
-        """The draft that is the request's current response (bolster if present)."""
+    def judged_draft(self) -> TurnRecord | None:
+        """The draft the judge panel ruled on (bolster if present, else latest) —
+        excludes any later restructure draft (plan Phase 6)."""
         for k in range(self.config.loop_caps.bolster, 0, -1):
             seq = self.layout.bolster_slot(k)
             if self.done(seq):
                 return self.record(seq)
         return self.latest_draft()
+
+    def operative_draft(self) -> TurnRecord | None:
+        """The request's current response: a restructure draft if the panel triggered
+        one, else the judged draft (bolster/latest)."""
+        for k in range(self.config.loop_caps.restructure, 0, -1):
+            seq = self.layout.restructure_slot(k)
+            if self.done(seq):
+                return self.record(seq)
+        return self.judged_draft()
+
+    # -- judge panel (plan Phase 6) --
+    def panel_results(self) -> list[PanelResult]:
+        """Fold this request's judge panel into per-objection survival distributions."""
+        draft_record = self.judged_draft()
+        if draft_record is None:
+            return []
+        draft = DraftOutput.model_validate(draft_record.output)
+        judge_outputs: list[JudgeOutput] = []
+        for j in range(1, self.config.panels.judges + 1):
+            seq = self.layout.judge_slot(j)
+            if self.done(seq):
+                judge_outputs.append(JudgeOutput.model_validate(self.record(seq).output))
+        return fold_objection_results(
+            self.run_id, str(self.request.request_id), draft.objections, judge_outputs
+        )
 
     # -- convergence (plan D6) --
     def _round_history(self, upto_r: int) -> list[RoundState]:
@@ -446,6 +489,76 @@ class JudgePanelStage:
         return specs
 
 
+class RestructureStage:
+    """A costed post-panel restructure pass (plan Phase 6). When the judge panel rules
+    an objection would survive a motion to compel less often than the task's
+    ``restructure_threshold``, the associate re-enters once per affected request to
+    drop, narrow, or bolster the weak objection(s). Requests with no weak objection
+    skip the stage (no turn, no cost)."""
+
+    name = RESTRUCTURE_STAGE
+
+    def _weak(self, ctx: StageContext) -> list[PanelResult]:
+        threshold = ctx.config.restructure_threshold
+        return [
+            r for r in ctx.panel_results() if r.total_votes > 0 and r.survival_rate < threshold
+        ]
+
+    def is_complete(self, ctx: StageContext) -> bool:
+        if not JudgePanelStage().is_complete(ctx):
+            return False  # not decidable until the panel has ruled
+        if not self._weak(ctx):
+            return True  # nothing weak -> no restructure needed
+        cap = ctx.config.loop_caps.restructure
+        return all(ctx.done(ctx.layout.restructure_slot(k)) for k in range(1, cap + 1))
+
+    def plan(self, ctx: StageContext) -> list[TurnSpec]:
+        weak = self._weak(ctx)
+        if not weak:
+            return []
+        draft = ctx.judged_draft()
+        findings = [
+            {
+                "objection_index": r.objection_index,
+                "objection_basis": r.objection_basis,
+                "survival": f"{r.survive_votes}/{r.total_votes}",
+                "reasoning_samples": r.reasoning_samples,
+            }
+            for r in weak
+        ]
+        summary = "; ".join(
+            f"objection {r.objection_index} ({r.objection_basis}) survived "
+            f"{r.survive_votes}/{r.total_votes}"
+            for r in weak
+        )
+        directive = (
+            "The judge panel found one or more of your objections weak "
+            f"({summary}). Revise the response: for each weak objection, drop it, "
+            "narrow it, or bolster it with a request-specific basis. Keep the strong "
+            "objections and the substantive answer intact."
+        )
+        for k in range(1, ctx.config.loop_caps.restructure + 1):
+            seq = ctx.layout.restructure_slot(k)
+            if not ctx.done(seq):
+                return [
+                    ctx._spec(
+                        seq,
+                        PersonaName.ASSOCIATE,
+                        self.name,
+                        SCHEMA_DRAFT,
+                        _draft_context(
+                            ctx,
+                            {
+                                "directive": directive,
+                                "previous_draft": draft.output if draft else None,
+                                "panel_findings": findings,
+                            },
+                        ),
+                    )
+                ]
+        return []
+
+
 class RubricGateStage:
     """The final rubric gate: a decorrelated panel of rubric judges (plan D6), each
     with a distinct lens, scores the operative draft. The orchestrator aggregates the
@@ -488,6 +601,7 @@ _STAGES: dict[str, Stage] = {
         OCAttackStage(),
         BolsterStage(),
         JudgePanelStage(),
+        RestructureStage(),
         RubricGateStage(),
     )
 }

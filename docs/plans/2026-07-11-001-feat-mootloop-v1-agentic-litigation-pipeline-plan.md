@@ -297,14 +297,14 @@ Every skill has a CLI mirror (`mootloop init|ingest|run|decide|export|learn|stat
 - [x] `mootloop init` / `/moot:setup` creates a valid vault; matter.yaml schema-validated with our_side, judge, deadlines
 - [ ] Ingestion handles Damien's real case folder: manifest with role tags + privilege flags; unreadable docs surfaced
 - [x] Served rogs/RFPs/RFAs parse into numbered per-request work items (subparts included)
-- [ ] Thin full pipeline produces per-request responses + objections + privilege log + strategy memo on synthetic matter
+- [x] Thin full pipeline produces per-request responses + objections + privilege log + strategy memo on synthetic matter
 - [ ] All six personas individually enable/bypass-able; pipeline strategies thin-full / deep-core / adversarial-first selectable
 - [x] Convergence terminates loops via locked rubric deltas; iteration caps user-configurable
 - [x] Citation gate: 200/404/400 semantics enforced; nothing unverified exports; research-request queue works
 - [x] Fabrication gate: assertions without fact/corpus provenance blocked or gated to attorney
 - [x] Attorney gates (P-28 set) function in all three run modes; decisions recorded
-- [ ] Judge discovery-adapter produces objection-survival distributions that drive a restructure pass
-- [ ] Export: DOCX (court caption) + Google Doc + memo + annotated draft; DRAFT watermark until attestation; residue scan clean; AI-use audit log emitted
+- [x] Judge discovery-adapter produces objection-survival distributions that drive a restructure pass
+- [ ] Export: DOCX (court caption) + Google Doc + memo + annotated draft; DRAFT watermark until attestation; residue scan clean; AI-use audit log emitted _(GDoc + annotated draft deferred per D13)_
 - [ ] Edit-learning round-trip: DOCX/GDoc edits → anchored diffs → tier-routed learnings; scrub gate blocks client facts from playbooks
 - [ ] RFP light-production help: responsive/non-responsive suggestions per request
 - [ ] Hand-draft benchmark run + judged; live discovery responses produced through full gate stack

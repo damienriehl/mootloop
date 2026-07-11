@@ -26,6 +26,9 @@ class LoopCaps(StrictModel):
     associate_partner: int = Field(default=2, ge=1)
     oc: int = Field(default=1, ge=0)
     bolster: int = Field(default=1, ge=0)
+    # Costed associate restructure turns after the judge panel, when an objection's
+    # survival rate falls below ``restructure_threshold`` (plan Phase 6).
+    restructure: int = Field(default=1, ge=0)
 
 
 class PanelConfig(StrictModel):
@@ -60,6 +63,9 @@ class TaskAdapterConfig(VersionedModel):
     gates: list[str] = Field(default_factory=list)
     rubric_id: str
     rubric_threshold: float = Field(default=0.75, ge=0.0, le=1.0)
+    # An objection surviving fewer than this fraction of the panel triggers a
+    # restructure pass on its request (plan Phase 6).
+    restructure_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
     deliverables: list[str] = Field(default_factory=list)
 
 

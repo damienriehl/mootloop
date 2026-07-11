@@ -14,7 +14,7 @@ from pydantic import ValidationError
 
 from mootloop import attest as attest_service
 from mootloop import decisions as decisions_service
-from mootloop import gate_ledger, orchestrator
+from mootloop import gate_ledger, orchestrator, panels
 from mootloop.citations import verify
 from mootloop.citations.extract import extract_citations
 from mootloop.citations.ledger import ResearchQueue
@@ -29,6 +29,7 @@ from mootloop.errors import (
     MootloopError,
     VaultBoundaryError,
 )
+from mootloop.export import service as export_service
 from mootloop.facts import FactStore, add_facts_from_file
 from mootloop.ingest import content_doc_id, ingest_folder
 from mootloop.llm import FakeLLMProvider
@@ -381,6 +382,33 @@ def run_gates(
         typer.echo("blockers: " + ", ".join(doc.blockers))
 
 
+@run_app.command("panels")
+def run_panels(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+    json_output: Annotated[bool, typer.Option("--json", help="Emit the panel report JSON")] = False,
+) -> None:
+    """Show the judge panel's objection-survival distribution (plan Phase 6)."""
+    try:
+        report = panels.build_panel_report(vault_path, run_id)
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    if json_output:
+        typer.echo(report.model_dump_json())
+        return
+    if not report.results:
+        typer.echo("No panel results yet (judge panel not complete).")
+        return
+    for result in report.results:
+        color = typer.colors.GREEN if result.survival_rate >= 0.5 else typer.colors.RED
+        typer.secho(
+            f"{result.request_id}  obj[{result.objection_index}] {result.objection_basis}: "
+            f"{result.survive_votes}/{result.total_votes} survive "
+            f"({result.survival_rate:.0%})",
+            fg=color,
+        )
+
+
 @run_app.command("plan-next")
 def run_plan_next(
     vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
@@ -707,6 +735,56 @@ def attest(
     except (AttestationBlockedError, MootloopError) as exc:
         raise _fail(exc) from exc
     typer.echo(f"attested {run_id}: master {record.master_sha256[:12]} by {record.reviewer}")
+
+
+@app.command()
+def export(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+    force_draft: Annotated[
+        bool, typer.Option("--force-draft", help="Force the DRAFT watermark regardless of state")
+    ] = False,
+) -> None:
+    """Build every deliverable and render per-set DOCX (draft until attested + green).
+
+    The markdown deliverables are always produced; DOCX is clean only when the run is
+    attested and the gate ledger is export-ready with a clean residue scan (plan D3
+    M12). Prints what was produced and any blockers.
+    """
+    try:
+        result = export_service.export_run(vault_path, run_id, _now(), force_draft=force_draft)
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+
+    typer.echo(f"Deliverables for {run_id} (draft={result.is_draft}):")
+    typer.echo(f"  master:        {result.master}")
+    if result.verification is not None:
+        typer.echo(f"  verification:  {result.verification}")
+    typer.echo(f"  privilege log: {result.privilege_log}")
+    typer.echo(f"  strategy memo: {result.memo}")
+    typer.echo(f"  audit log:     {result.audit_log}")
+    for path in result.set_masters:
+        typer.echo(f"  set master:    {path}")
+    if result.docx_skipped_reason is not None:
+        typer.secho(
+            f"  DOCX skipped: {result.docx_skipped_reason} (markdown still written)",
+            fg=typer.colors.YELLOW,
+        )
+    for path in result.docx:
+        typer.secho(f"  DOCX:          {path}", fg=typer.colors.GREEN)
+    for label, scan in result.residue_results:
+        if scan.status != "pass":
+            reasons = "; ".join(f.code for f in scan.findings)
+            typer.secho(f"  residue FAIL [{label}]: {reasons}", fg=typer.colors.RED)
+
+    clean = result.export_ready and not result.is_draft
+    color = typer.colors.GREEN if clean else typer.colors.YELLOW
+    typer.secho(
+        f"export_ready: {result.export_ready}  ·  attestation: {result.attestation_state}",
+        fg=color,
+    )
+    if result.blockers:
+        typer.echo("blockers: " + ", ".join(result.blockers))
 
 
 @app.command("attest-status")

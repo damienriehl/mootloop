@@ -161,6 +161,9 @@ def estimate_run(
         ("oc_attack", "personas", oc, oc),
         ("bolster", "personas", bolster, bolster),
         ("judge_panel", "judges", judges * obj, judges * obj),
+        # Costed restructure pass fires only when an objection is weak (plan Phase 6):
+        # 0 in the converge-early floor, up to the cap in the all-caps ceiling.
+        ("restructure", "personas", 0, config.loop_caps.restructure),
         ("rubric_gate", "rubric", rubric_panel, rubric_panel),
     ]
 
