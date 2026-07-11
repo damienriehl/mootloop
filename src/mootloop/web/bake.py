@@ -186,5 +186,9 @@ def build_demo_vault(dest_dir: Path | str) -> Path:
         raise MootloopError(
             f"demo export not clean: draft={result.is_draft} blockers={result.blockers}"
         )
+    if result.docx_skipped_reason is None and (not result.docx or not result.residue_clean):
+        raise MootloopError(
+            f"demo DOCX export failed residue: blockers={result.blockers}"
+        )
     gate_ledger.write_ledger(vault, run_id)  # refresh after export/attest interplay
     return vault

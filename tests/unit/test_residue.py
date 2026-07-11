@@ -38,17 +38,32 @@ def test_canary_marker_fails(tmp_path: Path) -> None:
     assert any(f.code == "annotation_marker" for f in result.findings)
 
 
-def test_comments_part_fails(tmp_path: Path) -> None:
-    clean = _docx(tmp_path, "A clean paragraph.")
-    # Inject a comments part into the zip to simulate un-stripped review comments.
-    doctored = tmp_path / "with-comments.docx"
+def _with_comments_part(tmp_path: Path, comments_xml: str, name: str) -> Path:
+    clean = _docx(tmp_path, "A clean paragraph.", name=f"src-{name}")
+    doctored = tmp_path / name
     with zipfile.ZipFile(clean) as src, zipfile.ZipFile(doctored, "w") as dst:
         for item in src.namelist():
             dst.writestr(item, src.read(item))
-        dst.writestr("word/comments.xml", "<w:comments/>")
+        dst.writestr("word/comments.xml", comments_xml)
+    return doctored
+
+
+def test_comments_part_with_actual_comments_fails(tmp_path: Path) -> None:
+    doctored = _with_comments_part(
+        tmp_path,
+        '<w:comments><w:comment w:id="1"><w:p>review note</w:p></w:comment></w:comments>',
+        "with-comments.docx",
+    )
     result = scan_docx(doctored)
     assert result.status == "fail"
     assert any(f.code == "comments_part" for f in result.findings)
+
+
+def test_empty_comments_scaffold_passes(tmp_path: Path) -> None:
+    # Pandoc >= 3.1 always emits an empty <w:comments/> part; an empty scaffold
+    # carries no review-comment residue and must not block a clean export.
+    doctored = _with_comments_part(tmp_path, "<w:comments/>", "empty-comments.docx")
+    assert scan_docx(doctored).status == "pass"
 
 
 def test_missing_file_fails(tmp_path: Path) -> None:

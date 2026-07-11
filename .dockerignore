@@ -1,0 +1,15 @@
+# Never ship VCS state, caches, or test scaffolding in the demo image.
+# NOTE: fixtures/, personas/, config/, rubrics/ MUST stay in — they are bake inputs.
+.git
+.venv
+__pycache__
+**/__pycache__
+*.pyc
+tests
+.mypy_cache
+.pytest_cache
+.ruff_cache
+.coverage
+matters/
+Dockerfile
+.dockerignore

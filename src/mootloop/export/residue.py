@@ -51,14 +51,18 @@ def scan_docx(docx_path: Path | str) -> GateResult:
     findings: list[GateFinding] = []
     with zipfile.ZipFile(path) as archive:
         names = archive.namelist()
-        if any(n.startswith("word/comments") for n in names):
-            findings.append(
-                GateFinding(
-                    code="comments_part",
-                    message="DOCX contains a comments part",
-                    locator="word/comments.xml",
+        for name in (n for n in names if n.startswith("word/comments")):
+            # Modern pandoc (>= 3.1) always emits an EMPTY <w:comments/> scaffold
+            # part; only actual <w:comment> elements are review-comment residue.
+            raw = archive.read(name).decode("utf-8", errors="replace")
+            if "<w:comment " in raw or "<w:comment>" in raw:
+                findings.append(
+                    GateFinding(
+                        code="comments_part",
+                        message=f"DOCX contains review comments in {name}",
+                        locator=name,
+                    )
                 )
-            )
         for name in names:
             if not _is_text_part(name):
                 continue
