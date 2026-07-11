@@ -19,6 +19,7 @@ from mootloop.models.run import (
     SCHEMA_CRITIQUE,
     SCHEMA_DRAFT,
     SCHEMA_JUDGE,
+    SCHEMA_RUBRIC,
     TurnSpec,
 )
 
@@ -48,25 +49,8 @@ class LLMProvider(Protocol):
     def run_turn(self, spec: TurnSpec, prompt: str) -> RawTurnResult: ...
 
 
-# --- cost -------------------------------------------------------------------
-# $/1e6 tokens (input, output); pinned model ids per plan D5. Unknown -> free.
-_PRICES: dict[str, tuple[float, float]] = {
-    "claude-opus-4-8": (15.0, 75.0),
-    "claude-sonnet-5": (3.0, 15.0),
-    "claude-haiku-4-5": (1.0, 5.0),
-    "fake": (0.0, 0.0),
-}
-
-
-def usd_equiv(usage: TokenUsage) -> float:
-    """Metered $-equivalent for one call (cache reads 0.1x, writes 1.25x input)."""
-    rate_in, rate_out = _PRICES.get(usage.model, (0.0, 0.0))
-    return (
-        usage.input_tokens * rate_in
-        + usage.cache_write * 1.25 * rate_in
-        + usage.cache_read * 0.1 * rate_in
-        + usage.output_tokens * rate_out
-    ) / 1e6
+# Metering ($-equivalent) lives in ``mootloop.budget`` — one dated price table is the
+# single source of truth, and it needs the run date (never ``datetime.now()`` here).
 
 
 # --- fake provider ----------------------------------------------------------
@@ -98,7 +82,8 @@ class FakeLLMProvider:
             cache_read=0,
             cache_write=0,
             output_tokens=len(json.dumps(output)) // 4,
-            model="fake",
+            # Honor the tier-resolved model so metering/cap tests exercise real rates.
+            model=spec.model or "fake",
         )
         return RawTurnResult(text=json.dumps(output), usage=usage)
 
@@ -140,6 +125,17 @@ def _default_output(spec: TurnSpec) -> dict[str, Any]:
                 }
             ],
             "self_assessment": "Ruled on all objections.",
+        }
+    if spec.output_schema_name == SCHEMA_RUBRIC:
+        criteria = ctx.get("criteria", [])
+        ids = [c["id"] for c in criteria if isinstance(c, dict) and "id" in c]
+        return {
+            "scores": [
+                {"criterion_id": cid, "score": 4, "evidence": "Meets the criterion."}
+                for cid in ids
+            ],
+            "overall_notes": "Adequate against the injected criteria.",
+            "self_assessment": "Scored each injected criterion.",
         }
     raise ValueError(f"no default output for schema {spec.output_schema_name!r}")
 

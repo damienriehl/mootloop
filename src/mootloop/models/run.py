@@ -35,11 +35,31 @@ class PersonaName(StrEnum):
         """Filename stem under ``personas/`` (``oc_associate`` -> ``oc-associate``)."""
         return self.value.replace("_", "-")
 
+    @property
+    def role(self) -> str:
+        """Budget model-mix role (plan D5): ``personas`` | ``judges`` | ``rubric`` |
+        ``cite``. A run's tier maps each role to a concrete model at plan time."""
+        return _PERSONA_ROLE[self]
+
+
+# Persona -> budget model-mix role (plan D5 tiers vary model per role).
+_PERSONA_ROLE: dict[PersonaName, str] = {
+    PersonaName.ASSOCIATE: "personas",
+    PersonaName.PARTNER: "personas",
+    PersonaName.OC_ASSOCIATE: "personas",
+    PersonaName.OC_PARTNER: "personas",
+    PersonaName.JUDGE: "judges",
+    PersonaName.JUROR: "judges",
+    PersonaName.RUBRIC_JUDGE: "rubric",
+    PersonaName.CITE_CHECKER: "cite",
+}
+
 
 # --- output schema names ----------------------------------------------------
 SCHEMA_DRAFT = "draft"
 SCHEMA_CRITIQUE = "critique"
 SCHEMA_JUDGE = "judge"
+SCHEMA_RUBRIC = "rubric_score"
 
 
 class TurnSpec(StrictModel):
@@ -58,6 +78,7 @@ class TurnSpec(StrictModel):
     prompt_context: dict[str, Any] = Field(default_factory=dict)
     output_schema_name: str
     attempt: int = 1
+    model: str | None = None  # resolved from the run's budget tier at plan time (D5)
 
 
 # --- persona output schemas -------------------------------------------------
@@ -106,11 +127,32 @@ class JudgeOutput(StrictModel):
     self_assessment: str
 
 
+class CriterionScore(StrictModel):
+    """One rubric-judge score for a single (correctness) criterion, 0-5."""
+
+    criterion_id: str
+    score: int = Field(ge=0, le=5)
+    evidence: str
+
+
+class RubricScoreOutput(StrictModel):
+    """A rubric judge's numeric scores against the injected LOCKED rubric.
+
+    Only *correctness* criteria are scored here — presence criteria are checked
+    deterministically in code and never sent to the judge (plan D6/D7).
+    """
+
+    scores: list[CriterionScore] = Field(default_factory=list)
+    overall_notes: str
+    self_assessment: str
+
+
 # The one place schema names bind to models. Drivers/validators look up here.
 OUTPUT_SCHEMAS: dict[str, type[StrictModel]] = {
     SCHEMA_DRAFT: DraftOutput,
     SCHEMA_CRITIQUE: CritiqueOutput,
     SCHEMA_JUDGE: JudgeOutput,
+    SCHEMA_RUBRIC: RubricScoreOutput,
 }
 
 

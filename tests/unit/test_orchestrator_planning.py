@@ -63,12 +63,15 @@ def test_stage_order_single_request(tmp_path: Path) -> None:
     run_id = start_run(vault, "discovery-responses", NOW, run_id="unit-0001")
     provider = FakeLLMProvider()  # partner approves by default
 
-    # associate_draft -> partner_loop -> oc_attack -> bolster -> judge_panel(x3)
+    # associate_draft -> partner critique -> in-loop rubric judge -> (partner approves)
+    # -> oc_attack -> bolster -> judge_panel(x3) -> final rubric gate(x3)
     assert _run_step(vault, run_id, provider) == [PersonaName.ASSOCIATE.value]
     assert _run_step(vault, run_id, provider) == [PersonaName.PARTNER.value]
+    assert _run_step(vault, run_id, provider) == [PersonaName.RUBRIC_JUDGE.value]
     assert _run_step(vault, run_id, provider) == [PersonaName.OC_ASSOCIATE.value]
     assert _run_step(vault, run_id, provider) == [PersonaName.ASSOCIATE.value]  # bolster
     assert _run_step(vault, run_id, provider) == [PersonaName.JUDGE.value] * 3
+    assert _run_step(vault, run_id, provider) == [PersonaName.RUBRIC_JUDGE.value] * 3
 
     assert plan_next(vault, run_id) == []
     assert status_summary(vault, run_id)["status"] == "finished"

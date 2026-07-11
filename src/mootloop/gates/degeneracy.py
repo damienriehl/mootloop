@@ -12,7 +12,7 @@ Returns a `GateResult`; it never raises for a mere failure.
 from __future__ import annotations
 
 from mootloop.models.gates import GateFail, GateFinding, GatePass, GateResult
-from mootloop.models.run import CritiqueOutput, DraftOutput, JudgeOutput
+from mootloop.models.run import CritiqueOutput, DraftOutput, JudgeOutput, RubricScoreOutput
 
 GATE_NAME = "degeneracy"
 
@@ -56,7 +56,9 @@ def _check_draft(draft: DraftOutput) -> list[GateFinding]:
     return findings
 
 
-def evaluate(output: DraftOutput | CritiqueOutput | JudgeOutput) -> GateResult:
+def evaluate(
+    output: DraftOutput | CritiqueOutput | JudgeOutput | RubricScoreOutput,
+) -> GateResult:
     """Evaluate the degeneracy gate against a validated turn output."""
     if isinstance(output, DraftOutput):
         findings = _check_draft(output)

@@ -15,8 +15,9 @@ from mootloop.models.common import StrictModel
 from mootloop.models.gates import GateResult
 from mootloop.models.run import TurnRecord
 
-# Run lifecycle statuses.
-RunStatus = Literal["running", "finished", "needs_attention"]
+# Run lifecycle statuses. ``capped`` is a graceful budget checkpoint (plan D5) —
+# a finished state a later ``CapRaised`` can reopen to ``running``.
+RunStatus = Literal["running", "finished", "needs_attention", "capped"]
 
 
 class RunStarted(StrictModel):
@@ -67,6 +68,14 @@ class RunFinished(StrictModel):
     status: RunStatus
 
 
+class CapRaised(StrictModel):
+    """The hard budget cap was raised (``mootloop run raise-cap``). Reopens a capped
+    run to ``running`` and lifts the effective cap (plan D5, resumable checkpoint)."""
+
+    kind: Literal["cap_raised"] = "cap_raised"
+    to_usd: float
+
+
 JournalEvent = Annotated[
     RunStarted
     | StageStarted
@@ -74,7 +83,8 @@ JournalEvent = Annotated[
     | TurnDiscarded
     | GateEvaluated
     | SpendRecorded
-    | RunFinished,
+    | RunFinished
+    | CapRaised,
     Field(discriminator="kind"),
 ]
 
@@ -91,6 +101,11 @@ class RunState(StrictModel):
     completed_turns: dict[str, TurnRecord] = Field(default_factory=dict)
     discarded: dict[str, int] = Field(default_factory=dict)
     total_spend_usd: float = 0.0
+    total_input_tokens: int = 0
+    total_cache_read: int = 0
+    total_cache_write: int = 0
+    total_output_tokens: int = 0
+    cap_raised_to: float | None = None
 
     @property
     def finished(self) -> bool:

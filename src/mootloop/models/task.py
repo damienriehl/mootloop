@@ -33,6 +33,19 @@ class PanelConfig(StrictModel):
 
     judges: int = Field(default=3, ge=1)
     jury: bool = False
+    # Decorrelated rubric-scoring panel at the final gate (plan D6 — stays at N≈3
+    # regardless of tier; reliability plateaus for correlated judges).
+    rubric_judges: int = Field(default=3, ge=1)
+
+
+class ConvergenceConfig(StrictModel):
+    """Loop-termination floors (plan D6). A partner loop converges only when the
+    draft *stopped improving* AND *stopped changing* AND is *complete* — or the cap
+    is hit. Each floor is user-configurable per task."""
+
+    score_delta_floor: float = Field(default=0.02, ge=0.0)
+    material_change_floor: float = Field(default=0.10, ge=0.0)
+    coverage_floor: float = Field(default=0.80, ge=0.0, le=1.0)
 
 
 class TaskAdapterConfig(VersionedModel):
@@ -43,8 +56,10 @@ class TaskAdapterConfig(VersionedModel):
     stages: list[str]
     loop_caps: LoopCaps = Field(default_factory=LoopCaps)
     panels: PanelConfig = Field(default_factory=PanelConfig)
+    convergence: ConvergenceConfig = Field(default_factory=ConvergenceConfig)
     gates: list[str] = Field(default_factory=list)
     rubric_id: str
+    rubric_threshold: float = Field(default=0.75, ge=0.0, le=1.0)
     deliverables: list[str] = Field(default_factory=list)
 
 

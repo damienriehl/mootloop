@@ -8,8 +8,6 @@ from pathlib import Path
 from mootloop.llm import (
     FakeLLMProvider,
     RecordingProvider,
-    TokenUsage,
-    usd_equiv,
 )
 from mootloop.models.run import (
     SCHEMA_CRITIQUE,
@@ -85,14 +83,10 @@ def test_recording_provider_persists_prompt(tmp_path: Path) -> None:
     assert inner.calls == ["run-1-t0000"]
 
 
-def test_usd_equiv_meters_cache_tiers() -> None:
-    usage = TokenUsage(
-        input_tokens=1_000_000,
-        cache_read=1_000_000,
-        cache_write=1_000_000,
-        output_tokens=1_000_000,
-        model="claude-opus-4-8",
-    )
-    # 15 (in) + 0.1*15 (read) + 1.25*15 (write) + 75 (out) = 110.25
-    assert abs(usd_equiv(usage) - 110.25) < 1e-9
-    assert usd_equiv(TokenUsage(1, 0, 0, 1, "fake")) == 0.0
+def test_fake_provider_honors_tier_model() -> None:
+    # The tier-resolved model rides on the spec; usage echoes it for metering.
+    provider = FakeLLMProvider()
+    spec = _spec(SCHEMA_DRAFT, "associate_draft", PersonaName.ASSOCIATE)
+    assert provider.run_turn(spec, "p").usage.model == "fake"
+    spec_priced = spec.model_copy(update={"model": "claude-opus-4-8"})
+    assert provider.run_turn(spec_priced, "p").usage.model == "claude-opus-4-8"

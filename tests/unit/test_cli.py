@@ -178,3 +178,44 @@ def test_facts_add_unknown_source_exits_nonzero(tmp_path: Path) -> None:
     bad.write_text('[{"statement": "x", "provenance": [{"source": "nope.md", "quote": "q"}]}]')
     result = runner.invoke(app, ["facts", "add", str(vault), "--input", str(bad)])
     assert result.exit_code == 1
+
+
+def _seed_requests(vault: Path) -> None:
+    _init_from_fixture(vault)
+    served_sets = (("rogs-set1.txt", "rog"), ("rfps-set1.txt", "rfp"), ("rfas-set1.txt", "rfa"))
+    for name, code in served_sets:
+        served = str(FIXTURE / "served" / name)
+        result = runner.invoke(app, ["requests", "parse", str(vault), served, "--type", code])
+        assert result.exit_code == 0
+
+
+def test_run_estimate_prints_range_and_breakdown(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    _seed_requests(vault)
+    result = runner.invoke(app, ["run", "estimate", str(vault), "--tier", "moderate"])
+    assert result.exit_code == 0, result.output
+    assert "range:" in result.output
+    assert "notional" in result.output
+    assert "judge_panel" in result.output
+    assert "rubric_gate" in result.output
+
+
+def test_run_status_labels_spend_notional(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    _seed_requests(vault)
+    runner.invoke(app, ["facts", "add", str(vault), "--input", str(FIXTURE / "facts.json")])
+    run_id = runner.invoke(app, ["run", "start", str(vault)]).output.strip()
+    runner.invoke(app, ["run", "drive", str(vault), run_id, "--fake"])
+    status = runner.invoke(app, ["run", "status", str(vault), run_id, "--json"])
+    assert status.exit_code == 0, status.output
+    assert "notional (plan mode)" in status.output
+    assert '"spend_usd"' in status.output
+
+
+def test_run_raise_cap_appends_event(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    _seed_requests(vault)
+    run_id = runner.invoke(app, ["run", "start", str(vault)]).output.strip()
+    result = runner.invoke(app, ["run", "raise-cap", str(vault), run_id, "--to", "500"])
+    assert result.exit_code == 0, result.output
+    assert "raised cap" in result.output

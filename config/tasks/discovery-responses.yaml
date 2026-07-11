@@ -9,6 +9,7 @@ stages:
   - oc_attack
   - bolster
   - judge_panel
+  - rubric_gate
   - assemble
 
 # Per-request loop caps (thin mode; plan D6 keeps caps low).
@@ -20,13 +21,26 @@ loop_caps:
 panels:
   judges: 3
   jury: false
+  # Decorrelated rubric panel at the final gate (plan D6 — stays at N≈3).
+  rubric_judges: 3
 
-# Gates evaluated per the D12 execution order. Phase 2 ships degeneracy only;
-# fabrication/citation/rubric land in Phases 3-4.
+# Convergence floors (plan D6). A partner loop stops only when the draft stopped
+# improving AND stopped changing AND is complete — or the iteration cap is hit.
+convergence:
+  score_delta_floor: 0.02
+  material_change_floor: 0.10
+  coverage_floor: 0.80
+
+# Gates evaluated per the D12 execution order. Phase 3 adds the deterministic
+# completeness gate (presence criteria) and the LLM-judged rubric gate.
 gates:
   - degeneracy
+  - completeness
+  - rubric
 
 rubric_id: discovery-responses-v1.0
+# Final rubric gate passes iff the weighted median composite >= this threshold.
+rubric_threshold: 0.75
 
 deliverables:
   - draft-discovery-responses.md

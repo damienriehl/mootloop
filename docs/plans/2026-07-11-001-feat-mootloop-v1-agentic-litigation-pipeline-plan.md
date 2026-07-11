@@ -299,7 +299,7 @@ Every skill has a CLI mirror (`mootloop init|ingest|run|decide|export|learn|stat
 - [x] Served rogs/RFPs/RFAs parse into numbered per-request work items (subparts included)
 - [ ] Thin full pipeline produces per-request responses + objections + privilege log + strategy memo on synthetic matter
 - [ ] All six personas individually enable/bypass-able; pipeline strategies thin-full / deep-core / adversarial-first selectable
-- [ ] Convergence terminates loops via locked rubric deltas; iteration caps user-configurable
+- [x] Convergence terminates loops via locked rubric deltas; iteration caps user-configurable
 - [ ] Citation gate: 200/404/400 semantics enforced; nothing unverified exports; research-request queue works
 - [ ] Fabrication gate: assertions without fact/corpus provenance blocked or gated to attorney
 - [ ] Attorney gates (P-28 set) function in all three run modes; decisions recorded
@@ -313,7 +313,7 @@ Every skill has a CLI mirror (`mootloop init|ingest|run|decide|export|learn|stat
 - [x] Zero matter data in the OSS repo — privacy-grep + gitleaks pre-commit, CI invariant on fixtures
 - [ ] folio-enrich called localhost-only; endpoint allowlist preflight; no matter data in web-search lane
 - [x] Any run resumable after crash/interrupt from journal
-- [ ] Budget: pre-run range estimate, live tokens + $-equivalent, hard cap honored
+- [x] Budget: pre-run range estimate, live tokens + $-equivalent, hard cap honored
 - [x] Derailed subagents auto-detected and relaunched, never repaired
 
 ### Quality gates

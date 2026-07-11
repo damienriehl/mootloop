@@ -12,10 +12,15 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_DIR = REPO_ROOT / "config"
 PERSONAS_DIR = REPO_ROOT / "personas"
+RUBRICS_DIR = REPO_ROOT / "rubrics"
 
 
 def task_config_path(task: str) -> Path:
     return CONFIG_DIR / "tasks" / f"{task}.yaml"
+
+
+def rubric_path(rubric_id: str) -> Path:
+    return RUBRICS_DIR / f"{rubric_id}.yaml"
 
 
 def persona_body(slug: str) -> str:

@@ -12,25 +12,51 @@ Minnesota / federal rules.
 
 ## Status
 
-**Phase 1 — Ingestion, requests, facts.** On top of the Phase 0 scaffold (domain
-models, vault path-hardening + run lock, canary/privacy-grep guardrails, `init` /
-`validate`), this phase adds the deterministic front of the pipeline:
+**Phase 3 — Convergence, rubrics, budget.** On top of the Phase 1 deterministic
+front-end and the Phase 2 orchestrator (the stepwise, journal-folded persona
+pipeline), this phase makes loops *terminate on quality* and *respect a budget*:
 
-- **Corpus ingestion** — `mootloop ingest` walks a source folder, content-addresses
-  every document (`doc-<sha256[:16]>`, stable across re-ingest), copies originals,
-  and normalizes `.txt` / `.md` / `.docx` / `.eml` to `corpus/normalized/`. PDFs and
-  unknown types surface as `needs_conversion`; symlinks/unreadable files fail closed.
-  Role/privilege tags apply non-interactively via a `tags.yaml` glob map.
-- **Discovery parser** — `mootloop requests parse` turns served interrogatories /
-  RFPs / RFAs into numbered work items with canonical opponent-owned IDs (`ROG-3`,
-  `RFP-12`, `RFA-7`, subparts `ROG-3(a)`); numbering gaps become warnings, never
-  silent drops. Deterministic, no LLM.
-- **Fact repository** — `mootloop facts add` / `list` over an append-only,
-  content-addressed, versioned fact log (`facts/facts.jsonl`) with corpus provenance.
+- **Locked rubric** — `rubrics/discovery-responses-v1.0.yaml` encodes the discovery
+  practice checklist (plan D7) as versioned criteria of two kinds. *Presence*
+  criteria (per-request disposition, objection specificity, RFP withheld-statement,
+  RFA disposition + reasonable-inquiry recital, MN interrogatory restatement, no
+  boilerplate objections, no "subject to and without waiving" hedge) are checked
+  deterministically in `gates/completeness.py` and never sent to a judge. *Correctness*
+  criteria are judge-scored 0-5. The rubric is **content-hash locked** — changing it
+  requires a new version file, never an in-place edit.
+- **Convergence** — a single rubric judge scores each partner-loop round; the loop
+  stops only when the draft **stopped improving AND stopped changing AND is complete**
+  (rubric-delta floor + token-level material-change floor + presence-coverage floor),
+  or the iteration cap is hit (plan D6). No embeddings — material change is a
+  deterministic `difflib` ratio.
+- **Final rubric gate** — after bolstering, a decorrelated **3-judge** panel (distinct
+  lenses; median-per-criterion, weighted) gates the response against a threshold.
+- **Budget** — a dated price table meters every call with the four-bucket cache-aware
+  formula; tiers move the persona/judge/rubric/cite model (plan D5). `mootloop run
+  estimate` prints a pre-run range + per-stage breakdown; `run status` shows live
+  tokens + a notional `$`-equivalent; a `hard_cap_usd` triggers a **graceful
+  checkpoint** — a gaps report + a `capped` run that `mootloop run raise-cap` reopens.
 
-A fully synthetic MN breach-of-contract matter lives in `fixtures/synthetic-matter/`
-and runs the whole path in CI. The persona pipeline itself is not yet built — see the
-plan for the roadmap.
+Earlier phases remain: **corpus ingestion** (`mootloop ingest`), the **discovery
+parser** (`mootloop requests parse`), and the append-only **fact repository**
+(`mootloop facts add` / `list`). A fully synthetic MN breach-of-contract matter lives
+in `fixtures/synthetic-matter/` and runs the whole path in CI. Live model calls are
+not wired in v1 — the `FakeLLMProvider` drives every run.
+
+### Budget: estimate, meter, cap
+
+```bash
+# Pre-run cost range + per-stage breakdown (notional $, plan mode):
+uv run mootloop run estimate ~/matters/acme --tier moderate
+
+# Live spend (tokens + notional $-equivalent) folded from the journal:
+uv run mootloop run status ~/matters/acme <run-id>
+
+# If a run hits matter.yaml's budget.hard_cap_usd it checkpoints to `capped` and
+# writes deliverables/gaps-<run-id>.md. Raise the cap and resume:
+uv run mootloop run raise-cap ~/matters/acme <run-id> --to 120
+uv run mootloop run drive ~/matters/acme <run-id> --fake
+```
 
 ## Quickstart
 
