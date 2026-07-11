@@ -13,8 +13,12 @@ import yaml
 from pydantic import ValidationError
 
 from mootloop import orchestrator
+from mootloop.citations import verify
+from mootloop.citations.extract import extract_citations
+from mootloop.citations.ledger import ResearchQueue
 from mootloop.discovery_parser import parse_discovery_document, save_requests
 from mootloop.errors import (
+    CitationError,
     FactError,
     IngestError,
     MatterConfigError,
@@ -37,9 +41,15 @@ facts_app = typer.Typer(help="Manage the fact repository.", no_args_is_help=True
 run_app = typer.Typer(
     help="Drive an orchestrator run (stepwise state machine).", no_args_is_help=True
 )
+cite_app = typer.Typer(help="Extract and verify citations.", no_args_is_help=True)
+research_app = typer.Typer(
+    help="Manage the citation research-request queue.", no_args_is_help=True
+)
 app.add_typer(requests_app, name="requests")
 app.add_typer(facts_app, name="facts")
 app.add_typer(run_app, name="run")
+app.add_typer(cite_app, name="cite")
+app.add_typer(research_app, name="research")
 
 
 def _now() -> str:
@@ -436,6 +446,76 @@ def run_raise_cap(
     except MootloopError as exc:
         raise _fail(exc) from exc
     typer.echo(f"raised cap for {run_id} to ${to:.2f} — resume with `run drive --fake`")
+
+
+def _print_verify_summary(summary: verify.VerifySummary) -> None:
+    typer.echo(f"Citations: {len(summary.outcomes)}  {summary.counts()}")
+    for outcome in summary.outcomes:
+        verified = outcome.status.value == "verified"
+        line = f"  [{outcome.status.value}] {outcome.citation.raw_text}"
+        if outcome.source_url:
+            line += f"  <{outcome.source_url}>"
+        typer.secho(line, fg=typer.colors.GREEN if verified else typer.colors.RED)
+    if summary.research_request_ids:
+        typer.echo("Research requests opened: " + ", ".join(summary.research_request_ids))
+    typer.secho(summary.disclosure, fg=typer.colors.YELLOW)
+
+
+@cite_app.command("verify")
+def cite_verify(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str | None, typer.Option("--run", help="Verify a run's drafts")] = None,
+    text_file: Annotated[Path | None, typer.Option("--text", help="Verify a text file")] = None,
+) -> None:
+    """Extract citations (from a run's drafts or a text file) and verify them."""
+    if (run_id is None) == (text_file is None):
+        raise _fail(MootloopError("cite verify needs exactly one of --run or --text")) from None
+    try:
+        if run_id is not None:
+            summary = orchestrator.verify_run_citations(vault_path, run_id, _now())
+        else:
+            assert text_file is not None
+            if not text_file.is_file():
+                raise MootloopError(f"--text file not found: {text_file}")
+            citations = extract_citations(text_file.read_text(encoding="utf-8"))
+            summary = verify.verify_all(vault_path, citations, _now())
+    except (MootloopError, VaultBoundaryError) as exc:
+        raise _fail(exc) from exc
+    _print_verify_summary(summary)
+
+
+@research_app.command("list")
+def research_list(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+) -> None:
+    """List open citation research requests (citations the free stack cannot verify)."""
+    try:
+        open_requests = ResearchQueue(vault_path).open_requests()
+    except VaultBoundaryError as exc:
+        raise _fail(exc) from exc
+    if not open_requests:
+        typer.echo("No open research requests.")
+        return
+    for request in open_requests:
+        typer.echo(f"{request.request_id}  {request.normalized}  ({request.reason})")
+    typer.secho(verify.CITATOR_DISCLOSURE, fg=typer.colors.YELLOW)
+
+
+@research_app.command("fulfill")
+def research_fulfill(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    request_id: Annotated[str, typer.Argument(help="Research request id")],
+    file: Annotated[Path, typer.Option("--file", help="Authority markdown to curate")],
+    url: Annotated[str | None, typer.Option("--url", help="Source URL for the authority")] = None,
+) -> None:
+    """Fulfill a research request: curate the authority and mark its citation verified."""
+    try:
+        record = verify.fulfill_research_request(
+            vault_path, request_id, file=file, now=_now(), url=url
+        )
+    except (CitationError, VaultBoundaryError) as exc:
+        raise _fail(exc) from exc
+    typer.echo(f"fulfilled {request_id}: {record.citation_id} verified (curated)")
 
 
 if __name__ == "__main__":
