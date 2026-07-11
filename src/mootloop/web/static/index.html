@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="MootLoop demo — the agentic law firm arc on a synthetic matter. Read-only; no real client data.">
+<title>MootLoop — Demo Run Viewer</title>
+<link rel="stylesheet" href="/static/styles.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='0.9em' font-size='90'%3E%E2%9A%96%EF%B8%8F%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">§</span>
+      <div>
+        <p class="brand-name">MootLoop</p>
+        <p class="brand-tag">the agentic law firm, on the record</p>
+      </div>
+    </div>
+    <div class="masthead-right">
+      <span class="demo-badge" title="Pre-baked run on the synthetic matter. No live model calls.">
+        synthetic demo · read-only
+      </span>
+      <button id="theme-toggle" class="theme-toggle" type="button"
+              aria-label="Toggle color theme">◐</button>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <!-- Pleading caption -->
+  <section class="caption-card reveal" aria-label="Case caption">
+    <div class="caption-venue">
+      <span id="cap-state">STATE OF —</span>
+      <span id="cap-court">DISTRICT COURT</span>
+    </div>
+    <div class="caption-venue caption-venue-sub">
+      <span id="cap-county">COUNTY OF —</span>
+      <span id="cap-judge"></span>
+    </div>
+    <div class="caption-body">
+      <div class="caption-parties">
+        <p id="cap-plaintiff" class="party-name">—</p>
+        <p class="party-role">Plaintiff,</p>
+        <p class="party-v">v.</p>
+        <p id="cap-defendant" class="party-name">—</p>
+        <p class="party-role">Defendant.</p>
+      </div>
+      <div class="caption-rule" aria-hidden="true">)&#10;)&#10;)&#10;)&#10;)&#10;)&#10;)&#10;)</div>
+      <div class="caption-title">
+        <p class="cap-eyebrow">Court File No.</p>
+        <p id="cap-case" class="cap-case">—</p>
+        <p class="cap-doc-title">Defendant’s Responses and Objections<br>to Served Discovery</p>
+        <p class="cap-eyebrow" id="cap-ourside"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Run summary + persona pipeline -->
+  <section class="pipeline reveal" aria-label="Run pipeline">
+    <div class="run-summary">
+      <div class="stat">
+        <span class="stat-label">run status</span>
+        <span id="run-status" class="stat-value">—</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">requests</span>
+        <span id="run-requests" class="stat-value">—</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">turns</span>
+        <span id="run-turns" class="stat-value">—</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">spend (notional)</span>
+        <span id="run-spend" class="stat-value">—</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">rubric</span>
+        <span id="run-rubric" class="stat-value">—</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">export</span>
+        <span id="run-export" class="stat-value">—</span>
+      </div>
+    </div>
+    <ol id="persona-strip" class="persona-strip" aria-label="The six personas and their turn counts">
+      <!-- populated by app.js -->
+    </ol>
+  </section>
+
+  <!-- Tabs -->
+  <nav class="tabs reveal" role="tablist" aria-label="Run views">
+    <button role="tab" id="tab-requests" aria-controls="panel-requests" aria-selected="true" class="tab is-active">Requests</button>
+    <button role="tab" id="tab-decisions" aria-controls="panel-decisions" aria-selected="false" class="tab">Decisions <span id="decisions-count" class="tab-count"></span></button>
+    <button role="tab" id="tab-deliverables" aria-controls="panel-deliverables" aria-selected="false" class="tab">Deliverables</button>
+  </nav>
+
+  <!-- Requests -->
+  <section id="panel-requests" role="tabpanel" aria-labelledby="tab-requests" class="panel">
+    <div class="table-scroll">
+      <table class="request-table">
+        <thead>
+          <tr>
+            <th scope="col">Request</th>
+            <th scope="col">Served text</th>
+            <th scope="col">Turns</th>
+            <th scope="col">Gates</th>
+            <th scope="col">Posture</th>
+          </tr>
+        </thead>
+        <tbody id="request-rows"><!-- populated --></tbody>
+      </table>
+    </div>
+
+    <article id="request-detail" class="request-detail" hidden aria-live="polite">
+      <header class="detail-header">
+        <div>
+          <p class="detail-eyebrow">exhibit</p>
+          <h2 id="detail-id" class="detail-id">—</h2>
+        </div>
+        <button id="detail-close" class="detail-close" type="button" aria-label="Close request detail">✕ close</button>
+      </header>
+      <blockquote id="detail-text" class="detail-request-text"></blockquote>
+
+      <h3 class="detail-section">Iteration timeline</h3>
+      <ol id="detail-timeline" class="timeline"><!-- populated --></ol>
+
+      <h3 class="detail-section">Objection survival — judge panel</h3>
+      <div id="detail-panel" class="survival"><!-- populated --></div>
+
+      <h3 class="detail-section">Final response (operative draft)</h3>
+      <div id="detail-response" class="final-response"><!-- populated --></div>
+    </article>
+  </section>
+
+  <!-- Decisions -->
+  <section id="panel-decisions" role="tabpanel" aria-labelledby="tab-decisions" class="panel" hidden>
+    <p class="panel-intro">Propose-then-approve attorney gates: a persona proposes each call with
+      reasoning and options; the attorney resolves it. Nothing exports while a decision is open.</p>
+    <ol id="decision-list" class="decision-list"><!-- populated --></ol>
+  </section>
+
+  <!-- Deliverables -->
+  <section id="panel-deliverables" role="tabpanel" aria-labelledby="tab-deliverables" class="panel" hidden>
+    <div class="deliverables-layout">
+      <nav class="deliverable-nav" aria-label="Deliverables">
+        <ol id="deliverable-list" class="deliverable-list"><!-- populated --></ol>
+      </nav>
+      <article id="deliverable-view" class="deliverable-view">
+        <p class="deliverable-placeholder">Select a deliverable to read it.</p>
+      </article>
+    </div>
+  </section>
+</main>
+
+<footer class="colophon">
+  <p class="colophon-warning">
+    <strong>Synthetic demonstration matter — no real client data.</strong>
+    Every party, document, and fact on this page is fictional; the run was pre-generated
+    with a deterministic fake model provider. This server is read-only and holds no
+    matter-data mechanisms.
+  </p>
+  <p class="colophon-disclosure">
+    Citation currency not checked against a citator (KeyCite/Shepard’s) — an attorney
+    must confirm good-law status before any real-world use.
+  </p>
+  <p class="colophon-links">
+    <a href="https://github.com/damienriehl/mootloop">Source on GitHub</a>
+    <span aria-hidden="true">·</span>
+    <a href="/docs">API</a>
+  </p>
+</footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

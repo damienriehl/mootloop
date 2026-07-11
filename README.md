@@ -195,6 +195,29 @@ uv run mootloop init ~/matters/acme-v-widgets \
 uv run mootloop validate ~/matters/acme-v-widgets
 ```
 
+## Demo
+
+A public, **read-only** demo shows the full agentic arc on a synthetic matter —
+six personas drafting, attacking, and adjudicating discovery responses through
+rubric-gated loops, with the gate ledger, attorney-gate decisions, objection-survival
+panels, and finished deliverables all browsable:
+
+- **DEV:** <https://mootloop.dev.openlegalstandard.org>
+- **PROD:** <https://mootloop.org> (coming)
+
+The demo run is pre-baked at image build time with a deterministic fake model
+provider — zero LLM calls, zero secrets, zero matter-data mechanisms at runtime.
+The servers never host real matter data (see [`docs/deploy.md`](docs/deploy.md)).
+
+Run it locally:
+
+```bash
+uv sync --extra web
+uv run mootloop web bake /tmp/demo
+MOOTLOOP_DEMO_VAULT=/tmp/demo uv run uvicorn mootloop.web.app:app
+# open http://127.0.0.1:8000
+```
+
 ## Guardrails
 
 - **Vault boundary:** matter data never lives in the repo; the vault path is
@@ -205,6 +228,9 @@ uv run mootloop validate ~/matters/acme-v-widgets
 
 ## Documentation
 
+- **Live-matter quickstart:** [`docs/quickstart-live-matter.md`](docs/quickstart-live-matter.md)
+  — the full local workflow (vault → ingest → run → decide → attest → export)
+- **Demo deployment:** [`docs/deploy.md`](docs/deploy.md)
 - **Plan:** [`docs/plans/2026-07-11-001-feat-mootloop-v1-agentic-litigation-pipeline-plan.md`](docs/plans/2026-07-11-001-feat-mootloop-v1-agentic-litigation-pipeline-plan.md)
 - **Brainstorm:** [`docs/brainstorms/2026-07-11-mootloop-brainstorm.md`](docs/brainstorms/2026-07-11-mootloop-brainstorm.md)
 - **Agent instructions:** [`AGENTS.md`](AGENTS.md)

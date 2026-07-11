@@ -24,6 +24,12 @@ dependencies = [
     "typer",
 ]
 
+[project.optional-dependencies]
+web = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+]
+
 [project.scripts]
 mootloop = "mootloop.cli:app"
 
@@ -35,6 +41,8 @@ dev = [
     "respx>=0.21",
     "ruff",
     "types-PyYAML",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
 ]
 
 [build-system]
