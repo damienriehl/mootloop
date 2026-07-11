@@ -108,7 +108,9 @@ def build_panel_report(vault_root: Path | str, run_id: str) -> PanelReport:
         if not judge_outputs:
             continue
         results.extend(
-            fold_objection_results(run_id, str(units[i].request_id), draft.objections, judge_outputs)
+            fold_objection_results(
+                run_id, str(units[i].request_id), draft.objections, judge_outputs
+            )
         )
 
     report = PanelReport(run_id=run_id, results=results)

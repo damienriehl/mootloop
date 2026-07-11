@@ -29,6 +29,7 @@ from mootloop.models.requests import (
     RequestSet,
     RequestType,
     marker_label,
+    type_code,
 )
 from mootloop.models.run import DraftOutput
 from mootloop.orchestrator import operative_drafts
@@ -208,6 +209,58 @@ def _resolved_rfa_dispositions(vault_root: Path | str, run_id: str) -> dict[str,
     return out
 
 
+def _set_body(
+    matter: MatterConfig,
+    request_set: RequestSet,
+    drafts: dict[str, DraftOutput | None],
+    resolved_rfa: dict[str, str],
+) -> list[str]:
+    """The per-request response blocks for one served set (title + blocks)."""
+    lines = [f"# {_document_title(matter, request_set)}", ""]
+    top_level = [item for item in request_set.items if item.subpart is None]
+    top_level.sort(key=lambda i: i.number)
+    for item in top_level:
+        lines.extend(
+            _response_block(
+                matter,
+                item,
+                drafts.get(str(item.request_id)),
+                request_set.request_type,
+                resolved_rfa.get(str(item.request_id)),
+            )
+        )
+        lines.append("")
+    return lines
+
+
+def build_set_masters(vault_root: Path | str, run_id: str, now: str) -> list[tuple[str, Path]]:
+    """Write one self-contained court-formatted markdown file per served set (caption +
+    title + responses + signature + certificate) under ``deliverables/<run-id>/sets/``.
+    Returns ``(set-label, path)`` pairs — the per-set DOCX render sources (plan D8)."""
+    matter = load_matter(vault_root)
+    request_sets = load_request_sets(vault_root)
+    drafts: dict[str, DraftOutput | None] = {
+        str(item.request_id): draft for item, draft in operative_drafts(vault_root, run_id)
+    }
+    resolved_rfa = _resolved_rfa_dispositions(vault_root, run_id)
+
+    out: list[tuple[str, Path]] = []
+    for request_set in request_sets:
+        label = f"{type_code(request_set.request_type)}-set{request_set.set_number}"
+        lines = _caption_block(matter)
+        lines.append("")
+        lines.append(f"_Run `{run_id}` · generated {now}_")
+        lines.append("")
+        lines.extend(_set_body(matter, request_set, drafts, resolved_rfa))
+        lines.extend(_signature_block(matter))
+        lines.append("")
+        lines.extend(_certificate_of_service(matter))
+        path = deliverables_dir(vault_root, run_id) / "sets" / f"{label}.md"
+        atomic_write_text(path, "\n".join(lines).rstrip("\n") + "\n")
+        out.append((label, path))
+    return out
+
+
 def build_court_master(vault_root: Path | str, run_id: str, now: str) -> Path:
     """Assemble the court-formatted master and write ``deliverables/<run-id>/master.md``."""
     matter = load_matter(vault_root)
@@ -224,18 +277,7 @@ def build_court_master(vault_root: Path | str, run_id: str, now: str) -> Path:
     lines.append("")
 
     for request_set in request_sets:
-        lines.append(f"# {_document_title(matter, request_set)}")
-        lines.append("")
-        top_level = [item for item in request_set.items if item.subpart is None]
-        top_level.sort(key=lambda i: i.number)
-        for item in top_level:
-            draft = drafts.get(str(item.request_id))
-            lines.extend(
-                _response_block(
-                    matter, item, draft, request_set.request_type, resolved_rfa.get(str(item.request_id))
-                )
-            )
-            lines.append("")
+        lines.extend(_set_body(matter, request_set, drafts, resolved_rfa))
 
     lines.extend(_signature_block(matter))
     lines.append("")

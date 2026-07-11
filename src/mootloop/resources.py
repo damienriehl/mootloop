@@ -13,10 +13,20 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_DIR = REPO_ROOT / "config"
 PERSONAS_DIR = REPO_ROOT / "personas"
 RUBRICS_DIR = REPO_ROOT / "rubrics"
+COURTS_DIR = CONFIG_DIR / "courts"
+
+DEFAULT_REFERENCE_DOC = "generic-mn-district"
 
 
 def task_config_path(task: str) -> Path:
     return CONFIG_DIR / "tasks" / f"{task}.yaml"
+
+
+def reference_doc_path(name: str, *, draft: bool = False) -> Path:
+    """The pandoc court reference-doc for ``name`` (``generic-mn-district``), or its
+    ``-draft`` variant (the DRAFT-watermark template) when ``draft`` (plan D8)."""
+    stem = f"{name}-draft" if draft else name
+    return COURTS_DIR / f"{stem}.docx"
 
 
 def rubric_path(rubric_id: str) -> Path:

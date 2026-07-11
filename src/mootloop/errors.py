@@ -63,3 +63,12 @@ class DecisionError(MootloopError):
 class AttestationBlockedError(MootloopError):
     """Attestation was refused: open attorney-gate decisions remain, or the md-master
     deliverable does not yet exist. Attestation reads gate state; it never sets it."""
+
+
+class ExportError(MootloopError):
+    """An export precondition failed (missing master, unreadable reference doc, …)."""
+
+
+class PandocMissingError(ExportError):
+    """pandoc is not on PATH, so DOCX rendering cannot run. The court-formatted
+    markdown is still emitted; the DOCX step degrades gracefully (plan Phase 7)."""
