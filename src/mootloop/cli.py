@@ -12,12 +12,21 @@ import typer
 import yaml
 from pydantic import ValidationError
 
+from mootloop import orchestrator
 from mootloop.discovery_parser import parse_discovery_document, save_requests
-from mootloop.errors import FactError, IngestError, MatterConfigError, VaultBoundaryError
+from mootloop.errors import (
+    FactError,
+    IngestError,
+    MatterConfigError,
+    MootloopError,
+    VaultBoundaryError,
+)
 from mootloop.facts import FactStore, add_facts_from_file
 from mootloop.ingest import content_doc_id, ingest_folder
+from mootloop.llm import FakeLLMProvider
 from mootloop.models.matter import SCHEMA_VERSION, MatterConfig
 from mootloop.models.requests import RequestType
+from mootloop.models.run import DiscardedTurn
 from mootloop.vault import init_vault, matter_validation_issues
 
 app = typer.Typer(help="MootLoop — agentic law firm simulator.", no_args_is_help=True)
@@ -25,8 +34,16 @@ requests_app = typer.Typer(
     help="Parse served discovery into request work items.", no_args_is_help=True
 )
 facts_app = typer.Typer(help="Manage the fact repository.", no_args_is_help=True)
+run_app = typer.Typer(
+    help="Drive an orchestrator run (stepwise state machine).", no_args_is_help=True
+)
 app.add_typer(requests_app, name="requests")
 app.add_typer(facts_app, name="facts")
+app.add_typer(run_app, name="run")
+
+
+def _now() -> str:
+    return datetime.now(UTC).isoformat()
 
 
 class RequestTypeArg(StrEnum):
@@ -273,6 +290,110 @@ def facts_list(
         flag = "" if fact.provenance else "  [UNSUPPORTED]"
         typer.echo(f"{fact.fact_id} (v{fact.version}, conf={fact.confidence}){flag}")
         typer.echo(f"  {fact.statement}")
+
+
+# --- run verbs (thin adapters over the orchestrator) ------------------------
+
+
+@run_app.command("start")
+def run_start(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    task: Annotated[str, typer.Option("--task", help="Task adapter name")] = "discovery-responses",
+) -> None:
+    """Begin a run: write RunStarted, acquire the run lock, print the run id."""
+    try:
+        run_id = orchestrator.start_run(vault_path, task, _now())
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    typer.echo(run_id)
+
+
+@run_app.command("plan-next")
+def run_plan_next(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+    json_output: Annotated[bool, typer.Option("--json", help="Emit TurnSpec JSON")] = False,
+) -> None:
+    """List the TurnSpecs that can execute now."""
+    try:
+        specs = orchestrator.plan_next(vault_path, run_id)
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    if json_output:
+        typer.echo(json.dumps([s.model_dump(mode="json") for s in specs]))
+    else:
+        for spec in specs:
+            typer.echo(f"{spec.turn_id}  {spec.persona.value}  {spec.stage}  {spec.request_id}")
+
+
+@run_app.command("prompt")
+def run_prompt(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+    turn_id: Annotated[str, typer.Argument(help="Turn id from plan-next")],
+) -> None:
+    """Print the assembled prompt for a schedulable turn."""
+    try:
+        typer.echo(orchestrator.assemble_prompt(vault_path, run_id, turn_id))
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+
+
+@run_app.command("record-turn")
+def run_record_turn(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+    turn_id: Annotated[str, typer.Argument(help="Turn id")],
+    input_file: Annotated[Path, typer.Option("--input", help="File with the raw turn JSON")],
+) -> None:
+    """Validate + gate + journal a subagent's raw output for one turn."""
+    if not input_file.is_file():
+        raise _fail(MootloopError(f"--input file not found: {input_file}")) from None
+    raw_text = input_file.read_text(encoding="utf-8")
+    try:
+        result = orchestrator.record_turn(vault_path, run_id, turn_id, raw_text, None, _now())
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    if isinstance(result, DiscardedTurn):
+        typer.secho(
+            f"discarded {turn_id} (attempt {result.attempt}): {result.reason}",
+            fg=typer.colors.YELLOW,
+        )
+    else:
+        typer.echo(f"recorded {turn_id}")
+
+
+@run_app.command("status")
+def run_status(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+    json_output: Annotated[bool, typer.Option("--json", help="Emit status JSON")] = False,
+) -> None:
+    """Print a status snapshot (folded from the journal)."""
+    summary = orchestrator.status_summary(vault_path, run_id)
+    if json_output:
+        typer.echo(json.dumps(summary))
+    else:
+        for key, value in summary.items():
+            typer.echo(f"{key}: {value}")
+
+
+@run_app.command("drive")
+def run_drive(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+    fake: Annotated[bool, typer.Option("--fake", help="Drive with the FakeLLMProvider")] = False,
+) -> None:
+    """Drive a run to completion. v1 only supports the fake provider (--fake)."""
+    if not fake:
+        raise _fail(
+            MootloopError("run drive currently requires --fake (no live provider in v1)")
+        ) from None
+    try:
+        state = orchestrator.run_with_provider(vault_path, run_id, FakeLLMProvider(), _now())
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    typer.echo(f"{run_id}: {state.status} ({len(state.completed_turns)} turns)")
 
 
 if __name__ == "__main__":

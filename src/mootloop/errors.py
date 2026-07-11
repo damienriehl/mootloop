@@ -26,3 +26,11 @@ class IngestError(MootloopError):
 
 class FactError(MootloopError):
     """A fact-store precondition failed (unknown fact id, unresolvable provenance, …)."""
+
+
+class TaskConfigError(MootloopError):
+    """A task-adapter config failed to load or validate. Message names each bad field."""
+
+
+class OrchestratorError(MootloopError):
+    """An orchestrator precondition failed (unknown run, unschedulable turn, …)."""

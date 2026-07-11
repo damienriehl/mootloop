@@ -1,0 +1,32 @@
+schema_version: "1.0"
+task: discovery-responses
+
+# Fixed stage order (plan Execution model). `assemble` is the deterministic,
+# run-level finalizer — no persona turn.
+stages:
+  - associate_draft
+  - partner_loop
+  - oc_attack
+  - bolster
+  - judge_panel
+  - assemble
+
+# Per-request loop caps (thin mode; plan D6 keeps caps low).
+loop_caps:
+  associate_partner: 2
+  oc: 1
+  bolster: 1
+
+panels:
+  judges: 3
+  jury: false
+
+# Gates evaluated per the D12 execution order. Phase 2 ships degeneracy only;
+# fabrication/citation/rubric land in Phases 3-4.
+gates:
+  - degeneracy
+
+rubric_id: discovery-responses-v1.0
+
+deliverables:
+  - draft-discovery-responses.md
