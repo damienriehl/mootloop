@@ -25,6 +25,9 @@ Defendant Granite Supply Co., for its Answer to the Complaint, states as follows
 
 5. Plaintiff's claims are barred, in whole or in part, because Plaintiff failed to
    provide timely written notice of nonconformity as required by the Agreement.
+   Acceptance and additional terms are governed by Minn. Stat. § 336.2-207, and
+   discovery is governed by Minn. R. Civ. P. 33.01. See Nordwind v. Cassini, 512
+   N.W.2d 999 (Minn. 1994).
 
 6. Plaintiff's damages, if any, were caused by Plaintiff's own conduct.
 

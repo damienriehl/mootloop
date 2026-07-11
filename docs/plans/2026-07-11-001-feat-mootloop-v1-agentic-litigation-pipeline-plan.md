@@ -300,8 +300,8 @@ Every skill has a CLI mirror (`mootloop init|ingest|run|decide|export|learn|stat
 - [ ] Thin full pipeline produces per-request responses + objections + privilege log + strategy memo on synthetic matter
 - [ ] All six personas individually enable/bypass-able; pipeline strategies thin-full / deep-core / adversarial-first selectable
 - [x] Convergence terminates loops via locked rubric deltas; iteration caps user-configurable
-- [ ] Citation gate: 200/404/400 semantics enforced; nothing unverified exports; research-request queue works
-- [ ] Fabrication gate: assertions without fact/corpus provenance blocked or gated to attorney
+- [x] Citation gate: 200/404/400 semantics enforced; nothing unverified exports; research-request queue works
+- [x] Fabrication gate: assertions without fact/corpus provenance blocked or gated to attorney
 - [ ] Attorney gates (P-28 set) function in all three run modes; decisions recorded
 - [ ] Judge discovery-adapter produces objection-survival distributions that drive a restructure pass
 - [ ] Export: DOCX (court caption) + Google Doc + memo + annotated draft; DRAFT watermark until attestation; residue scan clean; AI-use audit log emitted

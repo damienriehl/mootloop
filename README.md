@@ -12,6 +12,44 @@ Minnesota / federal rules.
 
 ## Status
 
+**Phase 4 — Citation & fabrication gates.** The two guardrails that keep fabricated
+authority and unsupported facts out of the work product:
+
+- **Fabrication gate** (`gates/fabrication.py`, deterministic, every draft/bolster
+  turn) — every `fact_id` a draft uses must exist; every provenance-required assertion
+  (a quoted span, a dollar amount, a specific date) must trace to a cited fact's
+  statement/provenance or the normalized corpus text; a draft that grounds in nothing
+  (no facts *and* no attorney-gate item) fails. Findings are recorded on the turn and
+  block at export.
+- **Citation extraction** (`citations/extract.py`) — eyecite over cleaned text (plan
+  D8: `clean_text` before `get_citations`), classified into case / state-statute /
+  federal-statute / regulation / court-rule, with a regex fallback for MN court-rule
+  shapes eyecite does not tokenize. Deduped by normalized form.
+- **Verification** — a single hardened HTTP layer (`citations/http.py`, the *only*
+  module that touches the network) enforces a fixed **egress allowlist** (plan H9),
+  builds every request from structured params (never a URL from ingested content), and
+  injects the CourtListener token from `~/.mootloop/secrets.env` — never logged.
+  Case cites go to **CourtListener** `citation-lookup` (200 → verified, 404 →
+  unconfirmed, 400 → invalid, 300 → ambiguous, 429/error → pending; one process-wide
+  60/min token bucket, 250-cite chunks); MN statutes/rules to the **Revisor** stable
+  URLs; everything else to a **research-request queue** a human fulfills into
+  `law/curated/`.
+- **Append-only ledger** (`law/verifications.jsonl`, plan D9) — verification status is
+  *derived* from the immutable ledger (a persona can never assert "verified"; plan H8).
+  The fold is **staleness-aware**: a `verified` entry older than `max_cache_age`
+  (default 30d) folds to `pending`, forcing re-verification. A re-run reads the cache
+  and makes **zero** network calls until an entry goes stale.
+- **Export citation gate** — reads the ledger and blocks unless every citation in the
+  operative drafts is verified/curated. Every citation-bearing surface carries the
+  standing disclosure: *"Citation currency not checked against a citator
+  (KeyCite/Shepard's) — attorney must confirm good-law status."*
+
+```bash
+uv run mootloop cite verify ~/matters/acme --run <run-id>   # or --text cites.txt
+uv run mootloop research list ~/matters/acme
+uv run mootloop research fulfill ~/matters/acme <request-id> --file authority.md --url https://…
+```
+
 **Phase 3 — Convergence, rubrics, budget.** On top of the Phase 1 deterministic
 front-end and the Phase 2 orchestrator (the stepwise, journal-folded persona
 pipeline), this phase makes loops *terminate on quality* and *respect a budget*:
