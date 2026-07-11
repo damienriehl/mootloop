@@ -53,3 +53,13 @@ class EgressError(MootloopError):
 class CitationError(MootloopError):
     """A citation-verification precondition failed (unknown research request, missing
     fulfillment file, …). Verification *outcomes* are ledger states, not exceptions."""
+
+
+class DecisionError(MootloopError):
+    """An attorney-gate decision precondition failed (unknown decision id, resolving
+    an already-resolved decision, a modify with no chosen key, …)."""
+
+
+class AttestationBlockedError(MootloopError):
+    """Attestation was refused: open attorney-gate decisions remain, or the md-master
+    deliverable does not yet exist. Attestation reads gate state; it never sets it."""

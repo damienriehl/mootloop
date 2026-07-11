@@ -16,6 +16,7 @@ PartyRole = Literal["plaintiff", "defendant", "third-party"]
 Side = Literal["plaintiff", "defendant"]
 BudgetTier = Literal["no-budget", "moderate", "low"]
 GateMode = Literal["hard-human", "policy-delegable"]
+RunMode = Literal["autonomous", "gated", "observed"]
 
 MatterIdStr = Annotated[str, Field(pattern=MATTER_ID_PATTERN)]
 
@@ -102,5 +103,7 @@ class MatterConfig(VersionedModel):
     personas: Personas = Field(default_factory=Personas)
     panels: Panels = Field(default_factory=Panels)
     gates: list[Gate] = Field(default_factory=_default_gates)
+    # Run mode default (plan D12 precedence: defaults -> matter.yaml -> --mode flag).
+    run_mode: RunMode = "autonomous"
     budget: Budget = Field(default_factory=Budget)
     retention: Retention

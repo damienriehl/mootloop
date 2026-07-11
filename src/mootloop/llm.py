@@ -99,12 +99,15 @@ def _default_output(spec: TurnSpec) -> dict[str, Any]:
     ctx = spec.prompt_context
     if spec.output_schema_name == SCHEMA_DRAFT:
         fact_ids = list(ctx.get("fact_ids", []))
+        # An RFA request carries a Rule 36 disposition (seeds the attorney gate, P-28).
+        is_rfa = str(spec.request_id or "").upper().startswith("RFA")
         return {
             "response_text": f"Response to {spec.request_id or 'the request'}.",
             "objections": [{"basis": "relevance", "text": "Overbroad as to time."}],
             "candidate_citations": [],
             "fact_ids_used": fact_ids[:1] if fact_ids else [],
             "attorney_gate_items": [] if fact_ids else ["verify factual basis"],
+            "rfa_disposition": "deny" if is_rfa else None,
             "self_assessment": "Grounded in the cited fact.",
         }
     if spec.output_schema_name == SCHEMA_CRITIQUE:

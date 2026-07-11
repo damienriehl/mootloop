@@ -13,7 +13,7 @@ import yaml
 from mootloop.discovery_parser import parse_discovery_document, save_requests
 from mootloop.facts import add_facts_from_file
 from mootloop.ingest import ingest_folder
-from mootloop.journal import read_events
+from mootloop.journal import load_state, read_events
 from mootloop.llm import FakeLLMProvider
 from mootloop.models.common import DocId
 from mootloop.models.events import GateEvaluated
@@ -29,6 +29,7 @@ from mootloop.orchestrator import (
     status_summary,
 )
 from mootloop.vault import init_vault
+from tests.conftest import resolve_all_decisions
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = REPO_ROOT / "fixtures" / "synthetic-matter"
@@ -77,7 +78,10 @@ def test_convergence_skips_slots_and_records_median_gate(tmp_path: Path) -> None
     vault = _build_vault(tmp_path, _matter())
     run_id = start_run(vault, "discovery-responses", NOW, run_id="ph3-conv")
     provider = FakeLLMProvider(script={("partner", "partner_loop"): _partner_by_request})
-    state = run_with_provider(vault, run_id, provider, NOW)
+    run_with_provider(vault, run_id, provider, NOW)
+    # RFA dispositions are hard-human gates; resolve them to reach finished (Phase 5).
+    resolve_all_decisions(vault, run_id, NOW)
+    state = load_state(vault, run_id)
     assert state.status == "finished"
 
     units = load_request_units(vault)
@@ -129,10 +133,13 @@ def test_low_cap_checkpoints_then_resumes_after_raise(tmp_path: Path) -> None:
     # Over-cap: nothing more is schedulable until the cap is raised.
     assert plan_next(vault, run_id) == []
 
-    # Raise the cap generously and resume — the run now finishes cleanly.
+    # Raise the cap generously and resume — the run now runs out its work, then holds
+    # at the RFA hard-human gate until the dispositions are resolved (Phase 5).
     raise_cap(vault, run_id, 10_000.0)
     resumed = run_with_provider(vault, run_id, FakeLLMProvider(), NOW)
-    assert resumed.status == "finished"
+    assert resumed.status == "needs_decisions"
+    resolve_all_decisions(vault, run_id, NOW)
+    assert load_state(vault, run_id).status == "finished"
 
     units = load_request_units(vault)
     events = read_events(vault, run_id)

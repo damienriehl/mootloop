@@ -29,6 +29,7 @@ from mootloop.orchestrator import (
 )
 from mootloop.stages import render_prompt
 from mootloop.vault import init_vault
+from tests.conftest import resolve_all_decisions
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = REPO_ROOT / "fixtures" / "synthetic-matter"
@@ -67,8 +68,12 @@ def test_full_pipeline_produces_one_block_per_request(tmp_path: Path) -> None:
     units = load_request_units(vault)
     run_id = start_run(vault, "discovery-responses", NOW, run_id="matter-0001")
 
+    # The default fake proposes an RFA disposition per RFA — a hard-human gate that
+    # holds the run at needs_decisions until the attorney resolves it (Phase 5).
     state = run_with_provider(vault, run_id, FakeLLMProvider(), NOW)
-    assert state.status == "finished"
+    assert state.status == "needs_decisions"
+    resolve_all_decisions(vault, run_id, NOW)
+    assert load_state(vault, run_id).status == "finished"
 
     deliverable = vault / "deliverables" / "draft-discovery-responses.md"
     assert deliverable.is_file()
@@ -100,6 +105,9 @@ def test_kill_resume_never_reexecutes_completed_turns(tmp_path: Path) -> None:
     # --- resume with a FRESH provider: only new turns may be executed ---
     provider_b = FakeLLMProvider()
     state = run_with_provider(vault, run_id, provider_b, NOW)
+    assert state.status == "needs_decisions"
+    resolve_all_decisions(vault, run_id, NOW)
+    state = load_state(vault, run_id)
     assert state.status == "finished"
 
     # The resumed provider was never asked to redo an already-completed turn.

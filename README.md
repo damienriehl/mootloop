@@ -12,6 +12,45 @@ Minnesota / federal rules.
 
 ## Status
 
+**Phase 5 — Attorney gates & run modes.** The professional-judgment spine: personas
+*propose*, the attorney *approves* — and nothing exports with an unresolved gate.
+
+- **DECISION objects** (`models/decisions.py`, `decisions.py`) — every draft/bolster
+  turn derives the P-28 gate set: one **objection-posture** call per request type,
+  an **unsupported-assertion** call per attorney-gate item, a **privilege-call** per
+  privilege objection, and an **RFA-disposition** call (admit/deny/qualify/lack-of-
+  knowledge) per RFA. Generation is idempotent (one decision per logical gate across
+  redrafts). Decisions persist append-only to `runs/<id>/decisions/decisions.jsonl`
+  with a write-once proposal sidecar; the resolution is a later appended line.
+- **Gate taxonomy** (`matter.yaml` `gates:`) — `hard-human` (privilege, RFA,
+  attestation) vs `policy-delegable` (objection posture, unsupported assertion). A run
+  **cannot finish** while a hard-human gate is open (status `needs_decisions`);
+  resolving the last one reopens the run to `finished`. Delegable gates never block
+  the finish — they block *export*.
+- **decide / attest primitives** (plan D11 parity) — `mootloop decide list|show|
+  resolve` (single or `--input` batch), and `mootloop attest` as its own verb.
+  Attestation canonicalizes the md-master (line-ending + trailing-whitespace normalize,
+  so a whitespace-only edit is a no-op), hashes it plus the citation-ledger head, and
+  records append-only. A post-attestation content edit invalidates it (`attest-status`
+  → `INVALIDATED`) and re-imposes DRAFT.
+- **Gate ledger** (`gate_ledger.py`, `mootloop run gates`) — `runs/<id>/
+  gate-ledger.json`, the derived single source of truth for export blocking. It folds
+  the per-request turn gates (fabrication, rubric), the citation gate, decisions, and
+  attestation into `export_ready(vault, run_id) -> (bool, blockers)`. Phase 7's export
+  will refuse unless it is true.
+- **Run modes** (plan D12) — `autonomous` batches every gate into one end-of-run
+  review; `gated` pauses at stage boundaries (`run continue` clears the checkpoint);
+  `observed` streams `runs/<id>/STATUS.md`, ending with the house `STATE:` marker.
+  Resolves `--mode` flag → `matter.yaml` → `autonomous`.
+
+```bash
+uv run mootloop run start ~/matters/acme --mode gated
+uv run mootloop decide list ~/matters/acme <run-id>
+uv run mootloop decide resolve ~/matters/acme <run-id> <dec-id> --action approve --by "Jane"
+uv run mootloop attest ~/matters/acme <run-id> --by "Jane"
+uv run mootloop run gates ~/matters/acme <run-id>
+```
+
 **Phase 4 — Citation & fabrication gates.** The two guardrails that keep fabricated
 authority and unsupported facts out of the work product:
 

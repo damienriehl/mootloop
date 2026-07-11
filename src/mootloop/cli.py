@@ -12,13 +12,17 @@ import typer
 import yaml
 from pydantic import ValidationError
 
-from mootloop import orchestrator
+from mootloop import attest as attest_service
+from mootloop import decisions as decisions_service
+from mootloop import gate_ledger, orchestrator
 from mootloop.citations import verify
 from mootloop.citations.extract import extract_citations
 from mootloop.citations.ledger import ResearchQueue
 from mootloop.discovery_parser import parse_discovery_document, save_requests
 from mootloop.errors import (
+    AttestationBlockedError,
     CitationError,
+    DecisionError,
     FactError,
     IngestError,
     MatterConfigError,
@@ -31,7 +35,7 @@ from mootloop.llm import FakeLLMProvider
 from mootloop.models.matter import SCHEMA_VERSION, MatterConfig
 from mootloop.models.requests import RequestType
 from mootloop.models.run import DiscardedTurn
-from mootloop.vault import init_vault, matter_validation_issues
+from mootloop.vault import init_vault, load_matter, matter_validation_issues
 
 app = typer.Typer(help="MootLoop — agentic law firm simulator.", no_args_is_help=True)
 requests_app = typer.Typer(
@@ -45,11 +49,29 @@ cite_app = typer.Typer(help="Extract and verify citations.", no_args_is_help=Tru
 research_app = typer.Typer(
     help="Manage the citation research-request queue.", no_args_is_help=True
 )
+decide_app = typer.Typer(help="Review and resolve attorney-gate decisions.", no_args_is_help=True)
 app.add_typer(requests_app, name="requests")
 app.add_typer(facts_app, name="facts")
 app.add_typer(run_app, name="run")
 app.add_typer(cite_app, name="cite")
 app.add_typer(research_app, name="research")
+app.add_typer(decide_app, name="decide")
+
+
+class RunModeArg(StrEnum):
+    """CLI-facing run mode (plan D12)."""
+
+    autonomous = "autonomous"
+    gated = "gated"
+    observed = "observed"
+
+
+class DecisionActionArg(StrEnum):
+    """CLI-facing decision resolution action (plan D11)."""
+
+    approve = "approve"
+    modify = "modify"
+    deny = "deny"
 
 
 def _now() -> str:
@@ -309,13 +331,54 @@ def facts_list(
 def run_start(
     vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
     task: Annotated[str, typer.Option("--task", help="Task adapter name")] = "discovery-responses",
+    mode: Annotated[
+        RunModeArg | None, typer.Option("--mode", help="autonomous | gated | observed")
+    ] = None,
 ) -> None:
     """Begin a run: write RunStarted, acquire the run lock, print the run id."""
     try:
-        run_id = orchestrator.start_run(vault_path, task, _now())
+        run_id = orchestrator.start_run(
+            vault_path, task, _now(), mode=mode.value if mode else None
+        )
     except MootloopError as exc:
         raise _fail(exc) from exc
     typer.echo(run_id)
+
+
+@run_app.command("continue")
+def run_continue(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+) -> None:
+    """Clear a gated-mode checkpoint so the run resumes (plan Phase 5)."""
+    try:
+        orchestrator.continue_run(vault_path, run_id)
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    typer.echo(f"cleared checkpoint for {run_id} — resume with `run drive --fake`")
+
+
+@run_app.command("gates")
+def run_gates(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+    json_output: Annotated[bool, typer.Option("--json", help="Emit the gate-ledger JSON")] = False,
+) -> None:
+    """Regenerate and show the gate ledger — the single source of truth for export."""
+    try:
+        gate_ledger.write_ledger(vault_path, run_id)
+        doc = gate_ledger.build_ledger(vault_path, run_id)
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    if json_output:
+        typer.echo(json.dumps(doc.to_dict()))
+        return
+    typer.secho(
+        f"export_ready: {doc.export_ready}",
+        fg=typer.colors.GREEN if doc.export_ready else typer.colors.RED,
+    )
+    if doc.blockers:
+        typer.echo("blockers: " + ", ".join(doc.blockers))
 
 
 @run_app.command("plan-next")
@@ -516,6 +579,150 @@ def research_fulfill(
     except (CitationError, VaultBoundaryError) as exc:
         raise _fail(exc) from exc
     typer.echo(f"fulfilled {request_id}: {record.citation_id} verified (curated)")
+
+
+# --- decide verbs (attorney-gate primitives, plan D11) ----------------------
+
+
+@decide_app.command("list")
+def decide_list(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+    json_output: Annotated[bool, typer.Option("--json", help="Emit decision JSON")] = False,
+) -> None:
+    """List the run's open attorney-gate decisions."""
+    try:
+        matter = load_matter(vault_path)
+        open_decisions = decisions_service.DecisionStore(vault_path, run_id).list_open()
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    if json_output:
+        typer.echo(json.dumps([d.model_dump(mode="json") for d in open_decisions]))
+        return
+    if not open_decisions:
+        typer.echo("No open decisions.")
+        return
+    for decision in open_decisions:
+        mode = decisions_service.gate_mode_for(matter, decision.kind)
+        typer.echo(f"{decision.decision_id}  [{mode}]  {decision.kind.value}")
+        typer.echo(f"  {decision.proposal.summary}")
+        typer.echo(f"  recommended: {decision.proposal.recommended}")
+
+
+@decide_app.command("show")
+def decide_show(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+    decision_id: Annotated[str, typer.Argument(help="Decision id")],
+) -> None:
+    """Show a single decision's full proposal (and resolution, if any)."""
+    decision = decisions_service.DecisionStore(vault_path, run_id).get(decision_id)
+    if decision is None:
+        raise _fail(DecisionError(f"unknown decision {decision_id!r}")) from None
+    typer.echo(decision.model_dump_json(indent=2))
+
+
+def _resolve_one(
+    vault_path: Path,
+    run_id: str,
+    decision_id: str,
+    action: str,
+    chosen: str | None,
+    note: str,
+    by: str,
+    source: str,
+) -> None:
+    decisions_service.resolve(
+        vault_path,
+        run_id,
+        decision_id,
+        action,  # type: ignore[arg-type]
+        chosen,
+        note,
+        by,
+        source,  # type: ignore[arg-type]
+        _now(),
+    )
+
+
+@decide_app.command("resolve")
+def decide_resolve(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+    decision_id: Annotated[
+        str | None, typer.Argument(help="Decision id (omit with --input)")
+    ] = None,
+    action: Annotated[
+        DecisionActionArg | None, typer.Option("--action", help="approve | modify | deny")
+    ] = None,
+    choose: Annotated[str | None, typer.Option("--choose", help="Chosen option key")] = None,
+    note: Annotated[str, typer.Option("--note", help="Resolution note")] = "",
+    by: Annotated[str | None, typer.Option("--by", help="Deciding attorney's name")] = None,
+    input_file: Annotated[
+        Path | None, typer.Option("--input", help="JSON list of resolutions (batch)")
+    ] = None,
+) -> None:
+    """Resolve one decision, or a batch via ``--input`` (source is human unless the
+    batch entry marks it ``policy``)."""
+    try:
+        if input_file is not None:
+            if not input_file.is_file():
+                raise MootloopError(f"--input file not found: {input_file}")
+            entries = json.loads(input_file.read_text(encoding="utf-8"))
+            if not isinstance(entries, list):
+                raise MootloopError("--input must be a JSON list of resolutions")
+            for entry in entries:
+                _resolve_one(
+                    vault_path,
+                    run_id,
+                    entry["decision_id"],
+                    entry.get("action", "approve"),
+                    entry.get("choose"),
+                    entry.get("note", ""),
+                    entry.get("by", by or "batch"),
+                    entry.get("source", "human"),
+                )
+            typer.echo(f"resolved {len(entries)} decision(s)")
+            return
+        if decision_id is None or action is None or by is None:
+            raise MootloopError("single resolve needs <decision-id>, --action, and --by")
+        _resolve_one(vault_path, run_id, decision_id, action.value, choose, note, by, "human")
+        typer.echo(f"resolved {decision_id}: {action.value}")
+    except (MootloopError, KeyError) as exc:
+        raise _fail(exc if isinstance(exc, MootloopError) else DecisionError(str(exc))) from exc
+
+
+# --- attest verb (its own primitive; export reads it, never sets it) --------
+
+
+@app.command()
+def attest(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+    by: Annotated[str, typer.Option("--by", help="Reviewing attorney's name")],
+) -> None:
+    """Record an attestation over the run's md-master (plan D9). Refuses on open gates."""
+    try:
+        record = attest_service.attest(vault_path, run_id, by, _now())
+    except (AttestationBlockedError, MootloopError) as exc:
+        raise _fail(exc) from exc
+    typer.echo(f"attested {run_id}: master {record.master_sha256[:12]} by {record.reviewer}")
+
+
+@app.command("attest-status")
+def attest_status(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+) -> None:
+    """Report attestation state (Valid | Invalidated | Missing), logging invalidation."""
+    check = attest_service.check_attestation(vault_path, run_id, _now())
+    color = {"valid": typer.colors.GREEN, "invalidated": typer.colors.RED}.get(
+        check.status, typer.colors.YELLOW
+    )
+    line = check.status.upper()
+    if check.reason:
+        line += f" — {check.reason}"
+    typer.secho(line, fg=color)
 
 
 if __name__ == "__main__":
