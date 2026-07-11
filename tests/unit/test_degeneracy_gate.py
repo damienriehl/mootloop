@@ -51,6 +51,15 @@ def test_attorney_gate_item_grounds_a_draft() -> None:
     assert result.status == "pass"
 
 
+def test_subject_to_hedge_fails() -> None:
+    # "subject to and without waiving" is condemned (Liguria Foods, plan D7).
+    result = evaluate(
+        _draft(response_text="Subject to and without waiving the foregoing, Defendant answers.")
+    )
+    assert result.status == "fail"
+    assert any(f.code == "hedge_subject_to" for f in result.findings)
+
+
 def test_critique_needs_self_assessment() -> None:
     ok = CritiqueOutput(verdict="approve", self_assessment="fine")
     assert evaluate(ok).status == "pass"

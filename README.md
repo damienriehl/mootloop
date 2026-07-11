@@ -12,6 +12,47 @@ Minnesota / federal rules.
 
 ## Status
 
+**Phase 6-7 — Panels, restructure & deliverable export.** The judge panel drives a
+restructure pass, and one command turns a finished run into court-formatted
+deliverables — clean only when attested.
+
+- **Objection-survival panels** (`models/panels.py`, `panels.py`, `mootloop run
+  panels`) — the judge panel's `JudgeOutput` turns fold into a per-objection
+  `PanelResult` distribution (survive/total votes, survival rate, reasoning samples)
+  and a `PanelReport` written to `runs/<id>/scores/panels/report.json` (the D12
+  `PANEL_RESULT` entity).
+- **Costed restructure pass** (`stages.py`) — when an objection survives fewer than
+  `restructure_threshold` (default 0.5) of the panel, the associate re-enters once per
+  affected request (stage `restructure`, a reserved slot) to drop, narrow, or bolster
+  the weak objection; the restructured draft becomes the operative one. Requests with
+  no weak objection skip the stage (no turn, no cost).
+- **Court-formatted deliverables** (`export/`, `mootloop export`) — from a run's
+  operative drafts, matter, and served sets: `master.md` with the D7 structure
+  (caption, per-set document title, MN Rule 33 interrogatory restatement before each
+  answer, `::: {#resp-ID}` anchors, objections with specificity, RFA dispositions with
+  the reasonable-inquiry recital, RFP withheld-statements, attorney signature block,
+  certificate-of-service stub); `verification.md` (rog sets) with MN's exact perjury
+  declaration (unsigned — the client signs on paper); a functional-standard
+  `privilege-log.md`; a `strategy-memo.md` (objection strategy, panel survival rates,
+  OC attack findings, open risks, spend, citator disclosure); and `audit-log.json`
+  derived strictly from the journal + ledger + decisions + attestations (never
+  LLM-asserted). No boilerplate general objections; the "subject to and without
+  waiving" hedge is blocked by the degeneracy gate (Liguria Foods).
+- **DOCX render + watermark + residue scan** (`export/docx_render.py`,
+  `export/residue.py`, `config/courts/*.docx`) — pandoc renders a DOCX per served set
+  with a court `--reference-doc`; the copy is **DRAFT-watermarked** (`.DRAFT.docx`,
+  draft template) until the run is attested AND `export_ready` AND the residue scan is
+  clean. The residue scan (raw-zip) rejects any annotation marker, comments part, or
+  tracked change. `export_run` is the one shared code path (CLI + `moot-export`
+  skill) — a raw call cannot produce an un-attested clean export (plan D3 M12). Where
+  pandoc is absent, the DOCX step degrades gracefully and the markdown still ships.
+
+```bash
+uv run mootloop run panels ~/matters/acme <run-id>
+uv run mootloop export ~/matters/acme <run-id>          # DRAFT until attested + green
+uv run mootloop export ~/matters/acme <run-id> --force-draft
+```
+
 **Phase 5 — Attorney gates & run modes.** The professional-judgment spine: personas
 *propose*, the attorney *approves* — and nothing exports with an unresolved gate.
 
@@ -37,7 +78,7 @@ Minnesota / federal rules.
   gate-ledger.json`, the derived single source of truth for export blocking. It folds
   the per-request turn gates (fabrication, rubric), the citation gate, decisions, and
   attestation into `export_ready(vault, run_id) -> (bool, blockers)`. Phase 7's export
-  will refuse unless it is true.
+  refuses a clean copy unless it is true.
 - **Run modes** (plan D12) — `autonomous` batches every gate into one end-of-run
   review; `gated` pauses at stage boundaries (`run continue` clears the checkpoint);
   `observed` streams `runs/<id>/STATUS.md`, ending with the house `STATE:` marker.
