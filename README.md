@@ -195,6 +195,29 @@ uv run mootloop init ~/matters/acme-v-widgets \
 uv run mootloop validate ~/matters/acme-v-widgets
 ```
 
+## Demo
+
+A public, **read-only** demo shows the full agentic arc on a synthetic matter —
+six personas drafting, attacking, and adjudicating discovery responses through
+rubric-gated loops, with the gate ledger, attorney-gate decisions, objection-survival
+panels, and finished deliverables all browsable:
+
+- **DEV:** <https://mootloop.dev.openlegalstandard.org>
+- **PROD:** <https://mootloop.org> (coming)
+
+The demo run is pre-baked at image build time with a deterministic fake model
+provider — zero LLM calls, zero secrets, zero matter-data mechanisms at runtime.
+The servers never host real matter data (see [`docs/deploy.md`](docs/deploy.md)).
+
+Run it locally:
+
+```bash
+uv sync --extra web
+uv run mootloop web bake /tmp/demo
+MOOTLOOP_DEMO_VAULT=/tmp/demo uv run uvicorn mootloop.web.app:app
+# open http://127.0.0.1:8000
+```
+
 ## Guardrails
 
 - **Vault boundary:** matter data never lives in the repo; the vault path is
