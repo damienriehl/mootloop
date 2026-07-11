@@ -85,6 +85,17 @@ class Budget(_Model):
     hard_cap_usd: float | None = None
 
 
+class Attorney(_Model):
+    """The signing attorney's block for the signature + verification pages (plan D7)."""
+
+    name: str
+    firm: str = ""
+    address: str = ""
+    email: str = ""
+    phone: str = ""
+    bar_number: str = ""
+
+
 class Retention(_Model):
     retention_class: str
     destruction_date: date | None = None
@@ -106,4 +117,5 @@ class MatterConfig(VersionedModel):
     # Run mode default (plan D12 precedence: defaults -> matter.yaml -> --mode flag).
     run_mode: RunMode = "autonomous"
     budget: Budget = Field(default_factory=Budget)
+    attorney: Attorney | None = None
     retention: Retention
