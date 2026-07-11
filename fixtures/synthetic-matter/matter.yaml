@@ -1,0 +1,18 @@
+schema_version: "1.0"
+matter_id: northfield-widgets-v-granite-supply
+caption:
+  court_name: "District Court, Rice County"
+  case_number: "66-CV-26-0417"
+  county: "Rice"
+  judge_name: "Hon. A. Lindqvist"
+jurisdiction:
+  state: "MN"
+  forum: "state"
+parties:
+  - name: "Northfield Widgets LLC"
+    role: "plaintiff"
+  - name: "Granite Supply Co."
+    role: "defendant"
+our_side: "defendant"
+retention:
+  retention_class: "standard"

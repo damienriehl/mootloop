@@ -8,11 +8,14 @@ structurally out of the repo tree.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
 import re
+import shutil
 import socket
+import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import TracebackType
@@ -98,6 +101,45 @@ def safe_vault_path(vault_root: Path | str, *parts: str) -> Path:
     if not _is_within(candidate, root_real):
         raise VaultBoundaryError(f"path {candidate} escapes vault root {root_real}")
     return candidate
+
+
+def atomic_write_text(path: Path, text: str, *, encoding: str = "utf-8") -> None:
+    """Durably replace ``path`` with ``text`` via a same-dir temp file + ``os.replace``.
+
+    The temp file is fsync'd before the rename so a crash leaves either the old
+    file or the complete new one — never a truncated write. Callers resolve ``path``
+    through `safe_vault_path` first.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".tmp-", suffix=path.suffix)
+    try:
+        with os.fdopen(fd, "w", encoding=encoding) as handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+        raise
+
+
+def atomic_copy(src: Path, dst: Path) -> None:
+    """Copy ``src`` onto ``dst`` atomically (same-dir temp + ``os.replace``).
+
+    Content-addressed callers may re-copy identical bytes; the rename keeps that
+    idempotent and crash-safe. ``dst`` is expected to be a `safe_vault_path` result.
+    """
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(dst.parent), prefix=".tmp-", suffix=dst.suffix)
+    os.close(fd)
+    try:
+        shutil.copyfile(src, tmp)
+        os.replace(tmp, dst)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+        raise
 
 
 def assert_vault_outside_repo(vault_root: Path | str, repo_root: Path | str) -> None:

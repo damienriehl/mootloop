@@ -12,10 +12,25 @@ Minnesota / federal rules.
 
 ## Status
 
-**Phase 0 — Scaffold & guardrails.** This repo currently contains the tooling
-scaffold, domain models, vault module (path hardening + run lock), privacy
-guardrails (canary tokens + fail-closed privacy grep), and the `init` / `validate`
-CLI commands. The pipeline itself is not yet built. See the plan for the roadmap.
+**Phase 1 — Ingestion, requests, facts.** On top of the Phase 0 scaffold (domain
+models, vault path-hardening + run lock, canary/privacy-grep guardrails, `init` /
+`validate`), this phase adds the deterministic front of the pipeline:
+
+- **Corpus ingestion** — `mootloop ingest` walks a source folder, content-addresses
+  every document (`doc-<sha256[:16]>`, stable across re-ingest), copies originals,
+  and normalizes `.txt` / `.md` / `.docx` / `.eml` to `corpus/normalized/`. PDFs and
+  unknown types surface as `needs_conversion`; symlinks/unreadable files fail closed.
+  Role/privilege tags apply non-interactively via a `tags.yaml` glob map.
+- **Discovery parser** — `mootloop requests parse` turns served interrogatories /
+  RFPs / RFAs into numbered work items with canonical opponent-owned IDs (`ROG-3`,
+  `RFP-12`, `RFA-7`, subparts `ROG-3(a)`); numbering gaps become warnings, never
+  silent drops. Deterministic, no LLM.
+- **Fact repository** — `mootloop facts add` / `list` over an append-only,
+  content-addressed, versioned fact log (`facts/facts.jsonl`) with corpus provenance.
+
+A fully synthetic MN breach-of-contract matter lives in `fixtures/synthetic-matter/`
+and runs the whole path in CI. The persona pipeline itself is not yet built — see the
+plan for the roadmap.
 
 ## Quickstart
 

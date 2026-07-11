@@ -11,6 +11,24 @@ from mootloop.cli import app
 
 runner = CliRunner()
 
+FIXTURE = Path(__file__).resolve().parents[2] / "fixtures" / "synthetic-matter"
+
+
+def _init_from_fixture(vault: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "init",
+            str(vault),
+            "--matter-id",
+            "northfield-widgets-v-granite-supply",
+            "--no-interactive",
+            "--from-yaml",
+            str(FIXTURE / "matter.yaml"),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+
 
 def test_init_non_interactive_happy_path(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
@@ -125,3 +143,38 @@ def test_validate_json_output(tmp_path: Path) -> None:
     assert result.exit_code == 1
     assert '"ok": false' in result.output
     assert "caption" in result.output
+
+
+def test_ingest_requests_facts_pipeline(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    _init_from_fixture(vault)
+
+    ingest = runner.invoke(
+        app,
+        ["ingest", str(vault), str(FIXTURE / "source-docs"), "--tags", str(FIXTURE / "tags.yaml")],
+    )
+    assert ingest.exit_code == 0, ingest.output
+    assert "Ingested 6 document(s)" in ingest.output
+
+    rogs = str(FIXTURE / "served" / "rogs-set1.txt")
+    parse = runner.invoke(app, ["requests", "parse", str(vault), rogs, "--type", "rog"])
+    assert parse.exit_code == 0, parse.output
+    assert "8 request(s) + 3 subpart(s)" in parse.output
+    assert (vault / "requests" / "rog-set01.json").is_file()
+
+    add = runner.invoke(app, ["facts", "add", str(vault), "--input", str(FIXTURE / "facts.json")])
+    assert add.exit_code == 0, add.output
+    assert "Added 6 fact(s)" in add.output
+
+    listed = runner.invoke(app, ["facts", "list", str(vault)])
+    assert listed.exit_code == 0, listed.output
+    assert "contract price of $148,500" in listed.output
+
+
+def test_facts_add_unknown_source_exits_nonzero(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    _init_from_fixture(vault)
+    bad = tmp_path / "bad.json"
+    bad.write_text('[{"statement": "x", "provenance": [{"source": "nope.md", "quote": "q"}]}]')
+    result = runner.invoke(app, ["facts", "add", str(vault), "--input", str(bad)])
+    assert result.exit_code == 1

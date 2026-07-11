@@ -10,6 +10,7 @@ license and integration mode. **Mode** is one of:
 
 | Component | Source | License | Mode |
 |-----------|--------|---------|------|
+| python-docx | https://github.com/python-openxml/python-docx | MIT | dependency (Phase 1 — `.docx` normalization) |
 | folio-python | https://github.com/alea-institute/folio-python | MIT | dependency-planned |
 | alea-intake components (convergence, scoring, DOCX export) | https://github.com/alea-institute (alea-intake) | MIT | copy-planned (Phase 3 / 7) |
 | FreeLawProject eyecite | https://github.com/freelawproject/eyecite | BSD-2-Clause | dependency-planned (Phase 4) |

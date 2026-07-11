@@ -1,0 +1,7 @@
+# Filename glob -> {role, privileged}. Later matching rules win per field, so the
+# specific email3.eml rule overrides the "*.eml" default for privilege.
+"contract.md": {role: client-doc, privileged: false}
+"complaint.md": {role: complaint, privileged: false}
+"answer.md": {role: answer, privileged: false}
+"*.eml": {role: correspondence, privileged: false}
+"email3.eml": {role: correspondence, privileged: true}
