@@ -101,6 +101,15 @@ def _doc_id_from_hash(hexdigest: str) -> DocId:
     return DocId(f"doc-{hexdigest[:16]}")
 
 
+def content_doc_id(data: bytes) -> DocId:
+    """The content-addressed ``doc-<sha256[:16]>`` id for ``data``.
+
+    The same scheme `ingest_folder` assigns, so a served document parsed directly
+    keys on the same id it would receive if ingested into the corpus.
+    """
+    return _doc_id_from_hash(hashlib.sha256(data).hexdigest())
+
+
 def _fallback_doc_id(rel_path: str) -> DocId:
     """A path-derived id for documents we cannot read (symlink/unreadable)."""
     digest = hashlib.sha256(rel_path.encode("utf-8")).hexdigest()
@@ -295,7 +304,7 @@ def _ingest_one(
         )
         return IngestEntry(doc=doc, reason=f"read failed: {exc}")
 
-    doc_id = _doc_id_from_hash(hashlib.sha256(data).hexdigest())
+    doc_id = content_doc_id(data)
     role, privileged = _carry_prior_tags(doc_id, manifest, role, privileged)
     _copy_original(vault_root, full, doc_id, suffix)
 

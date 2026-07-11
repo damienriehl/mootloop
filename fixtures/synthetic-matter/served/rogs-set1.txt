@@ -1,0 +1,49 @@
+STATE OF MINNESOTA                                       DISTRICT COURT
+COUNTY OF RICE                               THIRD JUDICIAL DISTRICT
+
+Northfield Widgets LLC,
+                Plaintiff,
+v.                                           PLAINTIFF'S FIRST SET OF
+                                             INTERROGATORIES TO DEFENDANT
+Granite Supply Co.,
+                Defendant.
+
+
+INSTRUCTIONS
+
+1. These interrogatories are continuing in nature under Minn. R. Civ. P. 33.01.
+2. If you object to any interrogatory, state the basis for the objection with
+   particularity and answer to the extent the interrogatory is not objectionable.
+
+DEFINITIONS
+
+1. "Document" means any writing as defined in Minn. R. Civ. P. 34.01.
+2. "You" and "Your" mean Defendant Granite Supply Co. and its agents.
+
+
+INTERROGATORY NO. 1: State the full legal name, business address, and principal place
+of business of Defendant.
+
+INTERROGATORY NO. 2: Describe in detail the manufacturing process used to produce the
+500 granite widget assemblies at issue in this action.
+
+INTERROGATORY NO. 3: State the date on which each of the assemblies was tendered for
+delivery to Plaintiff.
+
+INTERROGATORY NO. 4: Identify every quality-control inspection performed on the
+assemblies before shipment, including the date and the person who performed it.
+
+INTERROGATORY NO. 5: For each assembly that You contend conformed to Specification
+GS-11 at the time of tender, identify:
+(a) the serial or lot number of the assembly;
+(b) the inspector who certified its conformity; and
+(c) the document that records the inspection result.
+
+INTERROGATORY NO. 6: State whether You contend that any nonconformity arose after
+tender, and if so, describe the factual basis for that contention.
+
+INTERROGATORY NO. 7: Identify all communications between You and Plaintiff concerning
+the condition of the assemblies.
+
+INTERROGATORY NO. 8: State the amount of any refund, credit, or price adjustment You
+have offered to Plaintiff, and the date of each such offer.

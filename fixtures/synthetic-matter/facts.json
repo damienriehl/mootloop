@@ -1,0 +1,68 @@
+[
+  {
+    "statement": "The parties agreed on a contract price of $148,500 for the goods.",
+    "confidence": 0.98,
+    "provenance": [
+      {
+        "source": "contract.md",
+        "quote": "Buyer shall pay Seller the sum of $148,500 for the Goods.",
+        "location_hint": "Section 2 (Price)"
+      }
+    ]
+  },
+  {
+    "statement": "The contract covered 500 granite widget assemblies under Specification GS-11.",
+    "confidence": 0.98,
+    "provenance": [
+      {
+        "source": "contract.md",
+        "quote": "The Goods consist of 500 granite widget assemblies conforming to Specification GS-11.",
+        "location_hint": "Section 1 (Goods)"
+      }
+    ]
+  },
+  {
+    "statement": "Delivery was complete upon tender at Buyer's loading dock.",
+    "confidence": 0.9,
+    "provenance": [
+      {
+        "source": "contract.md",
+        "quote": "Delivery is complete upon tender at Buyer's loading dock.",
+        "location_hint": "Section 3 (Delivery)"
+      }
+    ]
+  },
+  {
+    "statement": "Granite Supply tendered all 500 assemblies on March 14, 2026, before the deadline.",
+    "confidence": 0.85,
+    "provenance": [
+      {
+        "source": "answer.md",
+        "quote": "Granite Supply tendered all 500 assemblies on March 14, 2026,",
+        "location_hint": "Answer, Response 2"
+      }
+    ]
+  },
+  {
+    "statement": "Plaintiff alleges at least 120 assemblies had hairline cracks.",
+    "confidence": 0.7,
+    "provenance": [
+      {
+        "source": "complaint.md",
+        "quote": "at least 120 of the assemblies exhibited hairline cracks",
+        "location_hint": "Complaint, paragraph 5"
+      }
+    ]
+  },
+  {
+    "statement": "Plaintiff rejected the shipment and demanded a full refund.",
+    "confidence": 0.8,
+    "provenance": [
+      {
+        "source": "email1.eml",
+        "quote": "We are rejecting the shipment and demand a full refund of $148,500.",
+        "location_hint": "Email of Mar 20, 2026"
+      }
+    ]
+  }
+]
