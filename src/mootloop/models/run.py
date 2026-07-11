@@ -91,6 +91,9 @@ class Objection(StrictModel):
     text: str
 
 
+RfaDisposition = Literal["admit", "deny", "qualify", "lack_of_knowledge"]
+
+
 class DraftOutput(StrictModel):
     """An Associate (or bolster) draft response to one request."""
 
@@ -99,6 +102,9 @@ class DraftOutput(StrictModel):
     candidate_citations: list[str] = Field(default_factory=list)
     fact_ids_used: list[str] = Field(default_factory=list)
     attorney_gate_items: list[str] = Field(default_factory=list)
+    # For an RFA request, the proposed Rule 36 disposition (plan P-28 #3); ``None``
+    # for ROG/RFP drafts. Seeds the ``rfa_disposition`` attorney gate.
+    rfa_disposition: RfaDisposition | None = None
     self_assessment: str
 
 

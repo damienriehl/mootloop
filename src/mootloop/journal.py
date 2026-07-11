@@ -20,6 +20,9 @@ from pydantic import TypeAdapter, ValidationError
 
 from mootloop.models.events import (
     CapRaised,
+    CheckpointCleared,
+    CheckpointReached,
+    DecisionRecorded,
     GateEvaluated,
     JournalEvent,
     RunFinished,
@@ -130,6 +133,7 @@ def fold(events: list[JournalEvent]) -> RunState:
             state.matter_id = event.matter_id
             state.task = event.task
             state.rubric_version = event.rubric_version
+            state.mode = event.mode
         elif isinstance(event, StageStarted):
             state.current_stage = event.stage
         elif isinstance(event, TurnCompleted):
@@ -148,8 +152,14 @@ def fold(events: list[JournalEvent]) -> RunState:
             state.cap_raised_to = event.to_usd
             if state.status == "capped":
                 state.status = "running"  # reopen a graceful cap checkpoint
-        elif isinstance(event, GateEvaluated):
-            pass  # informational; the authoritative gate copy rides on the TurnRecord
+        elif isinstance(event, CheckpointReached):
+            state.status = "checkpoint"
+        elif isinstance(event, CheckpointCleared):
+            state.cleared_checkpoints.add(event.boundary)
+            if state.status == "checkpoint":
+                state.status = "running"  # reopen a gated stage-boundary pause
+        elif isinstance(event, (GateEvaluated, DecisionRecorded)):
+            pass  # informational; authoritative copies ride on TurnRecord/decisions
     return state
 
 

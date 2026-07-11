@@ -19,7 +19,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from mootloop import budget
+from mootloop import budget, decisions
 from mootloop.citations import verify
 from mootloop.citations.extract import extract_citations
 from mootloop.citations.http import Transport
@@ -32,6 +32,7 @@ from mootloop.gates import completeness, degeneracy, fabrication
 from mootloop.journal import (
     append,
     load_state,
+    read_events,
     write_turn_body,
 )
 from mootloop.llm import LLMProvider, RawTurnResult, TokenUsage
@@ -39,8 +40,11 @@ from mootloop.models.budget import EstimateRange
 from mootloop.models.citations import Citation
 from mootloop.models.events import (
     CapRaised,
+    CheckpointCleared,
+    CheckpointReached,
     GateEvaluated,
     RunFinished,
+    RunMode,
     RunStarted,
     RunState,
     SpendRecorded,
@@ -170,11 +174,17 @@ def start_run(
     now: str,
     *,
     run_id: str | None = None,
+    mode: RunMode | None = None,
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
 ) -> str:
-    """Begin a run: write RunStarted under the run lock; finalize if there is no work."""
+    """Begin a run: write RunStarted under the run lock; finalize if there is no work.
+
+    The run ``mode`` resolves ``--mode`` flag -> ``matter.yaml`` -> ``autonomous``
+    (plan D12 precedence).
+    """
     binding = get_binding(task)
     matter = load_matter(vault_root)
+    resolved_mode: RunMode = mode or matter.run_mode
     resolved_id = run_id or f"{task}-{_compact_ts(now)}"
     with RunLock(vault_root, resolved_id):
         append(
@@ -186,10 +196,11 @@ def start_run(
                 task=task,
                 rubric_version=binding.config.rubric_id,
                 config_digest=_config_digest(binding),
+                mode=resolved_mode,
             ),
         )
         units = load_request_units(vault_root)
-        _finalize(vault_root, resolved_id, binding, units)
+        _finalize(vault_root, resolved_id, binding, units, now)
     return resolved_id
 
 
@@ -316,6 +327,9 @@ def _record_spec(
     )
     write_turn_body(vault_root, run_id, record)
     append(vault_root, run_id, TurnCompleted(record=record))
+    # Attorney-gate decisions (plan P-28): every draft/bolster turn may imply gates.
+    if isinstance(output, DraftOutput):
+        decisions.derive_and_store(vault_root, run_id, spec, output, units)
     if usage is not None:
         append(
             vault_root,
@@ -337,9 +351,14 @@ def _record_spec(
     # Budget hard cap (plan D5): graceful checkpoint before scheduling anything more.
     if _over_cap(vault_root, load_state(vault_root, run_id)):
         _cap_transition(vault_root, run_id, binding, units)
+        _write_observed_status(vault_root, run_id, binding, units)
         return record
 
-    _finalize(vault_root, run_id, binding, units)
+    _finalize(vault_root, run_id, binding, units, now)
+    # Gated mode (plan Phase 5): pause at the next stage boundary or on open
+    # policy-delegable decisions, once this turn leaves the run still running.
+    _maybe_checkpoint(vault_root, run_id, binding, units)
+    _write_observed_status(vault_root, run_id, binding, units)
     return record
 
 
@@ -547,22 +566,180 @@ def raise_cap(vault_root: Path | str, run_id: str, to_usd: float) -> None:
 # --- finalize + assemble ----------------------------------------------------
 
 
+def _all_requests_complete(
+    vault_root: Path | str,
+    run_id: str,
+    binding: TaskBinding,
+    units: list[RequestItem],
+    state: RunState,
+) -> bool:
+    facts = _load_facts(vault_root)
+    for i in range(len(units)):
+        ctx = _context_for(run_id, state, binding, units, facts, i, DEFAULT_MAX_ATTEMPTS)
+        if not request_complete(ctx):
+            return False
+    return True
+
+
 def _finalize(
     vault_root: Path | str,
     run_id: str,
     binding: TaskBinding,
     units: list[RequestItem],
+    now: str,
 ) -> None:
+    """Once every request is complete, assemble the DRAFT deliverable, then either
+    finish or block on open hard-human attorney gates (plan Phase 5).
+
+    ``needs_decisions`` is treated as still-finalizable: resolving the last hard-human
+    gate re-enters here (via ``finalize_if_ready``) and flips the run to ``finished``.
+    """
     state = load_state(vault_root, run_id)
-    if state.finished:
+    if state.status not in ("running", "needs_decisions"):
+        return  # finished / needs_attention / capped / checkpoint are handled elsewhere
+    if not _all_requests_complete(vault_root, run_id, binding, units, state):
+        return
+    # The md-master is a DRAFT until attestation; assemble it now so it exists for the
+    # gate ledger and attestation hash even while decisions are pending.
+    _assemble(vault_root, run_id, binding, units, state)
+    matter = load_matter(vault_root)
+    if decisions.open_by_taxonomy(vault_root, run_id, matter, "hard-human"):
+        if state.status != "needs_decisions":
+            append(vault_root, run_id, RunFinished(status="needs_decisions"))
+        return
+    append(vault_root, run_id, RunFinished(status="finished"))
+
+
+def finalize_if_ready(
+    vault_root: Path | str,
+    run_id: str,
+    now: str,
+) -> RunState:
+    """Re-run finalization after a decision resolves (plan Phase 5). Caller holds the
+    run lock. Reopens a ``needs_decisions`` run to ``finished`` once the last
+    hard-human gate clears."""
+    state = load_state(vault_root, run_id)
+    if state.task is None or state.status not in ("running", "needs_decisions"):
+        return state
+    binding = get_binding(state.task)
+    units = load_request_units(vault_root)
+    _finalize(vault_root, run_id, binding, units, now)
+    return load_state(vault_root, run_id)
+
+
+# --- gated checkpoints + observed status (plan Phase 5) ---------------------
+
+# Stage boundaries a gated run pauses before (after associate_draft completes ->
+# before partner_loop; before oc_attack; before judge_panel).
+_CHECKPOINT_STAGE_ORDER: tuple[str, ...] = ("partner_loop", "oc_attack", "judge_panel")
+
+# Run status -> the house STATE marker (plan Phase 5 / D12 convention).
+_STATE_MARKER: dict[str, str] = {
+    "running": "working",
+    "needs_decisions": "ask-pending",
+    "checkpoint": "ask-pending",
+    "needs_attention": "blocked",
+    "capped": "blocked",
+    "finished": "done",
+}
+
+
+def state_marker(status: str) -> str:
+    """Map a run status to its trailing ``STATE:`` marker (house convention)."""
+    return _STATE_MARKER.get(status, "working")
+
+
+def _maybe_checkpoint(
+    vault_root: Path | str,
+    run_id: str,
+    binding: TaskBinding,
+    units: list[RequestItem],
+) -> None:
+    """Gated mode: pause the run when it is uniformly poised to enter a checkpoint
+    stage, or (once) while policy-delegable decisions are open."""
+    state = load_state(vault_root, run_id)
+    if state.mode != "gated" or state.status != "running":
         return
     facts = _load_facts(vault_root)
+    tier = _tier_models(vault_root)
+    specs = _plan(run_id, state, binding, units, facts, DEFAULT_MAX_ATTEMPTS, tier)
+    if specs:
+        stages = {s.stage for s in specs}
+        if len(stages) == 1:
+            (stage,) = tuple(stages)
+            if stage in _CHECKPOINT_STAGE_ORDER and stage not in state.cleared_checkpoints:
+                append(vault_root, run_id, CheckpointReached(boundary=stage))
+                return
+    matter = load_matter(vault_root)
+    if "policy_decisions" not in state.cleared_checkpoints and decisions.open_by_taxonomy(
+        vault_root, run_id, matter, "policy-delegable"
+    ):
+        append(vault_root, run_id, CheckpointReached(boundary="policy_decisions"))
+
+
+def continue_run(vault_root: Path | str, run_id: str) -> None:
+    """Clear a gated checkpoint (``mootloop run continue``) so the run resumes."""
+    with RunLock(vault_root, run_id):
+        events = read_events(vault_root, run_id)
+        state = load_state(vault_root, run_id)
+        if state.status != "checkpoint":
+            raise OrchestratorError(f"run {run_id!r} is not paused at a checkpoint")
+        boundary = "unknown"
+        for event in events:
+            if isinstance(event, CheckpointReached):
+                boundary = event.boundary
+        append(vault_root, run_id, CheckpointCleared(boundary=boundary))
+
+
+def _write_observed_status(
+    vault_root: Path | str,
+    run_id: str,
+    binding: TaskBinding,
+    units: list[RequestItem],
+) -> None:
+    """Observed mode: overwrite ``runs/<run-id>/STATUS.md`` (a derived view)."""
+    state = load_state(vault_root, run_id)
+    if state.mode != "observed":
+        return
+    path = safe_vault_path(vault_root, "runs", run_id, "STATUS.md")
+    atomic_write_text(path, _render_status_md(vault_root, run_id, binding, units, state))
+
+
+def _render_status_md(
+    vault_root: Path | str,
+    run_id: str,
+    binding: TaskBinding,
+    units: list[RequestItem],
+    state: RunState,
+) -> str:
+    matter = load_matter(vault_root)
+    facts = _load_facts(vault_root)
+    lines: list[str] = [
+        f"# Run status — `{run_id}`",
+        "",
+        f"- Matter: `{matter.matter_id}`",
+        f"- Task: `{state.task}`  ·  Mode: `{state.mode}`  ·  Status: `{state.status}`",
+        f"- Spend so far: ${state.total_spend_usd:.4f} (notional)",
+        "",
+        "## Stage progress",
+        "",
+        "| request | stage |",
+        "| --- | --- |",
+    ]
     for i in range(len(units)):
         ctx = _context_for(run_id, state, binding, units, facts, i, DEFAULT_MAX_ATTEMPTS)
-        if not request_complete(ctx):
-            return
-    _assemble(vault_root, run_id, binding, units, state)
-    append(vault_root, run_id, RunFinished(status="finished"))
+        stage = first_incomplete_stage(ctx) or "complete"
+        lines.append(f"| `{units[i].request_id}` | {stage} |")
+    open_decisions = decisions.DecisionStore(vault_root, run_id).list_open()
+    lines += ["", "## Open decisions", ""]
+    if not open_decisions:
+        lines.append("_none_")
+    else:
+        for decision in open_decisions:
+            mode = decisions.gate_mode_for(matter, decision.kind)
+            lines.append(f"- `{decision.decision_id}` [{mode}] {decision.proposal.summary}")
+    lines += ["", f"STATE: {state_marker(state.status)}", ""]
+    return "\n".join(lines)
 
 
 def _assemble(
@@ -632,7 +809,8 @@ def run_with_provider(
             facts = _load_facts(vault_root)
             specs = _plan(run_id, state, binding, units, facts, max_attempts, tier_models)
             if not specs:
-                _finalize(vault_root, run_id, binding, units)
+                _finalize(vault_root, run_id, binding, units, now)
+                _write_observed_status(vault_root, run_id, binding, units)
                 break
             for spec in specs:
                 fresh = load_state(vault_root, run_id)
@@ -683,14 +861,17 @@ def status_summary(vault_root: Path | str, run_id: str) -> dict[str, object]:
     )
     # v1 drives everything through the fake/seat provider, so spend is notional
     # (plan quota, not billed) — one mechanism, two labels (plan D5).
+    open_decisions = decisions.DecisionStore(vault_root, run_id).list_open()
     return {
         "run_id": run_id,
         "task": state.task,
+        "mode": state.mode,
         "status": state.status,
         "finished": state.finished,
         "requests": len(units),
         "completed_turns": len(state.completed_turns),
         "discarded_turns": len(state.discarded),
+        "open_decisions": [d.decision_id for d in open_decisions],
         "total_tokens": total_tokens,
         "input_tokens": state.total_input_tokens,
         "cache_read_tokens": state.total_cache_read,

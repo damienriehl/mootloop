@@ -2,9 +2,34 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from mootloop.models.matter import MatterConfig
+
+NOW_ISO = "2026-07-11T00:00:00+00:00"
+
+
+def resolve_all_decisions(
+    vault: Path | str, run_id: str, now: str = NOW_ISO, *, by: str = "Test Attorney"
+) -> None:
+    """Resolve every open attorney-gate decision (approve @ recommendation). Used by
+    tests that need a run to advance past the Phase 5 hard-human finish gate."""
+    from mootloop.decisions import DecisionStore, resolve
+
+    for decision in DecisionStore(vault, run_id).list_open():
+        resolve(
+            vault,
+            run_id,
+            decision.decision_id,
+            "approve",
+            decision.proposal.recommended,
+            "",
+            by,
+            "human",
+            now,
+        )
 
 
 def make_matter(matter_id: str = "acme-v-widgets") -> MatterConfig:
