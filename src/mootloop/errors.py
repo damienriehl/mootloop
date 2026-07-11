@@ -43,3 +43,13 @@ class RubricLockError(MootloopError):
 
 class BudgetError(MootloopError):
     """A budget precondition failed (unknown tier/model, un-estimable run, …)."""
+
+
+class EgressError(MootloopError):
+    """An outbound HTTP request violated the egress policy — a host outside the fixed
+    allowlist, or a target that did not come from one of our own request builders."""
+
+
+class CitationError(MootloopError):
+    """A citation-verification precondition failed (unknown research request, missing
+    fulfillment file, …). Verification *outcomes* are ledger states, not exceptions."""
