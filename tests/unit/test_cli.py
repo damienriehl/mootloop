@@ -219,3 +219,45 @@ def test_run_raise_cap_appends_event(tmp_path: Path) -> None:
     result = runner.invoke(app, ["run", "raise-cap", str(vault), run_id, "--to", "500"])
     assert result.exit_code == 0, result.output
     assert "raised cap" in result.output
+
+
+def test_cite_verify_text_routes_federal_to_research(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    _init_from_fixture(vault)
+    text = tmp_path / "cites.txt"
+    text.write_text("The claim arises under 42 U.S.C. § 1983.", encoding="utf-8")
+    result = runner.invoke(app, ["cite", "verify", str(vault), "--text", str(text)])
+    assert result.exit_code == 0, result.output
+    assert "needs_research" in result.output
+    assert "citator" in result.output.lower()
+
+
+def test_cite_verify_requires_exactly_one_source(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    _init_from_fixture(vault)
+    result = runner.invoke(app, ["cite", "verify", str(vault)])
+    assert result.exit_code == 1
+
+
+def test_research_list_and_fulfill(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    _init_from_fixture(vault)
+    text = tmp_path / "cites.txt"
+    text.write_text("See 42 U.S.C. § 1983.", encoding="utf-8")
+    runner.invoke(app, ["cite", "verify", str(vault), "--text", str(text)])
+
+    listed = runner.invoke(app, ["research", "list", str(vault)])
+    assert listed.exit_code == 0, listed.output
+    request_id = listed.output.split()[0]
+    assert request_id.startswith("research-")
+
+    authority = tmp_path / "authority.md"
+    authority.write_text("# 42 U.S.C. 1983 curated\n", encoding="utf-8")
+    fulfilled = runner.invoke(
+        app, ["research", "fulfill", str(vault), request_id, "--file", str(authority)]
+    )
+    assert fulfilled.exit_code == 0, fulfilled.output
+    assert "verified" in fulfilled.output
+    # queue now shows no open requests
+    relist = runner.invoke(app, ["research", "list", str(vault)])
+    assert "No open research requests." in relist.output

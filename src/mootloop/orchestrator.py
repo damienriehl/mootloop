@@ -20,9 +20,15 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from mootloop import budget
+from mootloop.citations import verify
+from mootloop.citations.extract import extract_citations
+from mootloop.citations.http import Transport
+from mootloop.citations.ledger import DEFAULT_MAX_CACHE_AGE_DAYS
+from mootloop.citations.ratelimit import TokenBucket
+from mootloop.citations.verify import VerifySummary
 from mootloop.errors import OrchestratorError
 from mootloop.facts import FactStore
-from mootloop.gates import completeness, degeneracy
+from mootloop.gates import completeness, degeneracy, fabrication
 from mootloop.journal import (
     append,
     load_state,
@@ -30,6 +36,7 @@ from mootloop.journal import (
 )
 from mootloop.llm import LLMProvider, RawTurnResult, TokenUsage
 from mootloop.models.budget import EstimateRange
+from mootloop.models.citations import Citation
 from mootloop.models.events import (
     CapRaised,
     GateEvaluated,
@@ -293,6 +300,11 @@ def _record_spec(
         comp = _completeness_gate(spec, output, binding, units)
         append(vault_root, run_id, GateEvaluated(turn_id=spec.turn_id, result=comp))
         gate_results.append(comp)
+        # Fabrication gate on every draft/bolster turn (plan D12): every assertion must
+        # trace to a fact or corpus. Recorded, non-fatal at turn time; blocks at export.
+        fab = _fabrication_gate(vault_root, output)
+        append(vault_root, run_id, GateEvaluated(turn_id=spec.turn_id, result=fab))
+        gate_results.append(fab)
 
     if spec.stage != state.current_stage:
         append(vault_root, run_id, StageStarted(stage=spec.stage))
@@ -342,6 +354,78 @@ def _completeness_gate(
     unit = next((u for u in units if str(u.request_id) == request_id), None)
     req_text = unit.text if unit else ""
     return completeness.evaluate(draft, binding.rubric, code, req_text)
+
+
+def _fabrication_gate(vault_root: Path | str, draft: DraftOutput) -> GateResult:
+    """Fabrication gate for one draft: assertions vs. current facts + corpus (plan D12)."""
+    facts = FactStore(vault_root).get_current()
+    corpus_text = fabrication.build_corpus_text(vault_root)
+    return fabrication.check(draft, facts, corpus_text)
+
+
+# --- citation verification (plan Phase 4) -----------------------------------
+
+
+def _operative_citations(vault_root: Path | str, run_id: str) -> list[Citation]:
+    """Every distinct citation in the run's operative (final) draft per request."""
+    binding = _binding_for(vault_root, run_id)
+    state = load_state(vault_root, run_id)
+    units = load_request_units(vault_root)
+    facts = _load_facts(vault_root)
+    found: dict[str, Citation] = {}
+    for i in range(len(units)):
+        ctx = _context_for(run_id, state, binding, units, facts, i, DEFAULT_MAX_ATTEMPTS)
+        record = ctx.operative_draft()
+        if record is None:
+            continue
+        draft = DraftOutput.model_validate(record.output)
+        texts = [draft.response_text, *draft.candidate_citations]
+        for text in texts:
+            for citation in extract_citations(text, source_turn_id=record.spec.turn_id):
+                found.setdefault(citation.citation_id, citation)
+    return list(found.values())
+
+
+def verify_run_citations(
+    vault_root: Path | str,
+    run_id: str,
+    now: str,
+    *,
+    max_cache_age_days: int = DEFAULT_MAX_CACHE_AGE_DAYS,
+    limiter: TokenBucket | None = None,
+    transport: Transport | None = None,
+) -> VerifySummary:
+    """Explicit verification step (between bolster and the final gate): extract every
+    citation from the run's operative drafts, verify via the router, journal the gate."""
+    citations = _operative_citations(vault_root, run_id)
+    summary = verify.verify_all(
+        vault_root,
+        citations,
+        now,
+        max_cache_age_days=max_cache_age_days,
+        limiter=limiter,
+        transport=transport,
+    )
+    gate = verify.citation_gate(
+        vault_root, citations, now=now, max_cache_age_days=max_cache_age_days
+    )
+    append(vault_root, run_id, GateEvaluated(turn_id=f"{run_id}-citations", result=gate))
+    return summary
+
+
+def citation_export_gate(
+    vault_root: Path | str,
+    run_id: str,
+    now: str,
+    *,
+    max_cache_age_days: int = DEFAULT_MAX_CACHE_AGE_DAYS,
+) -> GateResult:
+    """The export-readiness citation gate: reads the immutable ledger (no HTTP) and
+    blocks unless every citation in the operative drafts is verified/curated (plan H8)."""
+    citations = _operative_citations(vault_root, run_id)
+    return verify.citation_gate(
+        vault_root, citations, now=now, max_cache_age_days=max_cache_age_days
+    )
 
 
 def _maybe_emit_rubric_gate(
