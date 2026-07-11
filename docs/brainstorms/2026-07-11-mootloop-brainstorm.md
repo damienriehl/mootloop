@@ -30,7 +30,7 @@
 
 | # | Decision | Choice |
 |---|----------|--------|
-| 1 | Name / repo | **MootLoop** / `mootloop` — verified clean on GitHub (repos + org name) and PyPI; mootloop.com and mootloop.ai appear unregistered. LawLoop rejected (existing legal SaaS + GitHub org); FirmOS rejected (existing company, 43 repos, oversells scope); LegalLoop rejected (LegalLoop.ai ships a Claude Code legal skill + MCP connector) |
+| 1 | Name / repo | **MootLoop** / `mootloop` — verified clean on GitHub (repos + org name) and PyPI; **mootloop.org registered by Damien 2026-07-11**; mootloop.com and mootloop.ai appeared unregistered at check time. LawLoop rejected (existing legal SaaS + GitHub org); FirmOS rejected (existing company, 43 repos, oversells scope); LegalLoop rejected (LegalLoop.ai ships a Claude Code legal skill + MCP connector) |
 | 2 | Audience | Damien first, OSS-ready (MIT) from day one |
 | 3 | Form factor | Hybrid: Claude Code-native v1 → Agent SDK extraction later |
 | 4 | Orchestration | Fable orchestrates/judges; Opus subagents perform persona work |
@@ -48,6 +48,14 @@
 | 16 | Vault + cloud | Canonical vault = **local plain directory**. Cloud in two optional layers: (a) user-managed Drive/Dropbox desktop sync of the vault dir for backup/multi-device (zero MootLoop code); (b) first-class **ingestion connectors** (Drive/Dropbox via MCP/API) that pull client documents into the vault. Cloud is never the live store the pipeline reads from |
 | 17 | AI-use audit trail | Built-in: disclosure-ready export (which agents produced what, every citation's verification status) derived from the traceability logs — future-proofs against AI-disclosure standing orders |
 | 18 | Cost display | Every run pre-estimates and post-reports **tokens + API-price $-equivalent** — plan users see notional cost, API users see real cost, one mechanism |
+| 19 | Run interaction model | Per-run setting, all three modes: **autonomous** (run to completion, review after), **gated** (configurable checkpoints, e.g. before the Opposing Counsel round), **observed** (live persona-activity view with interrupt, lane-watch style) |
+| 20 | Deliverable formats | **Markdown master** (diffable, drives iteration tracing) rendered to: court-ready **DOCX** (caption/format template per court), **Google Doc export** (co-party/co-counsel collaboration), companion **strategy memo** (objection strategy, risk flags, judicial-panel odds, opposing-counsel findings), and an **annotated draft** (per-passage confidence, citation-verification status, persona attribution — annotations strip on export) |
+| 21 | Success criteria + edit-learning | Rubric gates inside loops (drive convergence) + **hand-draft benchmark** (pipeline re-runs the tasks Damien already drafted; success = equal-or-better by his judgment) + **edit-learning loop**: user edits output → system analyzes diffs → learnings improve (1) this matter, (2) firm preferences, (3) area-of-law playbooks, compounding across matters and users |
+| 22 | Persona taste | Generic top-tier practice by default; **optional style corpus** (user's prior briefs/edits) calibrates personas when available |
+| 23 | Learning storage tiers | Matter learnings → that matter's vault; firm learnings → private **firm profile** directory outside the OSS repo, shared across matters; area-of-law learnings → scrubbed of client facts, eligible to contribute back to OSS as shared playbooks |
+| 24 | Multi-user | **Shared firm profile** from v1 (private shared store with merge semantics for concurrent learnings) + **co-counsel review lane**: Google Doc comments ingested back as edit-learning input |
+| 25 | Professional-responsibility guardrails | All four, built-in: (a) **no-fabrication enforcement** — citation-verification gate hard-blocks unverified authority from deliverables; (b) **human-signoff attestation** — DRAFT watermark until an explicit "reviewed by [name]" attestation at export (Rule 5.3-style supervision); (c) **UPL framing** — OSS docs/outputs frame MootLoop as a lawyer's tool, not legal advice; (d) **confidentiality preflight** — pre-run check that matter data isn't leaking outside the vault and the LLM endpoint is the approved one |
+| 26 | Case corpus status | Damien's case materials are already collected in one organized digital folder — v1 ingestion = point folio-enrich at it to populate the first matter vault |
 
 ## Resolved Questions
 
@@ -62,6 +70,14 @@
 - **Vault shape and cloud storage?** Local plain directory canonical; cloud as optional sync (user-managed) and ingestion connectors (Decision 16).
 - **AI-use audit trail?** Built-in, disclosure-ready (Decision 17).
 - **Cost on a seat-based plan?** Tokens + $-equivalent everywhere (Decision 18).
+- **Interaction during runs?** All three modes, per-run configurable (Decision 19).
+- **What does the deliverable look like?** Markdown master → DOCX + Google Doc + strategy memo + annotated draft (Decision 20).
+- **How do we know it's good?** Rubric gates + hand-draft benchmark + edit-learning loop (Decision 21).
+- **Persona taste?** Generic excellence default, optional style corpus (Decision 22).
+- **Where do learnings live?** Three tiers: matter vault / private firm profile / scrubbed OSS playbooks (Decision 23).
+- **Multi-user?** Shared firm profile + co-counsel review lane in v1 (Decision 24).
+- **Ethics guardrails?** No-fabrication gate, signoff attestation, UPL framing, confidentiality preflight — all built-in (Decision 25).
+- **Case materials?** Already organized in one folder; ingestion points at it (Decision 26).
 
 ## Open Questions
 
