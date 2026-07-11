@@ -9,6 +9,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from mootloop.models.common import MATTER_ID_PATTERN, VersionedModel
 
+SCHEMA_VERSION = "1.0"
+
 Forum = Literal["state", "federal"]
 PartyRole = Literal["plaintiff", "defendant", "third-party"]
 Side = Literal["plaintiff", "defendant"]

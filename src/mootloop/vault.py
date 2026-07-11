@@ -158,10 +158,29 @@ def load_matter(vault_root: Path | str) -> MatterConfig:
 
 def _format_validation_error(exc: ValidationError) -> str:
     lines = [f"{MATTER_YAML} has {exc.error_count()} validation error(s):"]
-    for err in exc.errors():
-        loc = ".".join(str(p) for p in err["loc"]) or "<root>"
-        lines.append(f"  - {loc}: {err['msg']}")
+    for issue in _issues_from_validation(exc):
+        lines.append(f"  - {issue['loc']}: {issue['msg']}")
     return "\n".join(lines)
+
+
+def _issues_from_validation(exc: ValidationError) -> list[dict[str, str]]:
+    return [
+        {"loc": ".".join(str(p) for p in err["loc"]) or "<root>", "msg": err["msg"]}
+        for err in exc.errors()
+    ]
+
+
+def matter_validation_issues(vault_root: Path | str) -> list[dict[str, str]]:
+    """Return structured validation issues (``[]`` if valid). Never raises for a
+    merely-invalid matter; used by ``mootloop validate --json``."""
+    try:
+        load_matter(vault_root)
+    except MatterConfigError as exc:
+        cause = exc.__cause__
+        if isinstance(cause, ValidationError):
+            return _issues_from_validation(cause)
+        return [{"loc": "<file>", "msg": str(exc)}]
+    return []
 
 
 def create_vault(
@@ -195,6 +214,39 @@ def create_vault(
 
     seed_canary(root, matter.matter_id, registry_path=registry_path)
     return root
+
+
+def enclosing_git_repo(path: Path | str) -> Path | None:
+    """Return the git work-tree root enclosing ``path`` (or the nearest existing
+    ancestor), or None. Used to keep vaults out of any repo."""
+    cur = Path(path)
+    while not cur.exists() and cur != cur.parent:
+        cur = cur.parent
+    cur = _real(cur)
+    for ancestor in (cur, *cur.parents):
+        if (ancestor / ".git").exists():
+            return ancestor
+    return None
+
+
+def init_vault(
+    vault_path: Path | str,
+    matter: MatterConfig,
+    *,
+    allow_sync_folder: bool = False,
+    registry_path: Path | str | None = None,
+) -> Path:
+    """Preflight (repo boundary + sync-folder) then create the vault."""
+    repo = enclosing_git_repo(vault_path)
+    if repo is not None:
+        assert_vault_outside_repo(vault_path, repo)
+    marker = detect_sync_folder(vault_path)
+    if marker and not allow_sync_folder:
+        raise VaultBoundaryError(
+            f"vault path is inside a background-sync folder ({marker}); active "
+            "vaults must not live in sync folders — pass allow_sync_folder to override"
+        )
+    return create_vault(vault_path, matter, registry_path=registry_path)
 
 
 # --- Run lock ---------------------------------------------------------------
