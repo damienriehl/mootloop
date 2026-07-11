@@ -294,9 +294,9 @@ Every skill has a CLI mirror (`mootloop init|ingest|run|decide|export|learn|stat
 ## Acceptance Criteria
 
 ### Functional
-- [ ] `mootloop init` / `/moot:setup` creates a valid vault; matter.yaml schema-validated with our_side, judge, deadlines
+- [x] `mootloop init` / `/moot:setup` creates a valid vault; matter.yaml schema-validated with our_side, judge, deadlines
 - [ ] Ingestion handles Damien's real case folder: manifest with role tags + privilege flags; unreadable docs surfaced
-- [ ] Served rogs/RFPs/RFAs parse into numbered per-request work items (subparts included)
+- [x] Served rogs/RFPs/RFAs parse into numbered per-request work items (subparts included)
 - [ ] Thin full pipeline produces per-request responses + objections + privilege log + strategy memo on synthetic matter
 - [ ] All six personas individually enable/bypass-able; pipeline strategies thin-full / deep-core / adversarial-first selectable
 - [ ] Convergence terminates loops via locked rubric deltas; iteration caps user-configurable
@@ -310,7 +310,7 @@ Every skill has a CLI mirror (`mootloop init|ingest|run|decide|export|learn|stat
 - [ ] Hand-draft benchmark run + judged; live discovery responses produced through full gate stack
 
 ### Non-functional
-- [ ] Zero matter data in the OSS repo — privacy-grep + gitleaks pre-commit, CI invariant on fixtures
+- [x] Zero matter data in the OSS repo — privacy-grep + gitleaks pre-commit, CI invariant on fixtures
 - [ ] folio-enrich called localhost-only; endpoint allowlist preflight; no matter data in web-search lane
 - [ ] Any run resumable after crash/interrupt from journal
 - [ ] Budget: pre-run range estimate, live tokens + $-equivalent, hard cap honored
