@@ -1,0 +1,22 @@
+# Pre-commit hooks. Install with `make setup` (uv run pre-commit install).
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.21
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+
+  - repo: local
+    hooks:
+      - id: privacy-grep
+        name: privacy-grep (canary + denylist, fail-closed)
+        entry: python tools/privacy_grep.py
+        language: system
+        pass_filenames: false
+        always_run: true
