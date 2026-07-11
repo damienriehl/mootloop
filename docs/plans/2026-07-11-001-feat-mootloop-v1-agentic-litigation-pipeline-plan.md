@@ -312,9 +312,9 @@ Every skill has a CLI mirror (`mootloop init|ingest|run|decide|export|learn|stat
 ### Non-functional
 - [x] Zero matter data in the OSS repo — privacy-grep + gitleaks pre-commit, CI invariant on fixtures
 - [ ] folio-enrich called localhost-only; endpoint allowlist preflight; no matter data in web-search lane
-- [ ] Any run resumable after crash/interrupt from journal
+- [x] Any run resumable after crash/interrupt from journal
 - [ ] Budget: pre-run range estimate, live tokens + $-equivalent, hard cap honored
-- [ ] Derailed subagents auto-detected and relaunched, never repaired
+- [x] Derailed subagents auto-detected and relaunched, never repaired
 
 ### Quality gates
 - [ ] mypy-strict + ruff clean; pytest tiers green including invariants
