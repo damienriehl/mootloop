@@ -51,12 +51,14 @@ research_app = typer.Typer(
     help="Manage the citation research-request queue.", no_args_is_help=True
 )
 decide_app = typer.Typer(help="Review and resolve attorney-gate decisions.", no_args_is_help=True)
+web_app = typer.Typer(help="Public demo web tier (synthetic matter only).", no_args_is_help=True)
 app.add_typer(requests_app, name="requests")
 app.add_typer(facts_app, name="facts")
 app.add_typer(run_app, name="run")
 app.add_typer(cite_app, name="cite")
 app.add_typer(research_app, name="research")
 app.add_typer(decide_app, name="decide")
+app.add_typer(web_app, name="web")
 
 
 class RunModeArg(StrEnum):
@@ -718,6 +720,23 @@ def decide_resolve(
         typer.echo(f"resolved {decision_id}: {action.value}")
     except (MootloopError, KeyError) as exc:
         raise _fail(exc if isinstance(exc, MootloopError) else DecisionError(str(exc))) from exc
+
+
+# --- web verbs (demo tier; the bake is the tier's only writer) ---------------
+
+
+@web_app.command("bake")
+def web_bake(
+    dest: Annotated[Path, typer.Argument(help="Destination for the baked demo vault")],
+) -> None:
+    """Bake the synthetic demo vault (full pipeline, FakeLLMProvider, deterministic)."""
+    from mootloop.web.bake import build_demo_vault
+
+    try:
+        vault = build_demo_vault(dest)
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    typer.echo(f"Baked demo vault at {vault}")
 
 
 # --- attest verb (its own primitive; export reads it, never sets it) --------
