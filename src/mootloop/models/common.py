@@ -29,13 +29,18 @@ MatterText = NewType("MatterText", str)
 PublicText = NewType("PublicText", str)
 
 
-class VersionedModel(BaseModel):
-    """Base for every persisted model.
+class StrictModel(BaseModel):
+    """Base for non-persisted sub-models: strict (``extra="forbid"``) but without a
+    ``schema_version`` of their own. A nested value versions with its container."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class VersionedModel(StrictModel):
+    """Base for every persisted (top-level) model.
 
     `extra="forbid"` turns unknown/misspelled fields into field-named validation
     errors for free; `schema_version` anchors future migrations.
     """
-
-    model_config = ConfigDict(extra="forbid")
 
     schema_version: str

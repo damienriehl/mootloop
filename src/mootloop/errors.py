@@ -18,3 +18,11 @@ class MatterConfigError(MootloopError):
 
 class LockHeldError(MootloopError):
     """A run lock is held by a live process (or another host) and was not overridden."""
+
+
+class IngestError(MootloopError):
+    """A corpus ingest precondition failed (bad source dir, unresolvable tag, …)."""
+
+
+class FactError(MootloopError):
+    """A fact-store precondition failed (unknown fact id, unresolvable provenance, …)."""

@@ -10,6 +10,7 @@ from mootloop.models.common import (
     PublicText,
     RequestId,
     RunId,
+    StrictModel,
     VersionedModel,
 )
 from mootloop.models.matter import MatterConfig
@@ -25,5 +26,6 @@ __all__ = [
     "PublicText",
     "RequestId",
     "RunId",
+    "StrictModel",
     "VersionedModel",
 ]
