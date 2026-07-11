@@ -1,0 +1,132 @@
+rubric_id: discovery-responses-v1.0
+version: "1.0"
+locked: true
+
+# LOCKED discovery-response rubric (plan D7). Two criterion kinds:
+#   present  — deterministic-checkable; scored in code by gates/completeness.py,
+#              never shown to the LLM judge.
+#   correct  — judged 0-5 by the rubric-judge panel (median-aggregated).
+# `applies_to` scopes a criterion to a request family (rog/rfp/rfa) or `all`.
+# Sanctions caselaw drives the presence penalties: Fischer v. Forrest (boilerplate
+# general objections = waiver), Liguria Foods ("subject to and without waiving"
+# condemned), Heller v. City of Dallas (must state what is withheld).
+
+criteria:
+  # --- presence criteria (deterministic) ------------------------------------
+  - id: disposition-present
+    name: Per-request disposition present
+    description: >-
+      Each served request has an actual response (answer, production statement, or
+      admission disposition) — not an empty or placeholder stub.
+    kind: present
+    weight: 1.0
+    applies_to: all
+
+  - id: objection-basis-specificity
+    name: Objections state a basis with particularity
+    description: >-
+      Every asserted objection carries a stated legal basis and a request-specific
+      specificity string — not a bare label.
+    kind: present
+    weight: 1.0
+    applies_to: all
+
+  - id: no-boilerplate-general-objection
+    name: No boilerplate general objections
+    description: >-
+      No unadorned "overly broad and unduly burdensome" (or equivalent) objection
+      without request-specific reasons — Fischer v. Forrest treats boilerplate as
+      waiver.
+    kind: present
+    weight: 1.0
+    applies_to: all
+
+  - id: no-hedge-subject-to
+    name: No "subject to and without waiving" hedge
+    description: >-
+      The response does not answer "subject to and without waiving" its objections —
+      a hedge condemned in Liguria Foods.
+    kind: present
+    weight: 1.0
+    applies_to: all
+
+  - id: rfp-withheld-statement
+    name: RFP withheld-materials statement present
+    description: >-
+      Each production response states whether responsive materials are being
+      withheld on the basis of any objection (Heller v. City of Dallas; Rule 34(b)).
+    kind: present
+    weight: 1.0
+    applies_to: rfp
+
+  - id: rfa-disposition
+    name: RFA disposition is well-formed
+    description: >-
+      Each admission response takes a recognized disposition: admit, deny, qualify,
+      or lack of knowledge/information (Rule 36).
+    kind: present
+    weight: 1.0
+    applies_to: rfa
+
+  - id: rfa-reasonable-inquiry
+    name: Lack-of-knowledge recites reasonable inquiry
+    description: >-
+      A lack-of-knowledge answer recites that a reasonable inquiry was made and the
+      information known or readily obtainable is insufficient to admit or deny.
+    kind: present
+    weight: 1.0
+    applies_to: rfa
+
+  - id: mn-rog-restatement
+    name: MN interrogatory restatement present
+    description: >-
+      Under MN Rule 33, each interrogatory is restated immediately before its answer.
+    kind: present
+    weight: 1.0
+    applies_to: rog
+
+  # --- correctness criteria (judge-scored 0-5) ------------------------------
+  - id: denial-meets-substance
+    name: Denial fairly meets the substance
+    description: >-
+      A denial (or qualified answer) fairly meets the substance of the matter and
+      does not evade by hair-splitting the wording (Rule 36(a)(4)).
+    kind: correct
+    weight: 0.20
+    applies_to: rfa
+
+  - id: objection-defensible
+    name: Objection is legally defensible
+    description: >-
+      Each asserted objection is legally supportable on this request under the
+      governing rules and proportionality — not reflexive.
+    kind: correct
+    weight: 0.20
+    applies_to: all
+
+  - id: answer-completeness
+    name: Answer is complete to the extent not objected
+    description: >-
+      To the extent the request is not objected to, the answer is complete and
+      responsive — no partial dodge behind a narrow objection.
+    kind: correct
+    weight: 0.25
+    applies_to: all
+
+  - id: strategic-coherence
+    name: Strategically coherent posture
+    description: >-
+      The response's posture (what to concede, contest, object to) is coherent with
+      the matter's theory and the other responses — not internally at odds.
+    kind: correct
+    weight: 0.15
+    applies_to: all
+
+  - id: fact-grounding-quality
+    name: Facts are well grounded
+    description: >-
+      Every factual assertion traces to a grounded fact; nothing is asserted beyond
+      the record, and genuine gaps are surfaced rather than papered over.
+    kind: correct
+    weight: 0.20
+    applies_to: all

@@ -34,3 +34,12 @@ class TaskConfigError(MootloopError):
 
 class OrchestratorError(MootloopError):
     """An orchestrator precondition failed (unknown run, unschedulable turn, …)."""
+
+
+class RubricLockError(MootloopError):
+    """A LOCKED rubric's content no longer matches its recorded hash. Changing a
+    locked rubric requires shipping a new version file — never editing in place."""
+
+
+class BudgetError(MootloopError):
+    """A budget precondition failed (unknown tier/model, un-estimable run, …)."""

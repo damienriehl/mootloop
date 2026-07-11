@@ -53,6 +53,16 @@ def heading_label(request_type: RequestType) -> str:
     return _TYPE_META[request_type][3]
 
 
+_CODE_BY_PREFIX = {meta[1]: meta[0] for meta in _TYPE_META.values()}
+
+
+def code_from_request_id(request_id: str) -> str:
+    """The short type code (``rog`` / ``rfp`` / ``rfa``) implied by a request ID
+    prefix (``ROG-3`` -> ``rog``). Rubric ``applies_to`` filtering keys on this."""
+    prefix = request_id.split("-", 1)[0].split("(", 1)[0]
+    return _CODE_BY_PREFIX.get(prefix, "all")
+
+
 def make_request_id(
     request_type: RequestType, number: int, subpart: str | None = None
 ) -> RequestId:
