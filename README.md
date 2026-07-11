@@ -228,6 +228,9 @@ MOOTLOOP_DEMO_VAULT=/tmp/demo uv run uvicorn mootloop.web.app:app
 
 ## Documentation
 
+- **Live-matter quickstart:** [`docs/quickstart-live-matter.md`](docs/quickstart-live-matter.md)
+  — the full local workflow (vault → ingest → run → decide → attest → export)
+- **Demo deployment:** [`docs/deploy.md`](docs/deploy.md)
 - **Plan:** [`docs/plans/2026-07-11-001-feat-mootloop-v1-agentic-litigation-pipeline-plan.md`](docs/plans/2026-07-11-001-feat-mootloop-v1-agentic-litigation-pipeline-plan.md)
 - **Brainstorm:** [`docs/brainstorms/2026-07-11-mootloop-brainstorm.md`](docs/brainstorms/2026-07-11-mootloop-brainstorm.md)
 - **Agent instructions:** [`AGENTS.md`](AGENTS.md)
