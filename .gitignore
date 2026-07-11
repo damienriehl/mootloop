@@ -1,2 +1,22 @@
+# Matter data NEVER lives in the repo (vault-boundary rule; backstop only)
 matters/
+
+# Secrets
 .env
+secrets.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+build/
+dist/
+
+# Tooling caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
