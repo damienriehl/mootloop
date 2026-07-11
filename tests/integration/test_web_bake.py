@@ -8,7 +8,7 @@ from pathlib import Path
 
 from mootloop.attest import attestation_state
 from mootloop.decisions import DecisionStore
-from mootloop.gate_ledger import export_ready
+from mootloop.gate_ledger import TURN_GATES, build_ledger, export_ready
 from mootloop.journal import load_state
 from mootloop.models.decisions import DecisionKind
 from mootloop.web.bake import DEMO_ATTORNEY, DEMO_RUN_ID, RESTRUCTURE_REQUEST_IDS
@@ -24,6 +24,25 @@ def test_bake_run_finished_and_attested(demo_vault: Path) -> None:
 def test_bake_is_export_ready(demo_vault: Path) -> None:
     ready, blockers = export_ready(demo_vault, DEMO_RUN_ID)
     assert ready is True and blockers == []
+
+
+def test_bake_gate_ledger_all_requests_fully_pass(demo_vault: Path) -> None:
+    """Every request's ledger row shows every turn gate PASS — completeness included
+    (regression: the canned demo drafts once failed the deterministic presence
+    criteria and every row showed completeness=fail)."""
+    doc = build_ledger(demo_vault, DEMO_RUN_ID)
+    assert doc.gates, "the ledger must have per-request rows"
+    for request_id, row in doc.gates.items():
+        assert row["completeness"] == "pass", (
+            f"{request_id} completeness must pass, got {row['completeness']!r}"
+        )
+        for gate in TURN_GATES:
+            assert row[gate] == "pass", f"{request_id} {gate} must pass, got {row[gate]!r}"
+        for run_gate in ("citations", "decisions", "attestation"):
+            assert row[run_gate] == "pass", (
+                f"{request_id} {run_gate} must pass, got {row[run_gate]!r}"
+            )
+    assert doc.export_ready is True and doc.blockers == []
 
 
 def test_bake_triggers_restructure_on_scripted_subset(demo_vault: Path) -> None:
