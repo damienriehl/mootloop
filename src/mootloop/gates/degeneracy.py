@@ -19,6 +19,10 @@ GATE_NAME = "degeneracy"
 # Case-insensitive markers that betray an unfinished draft.
 _PLACEHOLDERS: tuple[str, ...] = ("[todo", "[insert", "lorem")
 
+# The condemned "subject to and without waiving" hedge (Liguria Foods; plan D7) —
+# answering while reserving objections is a deterministic failure, never served.
+_HEDGE = "subject to and without waiving"
+
 
 def _placeholder_findings(text: str, locator: str) -> list[GateFinding]:
     lowered = text.lower()
@@ -45,6 +49,14 @@ def _check_draft(draft: DraftOutput) -> list[GateFinding]:
     findings.extend(_placeholder_findings(draft.response_text, "response_text"))
     for idx, objection in enumerate(draft.objections):
         findings.extend(_placeholder_findings(objection.text, f"objections[{idx}].text"))
+    if _HEDGE in draft.response_text.lower():
+        findings.append(
+            GateFinding(
+                code="hedge_subject_to",
+                message='response hedges "subject to and without waiving" (Liguria Foods)',
+                locator="response_text",
+            )
+        )
     grounded = bool(draft.fact_ids_used) or bool(draft.attorney_gate_items)
     if not grounded:
         findings.append(

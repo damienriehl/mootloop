@@ -14,7 +14,7 @@ from pydantic import ValidationError
 
 from mootloop import attest as attest_service
 from mootloop import decisions as decisions_service
-from mootloop import gate_ledger, orchestrator
+from mootloop import gate_ledger, orchestrator, panels
 from mootloop.citations import verify
 from mootloop.citations.extract import extract_citations
 from mootloop.citations.ledger import ResearchQueue
@@ -379,6 +379,33 @@ def run_gates(
     )
     if doc.blockers:
         typer.echo("blockers: " + ", ".join(doc.blockers))
+
+
+@run_app.command("panels")
+def run_panels(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+    json_output: Annotated[bool, typer.Option("--json", help="Emit the panel report JSON")] = False,
+) -> None:
+    """Show the judge panel's objection-survival distribution (plan Phase 6)."""
+    try:
+        report = panels.build_panel_report(vault_path, run_id)
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    if json_output:
+        typer.echo(report.model_dump_json())
+        return
+    if not report.results:
+        typer.echo("No panel results yet (judge panel not complete).")
+        return
+    for result in report.results:
+        color = typer.colors.GREEN if result.survival_rate >= 0.5 else typer.colors.RED
+        typer.secho(
+            f"{result.request_id}  obj[{result.objection_index}] {result.objection_basis}: "
+            f"{result.survive_votes}/{result.total_votes} survive "
+            f"({result.survival_rate:.0%})",
+            fg=color,
+        )
 
 
 @run_app.command("plan-next")
