@@ -2,7 +2,7 @@
 name: moot-run
 description: Drive a MootLoop discovery-response run end-to-end inside Claude Code by spawning persona subagents for each planned turn.
 disable-model-invocation: true
-argument-hint: <vault-path> [--task discovery-responses]
+argument-hint: <vault-path> [--task discovery-responses] [--mode autonomous|gated|observed]
 ---
 
 # moot-run
@@ -23,14 +23,16 @@ mechanics, gating, and journaling — you only spawn subagents and shuttle JSON.
 ## 2. Start the run
 
 ```
-uv run mootloop run start "$VAULT" --task "$TASK"
+uv run mootloop run start "$VAULT" --task "$TASK" [--mode "$MODE"]
 ```
 
-Capture the printed `run-id` as `$RUN`.
+`$MODE` = `--mode` value, else the matter default (`autonomous`). `gated` pauses at
+stage boundaries; `observed` streams `runs/<run-id>/STATUS.md`. Capture the printed
+`run-id` as `$RUN`.
 
 ## 3. Drive loop
 
-Repeat until status reports `finished`:
+Repeat until `status` reports `finished`:
 
 1. `uv run mootloop run plan-next "$VAULT" "$RUN" --json` → a JSON list of
    TurnSpecs. If the list is empty, go to step 4.
@@ -43,15 +45,38 @@ Repeat until status reports `finished`:
      `uv run mootloop run record-turn "$VAULT" "$RUN" <turn_id> --input <file>`.
    - A `discarded` result is expected sometimes — the core will re-plan the same
      turn (counter-capped). Just continue the loop.
-3. `uv run mootloop run status "$VAULT" "$RUN" --json` — if `finished` is true or
-   `status` is `needs_attention`, stop looping.
+3. `uv run mootloop run status "$VAULT" "$RUN" --json` — branch on `status`:
+   - `checkpoint` (gated mode): the run paused at a stage boundary. Surface it to the
+     operator, then `uv run mootloop run continue "$VAULT" "$RUN"` and loop.
+   - `needs_decisions`: open **hard-human** attorney gates block the finish. Go to
+     step 4a — do not loop.
+   - `needs_attention`: go to step 4b.
+   - `finished`: go to step 4c.
 
 ## 4. Finish
 
-- On `needs_attention`: report which turn exhausted its attempts (from the journal)
-  and stop — do not force it.
-- On `finished`: read the deliverable under `"$VAULT/deliverables/"` and summarize
-  the per-request responses for the attorney.
+### 4a. `needs_decisions` — attorney gates
+
+- `uv run mootloop decide list "$VAULT" "$RUN"` → surface every open decision (id,
+  gate mode, summary, recommendation) to the attorney. **Do not resolve them
+  yourself** — privilege calls, RFA dispositions, and attestation are human-by-design.
+- After the attorney decides, record each:
+  `uv run mootloop decide resolve "$VAULT" "$RUN" <decision-id> --action approve|modify|deny [--choose <key>] --by "Name"` (or a batch `--input decisions.json`).
+- Resolving the last hard-human gate reopens the run — return to the drive loop.
+
+### 4b. `needs_attention`
+
+- Report which turn exhausted its attempts (from the journal) and stop — do not
+  force it.
+
+### 4c. `finished`
+
+- Read the deliverable under `"$VAULT/deliverables/"` and summarize the per-request
+  responses for the attorney.
+- Before export, resolve any remaining **policy-delegable** decisions (`decide list`)
+  and attest: `uv run mootloop attest "$VAULT" "$RUN" --by "Name"`.
+- `uv run mootloop run gates "$VAULT" "$RUN"` is the single source of truth for
+  export-readiness (it lists any blockers).
 
 ## Rules
 
