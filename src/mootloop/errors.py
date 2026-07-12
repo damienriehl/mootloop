@@ -16,6 +16,11 @@ class MatterConfigError(MootloopError):
     """matter.yaml failed to parse or validate. Message names each bad field."""
 
 
+class MatterNotFoundError(MootloopError):
+    """No matter with the requested id exists under the matters-root. Distinct from
+    `VaultBoundaryError` (a containment breach) so callers can 404 vs. 400."""
+
+
 class LockHeldError(MootloopError):
     """A run lock is held by a live process (or another host) and was not overridden."""
 
