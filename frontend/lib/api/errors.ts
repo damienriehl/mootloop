@@ -33,6 +33,21 @@ export class LockContentionError extends ApiError {
   }
 }
 
+/**
+ * The typed 403 from the mint-link endpoint (`{ error: "export_not_ready" }`): a clean
+ * (non-DRAFT) deliverable was requested before the run is export-ready. `blockers`
+ * lists what still gates release, surfaced verbatim in the export room (FD-7/FD-9).
+ */
+export class ExportNotReadyError extends ApiError {
+  readonly blockers: string[];
+
+  constructor(status: number, detail: string, blockers: string[], body: unknown) {
+    super(status, detail, body);
+    this.name = "ExportNotReadyError";
+    this.blockers = blockers;
+  }
+}
+
 export class SessionExpiredError extends Error {
   constructor(message = "Cloudflare Access session expired — re-authentication required") {
     super(message);
@@ -60,6 +75,20 @@ function isLockBody(body: unknown): body is LockBody {
   );
 }
 
+interface ExportNotReadyBody {
+  error: "export_not_ready";
+  detail?: string;
+  blockers?: string[];
+}
+
+function isExportNotReadyBody(body: unknown): body is ExportNotReadyBody {
+  return (
+    typeof body === "object" &&
+    body !== null &&
+    (body as { error?: unknown }).error === "export_not_ready"
+  );
+}
+
 /** Build the right error subtype from a failed response's status + parsed body. */
 export function toApiError(status: number, body: unknown): ApiError {
   if (status === 409 && isLockBody(body)) {
@@ -67,6 +96,14 @@ export function toApiError(status: number, body: unknown): ApiError {
       status,
       body.detail ?? "A lock is held on this run; retry shortly.",
       body.retriable ?? true,
+      body,
+    );
+  }
+  if (status === 403 && isExportNotReadyBody(body)) {
+    return new ExportNotReadyError(
+      status,
+      body.detail ?? "This deliverable is not export-ready yet.",
+      body.blockers ?? [],
       body,
     );
   }

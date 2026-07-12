@@ -28,9 +28,26 @@ export default function MatterLayout({ children }: { children: ReactNode }) {
   const matter = matters?.find((m) => m.matter_id === matterId);
 
   const base = `/matters/${matterId}`;
+  // The export room is run-scoped; surface its docket tab only when a run is in context.
+  const runMatch = pathname.match(/\/runs\/([^/]+)/);
+  const contextRunId = runMatch?.[1];
   const tabs: DocketTab[] = [
-    { href: `${base}/runs`, label: "Runs", match: (p) => p.includes("/runs") },
+    { href: `${base}/begin`, label: "Begin Task", match: (p) => p.endsWith("/begin") },
+    {
+      href: `${base}/runs`,
+      label: "Runs",
+      match: (p) => p.includes("/runs") && !p.endsWith("/export"),
+    },
     { href: `${base}/inbox`, label: "Decision Inbox", match: (p) => p.endsWith("/inbox") },
+    ...(contextRunId
+      ? [
+          {
+            href: `${base}/runs/${contextRunId}/export`,
+            label: "Export",
+            match: (p: string) => p.endsWith("/export"),
+          },
+        ]
+      : []),
   ];
 
   return (

@@ -53,13 +53,21 @@ export default function CockpitPage() {
           </p>
           <h1 className="font-mono text-lg font-bold text-accent">{runId}</h1>
         </div>
-        <Link
-          href={`/matters/${matterId}/inbox`}
-          className="font-mono text-sm text-ink-soft hover:text-accent"
-        >
-          Decision inbox
-          {run && (run.open_decisions?.length ?? 0) > 0 ? ` (${run.open_decisions?.length})` : ""} →
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link
+            href={`/matters/${matterId}/inbox`}
+            className="font-mono text-sm text-ink-soft hover:text-accent"
+          >
+            Decision inbox
+            {run && (run.open_decisions?.length ?? 0) > 0 ? ` (${run.open_decisions?.length})` : ""} →
+          </Link>
+          <Link
+            href={`/matters/${matterId}/runs/${runId}/export`}
+            className="font-mono text-sm text-ink-soft hover:text-accent"
+          >
+            Export &amp; release →
+          </Link>
+        </div>
       </header>
 
       <InstrumentBand

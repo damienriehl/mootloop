@@ -30,6 +30,19 @@ export type GateFail = Schemas["GateFail"];
 export type GatePending = Schemas["GatePending"];
 export type GateResult = GatePass | GateFail | GatePending;
 
+// --- On-ramp (FE-2.5): the freeform lane produces a TaskSpec slip ---
+export type TaskSpec = Schemas["TaskSpec"];
+export type TaskSpecResponse = Schemas["TaskSpecResponse"];
+export type TaskSpecsResponse = Schemas["TaskSpecsResponse"];
+export type FreeformTaskRequest = Schemas["FreeformTaskRequest"];
+/** The on-ramp lane that produced a spec (freeform is the only live lane in FE-2.5). */
+export type SourceLane = TaskSpec["source_lane"];
+
+// --- Export room (FE-2.5): deliverables + certify-and-release signed links ---
+export type DeliverableInfo = Schemas["DeliverableInfo"];
+export type DeliverablesResponse = Schemas["DeliverablesResponse"];
+export type SignedLinkResponse = Schemas["SignedLinkResponse"];
+
 /** Run lifecycle status (the FastAPI `RunStatus` Literal). */
 export type RunStatus = RunStatusSummary["status"];
 /** Run execution mode. */
