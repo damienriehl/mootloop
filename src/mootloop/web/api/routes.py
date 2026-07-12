@@ -84,8 +84,8 @@ def _audit_dep(action: str) -> Callable[..., None]:
     def _record(
         request: Request,
         matter_id: str,
-        vault: Vault,
         principal: Principal,
+        vault: Vault,
     ) -> None:
         audit.append(
             vault,
@@ -146,8 +146,8 @@ def list_matters(
 @router.get("/api/matters/{matter_id}/runs")
 def list_runs(
     matter_id: str,
-    vault: Vault,
     _principal: Principal,
+    vault: Vault,
     _audited: Annotated[None, Depends(_audit_dep("list_runs"))],
 ) -> list[models.RunSummary]:
     return _runs_for(vault)
@@ -160,8 +160,8 @@ def list_runs(
 def get_run(
     matter_id: str,
     run_id: str,
-    vault: Vault,
     _principal: Principal,
+    vault: Vault,
     _audited: Annotated[None, Depends(_audit_dep("run_status"))],
 ) -> models.RunStatusSummary:
     return readers.run_status_summary(vault, run_id)
@@ -171,8 +171,8 @@ def get_run(
 def get_run_gates(
     matter_id: str,
     run_id: str,
-    vault: Vault,
     _principal: Principal,
+    vault: Vault,
     _audited: Annotated[None, Depends(_audit_dep("run_gates"))],
 ) -> models.GateLedgerResponse:
     return readers.gate_ledger_response(vault, run_id)
@@ -182,8 +182,8 @@ def get_run_gates(
 def get_run_decisions(
     matter_id: str,
     run_id: str,
-    vault: Vault,
     _principal: Principal,
+    vault: Vault,
     _audited: Annotated[None, Depends(_audit_dep("run_decisions"))],
 ) -> models.DecisionsResponse:
     return readers.decisions_response(vault, run_id)
@@ -193,8 +193,8 @@ def get_run_decisions(
 def get_run_requests(
     matter_id: str,
     run_id: str,
-    vault: Vault,
     _principal: Principal,
+    vault: Vault,
     _audited: Annotated[None, Depends(_audit_dep("run_requests"))],
 ) -> models.RequestsResponse:
     return readers.requests_response(vault, run_id)
@@ -207,8 +207,8 @@ def get_run_requests(
 def start_run(
     matter_id: str,
     body: models.StartRunRequest,
-    vault: Vault,
     principal: Principal,
+    vault: Vault,
     _csrf: Csrf,
     _audited: Annotated[None, Depends(_audit_dep("run_start"))],
 ) -> models.RunStatusSummary:
@@ -222,8 +222,8 @@ def start_run(
 def continue_run(
     matter_id: str,
     run_id: str,
-    vault: Vault,
     principal: Principal,
+    vault: Vault,
     _csrf: Csrf,
     _audited: Annotated[None, Depends(_audit_dep("run_continue"))],
 ) -> models.RunActionResponse:
@@ -238,8 +238,8 @@ def raise_cap(
     matter_id: str,
     run_id: str,
     body: models.RaiseCapRequest,
-    vault: Vault,
     principal: Principal,
+    vault: Vault,
     _csrf: Csrf,
     _audited: Annotated[None, Depends(_audit_dep("run_raise_cap"))],
 ) -> models.RunActionResponse:
@@ -268,8 +268,8 @@ def resolve_decision(
     run_id: str,
     decision_id: str,
     body: models.ResolveRequest,
-    vault: Vault,
     principal: Principal,
+    vault: Vault,
     _csrf: Csrf,
     _audited: Annotated[None, Depends(_audit_dep("resolve"))],
 ) -> models.ResolveResponse:
@@ -294,8 +294,8 @@ def resolve_decision(
 def attest_run(
     matter_id: str,
     run_id: str,
-    vault: Vault,
     principal: Principal,
+    vault: Vault,
     _csrf: Csrf,
     _audited: Annotated[None, Depends(_audit_dep("attest"))],
 ) -> models.AttestResponse:
@@ -310,8 +310,8 @@ def attest_run(
 def create_freeform_task(
     matter_id: str,
     body: models.FreeformTaskRequest,
-    vault: Vault,
     principal: Principal,
+    vault: Vault,
     _csrf: Csrf,
     _audited: Annotated[None, Depends(_audit_dep("task_freeform"))],
 ) -> models.TaskSpecResponse:
@@ -324,8 +324,8 @@ def create_freeform_task(
 @router.get("/api/matters/{matter_id}/tasks")
 def list_tasks(
     matter_id: str,
-    vault: Vault,
     _principal: Principal,
+    vault: Vault,
     _audited: Annotated[None, Depends(_audit_dep("tasks_list"))],
 ) -> models.TaskSpecsResponse:
     """List the matter's recorded TaskSpecs (all lanes, append order)."""
@@ -344,8 +344,8 @@ def _run_action(vault: Path, run_id: str, kind: str) -> models.RunActionResponse
 def pause_run_human(
     matter_id: str,
     run_id: str,
-    vault: Vault,
     principal: Principal,
+    vault: Vault,
     _csrf: Csrf,
     _audited: Annotated[None, Depends(_audit_dep("pause"))],
 ) -> models.RunActionResponse:
@@ -357,8 +357,8 @@ def pause_run_human(
 def resume_run_human(
     matter_id: str,
     run_id: str,
-    vault: Vault,
     principal: Principal,
+    vault: Vault,
     _csrf: Csrf,
     _audited: Annotated[None, Depends(_audit_dep("resume"))],
 ) -> models.RunActionResponse:
@@ -373,8 +373,8 @@ def resume_run_human(
 def stream_run(
     matter_id: str,
     run_id: str,
-    vault: Vault,
     principal: Principal,
+    vault: Vault,
     _audited: Annotated[None, Depends(_audit_dep("stream"))],
 ) -> StreamingResponse:
     """Tail the run's journal as Server-Sent Events until it is terminal (plan FE-1).
@@ -390,8 +390,8 @@ def stream_run(
 def list_deliverables(
     matter_id: str,
     run_id: str,
-    vault: Vault,
     _principal: Principal,
+    vault: Vault,
     _audited: Annotated[None, Depends(_audit_dep("deliverables_list"))],
 ) -> models.DeliverablesResponse:
     """List a run's deliverables with DRAFT/clean state and per-file downloadability
@@ -418,8 +418,8 @@ def mint_download_link(
     matter_id: str,
     run_id: str,
     name: str,
-    vault: Vault,
     principal: Principal,
+    vault: Vault,
     signer: Signer,
     _csrf: Csrf,
     _audited: Annotated[None, Depends(_audit_dep("deliverable_link"))],
@@ -468,8 +468,8 @@ def pause_run_internal(
     matter_id: str,
     run_id: str,
     body: models.PauseRequest,
-    vault: Vault,
     _internal: Internal,
+    vault: Vault,
 ) -> models.RunActionResponse:
     orchestrator.pause_run(vault, run_id, reason=body.reason or "manual")
     return _run_action(vault, run_id, "run_paused")
@@ -479,8 +479,8 @@ def pause_run_internal(
 def resume_run_internal(
     matter_id: str,
     run_id: str,
-    vault: Vault,
     _internal: Internal,
+    vault: Vault,
 ) -> models.RunActionResponse:
     orchestrator.resume_run(vault, run_id)
     return _run_action(vault, run_id, "run_resumed")

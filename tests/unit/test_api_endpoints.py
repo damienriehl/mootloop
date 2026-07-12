@@ -21,8 +21,8 @@ from mootloop.models.matter import MatterConfig
 from mootloop.registry import MatterRegistry
 from mootloop.web import audit
 from mootloop.web.api import create_matter_api, routes
-from mootloop.web.api.deps import get_registry, get_verifier
-from mootloop.web.security import AccessPrincipal
+from mootloop.web.api.deps import get_internal_auth, get_registry, get_verifier
+from mootloop.web.security import AccessPrincipal, InternalAuth
 
 _PRINCIPAL = AccessPrincipal(email="attorney@example.com", subject="sub-1", claims={})
 _AUTH = {"cf-access-jwt-assertion": "good"}
@@ -206,3 +206,65 @@ def test_matter_data_route_records_hash_chained_audit(
     assert len(entries) == 1
     assert '"actor":"attorney@example.com"' in entries[0]
     assert audit.verify_chain(vault) is True
+
+
+# --- FE-0 auth-before-resolve: no existence/charset oracle without auth ------
+#
+# The vault resolver must NEVER run before the auth guard. An unauthenticated
+# caller must get 401 whether the matter exists, is unknown, or is charset-invalid
+# — so existent and nonexistent matters are indistinguishable (no 404/400 oracle).
+
+_NO_AUTH: dict[str, str] = {}  # the stub verifier rejects every non-"good" token
+
+
+@pytest.fixture
+def internal_client(registry: MatterRegistry) -> TestClient:
+    """Client whose internal-secret guard is stubbed so we can assert secret-less 401s."""
+    app = create_matter_api()
+    app.dependency_overrides[get_verifier] = _StubVerifier
+    app.dependency_overrides[get_registry] = lambda: registry
+    app.dependency_overrides[get_internal_auth] = lambda: InternalAuth(secret="s3cr3t")
+    return TestClient(app)
+
+
+@pytest.mark.parametrize(
+    "matter_id",
+    [
+        "ghost-matter",  # nonexistent -> would be 404 if the resolver ran first
+        "UPPERCASE",  # charset-invalid -> would be 400 if the resolver ran first
+    ],
+)
+def test_read_route_401_without_auth_regardless_of_matter(
+    client: TestClient, matter_id: str
+) -> None:
+    resp = client.get(f"/api/matters/{matter_id}/runs", headers=_NO_AUTH)
+    assert resp.status_code == 401
+
+
+def test_read_route_401_without_auth_for_existing_matter(
+    client: TestClient, matter: MatterConfig
+) -> None:
+    # An EXISTING matter is likewise 401 without auth — no distinction from the above.
+    resp = client.get(f"/api/matters/{matter.matter_id}/runs", headers=_NO_AUTH)
+    assert resp.status_code == 401
+
+
+@pytest.mark.parametrize("matter_id", ["ghost-matter", "UPPERCASE"])
+def test_mutating_route_401_without_auth_regardless_of_matter(
+    client: TestClient, matter_id: str
+) -> None:
+    # POST with neither Access JWT nor CSRF fails on auth (401), never on resolve (404/400).
+    resp = client.post(f"/api/matters/{matter_id}/runs", headers=_NO_AUTH, json={"task": "x"})
+    assert resp.status_code == 401
+
+
+def test_internal_route_401_without_secret_regardless_of_matter(
+    internal_client: TestClient, matter: MatterConfig
+) -> None:
+    # No internal secret header -> 401 for a nonexistent, a charset-invalid, AND an
+    # existing matter — the Internal guard runs before the resolver on every path.
+    for matter_id in ("ghost-matter", "UPPERCASE", matter.matter_id):
+        resp = internal_client.post(
+            f"/internal/matters/{matter_id}/runs/r1/resume", headers=_NO_AUTH
+        )
+        assert resp.status_code == 401, matter_id
