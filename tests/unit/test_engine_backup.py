@@ -41,3 +41,19 @@ def test_backup_refuses_destination_inside_git_repo(tmp_path: Path) -> None:
     (repo / ".git").mkdir(parents=True)
     with pytest.raises(BackupError):
         backup_matter(vault, repo / "backups", NOW)
+
+
+def test_backup_refuses_destination_inside_sync_folder(tmp_path: Path) -> None:
+    vault = _make_vault(tmp_path)
+    synced = tmp_path / "Dropbox"
+    (synced / ".dropbox").mkdir(parents=True)  # a sync-client root marker
+    with pytest.raises(BackupError):
+        backup_matter(vault, synced / "backups", NOW)
+
+
+def test_backup_readback_confirms_matter_yaml_member(tmp_path: Path) -> None:
+    vault = _make_vault(tmp_path)
+    out = backup_matter(vault, tmp_path / "backups", NOW)
+    # The readback gate (fail-closed) only returns a path once matter.yaml is present.
+    with tarfile.open(out, "r:gz") as tar:
+        assert any(n.endswith("/matter.yaml") for n in tar.getnames())

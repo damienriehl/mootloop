@@ -7,12 +7,31 @@ from pathlib import Path
 import pytest
 
 from mootloop.errors import OrchestratorError
-from mootloop.journal import append
+from mootloop.journal import append, load_state, read_events
 from mootloop.models.common import DocId
-from mootloop.models.events import RunFinished, TurnIntent
+from mootloop.models.events import (
+    RunFinished,
+    RunPaused,
+    RunResumed,
+    SpendRecorded,
+    TurnIntent,
+)
 from mootloop.models.matter import MatterConfig
 from mootloop.models.requests import RequestItem, RequestSet, RequestType
-from mootloop.orchestrator import pause_run, plan_next, resume_run, status_summary
+from mootloop.orchestrator import (
+    pause_run,
+    plan_next,
+    resume_run,
+    start_run,
+    status_summary,
+)
+
+
+def _projected_spend(vault: Path, run_id: str) -> float:
+    """Spend the conservative cap check sees: settled spend + unreconciled reservations."""
+    state = load_state(vault, run_id)
+    return state.total_spend_usd + sum(state.pending_intents.values())
+
 
 NOW = "2026-07-11T00:00:00+00:00"
 
@@ -52,8 +71,6 @@ def _build_vault(tmp_path: Path, *, cap: float | None = None) -> Path:
 
 
 def test_pause_then_resume_reopens_run(tmp_path: Path) -> None:
-    from mootloop.orchestrator import start_run
-
     vault = _build_vault(tmp_path)
     run_id = start_run(vault, "discovery-responses", NOW, run_id="pause-0001")
     assert plan_next(vault, run_id)  # schedulable while running
@@ -68,8 +85,6 @@ def test_pause_then_resume_reopens_run(tmp_path: Path) -> None:
 
 
 def test_pause_rejects_terminal_run(tmp_path: Path) -> None:
-    from mootloop.orchestrator import start_run
-
     vault = _build_vault(tmp_path)
     run_id = start_run(vault, "discovery-responses", NOW, run_id="pause-0002")
     append(vault, run_id, RunFinished(status="finished"))
@@ -78,17 +93,65 @@ def test_pause_rejects_terminal_run(tmp_path: Path) -> None:
 
 
 def test_resume_rejects_non_paused_run(tmp_path: Path) -> None:
-    from mootloop.orchestrator import start_run
-
     vault = _build_vault(tmp_path)
     run_id = start_run(vault, "discovery-responses", NOW, run_id="pause-0003")
     with pytest.raises(OrchestratorError):
         resume_run(vault, run_id)
 
 
-def test_conservative_cap_counts_unreconciled_intent(tmp_path: Path) -> None:
-    from mootloop.orchestrator import start_run
+def test_pause_resume_event_order_and_non_terminal(tmp_path: Path) -> None:
+    vault = _build_vault(tmp_path)
+    run_id = start_run(vault, "discovery-responses", NOW, run_id="pause-0005")
 
+    pause_run(vault, run_id, reason="manual")
+    paused = load_state(vault, run_id)
+    assert paused.status == "paused"
+    assert paused.is_terminal is False  # a paused run is NOT terminally complete
+    assert plan_next(vault, run_id) == []
+
+    resume_run(vault, run_id)
+    assert load_state(vault, run_id).status == "running"
+    assert plan_next(vault, run_id)  # schedulable work returns
+
+    kinds = [type(e) for e in read_events(vault, run_id)]
+    assert kinds.index(RunPaused) < kinds.index(RunResumed)  # paused precedes resumed
+
+
+def test_reconciliation_drops_projected_spend(tmp_path: Path) -> None:
+    # A generous cap so the intent below never trips the cap path; this isolates the
+    # write-ahead ledger's double-counting-then-release behavior (plan FD-6).
+    vault = _build_vault(tmp_path, cap=100.0)
+    run_id = start_run(vault, "discovery-responses", NOW, run_id="pause-0006")
+
+    append(
+        vault,
+        run_id,
+        TurnIntent(turn_id="t-x", model="fake", billing_mode="subscription", max_plausible_usd=1.6),
+    )
+    # Unreconciled: the intent counts at its full max-plausible reservation.
+    assert load_state(vault, run_id).pending_intents == {"t-x": 1.6}
+    assert _projected_spend(vault, run_id) == 1.6
+
+    # The matching SpendRecorded reconciles the intent and books the real (lower) cost:
+    # the reservation is released, so projected spend drops (no double count).
+    append(
+        vault,
+        run_id,
+        SpendRecorded(
+            turn_id="t-x",
+            input_tokens=10,
+            cache_read=0,
+            cache_write=0,
+            output_tokens=5,
+            model="fake",
+            usd_equiv=0.3,
+        ),
+    )
+    assert load_state(vault, run_id).pending_intents == {}
+    assert _projected_spend(vault, run_id) == 0.3
+
+
+def test_conservative_cap_counts_unreconciled_intent(tmp_path: Path) -> None:
     vault = _build_vault(tmp_path, cap=1.0)
     run_id = start_run(vault, "discovery-responses", NOW, run_id="pause-0004")
     # A write-ahead intent whose max-plausible cost alone exceeds the cap must
