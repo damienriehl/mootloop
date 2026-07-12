@@ -8,6 +8,20 @@ origin: docs/brainstorms/2026-07-12-frontend-folio-brainstorm.md
 
 # ✨ feat: Hosted Frontend — FOLIO-Grounded Cockpit (mootloop.damienriehl.com)
 
+## Enhancement Summary
+
+**Deepened on:** 2026-07-12 · **Agents:** 7 focused reviewers (security, architecture, YAGNI, data-integrity, TypeScript, agent-native parity, frontend-design) on top of the 5 research agents that grounded the original plan.
+
+1. **The engine gets a real sandbox (top security finding):** persona turns run with Bash/WebFetch/WebSearch disabled, inside a network-egress jail permitting only `api.anthropic.com`, under per-matter OS isolation **in v1** — `--settings` deny rules are convenience, not a boundary, and one injected discovery PDF must not be able to exfiltrate the OAuth token or the vault (FD-1).
+2. **Localhost trust is dead:** on Coolify's shared Docker network, "localhost" is reachable by sibling apps — the driver authenticates to the API with a dedicated secret; FastAPI goes fully internal behind a Next.js BFF (one Access perimeter, no dual-JWT maintenance) (FD-1/FD-5).
+3. **Approve-then-inject reconciles auto-apply with security:** run findings still auto-apply to the board with the mandatory changelog/feed (P-33 preserved) — but only attorney-approved nodes ever influence persona prompts; auto-derived content lands `needs-review` first (FD-4).
+4. **P-30 honesty:** v1 task synthesis covers the served-request→response *family* (the pipeline's actual shape); motions/briefs need a `pipeline_shape` registry — roadmap, staged behind the first live run. "Available" stays, tiered honestly in the UI (FD-5).
+5. **Two new live-cutover gates from data-integrity:** a hosted backup that works on a never-idle vault (driver-coordinated consistent snapshot), and `mootloop close` inventory registration for all seven new stores — no real matter data on the box until both hold (FD-6).
+6. **Full capability map** (14 CLI verbs, two new hard-human gates: rubric-lock and failover-authorization) + a BFF-is-thin invariant test so parity can't silently rot (FD-7).
+7. **Typed contract:** OpenAPI-generated types with a CI drift gate, Query-cache-as-truth, zod at the SSE trust boundary, never-optimistic attest — explicitly rejecting the chassis's hand-mirrored-types data layer (FD-8).
+8. **Design direction locked:** a case file, not a SaaS console — pleading-spine nav, serif=argument/mono=record voice rule, inking motion, coverage seals, the so-ordered RFA ceremony, certify-and-release colophon (FD-9).
+9. **Re-sequenced for a fast first live run:** perimeter → sandboxed engine → cockpit+inbox → freeform on-ramp → SSH seed → **live fence-litigation run (~14 sessions)**; wizard/board/watchers/dashboard layer on after (FD-10).
+
 ## Overview
 
 MootLoop gains its attorney-facing surface: a **hosted web app** at `mootloop.damienriehl.com` on the Hetzner box, behind **Cloudflare Access**, usable from any device. Six rooms — dashboard, begin-task on-ramps, strategy board, run cockpit, decision inbox, export/audit — over a new authenticated write tier and a **headless Claude Code driver running on Damien's Max plan**. FOLIO grounds everything: the task catalog (Litigation Document, 668 concepts), the strategy skeleton (Litigation Objectives, 1,847), and the audit trail (every LLM proposal snapped to an IRI or flagged `unmapped`).
@@ -127,6 +141,61 @@ Vault: /srv/mootloop-matters/<matter_id>/  (0700, outside all repos)
 - **Damien actions:** Cloudflare Access team setup approval (I can API-drive most of it), Google Cloud OAuth app → "In Production" + one-time unverified-screen click-through, `claude setup-token` on the box, fence-folder rsync, mootloop.org DNS (still pending from the deploy plan).
 - **Risks:** ToS-gray headless Max usage (mitigated: low volume, CLI-only, API failover switch ready); box capacity (8GB/85% disk — lean images, no torch, prune discipline; if it tightens, the dedicated-matter-box option from the brainstorm reopens); Coolify/Traefik hand-config for AOP (budgeted); first-ever worker service on this box (template exists, folio-insights).
 - **Deferred:** Dropbox/OneDrive connectors, Web Push, multiplayer rubric editing (schema ready), UTBMS billing integration, generic fallback adapter.
+
+## Deepening Insights (FD-1..FD-10)
+
+Amendments from the 7-agent deepening pass. Where reviewers conflicted, the resolution is stated; security wins ties with simplicity.
+
+### FD-1. Engine sandbox & internal trust (amends FE-0/FE-1 — hard gates)
+- Persona turns: `--allowedTools` restricted to read-only file tools — **no Bash, WebFetch, WebSearch** (personas draft text). `--settings` deny/allow stays as defense-in-depth, never the boundary.
+- **Network-egress jail** per turn (namespace/bwrap or egress proxy): only `api.anthropic.com`. Neutralizes token/vault exfil even if injected.
+- **Per-matter OS isolation in v1** (per-matter UID or ephemeral container mounting only that matter's vault) — ethical walls apply to the engine's filesystem view, not just learnings.
+- **Driver secret replaces localhost trust**: FastAPI internal write paths require a dedicated bearer/mTLS secret; API container not published on the shared Docker network; "sibling container cannot reach write API" joins the FE-0 pen checklist, as does "no matter-tier container mounts the docker socket".
+- FE-1 gate: planted-injection-in-discovery fixture attempting token/vault exfil must fail closed.
+
+### FD-2. Perimeter details (amends FE-0)
+- Pin the **API/BFF app's own AUD**; assert RS256 (never read alg from token); JWKS fetch failure = reject (bounded cache TTL); service tokens **rejected on matter routes** (they carry no email claim).
+- **Device flow only** for Google OAuth — the Access-bypass callback option is struck.
+- Traefik AOP client key: locked perms, never on an app-shared volume. Backups **exclude** `secrets.env` + `CLAUDE_CONFIG_DIR` (second token copy); token rotation purges backup history.
+
+### FD-3. Controls that don't carry (new analogues; amends FE-0/FE-1/FE-6)
+- `redact()`: add Google-refresh (`1//…`) + OAuth-token shapes + exact live secret values; apply at every new sink (AccessAuditEntry, SSE, ntfy, digest).
+- **Runtime canary tripwire**: the per-matter canary must never appear in any outbound network/notification payload (runtime analogue of privacy-grep).
+- **AccessAuditEntry hash-chained**, head folded into the attestation tuple; downloads **fail closed if the audit write fails**; append-only via a different-user file or off-box sink.
+- ntfy topic = rotatable secret; matter/run IDs opaque (never party-derived); digest hard-capped to non-privileged counts; `gmail.send` on a **separate OAuth credential** from `drive.readonly`.
+
+### FD-4. Approve-then-inject (amends P-33/FE-4)
+Auto-apply lands on the board immediately and visibly (changelog + feed — the HOTL commitment holds), but **only attorney-approved/curated nodes flow into persona prompts**; content auto-derived from untrusted sources (run findings over opposing-counsel documents, watched-Drive suggestions) enters `needs-review` until promoted. Board text reaching prompts is fenced-as-data with per-node provenance tags (attorney vs LLM vs OC-derived).
+
+### FD-5. Architecture corrections (amends FE-1/FE-3 + Technical Approach)
+- **P-30 scoping:** v1 synthesis = the served-request→response family (framing strings + derived rubric vary; output schemas/gates/assembler are discovery-shaped). Full breadth needs a **`pipeline_shape` registry** (output-schema + gate-set + assembler triples) — roadmap item, staged post-first-run. UI keeps "Available" with honest tiers: *runs now* / *synthesizes now (this family)* / *roadmap shape*.
+- **`SynthesizedTaskAdapter`**: one generic data-driven behavior class (framing as data fields); `get_binding` gains a **vault-aware branch** (synthesized configs + derived rubrics + `.sha256` sidecars live in the vault; `RunStarted` persists the vault ref + **content hash** so resume rebinds from journal+vault alone). Derived-rubric ids encode lineage (`<base>@<matter>@<run>#<sha12>`).
+- **`paused` run status** as first-class: extend the `RunStatus` literal + `RunPaused(reason)`/`RunResumed` event pair (mirrors CheckpointCleared); reason generic (`capacity`), driver translates CLI events.
+- **Queue**: priority lanes (interactive preempts at turn granularity), paused runs release their slot, visibility-timeout/heartbeat reclaim on crashed workers.
+- **SSE tier tails read-only** (never the truncating `read_events` — cross-process race); driver hand-rolls the stepwise loop, never `run_with_provider`.
+- **Topology decision: BFF.** FastAPI fully internal (own network); Next.js (Node runtime) proxies API + SSE and is the single Access-verified surface; driver + BFF present internal secrets. One perimeter, no dual-JWT drift.
+- Deploy contract: web/BFF stateless-redeployable anytime; **driver is drain-required** (finish/checkpoint in-flight turn, exit; reclaim on boot).
+
+### FD-6. Data lifecycle (amends FE-0/FE-1/FE-4/FE-5; two LIVE-CUTOVER GATES)
+- **GATE — hosted backup**: idle-only snapshots can never fire on a hot vault. Add a driver-coordinated consistent snapshot (drain queue → lock-consistent copy → resume) or block-level snapshot; encrypted, off-box, sync-folder-guard-compliant; stated RPO; restore drill in FE-7.
+- **GATE — close inventory**: `source_matter_id` required on every new persisted model; every new store registered in the `mootloop close` inventory; CI invariant fails if a matter-scoped model isn't registered. AccessAuditEntry retention decision: retain a matter-anonymized stub post-close.
+- **Board mutation choke-point** `apply_board_edit(edit, provenance)` writes state + changelog atomically; invariant: state hash == fold(changelog). Optimistic concurrency (`expected_version` → typed 409) for user and driver alike.
+- **Spend ledger**: write-ahead turn intent before each model call; reconcile actual cost; idempotent on turn id; **billing-mode tag** per entry; cap check conservative (unknown cost = max plausible until reconciled).
+- **Watcher resilience**: token failures → `needs_attention` notification (never silent); page-token loss → re-baseline + full folder reconcile by content hash; notification emission idempotent.
+- **Upload staging outside the run-visible tree**; atomic register-then-move; GC sweep on driver boot. **Single writer per store** (or advisory-locked appends) — two-process append test in the FE-1 gate.
+
+### FD-7. Parity (amends FE-2..FE-6 + capability map)
+Full verb set (no "…"): `matters list` · `tasks synthesize` · **`tasks lock`** (hard-human: records approver + rubric hash) · `tasks rubric edit` (policy-delegable, `edited_by` provenance) · `board add/edit/rm/show` · `board curate` · **`board revert <id>`** · `board changelog --list` · `notify feed --list` · `suggestions list/accept/dismiss` (dismiss logged) · **`run failover --authorize`** (hard-human; matter auto-failover-with-cap = policy-delegable; the one-tap push resolves to this same primitive) · needs-triage **reuses `manifest set --privilege/--role`** (never fork the privilege primitive) · `export link --doc` (writes the access audit) · `connectors list/add-folder/remove` (OAuth consent is the single human step) · `notify mute` / `quiet-hours`. All new stores persist as vault JSON files with list/show endpoints. **BFF-is-thin invariant test** (clone of test_web_readonly): Next.js route handlers only proxy — no domain computation, no vault access from Node.
+
+### FD-8. TypeScript contract (amends FE-2; reject the chassis data layer)
+`openapi-typescript` generated types + **CI drift gate** (`git diff --exit-code`); `openapi-fetch` + six hand-rolled domain modules; no Authorization threading (same-origin CF cookie); TanStack Query cache = server truth (no useState mirrors — the 510-line tree cache is the named anti-pattern); Zustand persist for drafts only; backend emits pydantic `Literal` discriminators so TS gets real discriminated unions + `assertNever`; **zod parses every SSE event** (type-equality test pins zod to codegen); `@microsoft/fetch-event-source` with content-type login-redirect detection → shared `SessionExpiredError`; hierarchical query-key factories; optimistic decide with 409-aware backoff, **never-optimistic attest**; jose middleware module-scoped JWKS, dependency-light (edge), matcher discipline; MSW typed mocks now, Playwright only at FE-7 for what MSW can't reach. folio-mapper adaptations: tokenize hardcoded colors, generalize `BoardNodeData` to `folio|unmapped` discriminated kind, replace CandidateTree's counter-signal props, inject DetailPanel's fetcher.
+
+### FD-9. Design direction (governs FE-2..FE-6 visual build)
+**A case file, not a SaaS console.** Pleading-spine navigation (docket tabs; bottom tab bar on mobile); serif = argument voice, mono = record voice (semantic rule); "inking" as the one signature motion (new turns/decisions write in; spend fills like ink; one thing moves at a time); coverage seals on board nodes (stamp/ochre/oxblood-ring/pencil-dashed/margin-gray for proven/contested/gap/extrapolated/unmapped); the on-ramp omnibox where **input shape picks the lane** (empty=suggestions, keywords=catalog, sentence=freeform) assembling a pleading-caption TaskSpec slip; the **so-ordered two-step ceremony** for binding RFA admissions; **certify-and-release colophon** on downloads (run id, rubric hash, attestation tuple, audit-logged confirmation); board mobile mode = linearized ruled outline (doubles as the screen-reader structure). Banned: stat-tile grids, gavels/scales/parchment, force-directed hairballs, purple gradients. Full room-by-room direction to be committed as `docs/design/frontend-direction.md` at FE-2 kickoff.
+
+### FD-10. Revised sequencing (YAGNI adopted, security-adjusted)
+**To first live run (~14 sessions):** FE-0 perimeter (grown: FD-1/2/3 gates; CSRF/rate-limit/AOP all stay — cheap, load-bearing) → FE-1 engine (sandbox + queue + backup gate + spend write-ahead) → FE-2 cockpit + inbox (+ typed contract foundations) → FE-2.5 thin on-ramp (freeform lane only + TaskSpec + minimal export/download with colophon) → **SSH-seed fence matter → first live hosted run.**
+**After first run:** FE-3 wizard/catalog + task synthesis + failover UX → FE-4 strategy board (single graph renderer: React Flow path) → FE-5 upload UI + Drive watcher + deadline scheduler → FE-6 dashboard + digest + mute. Deferred further: Dropbox/OneDrive, Web Push, pipeline_shape registry, multiplayer. TaskSpec ships with only the fields the first run consumes (refs added as features land); `edited_by` provenance stays (Damien's explicit wish, cheap).
 
 ## Sources & References
 
