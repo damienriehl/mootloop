@@ -1,0 +1,53 @@
+# MootLoop matter-tier WRITE API (plan FE-0) — Access-gated FastAPI over real vaults.
+# Unlike the demo `Dockerfile`, this image bakes NO vault: it serves the live
+# per-matter vaults mounted at runtime under /srv/mootloop-matters. Matter data never
+# lives in the image or the repo.
+
+FROM python:3.12-slim
+
+LABEL org.opencontainers.image.title="mootloop-matter-api" \
+      org.opencontainers.image.description="MootLoop hosted write-tier matter API (Cloudflare Access-gated)" \
+      org.opencontainers.image.source="https://github.com/damienriehl/mootloop" \
+      org.opencontainers.image.licenses="MIT"
+
+# System deps: curl for the healthcheck, pandoc because export/docx_render.py shells
+# out to it at runtime to render DOCX deliverables.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    pandoc \
+    && rm -rf /var/lib/apt/lists/*
+
+# uv via the official binary (pip-installing uv has been flaky on constrained build
+# networks — mirrors the demo Dockerfile).
+COPY --from=ghcr.io/astral-sh/uv:0.5.11 /uv /usr/local/bin/uv
+
+WORKDIR /app
+
+# Dependency layer first so it caches across source-only changes.
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --extra web --no-install-project
+
+# The repo proper (personas/, config/, rubrics/ are runtime inputs; fixtures/ unused
+# on this tier but harmless). NO `mootloop web bake` — that is demo-only.
+COPY . .
+RUN uv sync --frozen --no-dev --extra web
+
+ENV PATH="/app/.venv/bin:$PATH"
+
+# Non-root service user, UID/GID 3200 — must match the host `mootloop` user that owns
+# /srv/mootloop-matters and ~/.mootloop/secrets.env (the bind mounts). HOME anchors the
+# secrets loader: SECRETS_FILE resolves to ~/.mootloop/secrets.env.
+RUN groupadd --gid 3200 mootloop \
+    && useradd --uid 3200 --gid 3200 --home-dir /home/mootloop --create-home mootloop \
+    && chown -R mootloop:mootloop /app
+ENV HOME=/home/mootloop
+USER mootloop
+
+EXPOSE 8000
+
+# Unauthenticated /health (bypasses the Access-JWT + internal guards, no matter data).
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
+
+# --factory: create_matter_api() builds the write-tier app (separate from the demo).
+CMD ["sh", "-c", "uvicorn --factory mootloop.web.api:create_matter_api --host 0.0.0.0 --port ${PORT:-8000}"]

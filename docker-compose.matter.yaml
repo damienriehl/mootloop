@@ -1,0 +1,62 @@
+# MootLoop matter tier (plans FE-0/FE-1, FD-5 topology) — Coolify Docker Compose app.
+#
+# Three services on the Coolify-generated network:
+#   web    — the Next.js BFF; the ONLY publicly routable service (fqdn set in Coolify,
+#            never here). It fronts the API and enforces Cloudflare Access.
+#   api    — the write-tier FastAPI over the live vaults; INTERNAL only (no ports).
+#   driver — the engine worker draining runs via headless Claude; INTERNAL only.
+#
+# Hard rules: no service mounts the Docker socket; api/driver are never published;
+# secrets + the signing key resolve through the read-only ~/.mootloop mount, not env;
+# Coolify generates the network + Traefik labels, so this file stays minimal.
+
+services:
+  web:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    ports:
+      - "8000"
+    environment:
+      # Coolify-injected placeholders (values live only in Coolify, never in the repo).
+      MOOTLOOP_API_URL: http://api:8000
+      MOOTLOOP_INTERNAL_SECRET: ${MOOTLOOP_INTERNAL_SECRET}
+      CF_ACCESS_TEAM_DOMAIN: ${CF_ACCESS_TEAM_DOMAIN}
+      CF_ACCESS_AUD: ${CF_ACCESS_AUD}
+      CF_ACCESS_ALLOWED_EMAIL: ${CF_ACCESS_ALLOWED_EMAIL}
+    depends_on:
+      - api
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.matter-api
+    restart: unless-stopped
+    # INTERNAL only — no published ports; the BFF reaches it as http://api:8000.
+    expose:
+      - "8000"
+    environment:
+      MOOTLOOP_MATTERS_ROOT: /srv/mootloop-matters
+      CF_ACCESS_TEAM_DOMAIN: ${CF_ACCESS_TEAM_DOMAIN}
+      CF_ACCESS_AUD: ${CF_ACCESS_AUD}
+      CF_ACCESS_ALLOWED_EMAIL: ${CF_ACCESS_ALLOWED_EMAIL}
+    volumes:
+      # Live vaults (read-write: the write tier persists here).
+      - /srv/mootloop-matters:/srv/mootloop-matters
+      # Host service-user secrets, read-only: MOOTLOOP_INTERNAL_SECRET + the download
+      # signing key resolve through ~/.mootloop/secrets.env (mootloop.secrets).
+      - /home/mootloop/.mootloop:/home/mootloop/.mootloop:ro
+
+  driver:
+    build:
+      context: .
+      dockerfile: Dockerfile.driver
+    restart: unless-stopped
+    # INTERNAL only — no ports at all (no web surface).
+    environment:
+      MOOTLOOP_WORKER_ID: ${MOOTLOOP_WORKER_ID}
+    volumes:
+      - /srv/mootloop-matters:/srv/mootloop-matters
+      - /home/mootloop/.mootloop:/home/mootloop/.mootloop:ro
+    # Must outlast an in-flight claude turn (timeout_s=600) so SIGTERM drains cleanly.
+    stop_grace_period: 630s
