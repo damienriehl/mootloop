@@ -21,12 +21,13 @@ from mootloop import attest as attest_svc
 from mootloop import decisions as decisions_svc
 from mootloop import orchestrator
 from mootloop.engine.queue import Queue as WorkQueue
+from mootloop.errors import OrchestratorError
 from mootloop.journal import load_state
 from mootloop.models.matters import MatterSummary
 from mootloop.registry import MatterRegistry
 from mootloop.vault import safe_vault_path
 from mootloop.web import audit
-from mootloop.web.api import deps, models
+from mootloop.web.api import deps, models, readers
 from mootloop.web.api.deps import (
     get_queue,
     get_registry,
@@ -132,6 +133,110 @@ def list_runs(
     _audited: Annotated[None, Depends(_audit_dep("list_runs"))],
 ) -> list[models.RunSummary]:
     return _runs_for(vault)
+
+
+# --- single-run read views (cockpit + inbox; Access + audited) --------------
+
+
+@router.get("/api/matters/{matter_id}/runs/{run_id}")
+def get_run(
+    matter_id: str,
+    run_id: str,
+    vault: Vault,
+    _principal: Principal,
+    _audited: Annotated[None, Depends(_audit_dep("run_status"))],
+) -> models.RunStatusSummary:
+    return readers.run_status_summary(vault, run_id)
+
+
+@router.get("/api/matters/{matter_id}/runs/{run_id}/gates")
+def get_run_gates(
+    matter_id: str,
+    run_id: str,
+    vault: Vault,
+    _principal: Principal,
+    _audited: Annotated[None, Depends(_audit_dep("run_gates"))],
+) -> models.GateLedgerResponse:
+    return readers.gate_ledger_response(vault, run_id)
+
+
+@router.get("/api/matters/{matter_id}/runs/{run_id}/decisions")
+def get_run_decisions(
+    matter_id: str,
+    run_id: str,
+    vault: Vault,
+    _principal: Principal,
+    _audited: Annotated[None, Depends(_audit_dep("run_decisions"))],
+) -> models.DecisionsResponse:
+    return readers.decisions_response(vault, run_id)
+
+
+@router.get("/api/matters/{matter_id}/runs/{run_id}/requests")
+def get_run_requests(
+    matter_id: str,
+    run_id: str,
+    vault: Vault,
+    _principal: Principal,
+    _audited: Annotated[None, Depends(_audit_dep("run_requests"))],
+) -> models.RequestsResponse:
+    return readers.requests_response(vault, run_id)
+
+
+# --- run lifecycle writes (start / continue / raise-cap; Access + CSRF) ------
+
+
+@router.post("/api/matters/{matter_id}/runs")
+def start_run(
+    matter_id: str,
+    body: models.StartRunRequest,
+    vault: Vault,
+    principal: Principal,
+    _csrf: Csrf,
+    _audited: Annotated[None, Depends(_audit_dep("run_start"))],
+) -> models.RunStatusSummary:
+    run_id = orchestrator.start_run(vault, body.task, _now_iso(), mode=body.mode)
+    return readers.run_status_summary(vault, run_id)
+
+
+@router.post("/api/matters/{matter_id}/runs/{run_id}/continue")
+def continue_run(
+    matter_id: str,
+    run_id: str,
+    vault: Vault,
+    principal: Principal,
+    _csrf: Csrf,
+    _audited: Annotated[None, Depends(_audit_dep("run_continue"))],
+) -> models.RunActionResponse:
+    """Clear a gated-mode checkpoint so the run resumes (mirrors ``mootloop run
+    continue``; the ``/resume`` route covers operator-paused runs)."""
+    orchestrator.continue_run(vault, run_id)
+    return _run_action(vault, run_id, "run_continued")
+
+
+@router.post("/api/matters/{matter_id}/runs/{run_id}/raise-cap")
+def raise_cap(
+    matter_id: str,
+    run_id: str,
+    body: models.RaiseCapRequest,
+    vault: Vault,
+    principal: Principal,
+    _csrf: Csrf,
+    _audited: Annotated[None, Depends(_audit_dep("run_raise_cap"))],
+) -> models.RunActionResponse:
+    """Raise a capped run's hard budget cap (absolute ``to_usd`` or ``delta_usd`` over
+    the current effective cap), reopening it for resumption (plan D5)."""
+    if body.to_usd is not None:
+        to_usd = body.to_usd
+    else:
+        current = readers.effective_cap(vault, load_state(vault, run_id))
+        if current is None:
+            raise OrchestratorError(
+                f"run {run_id!r} has no cap to increment; pass an absolute `to_usd`"
+            )
+        assert body.delta_usd is not None  # guaranteed by the request validator
+        to_usd = current + body.delta_usd
+    orchestrator.raise_cap(vault, run_id, to_usd)
+    return _run_action(vault, run_id, "cap_raised")
 
 
 # --- decision resolve (write; typed 409 on lock contention) -----------------
