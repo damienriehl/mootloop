@@ -15,7 +15,9 @@ services:
     build:
       context: ./frontend
     restart: unless-stopped
-    ports:
+    # Traefik reaches the BFF over the Coolify network — never publish a host port
+    # (a published ephemeral port would expose the origin beside Cloudflare).
+    expose:
       - "8000"
     environment:
       # Coolify-injected placeholders (values live only in Coolify, never in the repo).

@@ -63,7 +63,7 @@ The `MOOTLOOP_INTERNAL_SECRET` and the download signing key also resolve on `api
 - Create the service user with a fixed id: `mootloop`, **UID 3200 / GID 3200** (must match the image users).
 - `/srv/mootloop-matters` — owned `mootloop:mootloop`, mode **0700**. Every vault lives under it, outside every repo tree.
 - `~mootloop/.mootloop/` — dir mode **0700**; `~mootloop/.mootloop/secrets.env` mode **0600**, owned `mootloop:mootloop`.
-- Populate the secrets file (`KEY=VALUE` lines): `MOOTLOOP_INTERNAL_SECRET`, and the subscription token via `claude setup-token` → `CLAUDE_CODE_OAUTH_TOKEN`. The download signing key auto-derives + persists on first use.
+- Populate the secrets file (`KEY=VALUE` lines): `MOOTLOOP_INTERNAL_SECRET`, **`MOOTLOOP_DOWNLOAD_SIGNING_KEY`** (pre-seed it on the host — the containers mount `~/.mootloop` read-only, so first-use auto-derivation would fail closed), and the subscription token via `claude setup-token` → `CLAUDE_CODE_OAUTH_TOKEN`.
 - Run `claude setup-token` as the `mootloop` user so the token lands in that user's secrets file (the crown-jewel asset; never printed, never committed).
 
 ## Per-hostname AOP (Traefik `tls.options`) — hand-applied on the box
