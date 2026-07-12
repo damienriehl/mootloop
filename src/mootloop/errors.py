@@ -89,3 +89,9 @@ class InternalAuthError(MootloopError):
     """The internal driver/BFF secret was missing, empty, or did not match the
     configured value. Replaces localhost trust on the shared Docker network
     (plan FD-1); a missing secret rejects (fail closed)."""
+
+
+class AuditWriteError(MootloopError):
+    """A hash-chained access-audit append could not be durably written. Callers must
+    treat this as fatal and fail closed — a matter-data page view or download that
+    cannot be recorded is refused, never served (plan FD-3, threat-model item 13)."""
