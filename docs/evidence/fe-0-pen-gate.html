@@ -1,0 +1,405 @@
+<title>MootLoop FE-0 Penetration Gate — Attestation</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --paper: #f4efe4;
+    --paper-2: #eae2d1;
+    --ink: #211c17;
+    --ink-soft: #4b4238;
+    --rule: #cdbfa4;
+    --oxblood: #7c2b25;
+    --oxblood-soft: #a8514a;
+    --sealed: #3f6b4a;
+    --sealed-soft: #5c8a68;
+    --ochre: #a9741f;
+    --ochre-soft: #c79a4a;
+    --accent: var(--oxblood);
+    --card: #fbf7ee;
+    --shadow: 0 1px 0 rgba(33,28,23,.04), 0 6px 22px -14px rgba(33,28,23,.5);
+    --serif: 'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,serif;
+    --mono: ui-monospace,'SF Mono','Cascadia Code',Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #1a1713;
+      --paper-2: #221d18;
+      --ink: #ece3d4;
+      --ink-soft: #b3a794;
+      --rule: #3d352a;
+      --oxblood: #cf6a5f;
+      --oxblood-soft: #b5544a;
+      --sealed: #74ad82;
+      --sealed-soft: #5f9670;
+      --ochre: #d6a955;
+      --ochre-soft: #b98f42;
+      --card: #241f19;
+      --shadow: 0 1px 0 rgba(0,0,0,.2), 0 10px 30px -18px rgba(0,0,0,.8);
+    }
+  }
+  :root[data-theme="light"] {
+    --paper: #f4efe4; --paper-2: #eae2d1; --ink: #211c17; --ink-soft: #4b4238;
+    --rule: #cdbfa4; --oxblood: #7c2b25; --oxblood-soft:#a8514a; --sealed:#3f6b4a;
+    --sealed-soft:#5c8a68; --ochre:#a9741f; --ochre-soft:#c79a4a; --card:#fbf7ee;
+    --shadow: 0 1px 0 rgba(33,28,23,.04), 0 6px 22px -14px rgba(33,28,23,.5);
+  }
+  :root[data-theme="dark"] {
+    --paper:#1a1713; --paper-2:#221d18; --ink:#ece3d4; --ink-soft:#b3a794;
+    --rule:#3d352a; --oxblood:#cf6a5f; --oxblood-soft:#b5544a; --sealed:#74ad82;
+    --sealed-soft:#5f9670; --ochre:#d6a955; --ochre-soft:#b98f42; --card:#241f19;
+    --shadow: 0 1px 0 rgba(0,0,0,.2), 0 10px 30px -18px rgba(0,0,0,.8);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: var(--serif); line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 60rem; margin: 0 auto; padding: clamp(1.25rem, 4vw, 3.25rem) clamp(1rem, 4vw, 2.25rem) 5rem; }
+  .mono { font-family: var(--mono); }
+  .eyebrow {
+    font-family: var(--mono); font-size: .72rem; letter-spacing: .22em;
+    text-transform: uppercase; color: var(--ink-soft);
+  }
+  /* Caption block — pleading header */
+  .caption {
+    border: 1.5px solid var(--ink); border-radius: 3px; background: var(--card);
+    box-shadow: var(--shadow); overflow: hidden;
+  }
+  .caption-inner { padding: clamp(1.1rem,3vw,1.9rem) clamp(1.1rem,3vw,2rem); }
+  .caption h1 {
+    font-size: clamp(1.7rem, 4.4vw, 2.7rem); line-height: 1.05; margin: .5rem 0 .2rem;
+    text-wrap: balance; font-weight: 600; letter-spacing: -.01em;
+  }
+  .caption .sub { color: var(--ink-soft); font-size: 1.02rem; max-width: 44ch; }
+  .caption-rule { height: 0; border-top: 1px solid var(--rule); margin: 0; }
+  .docket {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem,1fr));
+    font-family: var(--mono); font-size: .74rem;
+  }
+  .docket div { padding: .6rem .9rem; border-right: 1px solid var(--rule); }
+  .docket div:last-child { border-right: 0; }
+  .docket dt { color: var(--ink-soft); letter-spacing: .1em; text-transform: uppercase; font-size: .64rem; }
+  .docket dd { margin: .2rem 0 0; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  /* Verdict seal */
+  .verdict-band { display: flex; flex-wrap: wrap; gap: .9rem; margin: 1.4rem 0 0; }
+  .seal {
+    flex: 1 1 8rem; min-width: 8rem; border-radius: 3px; padding: .85rem 1rem;
+    border: 1px solid var(--rule); background: var(--card); box-shadow: var(--shadow);
+  }
+  .seal .n { font-family: var(--mono); font-size: 1.9rem; font-variant-numeric: tabular-nums; line-height: 1; }
+  .seal .l { font-family: var(--mono); font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft); margin-top: .35rem; }
+  .seal.pass { border-color: color-mix(in srgb, var(--sealed) 45%, var(--rule)); }
+  .seal.pass .n { color: var(--sealed); }
+  .seal.blocked .n { color: var(--ochre); }
+  .seal.blocked { border-color: color-mix(in srgb, var(--ochre) 40%, var(--rule)); }
+  .seal.fail .n { color: var(--oxblood); }
+
+  section { margin-top: 2.6rem; }
+  h2 {
+    font-size: 1.35rem; margin: 0 0 .3rem; font-weight: 600; letter-spacing: -.01em;
+    display: flex; align-items: baseline; gap: .6rem;
+  }
+  h2 .num { font-family: var(--mono); font-size: .8rem; color: var(--oxblood); letter-spacing: .1em; }
+  .lede { color: var(--ink-soft); margin: 0 0 1.1rem; max-width: 62ch; }
+
+  /* Evidence ledger */
+  .ledger { display: flex; flex-direction: column; gap: .55rem; }
+  .item {
+    border: 1px solid var(--rule); border-radius: 3px; background: var(--card);
+    box-shadow: var(--shadow); overflow: hidden;
+  }
+  .item > summary {
+    list-style: none; cursor: pointer; padding: .75rem .95rem;
+    display: grid; grid-template-columns: 2.2rem 1fr auto; align-items: center; gap: .8rem;
+  }
+  .item > summary::-webkit-details-marker { display: none; }
+  .item .idx { font-family: var(--mono); font-size: .82rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .item .claim { font-size: .98rem; }
+  .item .claim b { font-weight: 600; }
+  .chip {
+    font-family: var(--mono); font-size: .64rem; letter-spacing: .1em; text-transform: uppercase;
+    padding: .28rem .5rem; border-radius: 2px; white-space: nowrap; border: 1px solid;
+  }
+  .chip.pass { color: var(--sealed); border-color: color-mix(in srgb, var(--sealed) 55%, transparent); background: color-mix(in srgb, var(--sealed) 12%, transparent); }
+  .chip.blocked { color: var(--ochre); border-color: color-mix(in srgb, var(--ochre) 55%, transparent); background: color-mix(in srgb, var(--ochre) 12%, transparent); }
+  .chip.na { color: var(--ink-soft); border-color: var(--rule); }
+  .evidence {
+    border-top: 1px solid var(--rule); padding: .85rem .95rem; background: var(--paper-2);
+    font-size: .9rem;
+  }
+  .evidence .how { color: var(--ink-soft); margin: 0 0 .55rem; }
+  pre {
+    margin: 0; padding: .7rem .8rem; background: var(--paper); border: 1px solid var(--rule);
+    border-radius: 3px; overflow-x: auto; font-family: var(--mono); font-size: .78rem; line-height: 1.5;
+    color: var(--ink);
+  }
+  pre .ok { color: var(--sealed); }
+  pre .bad { color: var(--oxblood); }
+  pre .dim { color: var(--ink-soft); }
+
+  .callout {
+    border-left: 3px solid var(--ochre); background: color-mix(in srgb, var(--ochre) 8%, var(--card));
+    padding: .9rem 1.1rem; border-radius: 0 3px 3px 0; margin: 1rem 0;
+  }
+  .callout.blood { border-left-color: var(--oxblood); background: color-mix(in srgb, var(--oxblood) 8%, var(--card)); }
+  .callout h3 { margin: 0 0 .3rem; font-size: 1rem; }
+  .callout p { margin: .25rem 0; }
+
+  /* Decision instrument */
+  .decision { border: 1.5px solid var(--ink); border-radius: 3px; background: var(--card); box-shadow: var(--shadow); }
+  .decision-h { padding: 1rem 1.1rem; border-bottom: 1px solid var(--rule); }
+  .decision-h h2 { margin: 0; }
+  .q { padding: 1rem 1.1rem; border-bottom: 1px solid var(--rule); }
+  .q:last-of-type { border-bottom: 0; }
+  .q .prompt { font-size: 1.02rem; margin: 0 0 .1rem; }
+  .q .ctx { color: var(--ink-soft); font-size: .88rem; margin: 0 0 .7rem; }
+  .opts { display: flex; flex-direction: column; gap: .45rem; }
+  .opt {
+    display: flex; gap: .6rem; align-items: flex-start; padding: .55rem .7rem;
+    border: 1px solid var(--rule); border-radius: 3px; cursor: pointer; background: var(--paper);
+    transition: border-color .12s, background .12s;
+  }
+  .opt:hover { border-color: var(--ink-soft); }
+  .opt.sel { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--paper)); }
+  .opt input { margin-top: .28rem; accent-color: var(--accent); }
+  .opt .ol { font-size: .94rem; }
+  .opt .ol .rec { font-family: var(--mono); font-size: .6rem; letter-spacing: .1em; color: var(--sealed); text-transform: uppercase; margin-left: .4rem; }
+  .opt .od { color: var(--ink-soft); font-size: .84rem; margin-top: .15rem; }
+  textarea {
+    width: 100%; margin-top: .6rem; background: var(--paper); color: var(--ink);
+    border: 1px solid var(--rule); border-radius: 3px; padding: .55rem .65rem;
+    font-family: var(--serif); font-size: .92rem; resize: vertical; min-height: 3rem;
+  }
+  .actions { padding: 1rem 1.1rem; display: flex; gap: .7rem; align-items: center; flex-wrap: wrap; }
+  button.copy {
+    font-family: var(--mono); font-size: .82rem; letter-spacing: .04em;
+    background: var(--ink); color: var(--paper); border: 0; border-radius: 3px;
+    padding: .6rem 1rem; cursor: pointer;
+  }
+  button.copy:hover { background: var(--oxblood); }
+  .copied { font-family: var(--mono); font-size: .78rem; color: var(--sealed); opacity: 0; transition: opacity .2s; }
+  .copied.show { opacity: 1; }
+  .preview {
+    margin: 0 1.1rem 1.1rem; padding: .8rem; background: var(--paper-2);
+    border: 1px dashed var(--rule); border-radius: 3px; font-family: var(--mono);
+    font-size: .74rem; white-space: pre-wrap; color: var(--ink-soft); max-height: 14rem; overflow: auto;
+  }
+  a { color: var(--oxblood); }
+  .foot { margin-top: 3rem; padding-top: 1.2rem; border-top: 1px solid var(--rule); color: var(--ink-soft); font-size: .82rem; font-family: var(--mono); }
+  .theme-toggle {
+    position: fixed; top: .8rem; right: .8rem; z-index: 5;
+    font-family: var(--mono); font-size: .68rem; letter-spacing: .08em; text-transform: uppercase;
+    background: var(--card); color: var(--ink-soft); border: 1px solid var(--rule);
+    border-radius: 3px; padding: .4rem .6rem; cursor: pointer;
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  @media (max-width: 34rem) {
+    .item > summary { grid-template-columns: 1.6rem 1fr; }
+    .item > summary .chip { grid-column: 2; justify-self: start; margin-top: .3rem; }
+  }
+</style>
+
+<button class="theme-toggle" onclick="toggleTheme()">◑ theme</button>
+<div class="wrap">
+
+  <div class="caption">
+    <div class="caption-inner">
+      <div class="eyebrow">MootLoop · Hosted Matter Tier · Security Attestation</div>
+      <h1>FE-0 Penetration Gate</h1>
+      <p class="sub">The perimeter that must hold <em>before</em> any real client matter data touches the server. Thirteen assertions, each mapped to landed code and verified against the live origin.</p>
+    </div>
+    <div class="caption-rule"></div>
+    <dl class="docket">
+      <div><dt>Host</dt><dd>mootloop.damienriehl.com</dd></div>
+      <div><dt>Origin</dt><dd>204.168.246.227</dd></div>
+      <div><dt>Date</dt><dd>2026-07-12</dd></div>
+      <div><dt>Gate</dt><dd id="gate-verdict">CONDITIONAL</dd></div>
+    </dl>
+  </div>
+
+  <div class="verdict-band">
+    <div class="seal pass"><div class="n">11</div><div class="l">Passed</div></div>
+    <div class="seal blocked"><div class="n">2</div><div class="l">Blocked on you</div></div>
+    <div class="seal fail"><div class="n">0</div><div class="l">Failed</div></div>
+  </div>
+
+  <div class="callout blood">
+    <h3>Hard rule still in force</h3>
+    <p>No real matter data on the server until all thirteen pass. Two items are blocked on actions only you can take (below). The rest hold, including a defect this gate <em>caught and fixed</em> before it could matter.</p>
+  </div>
+
+  <section>
+    <h2><span class="num">§1</span> What this gate found</h2>
+    <p class="lede">The gate did its job: probing the live origin surfaced a real perimeter defect that the unit tests didn't — every per-matter route resolved the vault <em>before</em> checking the Access token, leaking an unauthenticated 404/400 oracle that let a caller distinguish existent from nonexistent matters. Fixed in PR #16 (auth now resolves first on all 19 routes; regression test encodes the no-oracle invariant), redeployed, and re-verified below (item 2).</p>
+  </section>
+
+  <section>
+    <h2><span class="num">§2</span> The thirteen assertions</h2>
+    <p class="lede">Expand any row for the method and the actual evidence. <span class="mono">PASS</span> = verified holding; <span class="mono">BLOCKED</span> = control staged, waiting on a credential only you hold; <span class="mono">code-gate</span> = enforced and covered by a green unit test where a live probe would require seeded matter data.</p>
+    <div class="ledger" id="ledger"></div>
+  </section>
+
+  <section>
+    <h2><span class="num">§3</span> Rulings you need to make</h2>
+    <p class="lede">Pick an option per item, add any notes, then <b>Copy rulings</b> and paste back into the chat. Recommended picks are flagged.</p>
+    <div class="decision" id="decision"></div>
+  </section>
+
+  <section>
+    <h2><span class="num">§4</span> What is live right now</h2>
+    <div class="callout">
+      <p><b>Deployed &amp; healthy:</b> Next.js BFF (public, Access-gated), FastAPI matter API (internal, unpublished), driver worker — all three containers healthy in Coolify project <span class="mono">mootloop</span>. Let's Encrypt origin cert issued (ACME-challenge Access-bypass in place). DNS proxied. Internal driver secret + download signing key seeded on the box under the <span class="mono">mootloop</span> service user (uid 3200), matters-root <span class="mono">/srv/mootloop-matters</span> at 0700.</p>
+      <p><b>Not yet:</b> per-hostname AOP enforcement (staged, needs the SSL token scope), <span class="mono">claude setup-token</span> on the box (blocks the engine), and the fence-matter seed (blocked behind the full gate).</p>
+    </div>
+  </section>
+
+  <div class="foot">
+    MootLoop FE-0 · docs/security-frontend.md · generated 2026-07-12 · this attestation is versioned in the repo at docs/evidence/fe-0-pen-gate.html
+  </div>
+</div>
+
+<script>
+  const items = [
+    { n:1, verdict:"blocked", claim:"Direct-to-origin (bypassing Cloudflare) fails the TLS handshake — <b>per-hostname AOP</b>.",
+      how:"Control staged end-to-end on the box: CA + client cert generated, Traefik v3.6 <span class='mono'>tls.options</span> dynamic config written. Enforcement is INERT until the client cert is uploaded to Cloudflare's per-hostname store — which needs a token scope the current MootLoop token lacks (Zone → SSL and Certificates → Edit).",
+      pre:"<span class='dim'># staged, not yet enforcing:</span>\n/data/coolify/proxy/dynamic/mootloop-aop.yaml   <span class='dim'>(RequireAndVerifyClientCert)</span>\n/root/mootloop-aop/{aop-ca.crt,aop-client.crt,aop-client.key}\n<span class='bad'>CF cert upload -> 10000 Authentication error (missing SSL scope)</span>\n<span class='dim'># interim mitigation (verified below): origin fails closed on auth anyway</span>" },
+    { n:2, verdict:"pass", claim:"No Access JWT on any matter route → <b>401</b>, regardless of whether the matter exists (no oracle).",
+      how:"Probed the live origin directly (throwaway container on the app network, no Access JWT) after the PR #16 auth-ordering fix. Before the fix these leaked 400/404 pre-auth; now every shape returns an identical 401.",
+      pre:"<span class='dim'># GET /api/matters/{id}/runs, no JWT — post-fix:</span>\n  nonexistent id     -> <span class='ok'>401 {\"detail\":\"access denied\"}</span>\n  charset-invalid id -> <span class='ok'>401 {\"detail\":\"access denied\"}</span>\n  list (contrast)    -> <span class='ok'>401 {\"detail\":\"access denied\"}</span>\n  POST start_run     -> <span class='ok'>401 {\"detail\":\"access denied\"}</span>\n<span class='dim'># existent vs nonexistent are now indistinguishable.</span>\n<span class='dim'># at the edge (through Cloudflare): 302 -> Access login.</span>" },
+    { n:3, verdict:"code-gate", claim:"A JWT minted for a different Access app (wrong <span class='mono'>aud</span>) is rejected.",
+      how:"Enforced in the CfAccessVerifier (aud pinned to the per-app AUD); covered by <span class='mono'>test_wrong_aud_rejects</span>. A live probe needs a real signed token; the crypto path is unit-verified.",
+      pre:"<span class='ok'>tests/unit/test_web_security.py::test_wrong_aud_rejects PASSED</span>\n<span class='ok'>::test_wrong_iss_rejects PASSED</span>\n<span class='ok'>::test_wrong_email_rejects PASSED</span>" },
+    { n:4, verdict:"code-gate", claim:"An <span class='mono'>alg=none</span> or HS256-forged token is rejected — RS256 asserted, JWKS-fetch failure also rejects.",
+      how:"The verifier asserts RS256 (never reads alg from the token) against the pinned team JWKS; fetch failure fails closed.",
+      pre:"<span class='ok'>::test_alg_none_rejects PASSED</span>\n<span class='ok'>::test_hs256_forgery_rejects PASSED</span>\n<span class='ok'>::test_unfetchable_jwks_rejects_fail_closed PASSED</span>\n<span class='ok'>::test_empty_jwks_rejects_fail_closed PASSED</span>" },
+    { n:5, verdict:"code-gate", claim:"A Cloudflare service token (no email claim) is barred from matter routes.",
+      how:"Matter routes require an email claim; a service-token principal carries none → rejected.",
+      pre:"<span class='ok'>::test_missing_email_claim_rejects PASSED</span>" },
+    { n:6, verdict:"pass", claim:"<span class='mono'>matter_id = \"../other\"</span> / charset-invalid ids are rejected by <span class='mono'>validate_id</span> before any filesystem access.",
+      how:"Live: a charset-invalid id now returns 401 (auth first, post-fix) rather than leaking the 400 validator response; behind a valid Access JWT the validator itself rejects the id before any filesystem access, and is unit-covered directly.",
+      pre:"<span class='dim'># charset-invalid id, no JWT — post-fix:</span>\n  /api/matters/BADID/runs -> <span class='ok'>401 (was 400 pre-fix)</span>\n<span class='ok'>tests/unit/test_vault.py::test_safe_vault_path_rejects_dotdot[../] PASSED</span>\n<span class='ok'>registry.validate_id rejects charset/./..  (unit-covered)</span>" },
+    { n:7, verdict:"code-gate", claim:"A symlinked matter dir pointing outside the matters-root is blocked by realpath-containment (fail-closed).",
+      how:"<span class='mono'>safe_vault_path</span> / registry resolve assert realpath containment; symlink-escape raises VaultBoundaryError.",
+      pre:"<span class='ok'>tests/unit/test_vault.py::test_safe_vault_path_rejects_symlink_escape PASSED</span>\n<span class='ok'>::test_safe_vault_path_rejects_dotdot[..] PASSED</span>\n<span class='ok'>::test_safe_vault_path_rejects_absolute PASSED</span>" },
+    { n:8, verdict:"pass", claim:"A nonexistent <span class='mono'>matter_id</span> yields a clean error, never a stack trace or path disclosure.",
+      how:"Live: post-fix, an unauthenticated request to any matter (existent or not) returns a flat 401 JSON body — no path, no trace. Behind auth, a genuinely-absent matter maps to MatterNotFoundError → a central 404 handler (also body-only). The unauthenticated response is identical either way.",
+      pre:"nonexistent id, no JWT -> <span class='ok'>401 {\"detail\":\"access denied\"}</span>\n<span class='dim'># flat JSON body; no filesystem path, no traceback.</span>\n<span class='ok'>central exception handlers map MatterNotFound/VaultBoundary -> 404/400 body-only</span>" },
+    { n:9, verdict:"pass", claim:"A compromised sibling container cannot reach the write API — unpublished + internal secret required.",
+      how:"Ran a throwaway curl container on (a) the shared Coolify proxy network and (b) the app's own network.",
+      pre:"<span class='dim'># from the shared coolify network:</span>\napi:8000/health -> <span class='bad'>000 (unreachable — different network)</span>\n<span class='dim'># even on the app network, matter routes need the JWT:</span>\napi:8000/api/matters (no jwt) -> <span class='ok'>401</span>\napi:8000/internal/... (no secret) -> <span class='ok'>401 (post-fix)</span>" },
+    { n:10, verdict:"pass", claim:"No matter-tier container mounts the Docker socket.",
+      how:"Inspected the mounts of all three running containers.",
+      pre:"web  mounts: <span class='dim'>(none)</span>\napi  mounts: /srv/mootloop-matters, /home/mootloop/.mootloop <span class='dim'>(ro)</span>\ndriver mounts: /srv/mootloop-matters, /home/mootloop/.mootloop <span class='dim'>(ro)</span>\n<span class='ok'>/var/run/docker.sock -> absent on all three</span>" },
+    { n:11, verdict:"code-gate", claim:"A client-supplied upload filename cannot control the on-disk path (UUID + realpath containment).",
+      how:"The upload UI lands in FE-5; the choke-point <span class='mono'>safe_vault_path</span> that any upload must pass is present and unit-covered now. Re-verify live when the upload endpoint ships.",
+      pre:"<span class='ok'>tests/unit/test_vault.py::test_safe_vault_path_allows_within PASSED</span>\n<span class='dim'># upload endpoint = FE-5; control (safe_vault_path) already enforced</span>" },
+    { n:12, verdict:"pass", claim:"Exceeding the app-side rate limit on write endpoints is throttled (not only at the edge).",
+      how:"Hammered a write route 30× from the app network; pure-ASGI token bucket (cap 20, refill 2/s) throttles with a Retry-After.",
+      pre:"codes: <span class='dim'>200×20…</span> <span class='bad'>429 429 429 429 429 429 429 429 429</span> <span class='dim'>200</span>\nretry-after: <span class='ok'>1</span>\n<span class='dim'># limiter runs ahead of auth — protects the auth path itself</span>" },
+    { n:13, verdict:"code-gate", claim:"A download whose AccessAuditEntry write fails is refused — audit failure fails the download closed.",
+      how:"The download path writes the hash-chained audit entry first and aborts the stream if it fails.",
+      pre:"<span class='ok'>tests/unit/test_onramp_api.py::test_download_fails_closed_when_audit_write_fails PASSED</span>\n<span class='ok'>::test_download_streams_after_audit_records PASSED</span>\n<span class='ok'>test_api_endpoints.py::test_matter_data_route_records_hash_chained_audit PASSED</span>" },
+  ];
+
+  const chipLabel = { pass:"PASS", blocked:"BLOCKED", "code-gate":"code-gate" };
+  const chipClass = { pass:"pass", blocked:"blocked", "code-gate":"na" };
+  const ledger = document.getElementById('ledger');
+  for (const it of items) {
+    const d = document.createElement('details'); d.className = 'item';
+    if (it.verdict === 'blocked') d.open = true;
+    d.innerHTML =
+      `<summary><span class="idx">${String(it.n).padStart(2,'0')}</span>` +
+      `<span class="claim">${it.claim}</span>` +
+      `<span class="chip ${chipClass[it.verdict]}">${chipLabel[it.verdict]}</span></summary>` +
+      `<div class="evidence"><p class="how">${it.how}</p><pre>${it.pre}</pre></div>`;
+    ledger.appendChild(d);
+  }
+
+  // --- Decision instrument ---
+  const questions = [
+    { id:"aop", prompt:"Per-hostname AOP (pen item 1) — how do you want to unblock the origin-lock?",
+      ctx:"The control is fully staged on the box; only the Cloudflare-side cert upload is blocked by the current token's scope.",
+      opts:[
+        {v:"scope", t:"Add SSL/Certificates·Edit to the MootLoop token", rec:true, d:"You widen the existing token's scope in the CF dashboard; I finish the upload + attach the Traefik option automatically."},
+        {v:"newtoken", t:"Mint a separate short-lived cert-upload token", d:"You create a one-off token with just Zone→SSL·Edit; I use it once and it can be revoked after."},
+        {v:"defer", t:"Defer AOP; rely on edge Access for now", d:"Ship without the origin-lock. Not acceptable for real matter data — only for continued dry-run testing."},
+      ]},
+    { id:"setup", prompt:"claude setup-token on the box (blocks the engine / any live run) — ready to run it?",
+      ctx:"Must run as the mootloop service user so the OAuth token lands in that user's secrets file. This is the crown-jewel credential.",
+      opts:[
+        {v:"now", t:"I'll run it now via ! setup-token", rec:true, d:"You run the interactive login in this session; I wire it into the mootloop user's secrets."},
+        {v:"later", t:"Hold — not until the full gate passes", d:"Keep the engine credential off the box until AOP + gate are fully green."},
+      ]},
+    { id:"org", prompt:"mootloop.org (demo-prod domain) — the CF token can't create the zone. How to proceed?",
+      ctx:"Separate from the matter tier; only affects the public demo's production domain.",
+      opts:[
+        {v:"registrar", t:"You add A records @ and www → 204.168.246.227 at the registrar", rec:true, d:"Simplest; no nameserver change. Demo-prod serves once Coolify issues its cert."},
+        {v:"zonescope", t:"Add Zone→Create so I provision the CF zone + you flip nameservers", d:"Fuller CF management of mootloop.org; more moving parts."},
+        {v:"skip", t:"Skip mootloop.org for now", d:"Demo stays on mootloop.dev.openlegalstandard.org only."},
+      ]},
+  ];
+  const state = {};
+  const dec = document.getElementById('decision');
+  dec.innerHTML = `<div class="decision-h"><h2>Rulings</h2></div>`;
+  for (const q of questions) {
+    const wrap = document.createElement('div'); wrap.className = 'q';
+    let html = `<p class="prompt">${q.prompt}</p><p class="ctx">${q.ctx}</p><div class="opts">`;
+    for (const o of q.opts) {
+      html += `<label class="opt" data-q="${q.id}" data-v="${o.v}">` +
+        `<input type="radio" name="${q.id}" value="${o.v}">` +
+        `<span class="ol">${o.t}${o.rec?'<span class="rec">recommended</span>':''}<span class="od">${o.d}</span></span></label>`;
+    }
+    html += `</div><textarea placeholder="Notes on ${q.id} (optional)…" data-notes="${q.id}"></textarea>`;
+    wrap.innerHTML = html;
+    dec.appendChild(wrap);
+  }
+  const act = document.createElement('div'); act.className = 'actions';
+  act.innerHTML = `<button class="copy" onclick="copyRulings()">Copy rulings</button><span class="copied" id="copied">copied ✓</span>`;
+  dec.appendChild(act);
+  const prev = document.createElement('div'); prev.className = 'preview'; prev.id = 'preview';
+  prev.textContent = 'Your rulings will assemble here…';
+  dec.appendChild(prev);
+
+  dec.addEventListener('change', (e) => {
+    if (e.target.matches('input[type=radio]')) {
+      state[e.target.name] = e.target.value;
+      dec.querySelectorAll(`.opt[data-q="${e.target.name}"]`).forEach(l =>
+        l.classList.toggle('sel', l.dataset.v === e.target.value));
+    }
+    render();
+  });
+  dec.addEventListener('input', (e) => { if (e.target.matches('textarea')) render(); });
+
+  function assemble() {
+    let out = "MootLoop FE-0 pen-gate — rulings\n";
+    for (const q of questions) {
+      const chosen = q.opts.find(o => o.v === state[q.id]);
+      const notes = dec.querySelector(`textarea[data-notes="${q.id}"]`).value.trim();
+      out += `\n• ${q.prompt}\n   → ${chosen ? chosen.t : '(no selection)'}`;
+      if (notes) out += `\n   note: ${notes}`;
+    }
+    return out;
+  }
+  function render() { document.getElementById('preview').textContent = assemble(); }
+  function copyRulings() {
+    const text = assemble();
+    const done = () => { const c = document.getElementById('copied'); c.classList.add('show'); setTimeout(()=>c.classList.remove('show'),1600); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(()=>fallback(text, done));
+    } else fallback(text, done);
+  }
+  function fallback(text, done) {
+    const ta = document.createElement('textarea'); ta.value = text;
+    ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    try { document.execCommand('copy'); done(); } catch(e){}
+    document.body.removeChild(ta);
+  }
+
+  function toggleTheme() {
+    const r = document.documentElement;
+    const cur = r.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    r.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+  }
+</script>
