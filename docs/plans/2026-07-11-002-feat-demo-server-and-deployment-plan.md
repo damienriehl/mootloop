@@ -1,7 +1,7 @@
 ---
 title: "feat: MootLoop demo server + deployment — public read-only demo tier"
 type: feat
-status: active
+status: completed
 date: 2026-07-11
 origin: docs/plans/2026-07-11-001-feat-mootloop-v1-agentic-litigation-pipeline-plan.md §D13
 ---
