@@ -177,12 +177,14 @@ def start_run(
     *,
     run_id: str | None = None,
     mode: RunMode | None = None,
+    task_spec_id: str | None = None,
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
 ) -> str:
     """Begin a run: write RunStarted under the run lock; finalize if there is no work.
 
     The run ``mode`` resolves ``--mode`` flag -> ``matter.yaml`` -> ``autonomous``
-    (plan D12 precedence).
+    (plan D12 precedence). ``task_spec_id`` records the on-ramp TaskSpec the run started
+    from (plan FE-2.5), when any.
     """
     binding = get_binding(task)
     matter = load_matter(vault_root)
@@ -199,6 +201,7 @@ def start_run(
                 rubric_version=binding.config.rubric_id,
                 config_digest=_config_digest(binding),
                 mode=resolved_mode,
+                task_spec_id=task_spec_id,
             ),
         )
         units = load_request_units(vault_root)

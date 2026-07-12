@@ -32,7 +32,7 @@ attestation are human-by-design (`decide`/`attest` are their own verbs).
 ## 2. Export
 
 ```
-uv run mootloop export "$VAULT" "$RUN" [--force-draft]
+uv run mootloop export build "$VAULT" "$RUN" [--force-draft]
 ```
 
 This always writes the markdown deliverables under `deliverables/<run-id>/`:

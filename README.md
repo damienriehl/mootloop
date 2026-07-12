@@ -49,8 +49,9 @@ deliverables — clean only when attested.
 
 ```bash
 uv run mootloop run panels ~/matters/acme <run-id>
-uv run mootloop export ~/matters/acme <run-id>          # DRAFT until attested + green
-uv run mootloop export ~/matters/acme <run-id> --force-draft
+uv run mootloop export build ~/matters/acme <run-id>          # DRAFT until attested + green
+uv run mootloop export build ~/matters/acme <run-id> --force-draft
+uv run mootloop export link ~/matters/acme --run <run-id> --doc <deliverable>  # signed download link
 ```
 
 **Phase 5 — Attorney gates & run modes.** The professional-judgment spine: personas

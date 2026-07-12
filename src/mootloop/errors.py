@@ -124,3 +124,29 @@ class BackupError(MootloopError):
     """A hosted-backup precondition failed: the destination is inside a background-sync
     folder or a git repo, a consistent snapshot point could not be acquired, or the
     tar readback did not list the expected members (plan FD-6 hosted-backup gate)."""
+
+
+class TaskSpecError(MootloopError):
+    """A begin-task on-ramp precondition failed (unknown TaskSpec id, malformed spec
+    store, …). An *unresolved* intent is a valid TaskSpec (``task=None``), never an
+    error — this is reserved for genuine preconditions (plan FE-2.5)."""
+
+
+class ExportLinkError(MootloopError):
+    """A signed download link could not be minted or validated: an unknown deliverable,
+    or a tampered/expired token. Fails closed — an unverifiable link never streams a
+    byte (plan FD-7 / P-37)."""
+
+
+class ExportNotReadyError(ExportLinkError):
+    """A clean (non-DRAFT) deliverable was requested but the run is not export-ready
+    (``gate_ledger.export_ready`` is false). Carries the blocking gate names so the UI
+    can explain why. DRAFT deliverables are never gated this way (plan P-37)."""
+
+    def __init__(self, deliverable: str, blockers: list[str]) -> None:
+        self.deliverable = deliverable
+        self.blockers = blockers
+        super().__init__(
+            f"deliverable {deliverable!r} is not export-ready; blockers: "
+            + (", ".join(blockers) or "(unknown)")
+        )

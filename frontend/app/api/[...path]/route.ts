@@ -26,8 +26,15 @@ const FORWARD_REQUEST_HEADERS = [
   "cookie",
 ];
 
-// Response headers we surface back to the browser.
-const FORWARD_RESPONSE_HEADERS = ["content-type", "cache-control", "retry-after"];
+// Response headers we surface back to the browser (content-disposition names the
+// streamed deliverable download; content-length lets the browser show progress).
+const FORWARD_RESPONSE_HEADERS = [
+  "content-type",
+  "content-disposition",
+  "content-length",
+  "cache-control",
+  "retry-after",
+];
 
 async function proxy(
   request: NextRequest,

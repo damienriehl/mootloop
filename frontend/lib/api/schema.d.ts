@@ -21,6 +21,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Deliverable
+         * @description Validate a signed link, AUDIT-APPEND FIRST (fail closed), then stream the file.
+         *
+         *     Not matter-scoped in the path — the token carries the (matter, run, deliverable)
+         *     audience. The access audit MUST record before a byte streams: if the audit write
+         *     fails, `AuditWriteError` propagates (500) and nothing is served (plan FD-3).
+         */
+        get: operations["download_deliverable_api_download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/matters": {
         parameters: {
             query?: never;
@@ -145,6 +169,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/matters/{matter_id}/runs/{run_id}/deliverables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Deliverables
+         * @description List a run's deliverables with DRAFT/clean state and per-file downloadability
+         *     (clean files are downloadable only once the run is export-ready; plan P-37).
+         */
+        get: operations["list_deliverables_api_matters__matter_id__runs__run_id__deliverables_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/matters/{matter_id}/runs/{run_id}/deliverables/{name}/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mint Download Link
+         * @description Mint a short-expiry signed link for one deliverable. A clean (non-DRAFT) file
+         *     that is not export-ready yields a typed 403 (``export_not_ready``); DRAFT files are
+         *     always linkable (plan FD-7 / P-37).
+         */
+        post: operations["mint_download_link_api_matters__matter_id__runs__run_id__deliverables__name__link_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/matters/{matter_id}/runs/{run_id}/gates": {
         parameters: {
             query?: never;
@@ -250,6 +317,47 @@ export interface paths {
         get: operations["stream_run_api_matters__matter_id__runs__run_id__stream_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/matters/{matter_id}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Tasks
+         * @description List the matter's recorded TaskSpecs (all lanes, append order).
+         */
+        get: operations["list_tasks_api_matters__matter_id__tasks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/matters/{matter_id}/tasks/freeform": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Freeform Task
+         * @description Resolve free-text intent to a TaskSpec (deterministic v1; unmapped -> ``task=None``,
+         *     recorded but not runnable). Persists append-only at ``tasks/specs.jsonl`` (plan FE-2.5).
+         */
+        post: operations["create_freeform_task_api_matters__matter_id__tasks_freeform_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -497,6 +605,53 @@ export interface components {
              * @default 1.0
              */
             schema_version: string;
+        };
+        /**
+         * DeliverableInfo
+         * @description One deliverable file with its DRAFT/clean state and download eligibility.
+         */
+        DeliverableInfo: {
+            /** Downloadable */
+            downloadable: boolean;
+            /** Is Draft */
+            is_draft: boolean;
+            /** Name */
+            name: string;
+            /** Requires Export Ready */
+            requires_export_ready: boolean;
+            /** Size Bytes */
+            size_bytes: number;
+        };
+        /**
+         * DeliverablesResponse
+         * @description The run's deliverables plus the export-ready predicate (the colophon gate).
+         */
+        DeliverablesResponse: {
+            /** Deliverables */
+            deliverables?: components["schemas"]["DeliverableInfo"][];
+            /** Export Ready */
+            export_ready: boolean;
+            /**
+             * Kind
+             * @default deliverables
+             * @constant
+             */
+            kind: "deliverables";
+            /** Run Id */
+            run_id: string;
+            /**
+             * Schema Version
+             * @default 1.0
+             */
+            schema_version: string;
+        };
+        /**
+         * FreeformTaskRequest
+         * @description The body of the freeform on-ramp: an attorney's free-text task intent.
+         */
+        FreeformTaskRequest: {
+            /** Intent Text */
+            intent_text: string;
         };
         /**
          * GateFail
@@ -833,8 +988,40 @@ export interface components {
             total_spend_usd: number;
         };
         /**
+         * SignedLinkResponse
+         * @description A minted short-expiry download link bound to one (matter, run, deliverable).
+         */
+        SignedLinkResponse: {
+            /** Doc */
+            doc: string;
+            /** Expires At */
+            expires_at: string;
+            /** Is Draft */
+            is_draft: boolean;
+            /**
+             * Kind
+             * @default signed_link
+             * @constant
+             */
+            kind: "signed_link";
+            /** Run Id */
+            run_id: string;
+            /**
+             * Schema Version
+             * @default 1.0
+             */
+            schema_version: string;
+            /** Token */
+            token: string;
+            /** Url */
+            url: string;
+        };
+        /**
          * StartRunRequest
          * @description The body of a run-start call; ``task`` and ``mode`` mirror ``mootloop run start``.
+         *
+         *     ``task_spec_id`` optionally binds the run to a resolved on-ramp TaskSpec (plan
+         *     FE-2.5); it is recorded on the ``RunStarted`` journal event.
          */
         StartRunRequest: {
             /** Mode */
@@ -844,6 +1031,87 @@ export interface components {
              * @default discovery-responses
              */
             task: string;
+            /** Task Spec Id */
+            task_spec_id?: string | null;
+        };
+        /**
+         * TaskSpec
+         * @description A resolved (or unresolved) begin-task specification, persisted append-only.
+         *
+         *     ``task`` is a registered task-adapter key (``discovery-responses``) when the intent
+         *     resolved, or ``None`` when it did not — an unresolved spec is recorded for the audit
+         *     trail but is NOT runnable (``runnable`` is ``False``): no run can start from it until
+         *     a later lane resolves the concept.
+         */
+        TaskSpec: {
+            /** Created At */
+            created_at: string;
+            /** Folio Iri */
+            folio_iri?: string | null;
+            /** Folio Label */
+            folio_label?: string | null;
+            /** Intent Text */
+            intent_text: string;
+            /** Matter Id */
+            matter_id: string;
+            /** Request Set Refs */
+            request_set_refs?: string[];
+            /**
+             * Schema Version
+             * @default 1.0
+             */
+            schema_version: string;
+            /**
+             * Source Lane
+             * @enum {string}
+             */
+            source_lane: "freeform" | "wizard" | "suggestion";
+            /** Task */
+            task: string | null;
+            /** Task Spec Id */
+            task_spec_id: string;
+            /** Utbms */
+            utbms?: string | null;
+        };
+        /**
+         * TaskSpecResponse
+         * @description A single TaskSpec produced (or looked up) by an on-ramp. ``runnable`` mirrors the
+         *     domain property: false when the intent did not resolve to a runnable task.
+         */
+        TaskSpecResponse: {
+            /**
+             * Kind
+             * @default task_spec
+             * @constant
+             */
+            kind: "task_spec";
+            /** Runnable */
+            runnable: boolean;
+            /**
+             * Schema Version
+             * @default 1.0
+             */
+            schema_version: string;
+            task_spec: components["schemas"]["TaskSpec"];
+        };
+        /**
+         * TaskSpecsResponse
+         * @description Every recorded TaskSpec for a matter (append order).
+         */
+        TaskSpecsResponse: {
+            /**
+             * Kind
+             * @default task_specs
+             * @constant
+             */
+            kind: "task_specs";
+            /**
+             * Schema Version
+             * @default 1.0
+             */
+            schema_version: string;
+            /** Specs */
+            specs?: components["schemas"]["TaskSpec"][];
         };
         /** ValidationError */
         ValidationError: {
@@ -883,6 +1151,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CsrfToken"];
+                };
+            };
+        };
+    };
+    download_deliverable_api_download_get: {
+        parameters: {
+            query: {
+                token: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1138,6 +1437,71 @@ export interface operations {
             };
         };
     };
+    list_deliverables_api_matters__matter_id__runs__run_id__deliverables_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matter_id: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliverablesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mint_download_link_api_matters__matter_id__runs__run_id__deliverables__name__link_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matter_id: string;
+                run_id: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignedLinkResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_run_gates_api_matters__matter_id__runs__run_id__gates_get: {
         parameters: {
             query?: never;
@@ -1321,6 +1685,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tasks_api_matters__matter_id__tasks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matter_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskSpecsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_freeform_task_api_matters__matter_id__tasks_freeform_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matter_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FreeformTaskRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskSpecResponse"];
                 };
             };
             /** @description Validation Error */

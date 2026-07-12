@@ -19,6 +19,7 @@ from mootloop.models.decisions import Decision, ResolutionAction
 from mootloop.models.events import RunMode, RunStatus
 from mootloop.models.gates import GateResult
 from mootloop.models.requests import RequestItem
+from mootloop.models.taskspec import TaskSpec
 
 SCHEMA_VERSION = "1.0"
 
@@ -42,10 +43,20 @@ class PauseRequest(StrictModel):
 
 
 class StartRunRequest(StrictModel):
-    """The body of a run-start call; ``task`` and ``mode`` mirror ``mootloop run start``."""
+    """The body of a run-start call; ``task`` and ``mode`` mirror ``mootloop run start``.
+
+    ``task_spec_id`` optionally binds the run to a resolved on-ramp TaskSpec (plan
+    FE-2.5); it is recorded on the ``RunStarted`` journal event."""
 
     task: str = "discovery-responses"
     mode: RunMode | None = None
+    task_spec_id: str | None = None
+
+
+class FreeformTaskRequest(StrictModel):
+    """The body of the freeform on-ramp: an attorney's free-text task intent."""
+
+    intent_text: str
 
 
 class RaiseCapRequest(StrictModel):
@@ -166,3 +177,75 @@ class LockContentionBody(StrictModel):
     error: Literal["lock_held"] = "lock_held"
     detail: str
     retriable: bool = True
+
+
+# --- on-ramp: TaskSpec ------------------------------------------------------
+
+
+class TaskSpecResponse(VersionedModel):
+    """A single TaskSpec produced (or looked up) by an on-ramp. ``runnable`` mirrors the
+    domain property: false when the intent did not resolve to a runnable task."""
+
+    schema_version: str = SCHEMA_VERSION
+    kind: Literal["task_spec"] = "task_spec"
+    task_spec: TaskSpec
+    runnable: bool
+
+
+class TaskSpecsResponse(VersionedModel):
+    """Every recorded TaskSpec for a matter (append order)."""
+
+    schema_version: str = SCHEMA_VERSION
+    kind: Literal["task_specs"] = "task_specs"
+    specs: list[TaskSpec] = Field(default_factory=list)
+
+
+# --- export: deliverables + signed links ------------------------------------
+
+
+class DeliverableInfo(StrictModel):
+    """One deliverable file with its DRAFT/clean state and download eligibility."""
+
+    name: str
+    size_bytes: int
+    is_draft: bool
+    requires_export_ready: bool
+    downloadable: bool
+
+
+class DeliverablesResponse(VersionedModel):
+    """The run's deliverables plus the export-ready predicate (the colophon gate)."""
+
+    schema_version: str = SCHEMA_VERSION
+    kind: Literal["deliverables"] = "deliverables"
+    run_id: str
+    export_ready: bool
+    deliverables: list[DeliverableInfo] = Field(default_factory=list)
+
+
+class SignedLinkResponse(VersionedModel):
+    """A minted short-expiry download link bound to one (matter, run, deliverable)."""
+
+    schema_version: str = SCHEMA_VERSION
+    kind: Literal["signed_link"] = "signed_link"
+    run_id: str
+    doc: str
+    url: str
+    token: str
+    is_draft: bool
+    expires_at: str
+
+
+class ExportNotReadyBody(StrictModel):
+    """The typed HTTP 403 body when a clean deliverable is not yet export-ready."""
+
+    error: Literal["export_not_ready"] = "export_not_ready"
+    detail: str
+    blockers: list[str] = Field(default_factory=list)
+
+
+class InvalidLinkBody(StrictModel):
+    """The typed HTTP 400 body when a download token is tampered/expired/unknown."""
+
+    error: Literal["invalid_link"] = "invalid_link"
+    detail: str

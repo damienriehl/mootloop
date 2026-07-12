@@ -10,9 +10,15 @@ from __future__ import annotations
 
 import os
 import re
+import secrets as _secrets
 from pathlib import Path
 
 SECRETS_FILE = Path.home() / ".mootloop" / "secrets.env"
+
+# The HMAC signing key for short-expiry deliverable download links (plan FD-7 / P-37).
+# Loaded from the service-user secrets (never hard-coded); derived + persisted on first
+# use if absent so the hosted tier can mint links without manual provisioning.
+DOWNLOAD_SIGNING_KEY = "MOOTLOOP_DOWNLOAD_SIGNING_KEY"
 
 # Secret-shaped patterns scrubbed from any text written to journal/artifacts. The
 # CourtListener token is 40 lowercase hex chars; ``Token``/``Bearer`` headers and
@@ -69,6 +75,31 @@ def load_secret(key: str, *, secrets_file: Path = SECRETS_FILE) -> str | None:
     if from_file:
         return from_file
     return os.environ.get(key)
+
+
+def load_or_create_signing_key(
+    key: str = DOWNLOAD_SIGNING_KEY, *, secrets_file: Path = SECRETS_FILE
+) -> str:
+    """Return the download-link HMAC key, deriving + persisting it on first use.
+
+    Resolves ``key`` via `load_secret` (secrets file, then env). If unset, mints a fresh
+    urlsafe token and appends it to ``secrets_file`` under the service-user convention
+    (dir ``0700``, file ``0600``) so subsequent processes reuse the same key — links
+    minted before a restart stay verifiable. The value is registered for redaction and
+    never logged.
+    """
+    existing = load_secret(key, secrets_file=secrets_file)
+    if existing:
+        register_secret(existing)
+        return existing
+    value = _secrets.token_urlsafe(32)
+    secrets_file.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    fd = os.open(secrets_file, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    with os.fdopen(fd, "a", encoding="utf-8") as handle:
+        handle.write(f"{key}={value}\n")
+    os.chmod(secrets_file, 0o600)
+    register_secret(value)
+    return value
 
 
 def redact(text: str, *, extra: tuple[str, ...] = ()) -> str:

@@ -20,6 +20,7 @@ RequestId = NewType("RequestId", str)
 DocId = NewType("DocId", str)
 DecisionId = NewType("DecisionId", str)
 CitationId = NewType("CitationId", str)
+TaskSpecId = NewType("TaskSpecId", str)
 
 # --- Confidentiality-typed text --------------------------------------------
 # MatterText is confidential matter data; PublicText is publishable. The only

@@ -19,7 +19,9 @@ from fastapi import Depends, HTTPException, Request, Response
 
 from mootloop.engine.queue import Queue
 from mootloop.errors import AccessAuthError, InternalAuthError
+from mootloop.export.link import LinkSigner
 from mootloop.registry import MatterRegistry
+from mootloop.secrets import load_or_create_signing_key
 from mootloop.web.security import AccessPrincipal, CfAccessVerifier, InternalAuth
 
 # Marker attribute stamped on each auth guard; read back via route introspection.
@@ -52,6 +54,12 @@ def get_internal_auth() -> InternalAuth:
 def get_queue() -> Queue:
     """The file-based driver work queue rooted at the matters-root. Overridden in tests."""
     return Queue(MatterRegistry().root)
+
+
+def get_link_signer() -> LinkSigner:
+    """The download-link HMAC signer (key from the service-user secrets, fail-closed —
+    derived + persisted on first use). Overridden in tests."""
+    return LinkSigner(load_or_create_signing_key())
 
 
 # --- auth guards (introspectable) -------------------------------------------

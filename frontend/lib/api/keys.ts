@@ -23,6 +23,8 @@ export const keys = {
     return {
       key,
       runs: () => [...key, "runs"] as const,
+      // On-ramp TaskSpecs recorded for this matter (FE-2.5 freeform lane).
+      tasks: () => [...key, "tasks"] as const,
       run: (runId: string) => {
         const runKey = [...key, "runs", runId] as const;
         return {
@@ -31,6 +33,8 @@ export const keys = {
           gates: () => [...runKey, "gates"] as const,
           decisions: () => [...runKey, "decisions"] as const,
           requests: () => [...runKey, "requests"] as const,
+          // Export room: this run's deliverables + certify-and-release gate (FE-2.5).
+          deliverables: () => [...runKey, "deliverables"] as const,
         };
       },
     };
