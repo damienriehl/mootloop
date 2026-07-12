@@ -1,5 +1,9 @@
 # Deploying the MootLoop demo server
 
+> **Deploying the matter (write) tier instead?** See `docs/deploy-matter.md` +
+> `docs/security-frontend.md` — the matter tier is governed by those, not this doc. The
+> HARD RULE below applies to **this demo tier**.
+
 The public demo is a **read-only** server over a synthetic vault **baked at image
 build time**. It has zero matter-data mechanisms: no uploads, no `~/Matters`
 access, no secrets, no LLM calls at runtime.

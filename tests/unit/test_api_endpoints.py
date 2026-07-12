@@ -64,6 +64,27 @@ def test_matters_requires_valid_access(client: TestClient) -> None:
     assert client.get("/api/matters").status_code == 401
 
 
+# --- health: unauthenticated, no matter data --------------------------------
+
+
+def test_health_ok_and_leaks_no_matter_data(client: TestClient) -> None:
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "ok"
+    assert set(body) == {"status", "version"}
+
+
+def test_health_bypasses_access_guard_without_cf_config() -> None:
+    """A fresh app with no CF_ACCESS_* env (matter routes would 401) still serves
+    /health — proving the probe sits outside the Access-JWT and internal guards."""
+    resp = TestClient(create_matter_api()).get("/health")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "ok"
+    # The Access guard is intact for matter routes on the same unconfigured app.
+    assert TestClient(create_matter_api()).get("/api/matters").status_code == 401
+
+
 def test_matters_lists_for_valid_access(client: TestClient, matter: MatterConfig) -> None:
     resp = client.get("/api/matters", headers={"cf-access-jwt-assertion": "good"})
     assert resp.status_code == 200
