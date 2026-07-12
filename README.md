@@ -221,10 +221,16 @@ MOOTLOOP_DEMO_VAULT=/tmp/demo uv run uvicorn mootloop.web.app:app
 
 ## Hosted tier (FE-0)
 
-> **Perimeter foundation — code-complete, not yet deployed.** The demo tier above
-> stays read-only and untouched; this is a *separate* write-tier API built behind a
-> layered perimeter, ahead of any real matter data touching a server. See
-> [`docs/security-frontend.md`](docs/security-frontend.md) for the full threat model.
+> **Perimeter foundation — deployed to a live origin; penetration gate all but passed.**
+> The demo tier above stays read-only and untouched; this is a *separate* write-tier API
+> built behind a layered perimeter, ahead of any real matter data touching a server. The
+> matter tier (BFF + internal API + driver worker) runs at `mootloop.damienriehl.com`
+> behind Cloudflare Access. The 13-item penetration gate holds on 11 items (2 blocked on
+> operator credentials, 0 failing) — including a matter-ID oracle this gate caught and
+> fixed. See [`docs/security-frontend.md`](docs/security-frontend.md) for the threat
+> model, [`docs/deploy-matter.md`](docs/deploy-matter.md) for the runbook, and
+> [`docs/evidence/fe-0-pen-gate.html`](docs/evidence/fe-0-pen-gate.html) for the
+> attestation. **No real matter data until the gate is fully green.**
 
 - **Layered perimeter** — every matter route sits behind three fail-closed controls:
   a **Cloudflare Access** JWT (`Cf-Access-Jwt-Assertion`, RS256 asserted by us, with
@@ -253,6 +259,8 @@ MOOTLOOP_INTERNAL_SECRET     # driver/BFF internal-auth secret (never in the rep
 MOOTLOOP_MATTERS_ROOT        # matters-root dir (default /srv/mootloop-matters)
 MOOTLOOP_RATE_CAPACITY       # rate-limit bucket capacity (default 20)
 MOOTLOOP_RATE_REFILL_PER_SEC # rate-limit refill rate (default 2/s)
+MOOTLOOP_DOWNLOAD_SIGNING_KEY # download-link HMAC key (pre-seed on hosts with a
+                             #   read-only secrets mount; auto-derives otherwise)
 ```
 
 ## Engine (hosted driver, FE-1)
