@@ -109,6 +109,19 @@ Vault: /srv/mootloop-matters/<matter_id>/  (0700, outside all repos)
 > Sessions are focused half-days. Security lands first; each room ships usable.
 
 - **FE-0 — Security foundation + hosted skeleton (4 sessions):** threat-model doc (`docs/security-frontend.md`); Cloudflare Access apps + policies (+ service token); DNS `mootloop.damienriehl.com` (zone is on Damien's Cloudflare — automatable); per-hostname AOP cert + Traefik tls.options; matter registry + matters-root + service user; `web/api/` scaffold with Access-JWT dependency + audit log + rate limiting + CSRF; Coolify matter-tier apps (web/api/driver, `instant_deploy=false`); secrets provisioning. **Gate: penetration checklist passes (direct-origin blocked, JWT forgery rejected, path traversal, rate limits) before any matter data touches the server.**
+  - _Code perimeter delivered (branch `feat/fe-0-perimeter`, units 1-4):_
+    - [x] Threat-model doc `docs/security-frontend.md`
+    - [x] Matter registry + matters-root convention (`registry.py`, `MOOTLOOP_MATTERS_ROOT`, fail-closed resolve/containment + enumeration)
+    - [x] Cloudflare Access JWT verifier (`web/security.py` `CfAccessVerifier`; RS256 asserted, `aud`/`iss`/`exp`/`email` pinned, JWKS-fetch fails closed)
+    - [x] Internal driver-secret auth (`InternalAuth`, constant-time) — replaces localhost trust
+    - [x] Pure-ASGI rate limiter (`RateLimitMiddleware`, token bucket on write methods)
+    - [x] `web/api/` write-tier scaffold (`create_matter_api()`: matters/runs read + decide-resolve/attest write, CSRF double-submit, typed 409)
+    - [x] Hash-chained access audit (`web/audit.py`, `models/audit.py`; append-only, advisory-locked, tamper-evident)
+    - [x] Structural invariants (api never imports the demo app; every mutating route auth-guarded; audit fold==recompute) + JWT/registry/audit/endpoint + real-verifier e2e test suites
+    - [ ] Cloudflare Access apps/policies + service token (infra — not built)
+    - [ ] DNS + per-hostname AOP cert + Traefik `tls.options` (infra — not built)
+    - [ ] Coolify matter-tier apps + secrets provisioning (infra — not built)
+    - [ ] Penetration-checklist gate run against a live origin (deploy-side — not run)
 - **FE-1 — Engine + run lifecycle (3 sessions):** driver worker (queue consumer, per-turn sandbox, spend ledger, seat-limit pause/notify/resume + failover per P-32, lock discipline, drain/reclaim); run APIs; SSE journal streaming with heartbeats. Gate: full synthetic run driven end-to-end on the server via real `claude -p` (one live smoke run — mock-green is a false signal).
 - **FE-2 — Cockpit + decision inbox (3 sessions):** Next.js chassis + the two rooms fronting existing primitives; decide/attest flows; run controls (start/pause/continue/raise-cap/failover). Gate: a phone-driven run of the synthetic matter start→decide→attest→export.
 - **FE-3 — On-ramps + task synthesis (3 sessions):** FOLIO catalog service + wizard (search-first tree, facet chips, "Available" semantics per P-30); TaskSpec; freeform lane with resolve-after-generate; task-synthesis flow (adapter YAML + derived rubric draft → attorney review/lock per P-31); suggestion surfacing (accept → TaskSpec).

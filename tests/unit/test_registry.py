@@ -98,6 +98,38 @@ def test_list_matters_empty_when_root_absent(tmp_path: Path) -> None:
     assert reg.list_matters() == []
 
 
+def test_list_matters_empty_when_root_present_but_empty(tmp_path: Path) -> None:
+    (tmp_path / "empty-root").mkdir()
+    reg = MatterRegistry(root=tmp_path / "empty-root")
+    assert reg.list_matters() == []
+
+
+def test_list_matters_skips_dir_with_invalid_yaml(tmp_path: Path) -> None:
+    _seed(tmp_path, "alpha")
+    broken = tmp_path / "broken"
+    broken.mkdir()
+    # A matter.yaml that fails MatterConfig validation -> skipped, not fatal.
+    (broken / "matter.yaml").write_text("matter_id: 42\nnot: valid\n", encoding="utf-8")
+    reg = MatterRegistry(root=tmp_path)
+    assert [s.matter_id for s in reg.list_matters()] == ["alpha"]
+
+
+# --- create -----------------------------------------------------------------
+
+
+def test_create_then_resolve_roundtrip(tmp_path: Path) -> None:
+    reg = MatterRegistry(root=tmp_path / "matters")
+    created = reg.create(_matter("delta-v-echo"))
+    assert reg.resolve("delta-v-echo") == created
+    assert [s.matter_id for s in reg.list_matters()] == ["delta-v-echo"]
+
+
+def test_resolve_rejects_overlong_id(tmp_path: Path) -> None:
+    reg = MatterRegistry(root=tmp_path)
+    with pytest.raises(VaultBoundaryError):
+        reg.resolve("a" * 65)
+
+
 # --- root injection ---------------------------------------------------------
 
 

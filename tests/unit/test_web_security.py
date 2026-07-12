@@ -172,6 +172,13 @@ def test_unknown_kid_rejects(keypair) -> None:
         _verifier(jwks).verify(_mint(priv, kid="rotated-away"))
 
 
+def test_malformed_token_rejects(keypair) -> None:
+    # A non-JWT string never reaches decode: get_unverified_header fails closed.
+    _, jwks = keypair
+    with pytest.raises(AccessAuthError):
+        _verifier(jwks).verify("not-a-jwt.header.only")
+
+
 def test_from_env_requires_config(monkeypatch) -> None:
     for var in ("CF_ACCESS_TEAM_DOMAIN", "CF_ACCESS_AUD", "CF_ACCESS_ALLOWED_EMAIL"):
         monkeypatch.delenv(var, raising=False)
