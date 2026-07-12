@@ -62,6 +62,9 @@ matters_app = typer.Typer(
 driver_app = typer.Typer(
     help="Run the hosted driver worker loop (plan FE-1).", no_args_is_help=True
 )
+api_app = typer.Typer(
+    help="Write-tier matter API tooling (OpenAPI export, plan FE-2).", no_args_is_help=True
+)
 app.add_typer(requests_app, name="requests")
 app.add_typer(facts_app, name="facts")
 app.add_typer(run_app, name="run")
@@ -71,6 +74,7 @@ app.add_typer(decide_app, name="decide")
 app.add_typer(web_app, name="web")
 app.add_typer(matters_app, name="matters")
 app.add_typer(driver_app, name="driver")
+app.add_typer(api_app, name="api")
 
 
 class RunModeArg(StrEnum):
@@ -944,6 +948,22 @@ def driver_serve(
         stop=lambda: False,
         interval=interval,
     )
+
+
+# --- api verbs (write-tier OpenAPI tooling, plan FE-2) ----------------------
+
+
+@api_app.command("export-openapi")
+def api_export_openapi(
+    path: Annotated[Path, typer.Argument(help="Destination path for the OpenAPI JSON")],
+) -> None:
+    """Write the write-tier matter API's OpenAPI schema as JSON (feeds the typed TS
+    client codegen, plan FD-8)."""
+    from mootloop.web.api import create_matter_api
+
+    schema = create_matter_api().openapi()
+    path.write_text(json.dumps(schema, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    typer.echo(f"wrote OpenAPI schema to {path}")
 
 
 @app.command()

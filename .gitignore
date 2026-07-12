@@ -1,5 +1,7 @@
-# Matter data NEVER lives in the repo (vault-boundary rule; backstop only)
-matters/
+# Matter data NEVER lives in the repo (vault-boundary rule; backstop only).
+# Anchored to the repo root so it ignores the top-level vault dir only — not
+# source paths that happen to contain "matters" (e.g. frontend/app/matters routes).
+/matters/
 
 # Secrets
 .env
