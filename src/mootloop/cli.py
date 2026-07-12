@@ -36,6 +36,7 @@ from mootloop.llm import FakeLLMProvider
 from mootloop.models.matter import SCHEMA_VERSION, MatterConfig
 from mootloop.models.requests import RequestType
 from mootloop.models.run import DiscardedTurn
+from mootloop.registry import MatterRegistry
 from mootloop.vault import init_vault, load_matter, matter_validation_issues
 
 app = typer.Typer(help="MootLoop — agentic law firm simulator.", no_args_is_help=True)
@@ -52,6 +53,9 @@ research_app = typer.Typer(
 )
 decide_app = typer.Typer(help="Review and resolve attorney-gate decisions.", no_args_is_help=True)
 web_app = typer.Typer(help="Public demo web tier (synthetic matter only).", no_args_is_help=True)
+matters_app = typer.Typer(
+    help="Enumerate matter vaults under the matters-root (hosted tier).", no_args_is_help=True
+)
 app.add_typer(requests_app, name="requests")
 app.add_typer(facts_app, name="facts")
 app.add_typer(run_app, name="run")
@@ -59,6 +63,7 @@ app.add_typer(cite_app, name="cite")
 app.add_typer(research_app, name="research")
 app.add_typer(decide_app, name="decide")
 app.add_typer(web_app, name="web")
+app.add_typer(matters_app, name="matters")
 
 
 class RunModeArg(StrEnum):
@@ -720,6 +725,28 @@ def decide_resolve(
         typer.echo(f"resolved {decision_id}: {action.value}")
     except (MootloopError, KeyError) as exc:
         raise _fail(exc if isinstance(exc, MootloopError) else DecisionError(str(exc))) from exc
+
+
+# --- matters verbs (hosted-tier registry; read-only listing) ----------------
+
+
+@matters_app.command("list")
+def matters_list(
+    json_output: Annotated[bool, typer.Option("--json", help="Emit the registry JSON")] = False,
+) -> None:
+    """List matters under the matters-root (``MOOTLOOP_MATTERS_ROOT``)."""
+    try:
+        summaries = MatterRegistry().list_matters()
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    if json_output:
+        typer.echo(json.dumps([s.model_dump(mode="json") for s in summaries]))
+        return
+    if not summaries:
+        typer.echo("No matters found.")
+        return
+    for summary in summaries:
+        typer.echo(f"{summary.matter_id}  {summary.display_name}  ({summary.case_number})")
 
 
 # --- web verbs (demo tier; the bake is the tier's only writer) ---------------

@@ -16,6 +16,11 @@ class MatterConfigError(MootloopError):
     """matter.yaml failed to parse or validate. Message names each bad field."""
 
 
+class MatterNotFoundError(MootloopError):
+    """No matter with the requested id exists under the matters-root. Distinct from
+    `VaultBoundaryError` (a containment breach) so callers can 404 vs. 400."""
+
+
 class LockHeldError(MootloopError):
     """A run lock is held by a live process (or another host) and was not overridden."""
 
@@ -72,3 +77,21 @@ class ExportError(MootloopError):
 class PandocMissingError(ExportError):
     """pandoc is not on PATH, so DOCX rendering cannot run. The court-formatted
     markdown is still emitted; the DOCX step degrades gracefully (plan Phase 7)."""
+
+
+class AccessAuthError(MootloopError):
+    """Cloudflare Access JWT verification failed — bad signature/alg, wrong
+    aud/iss/email, expired, or an unfetchable JWKS. Every failure fails closed;
+    the verifier never falls through to "unverified" (plan FD-2)."""
+
+
+class InternalAuthError(MootloopError):
+    """The internal driver/BFF secret was missing, empty, or did not match the
+    configured value. Replaces localhost trust on the shared Docker network
+    (plan FD-1); a missing secret rejects (fail closed)."""
+
+
+class AuditWriteError(MootloopError):
+    """A hash-chained access-audit append could not be durably written. Callers must
+    treat this as fatal and fail closed — a matter-data page view or download that
+    cannot be recorded is refused, never served (plan FD-3, threat-model item 13)."""

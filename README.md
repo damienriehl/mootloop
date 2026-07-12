@@ -218,6 +218,42 @@ MOOTLOOP_DEMO_VAULT=/tmp/demo uv run uvicorn mootloop.web.app:app
 # open http://127.0.0.1:8000
 ```
 
+## Hosted tier (FE-0)
+
+> **Perimeter foundation — code-complete, not yet deployed.** The demo tier above
+> stays read-only and untouched; this is a *separate* write-tier API built behind a
+> layered perimeter, ahead of any real matter data touching a server. See
+> [`docs/security-frontend.md`](docs/security-frontend.md) for the full threat model.
+
+- **Layered perimeter** — every matter route sits behind three fail-closed controls:
+  a **Cloudflare Access** JWT (`Cf-Access-Jwt-Assertion`, RS256 asserted by us, with
+  `aud`/`iss`/`exp`/`email` pinned against the cached team JWKS), an **Attested OAuth
+  perimeter (AOP)** at the edge, and a constant-time **internal driver secret** for the
+  driver/BFF path (localhost trust is dead on a shared Docker network). Mutating routes
+  add a CSRF double-submit and a pure-ASGI token-bucket rate limiter.
+- **Matter registry** — all vaults live under a single matters-root
+  (`MOOTLOOP_MATTERS_ROOT`); `MatterRegistry` turns an untrusted `matter_id` from an
+  HTTP route into a vault path, validating the charset and asserting realpath-containment
+  before returning (the same choke-point discipline as `safe_vault_path`).
+- **Write-tier API** — `create_matter_api()` builds a FastAPI app *separate* from the
+  demo (`web/app.py`; an invariant test forbids the import) that layers the perimeter
+  over the existing tested services (decide/resolve, attest, run listing). Every
+  matter-data hit records a **hash-chained access audit** to `<vault>/audit/access.jsonl`
+  (append-only, advisory-locked, tamper-evident); lock contention surfaces as a typed
+  `409`.
+
+New environment variables (hosted tier only; the demo tier reads none of them):
+
+```bash
+CF_ACCESS_TEAM_DOMAIN        # Cloudflare Access team slug or full domain
+CF_ACCESS_AUD                # the Access application audience tag
+CF_ACCESS_ALLOWED_EMAIL      # the single pinned attorney identity
+MOOTLOOP_INTERNAL_SECRET     # driver/BFF internal-auth secret (never in the repo)
+MOOTLOOP_MATTERS_ROOT        # matters-root dir (default /srv/mootloop-matters)
+MOOTLOOP_RATE_CAPACITY       # rate-limit bucket capacity (default 20)
+MOOTLOOP_RATE_REFILL_PER_SEC # rate-limit refill rate (default 2/s)
+```
+
 ## Guardrails
 
 - **Vault boundary:** matter data never lives in the repo; the vault path is
