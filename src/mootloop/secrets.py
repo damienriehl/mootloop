@@ -16,14 +16,34 @@ SECRETS_FILE = Path.home() / ".mootloop" / "secrets.env"
 
 # Secret-shaped patterns scrubbed from any text written to journal/artifacts. The
 # CourtListener token is 40 lowercase hex chars; ``Token``/``Bearer`` headers and
-# ``sk-`` keys cover the common shapes.
+# ``sk-`` keys cover the common shapes. FD-3 adds the hosted-tier sinks' new shapes:
+# Google OAuth refresh tokens (``1//…``) and Claude Code OAuth/API tokens
+# (``sk-ant-oat…``/``sk-ant-ort…``/``sk-ant-api…``) — the crown-jewel subscription
+# token among them.
 _REDACT_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"(?i)\b(Token|Bearer)\s+\S+"),
+    re.compile(r"sk-ant-[A-Za-z0-9]{2,}-[A-Za-z0-9_\-]+"),
     re.compile(r"\bsk-[A-Za-z0-9_\-]{8,}"),
+    re.compile(r"1//[A-Za-z0-9_\-]+"),
     re.compile(r"\b[0-9a-f]{40}\b"),
 )
 
 _REDACTED = "***REDACTED***"
+
+# Exact live secret values registered for verbatim redaction. FD-3 requires scrubbing
+# the actual token strings (not just their shapes) at every outbound sink, so a value
+# that slips a pattern (e.g. an ntfy topic or a rotated key) still never leaks.
+_REGISTERED_SECRETS: set[str] = set()
+
+
+def register_secret(value: str) -> None:
+    """Register an exact secret value to be redacted verbatim wherever it appears.
+
+    Idempotent. Empty/blank values are ignored (they would otherwise match the whole
+    string). The value itself is never logged; only its literal is scrubbed later.
+    """
+    if value and value.strip():
+        _REGISTERED_SECRETS.add(value)
 
 
 def _read_secrets_file(path: Path = SECRETS_FILE) -> dict[str, str]:
@@ -58,7 +78,9 @@ def redact(text: str, *, extra: tuple[str, ...] = ()) -> str:
     or an artifact. Idempotent and safe on text with no secrets.
     """
     scrubbed = text
-    for value in extra:
+    # Longest first so a longer secret is replaced before any shorter substring of it.
+    literals = sorted({*extra, *_REGISTERED_SECRETS}, key=len, reverse=True)
+    for value in literals:
         if value:
             scrubbed = scrubbed.replace(value, _REDACTED)
     for pattern in _REDACT_PATTERNS:

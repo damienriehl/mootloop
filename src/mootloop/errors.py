@@ -77,3 +77,15 @@ class ExportError(MootloopError):
 class PandocMissingError(ExportError):
     """pandoc is not on PATH, so DOCX rendering cannot run. The court-formatted
     markdown is still emitted; the DOCX step degrades gracefully (plan Phase 7)."""
+
+
+class AccessAuthError(MootloopError):
+    """Cloudflare Access JWT verification failed — bad signature/alg, wrong
+    aud/iss/email, expired, or an unfetchable JWKS. Every failure fails closed;
+    the verifier never falls through to "unverified" (plan FD-2)."""
+
+
+class InternalAuthError(MootloopError):
+    """The internal driver/BFF secret was missing, empty, or did not match the
+    configured value. Replaces localhost trust on the shared Docker network
+    (plan FD-1); a missing secret rejects (fail closed)."""
