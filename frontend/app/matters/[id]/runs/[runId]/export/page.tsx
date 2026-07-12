@@ -86,7 +86,6 @@ export default function ExportRoomPage() {
             matterId={matterId}
             runId={runId}
             file={file}
-            exportReady={exportReady}
             colophon={colophon}
           />
         ))}

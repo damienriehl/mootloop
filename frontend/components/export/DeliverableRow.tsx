@@ -20,13 +20,11 @@ export function DeliverableRow({
   matterId,
   runId,
   file,
-  exportReady,
   colophon,
 }: {
   matterId: string;
   runId: string;
   file: DeliverableInfo;
-  exportReady: boolean;
   colophon: ColophonFields;
 }) {
   const [open, setOpen] = useState(false);
@@ -53,8 +51,12 @@ export function DeliverableRow({
     },
   });
 
-  // DRAFT files are always releasable; clean files require the run to be export-ready.
-  const gated = !file.is_draft && !exportReady;
+  // The server is the single source of truth for downloadability: DRAFT and informational
+  // files (markdown master, audit log) are always releasable; only clean COURT work
+  // product that requires export-ready is gated until the run is ready. Deriving `gated`
+  // from `file.downloadable` (not `!is_draft`) keeps informational files from being
+  // falsely gated.
+  const gated = !file.downloadable;
 
   return (
     <li
@@ -76,7 +78,9 @@ export function DeliverableRow({
           </div>
           <span className="mt-1 block font-mono text-[0.68rem] uppercase tracking-[0.08em] text-ink-faint">
             {(file.size_bytes / 1024).toFixed(1)} KB
-            {!file.is_draft && (gated ? " · clean · gated" : " · clean · ready")}
+            {/* Only clean COURT work product carries the gate annotation; informational
+                files (markdown master, audit log) require no export-ready and are omitted. */}
+            {file.requires_export_ready && (gated ? " · clean · gated" : " · clean · ready")}
           </span>
         </div>
 
