@@ -95,3 +95,32 @@ class AuditWriteError(MootloopError):
     """A hash-chained access-audit append could not be durably written. Callers must
     treat this as fatal and fail closed — a matter-data page view or download that
     cannot be recorded is refused, never served (plan FD-3, threat-model item 13)."""
+
+
+class SeatLimitError(MootloopError):
+    """The headless Claude subscription hit a seat/rate limit. The run pauses and the
+    driver reschedules it for a later resume — the work is not lost (plan FE-1)."""
+
+
+class AuthError(MootloopError):
+    """Headless Claude authentication failed (a bad or expired OAuth token). The run
+    needs attention; the driver stops retrying and raises a notification (plan FE-1)."""
+
+
+class TurnError(MootloopError):
+    """A headless turn failed for any reason other than a seat limit or auth failure.
+    Its message is redacted — a raw token never appears in the exception text."""
+
+
+class QueueError(MootloopError):
+    """A driver-queue precondition failed (bad lane, malformed work item, …)."""
+
+
+class DriverError(MootloopError):
+    """A driver-loop precondition failed (unresolvable matter, missing run dir, …)."""
+
+
+class BackupError(MootloopError):
+    """A hosted-backup precondition failed: the destination is inside a background-sync
+    folder or a git repo, a consistent snapshot point could not be acquired, or the
+    tar readback did not list the expected members (plan FD-6 hosted-backup gate)."""

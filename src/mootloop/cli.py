@@ -6,7 +6,7 @@ import json
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 import yaml
@@ -39,6 +39,9 @@ from mootloop.models.run import DiscardedTurn
 from mootloop.registry import MatterRegistry
 from mootloop.vault import init_vault, load_matter, matter_validation_issues
 
+if TYPE_CHECKING:
+    from mootloop.engine.worker import ProviderFactory
+
 app = typer.Typer(help="MootLoop — agentic law firm simulator.", no_args_is_help=True)
 requests_app = typer.Typer(
     help="Parse served discovery into request work items.", no_args_is_help=True
@@ -56,6 +59,9 @@ web_app = typer.Typer(help="Public demo web tier (synthetic matter only).", no_a
 matters_app = typer.Typer(
     help="Enumerate matter vaults under the matters-root (hosted tier).", no_args_is_help=True
 )
+driver_app = typer.Typer(
+    help="Run the hosted driver worker loop (plan FE-1).", no_args_is_help=True
+)
 app.add_typer(requests_app, name="requests")
 app.add_typer(facts_app, name="facts")
 app.add_typer(run_app, name="run")
@@ -64,6 +70,7 @@ app.add_typer(research_app, name="research")
 app.add_typer(decide_app, name="decide")
 app.add_typer(web_app, name="web")
 app.add_typer(matters_app, name="matters")
+app.add_typer(driver_app, name="driver")
 
 
 class RunModeArg(StrEnum):
@@ -364,6 +371,33 @@ def run_continue(
     except MootloopError as exc:
         raise _fail(exc) from exc
     typer.echo(f"cleared checkpoint for {run_id} — resume with `run drive --fake`")
+
+
+@run_app.command("pause")
+def run_pause(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+    reason: Annotated[str, typer.Option("--reason", help="Why the run is pausing")] = "manual",
+) -> None:
+    """Pause a live run so the driver stops ticking it (plan FE-1)."""
+    try:
+        orchestrator.pause_run(vault_path, run_id, reason=reason)
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    typer.echo(f"paused {run_id} ({reason})")
+
+
+@run_app.command("resume")
+def run_resume(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+) -> None:
+    """Resume a paused run so the driver picks it up again (plan FE-1)."""
+    try:
+        orchestrator.resume_run(vault_path, run_id)
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    typer.echo(f"resumed {run_id}")
 
 
 @run_app.command("gates")
@@ -847,6 +881,84 @@ def attest_status(
     if check.reason:
         line += f" — {check.reason}"
     typer.secho(line, fg=color)
+
+
+# --- driver verbs (hosted worker loop, plan FE-1) ---------------------------
+
+
+def _provider_factory(fake: bool) -> ProviderFactory:
+    from mootloop.llm import LLMProvider
+
+    if fake:
+        def _fake(vault_root: Path, run_dir: Path, billing_mode: str) -> LLMProvider:
+            return FakeLLMProvider()
+
+        return _fake
+
+    def _headless(vault_root: Path, run_dir: Path, billing_mode: str) -> LLMProvider:
+        from mootloop.engine.claude_provider import HeadlessClaudeProvider
+
+        return HeadlessClaudeProvider(
+            vault_root=vault_root, run_dir=run_dir, billing_mode=billing_mode
+        )
+
+    return _headless
+
+
+@driver_app.command("run-once")
+def driver_run_once(
+    matters_root: Annotated[Path, typer.Option("--matters-root", help="Matters-root dir")],
+    worker_id: Annotated[str, typer.Option("--worker-id", help="This worker's id")],
+    fake: Annotated[
+        bool, typer.Option("--fake", help="Use the FakeLLMProvider (smoke test)")
+    ] = False,
+) -> None:
+    """Run one driver tick: claim + drain one run (or report idle)."""
+    from mootloop.engine.queue import Queue
+    from mootloop.engine.worker import Worker
+
+    worker = Worker(matters_root, worker_id, Queue(matters_root), _provider_factory(fake))
+    try:
+        did_work = worker.run_once(datetime.now(UTC))
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    typer.echo("did work" if did_work else "idle")
+
+
+@driver_app.command("serve")
+def driver_serve(
+    matters_root: Annotated[Path, typer.Option("--matters-root", help="Matters-root dir")],
+    worker_id: Annotated[str, typer.Option("--worker-id", help="This worker's id")],
+    interval: Annotated[float, typer.Option("--interval", help="Idle poll seconds")] = 1.0,
+) -> None:
+    """Run the supervised driver loop until SIGTERM (drains the current turn first)."""
+    import time
+
+    from mootloop.engine.queue import Queue
+    from mootloop.engine.worker import Worker
+
+    worker = Worker(matters_root, worker_id, Queue(matters_root), _provider_factory(False))
+    worker.serve(
+        now_fn=lambda: datetime.now(UTC),
+        sleep_fn=time.sleep,
+        stop=lambda: False,
+        interval=interval,
+    )
+
+
+@app.command()
+def backup(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    dest: Annotated[Path, typer.Option("--dest", help="Destination dir for the snapshot")],
+) -> None:
+    """Write a consistent tar.gz snapshot of the matter vault (plan FD-6)."""
+    from mootloop.engine.backup import backup_matter
+
+    try:
+        out = backup_matter(vault_path, dest, _now())
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    typer.echo(f"backup written: {out}")
 
 
 if __name__ == "__main__":
