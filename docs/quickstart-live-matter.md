@@ -153,7 +153,7 @@ citator — confirm good-law status yourself.
 ## 8. Export
 
 ```bash
-uv run mootloop export ~/Matters/<matter-id> <run-id>
+uv run mootloop export build ~/Matters/<matter-id> <run-id>
 ```
 
 Markdown deliverables always build (master, per-set masters, verification

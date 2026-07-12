@@ -43,6 +43,9 @@ class RunStarted(StrictModel):
     rubric_version: str
     config_digest: str
     mode: RunMode = "autonomous"
+    # The on-ramp TaskSpec this run started from, when any (plan FE-2.5). Optional so
+    # older journals and direct ``start_run(task=...)`` calls fold unchanged.
+    task_spec_id: str | None = None
 
 
 class StageStarted(StrictModel):

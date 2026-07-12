@@ -68,6 +68,12 @@ _REGISTRY: dict[str, Callable[[], TaskAdapter]] = {
 }
 
 
+def registered_tasks() -> tuple[str, ...]:
+    """The registered task-adapter keys, sorted. The one place the on-ramp / freeform
+    resolver reads the catalog of runnable tasks (never hard-codes a task name)."""
+    return tuple(sorted(_REGISTRY))
+
+
 def get_binding(task: str) -> TaskBinding:
     """Resolve a task name to its config + adapter (raises on an unknown task)."""
     factory = _REGISTRY.get(task)

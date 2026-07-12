@@ -15,6 +15,7 @@ from pydantic import ValidationError
 from mootloop import attest as attest_service
 from mootloop import decisions as decisions_service
 from mootloop import gate_ledger, orchestrator, panels
+from mootloop import taskspec as taskspec_service
 from mootloop.citations import verify
 from mootloop.citations.extract import extract_citations
 from mootloop.citations.ledger import ResearchQueue
@@ -29,6 +30,7 @@ from mootloop.errors import (
     MootloopError,
     VaultBoundaryError,
 )
+from mootloop.export import link as export_link
 from mootloop.export import service as export_service
 from mootloop.facts import FactStore, add_facts_from_file
 from mootloop.ingest import content_doc_id, ingest_folder
@@ -65,6 +67,14 @@ driver_app = typer.Typer(
 api_app = typer.Typer(
     help="Write-tier matter API tooling (OpenAPI export, plan FE-2).", no_args_is_help=True
 )
+tasks_app = typer.Typer(
+    help="Begin-task on-ramp: resolve free-text intent into TaskSpecs (plan FE-2.5).",
+    no_args_is_help=True,
+)
+export_app = typer.Typer(
+    help="Build deliverables and mint signed download links (plan Phase 7 / FE-2.5).",
+    no_args_is_help=True,
+)
 app.add_typer(requests_app, name="requests")
 app.add_typer(facts_app, name="facts")
 app.add_typer(run_app, name="run")
@@ -75,6 +85,8 @@ app.add_typer(web_app, name="web")
 app.add_typer(matters_app, name="matters")
 app.add_typer(driver_app, name="driver")
 app.add_typer(api_app, name="api")
+app.add_typer(tasks_app, name="tasks")
+app.add_typer(export_app, name="export")
 
 
 class RunModeArg(StrEnum):
@@ -787,6 +799,55 @@ def matters_list(
         typer.echo(f"{summary.matter_id}  {summary.display_name}  ({summary.case_number})")
 
 
+# --- tasks verbs (begin-task on-ramp; plan FE-2.5) --------------------------
+
+
+@tasks_app.command("freeform")
+def tasks_freeform(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    intent: Annotated[str, typer.Option("--intent", help="Free-text task intent")],
+    json_output: Annotated[bool, typer.Option("--json", help="Emit the TaskSpec JSON")] = False,
+) -> None:
+    """Resolve free-text intent into a TaskSpec (deterministic v1). An unmapped intent is
+    still recorded, with ``task=None`` — not runnable until a later lane resolves it."""
+    try:
+        matter = load_matter(vault_path)
+        spec = taskspec_service.create_freeform(vault_path, matter.matter_id, intent, _now())
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    if json_output:
+        typer.echo(spec.model_dump_json())
+        return
+    if spec.runnable:
+        typer.secho(f"{spec.task_spec_id}  -> {spec.task}", fg=typer.colors.GREEN)
+    else:
+        typer.secho(
+            f"{spec.task_spec_id}  -> UNMAPPED (cannot start a run yet)", fg=typer.colors.YELLOW
+        )
+
+
+@tasks_app.command("list")
+def tasks_list(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    json_output: Annotated[bool, typer.Option("--json", help="Emit TaskSpec JSON list")] = False,
+) -> None:
+    """List the matter's recorded TaskSpecs (all lanes, append order)."""
+    try:
+        specs = taskspec_service.list_specs(vault_path)
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    if json_output:
+        typer.echo(json.dumps([s.model_dump(mode="json") for s in specs]))
+        return
+    if not specs:
+        typer.echo("No task specs recorded.")
+        return
+    for spec in specs:
+        target = spec.task if spec.runnable else "UNMAPPED"
+        typer.echo(f"{spec.task_spec_id}  [{spec.source_lane}]  {target}")
+        typer.echo(f"  {spec.intent_text}")
+
+
 # --- web verbs (demo tier; the bake is the tier's only writer) ---------------
 
 
@@ -821,8 +882,8 @@ def attest(
     typer.echo(f"attested {run_id}: master {record.master_sha256[:12]} by {record.reviewer}")
 
 
-@app.command()
-def export(
+@export_app.command("build")
+def export_build(
     vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
     run_id: Annotated[str, typer.Argument(help="Run id")],
     force_draft: Annotated[
@@ -869,6 +930,34 @@ def export(
     )
     if result.blockers:
         typer.echo("blockers: " + ", ".join(result.blockers))
+
+
+@export_app.command("link")
+def export_link_cmd(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Option("--run", help="Run id")],
+    doc: Annotated[str, typer.Option("--doc", help="Deliverable name (run-relative)")],
+) -> None:
+    """Mint a short-expiry signed download link for a deliverable (plan FD-7 / P-37).
+
+    Clean (non-DRAFT) DOCX require the run to be export-ready; DRAFT files are always
+    linkable. The signing key is loaded (or derived + stored) from the service-user
+    secrets — never hard-coded."""
+    from mootloop.secrets import load_or_create_signing_key
+
+    try:
+        matter = load_matter(vault_path)
+        signer = export_link.LinkSigner(load_or_create_signing_key())
+        link = export_link.mint_link(
+            vault_path, matter.matter_id, run_id, doc, _now(), signer
+        )
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    typer.echo(link.url)
+    typer.secho(
+        f"  doc={link.doc}  draft={link.is_draft}  expires={link.expires_at}",
+        fg=typer.colors.YELLOW,
+    )
 
 
 @app.command("attest-status")

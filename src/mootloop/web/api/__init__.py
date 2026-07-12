@@ -23,11 +23,14 @@ from mootloop.errors import (
     AuditWriteError,
     BackupError,
     DecisionError,
+    ExportLinkError,
+    ExportNotReadyError,
     InternalAuthError,
     LockHeldError,
     MatterNotFoundError,
     OrchestratorError,
     QueueError,
+    TaskSpecError,
     VaultBoundaryError,
 )
 from mootloop.web.api import models, routes
@@ -89,6 +92,20 @@ def _install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AuditWriteError)
     async def _audit(request: Request, exc: AuditWriteError) -> JSONResponse:
         return JSONResponse(status_code=500, content={"error": "audit_write_failed"})
+
+    @app.exception_handler(TaskSpecError)
+    async def _taskspec(request: Request, exc: TaskSpecError) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"error": "task_spec", "detail": str(exc)})
+
+    @app.exception_handler(ExportNotReadyError)
+    async def _export_not_ready(request: Request, exc: ExportNotReadyError) -> JSONResponse:
+        body = models.ExportNotReadyBody(detail=str(exc), blockers=exc.blockers)
+        return JSONResponse(status_code=403, content=body.model_dump())
+
+    @app.exception_handler(ExportLinkError)
+    async def _export_link(request: Request, exc: ExportLinkError) -> JSONResponse:
+        body = models.InvalidLinkBody(detail=str(exc))
+        return JSONResponse(status_code=400, content=body.model_dump())
 
 
 def create_matter_api() -> FastAPI:

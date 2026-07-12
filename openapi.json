@@ -1,0 +1,2456 @@
+{
+  "components": {
+    "schemas": {
+      "AttestResponse": {
+        "additionalProperties": false,
+        "description": "A recorded attestation. ``attestation.valid`` carries the state.",
+        "properties": {
+          "attestation": {
+            "$ref": "#/components/schemas/Attestation"
+          },
+          "kind": {
+            "const": "attested",
+            "default": "attested",
+            "title": "Kind",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attestation"
+        ],
+        "title": "AttestResponse",
+        "type": "object"
+      },
+      "Attestation": {
+        "additionalProperties": false,
+        "description": "One append-only attestation-manifest record (an attest or an invalidation).",
+        "properties": {
+          "attestation_id": {
+            "title": "Attestation Id",
+            "type": "string"
+          },
+          "attested_at": {
+            "title": "Attested At",
+            "type": "string"
+          },
+          "ledger_head_sha256": {
+            "title": "Ledger Head Sha256",
+            "type": "string"
+          },
+          "master_sha256": {
+            "title": "Master Sha256",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "reviewer": {
+            "title": "Reviewer",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "valid": {
+            "default": true,
+            "title": "Valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "attestation_id",
+          "run_id",
+          "master_sha256",
+          "ledger_head_sha256",
+          "reviewer",
+          "attested_at"
+        ],
+        "title": "Attestation",
+        "type": "object"
+      },
+      "CsrfToken": {
+        "additionalProperties": false,
+        "description": "The CSRF token returned alongside the double-submit cookie.",
+        "properties": {
+          "csrf_token": {
+            "title": "Csrf Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "csrf_token"
+        ],
+        "title": "CsrfToken",
+        "type": "object"
+      },
+      "Decision": {
+        "additionalProperties": false,
+        "description": "One attorney-gate decision (proposal + optional resolution).",
+        "properties": {
+          "decision_id": {
+            "title": "Decision Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/DecisionKind"
+          },
+          "proposal": {
+            "$ref": "#/components/schemas/DecisionProposal"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          },
+          "resolution": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecisionResolution"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "status": {
+            "default": "open",
+            "enum": [
+              "open",
+              "approved",
+              "modified",
+              "denied"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "decision_id",
+          "run_id",
+          "kind",
+          "proposal"
+        ],
+        "title": "Decision",
+        "type": "object"
+      },
+      "DecisionKind": {
+        "description": "The four propose-then-approve attorney gates (plan P-28).",
+        "enum": [
+          "objection_posture",
+          "privilege_call",
+          "rfa_disposition",
+          "unsupported_assertion"
+        ],
+        "title": "DecisionKind",
+        "type": "string"
+      },
+      "DecisionOption": {
+        "additionalProperties": false,
+        "description": "One selectable course of action, with the consequence of choosing it.",
+        "properties": {
+          "consequence": {
+            "title": "Consequence",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "consequence"
+        ],
+        "title": "DecisionOption",
+        "type": "object"
+      },
+      "DecisionProposal": {
+        "additionalProperties": false,
+        "description": "A persona's proposed call: what it is, why, and the options to choose among.",
+        "properties": {
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionOption"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "reasoning": {
+            "title": "Reasoning",
+            "type": "string"
+          },
+          "recommended": {
+            "title": "Recommended",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "summary",
+          "reasoning",
+          "recommended"
+        ],
+        "title": "DecisionProposal",
+        "type": "object"
+      },
+      "DecisionResolution": {
+        "additionalProperties": false,
+        "description": "The recorded outcome of a decision \u2014 how it was resolved and by whom.",
+        "properties": {
+          "action": {
+            "enum": [
+              "approve",
+              "modify",
+              "deny"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "chosen_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chosen Key"
+          },
+          "decided_at": {
+            "title": "Decided At",
+            "type": "string"
+          },
+          "decided_by": {
+            "title": "Decided By",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "human",
+              "policy"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "decided_by",
+          "source",
+          "decided_at"
+        ],
+        "title": "DecisionResolution",
+        "type": "object"
+      },
+      "DecisionsResponse": {
+        "additionalProperties": false,
+        "description": "The run's attorney-gate decisions; each ``decision.status`` is the discriminated\n`DecisionStatus` Literal.",
+        "properties": {
+          "decisions": {
+            "items": {
+              "$ref": "#/components/schemas/Decision"
+            },
+            "title": "Decisions",
+            "type": "array"
+          },
+          "kind": {
+            "const": "decisions",
+            "default": "decisions",
+            "title": "Kind",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id"
+        ],
+        "title": "DecisionsResponse",
+        "type": "object"
+      },
+      "DeliverableInfo": {
+        "additionalProperties": false,
+        "description": "One deliverable file with its DRAFT/clean state and download eligibility.",
+        "properties": {
+          "downloadable": {
+            "title": "Downloadable",
+            "type": "boolean"
+          },
+          "is_draft": {
+            "title": "Is Draft",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "requires_export_ready": {
+            "title": "Requires Export Ready",
+            "type": "boolean"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "size_bytes",
+          "is_draft",
+          "requires_export_ready",
+          "downloadable"
+        ],
+        "title": "DeliverableInfo",
+        "type": "object"
+      },
+      "DeliverablesResponse": {
+        "additionalProperties": false,
+        "description": "The run's deliverables plus the export-ready predicate (the colophon gate).",
+        "properties": {
+          "deliverables": {
+            "items": {
+              "$ref": "#/components/schemas/DeliverableInfo"
+            },
+            "title": "Deliverables",
+            "type": "array"
+          },
+          "export_ready": {
+            "title": "Export Ready",
+            "type": "boolean"
+          },
+          "kind": {
+            "const": "deliverables",
+            "default": "deliverables",
+            "title": "Kind",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "export_ready"
+        ],
+        "title": "DeliverablesResponse",
+        "type": "object"
+      },
+      "FreeformTaskRequest": {
+        "additionalProperties": false,
+        "description": "The body of the freeform on-ramp: an attorney's free-text task intent.",
+        "properties": {
+          "intent_text": {
+            "title": "Intent Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "intent_text"
+        ],
+        "title": "FreeformTaskRequest",
+        "type": "object"
+      },
+      "GateFail": {
+        "additionalProperties": false,
+        "description": "The artifact is blocked by this gate \u2014 a terminal state for the artifact.",
+        "properties": {
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/GateFinding"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "gate": {
+            "title": "Gate",
+            "type": "string"
+          },
+          "status": {
+            "const": "fail",
+            "default": "fail",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "gate"
+        ],
+        "title": "GateFail",
+        "type": "object"
+      },
+      "GateFinding": {
+        "additionalProperties": false,
+        "description": "One specific reason a gate reached its verdict (``code`` + human message).",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "locator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locator"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "GateFinding",
+        "type": "object"
+      },
+      "GateLedgerResponse": {
+        "additionalProperties": false,
+        "description": "The run's gate ledger plus the per-turn `GateResult` discriminated union\n(`GatePass | GateFail | GatePending`, discriminated on ``status``).",
+        "properties": {
+          "blockers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Blockers",
+            "type": "array"
+          },
+          "export_ready": {
+            "title": "Export Ready",
+            "type": "boolean"
+          },
+          "gates": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Gates",
+            "type": "object"
+          },
+          "kind": {
+            "const": "gate_ledger",
+            "default": "gate_ledger",
+            "title": "Kind",
+            "type": "string"
+          },
+          "overall": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Overall",
+            "type": "object"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "turn_gates": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "fail": "#/components/schemas/GateFail",
+                  "pass": "#/components/schemas/GatePass",
+                  "pending": "#/components/schemas/GatePending"
+                },
+                "propertyName": "status"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/GatePass"
+                },
+                {
+                  "$ref": "#/components/schemas/GateFail"
+                },
+                {
+                  "$ref": "#/components/schemas/GatePending"
+                }
+              ]
+            },
+            "title": "Turn Gates",
+            "type": "array"
+          }
+        },
+        "required": [
+          "run_id",
+          "export_ready"
+        ],
+        "title": "GateLedgerResponse",
+        "type": "object"
+      },
+      "GatePass": {
+        "additionalProperties": false,
+        "description": "The artifact cleared this gate.",
+        "properties": {
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/GateFinding"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "gate": {
+            "title": "Gate",
+            "type": "string"
+          },
+          "status": {
+            "const": "pass",
+            "default": "pass",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "gate"
+        ],
+        "title": "GatePass",
+        "type": "object"
+      },
+      "GatePending": {
+        "additionalProperties": false,
+        "description": "The gate could not be evaluated yet (e.g. an external check is queued).",
+        "properties": {
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/GateFinding"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "gate": {
+            "title": "Gate",
+            "type": "string"
+          },
+          "status": {
+            "const": "pending",
+            "default": "pending",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "gate"
+        ],
+        "title": "GatePending",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "MatterSummary": {
+        "additionalProperties": false,
+        "description": "Listing-safe summary of a single matter vault.\n\n`display_name`/`case_number` are the caption strings a human uses to recognize a\nmatter (court captions are public record, not `MatterText`). `rel_path` is the\nvault directory name relative to the matters-root \u2014 never an absolute path.",
+        "properties": {
+          "case_number": {
+            "title": "Case Number",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "loaded": {
+            "title": "Loaded",
+            "type": "boolean"
+          },
+          "matter_id": {
+            "title": "Matter Id",
+            "type": "string"
+          },
+          "rel_path": {
+            "title": "Rel Path",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "matter_id",
+          "display_name",
+          "case_number",
+          "rel_path",
+          "loaded"
+        ],
+        "title": "MatterSummary",
+        "type": "object"
+      },
+      "PauseRequest": {
+        "additionalProperties": false,
+        "description": "The optional body of a run-pause call; ``reason`` defaults to ``manual``.",
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "title": "PauseRequest",
+        "type": "object"
+      },
+      "RaiseCapRequest": {
+        "additionalProperties": false,
+        "description": "The body of a raise-cap call \u2014 exactly one of an absolute ``to_usd`` cap or a\n``delta_usd`` increment over the run's current effective cap (plan D5).",
+        "properties": {
+          "delta_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta Usd"
+          },
+          "to_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Usd"
+          }
+        },
+        "title": "RaiseCapRequest",
+        "type": "object"
+      },
+      "RequestItem": {
+        "additionalProperties": false,
+        "description": "One served request (or a subpart of one) as a unit of work.\n\n``subpart`` is ``None`` for a top-level request and a single lowercase letter\nfor a compound subpart, whose ``text`` is the subpart clause; the parent item\nretains the full request text.",
+        "properties": {
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "set_number": {
+            "default": 1,
+            "title": "Set Number",
+            "type": "integer"
+          },
+          "source_doc": {
+            "title": "Source Doc",
+            "type": "string"
+          },
+          "subpart": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subpart"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "number",
+          "text",
+          "source_doc"
+        ],
+        "title": "RequestItem",
+        "type": "object"
+      },
+      "RequestsResponse": {
+        "additionalProperties": false,
+        "description": "The served RFA/discovery request units in scope for the run (matter-scoped).",
+        "properties": {
+          "kind": {
+            "const": "requests",
+            "default": "requests",
+            "title": "Kind",
+            "type": "string"
+          },
+          "requests": {
+            "items": {
+              "$ref": "#/components/schemas/RequestItem"
+            },
+            "title": "Requests",
+            "type": "array"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id"
+        ],
+        "title": "RequestsResponse",
+        "type": "object"
+      },
+      "ResolveRequest": {
+        "additionalProperties": false,
+        "description": "The body of a decision-resolve call. ``decided_by`` and the timestamp are\nserver-derived (from the verified principal), never client-supplied.",
+        "properties": {
+          "action": {
+            "enum": [
+              "approve",
+              "modify",
+              "deny"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "chosen_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chosen Key"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "ResolveRequest",
+        "type": "object"
+      },
+      "ResolveResponse": {
+        "additionalProperties": false,
+        "description": "A resolved decision. ``decision.status`` is the `Literal` discriminated state.",
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/Decision"
+          },
+          "kind": {
+            "const": "decision_resolved",
+            "default": "decision_resolved",
+            "title": "Kind",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "decision"
+        ],
+        "title": "ResolveResponse",
+        "type": "object"
+      },
+      "RunActionResponse": {
+        "additionalProperties": false,
+        "description": "The result of a pause/resume/continue/raise-cap call, exposing the run's\nresulting `RunStatus` (the discriminated domain state).",
+        "properties": {
+          "kind": {
+            "enum": [
+              "run_paused",
+              "run_resumed",
+              "run_continued",
+              "cap_raised"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "finished",
+              "needs_attention",
+              "capped",
+              "needs_decisions",
+              "checkpoint",
+              "paused"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "run_id",
+          "status"
+        ],
+        "title": "RunActionResponse",
+        "type": "object"
+      },
+      "RunStatusSummary": {
+        "additionalProperties": false,
+        "description": "Single-run status envelope for the cockpit (folded from the journal). Exposes\nthe `RunStatus` Literal; also returned by the start-run wrapper.",
+        "properties": {
+          "completed_turns": {
+            "default": 0,
+            "title": "Completed Turns",
+            "type": "integer"
+          },
+          "current_stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Stage"
+          },
+          "discarded_turns": {
+            "default": 0,
+            "title": "Discarded Turns",
+            "type": "integer"
+          },
+          "hard_cap_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hard Cap Usd"
+          },
+          "kind": {
+            "const": "run_status",
+            "default": "run_status",
+            "title": "Kind",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "autonomous",
+              "gated",
+              "observed"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "open_decisions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Open Decisions",
+            "type": "array"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "finished",
+              "needs_attention",
+              "capped",
+              "needs_decisions",
+              "checkpoint",
+              "paused"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "task": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task"
+          },
+          "total_spend_usd": {
+            "default": 0.0,
+            "title": "Total Spend Usd",
+            "type": "number"
+          }
+        },
+        "required": [
+          "run_id",
+          "status",
+          "mode"
+        ],
+        "title": "RunStatusSummary",
+        "type": "object"
+      },
+      "RunSummary": {
+        "additionalProperties": false,
+        "description": "Listing-safe summary of one run under a matter vault (derived from the fold).",
+        "properties": {
+          "current_stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Stage"
+          },
+          "mode": {
+            "enum": [
+              "autonomous",
+              "gated",
+              "observed"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "finished",
+              "needs_attention",
+              "capped",
+              "needs_decisions",
+              "checkpoint",
+              "paused"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "task": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task"
+          },
+          "total_spend_usd": {
+            "default": 0.0,
+            "title": "Total Spend Usd",
+            "type": "number"
+          }
+        },
+        "required": [
+          "run_id",
+          "status",
+          "mode"
+        ],
+        "title": "RunSummary",
+        "type": "object"
+      },
+      "SignedLinkResponse": {
+        "additionalProperties": false,
+        "description": "A minted short-expiry download link bound to one (matter, run, deliverable).",
+        "properties": {
+          "doc": {
+            "title": "Doc",
+            "type": "string"
+          },
+          "expires_at": {
+            "title": "Expires At",
+            "type": "string"
+          },
+          "is_draft": {
+            "title": "Is Draft",
+            "type": "boolean"
+          },
+          "kind": {
+            "const": "signed_link",
+            "default": "signed_link",
+            "title": "Kind",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "doc",
+          "url",
+          "token",
+          "is_draft",
+          "expires_at"
+        ],
+        "title": "SignedLinkResponse",
+        "type": "object"
+      },
+      "StartRunRequest": {
+        "additionalProperties": false,
+        "description": "The body of a run-start call; ``task`` and ``mode`` mirror ``mootloop run start``.\n\n``task_spec_id`` optionally binds the run to a resolved on-ramp TaskSpec (plan\nFE-2.5); it is recorded on the ``RunStarted`` journal event.",
+        "properties": {
+          "mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "autonomous",
+                  "gated",
+                  "observed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
+          "task": {
+            "default": "discovery-responses",
+            "title": "Task",
+            "type": "string"
+          },
+          "task_spec_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Spec Id"
+          }
+        },
+        "title": "StartRunRequest",
+        "type": "object"
+      },
+      "TaskSpec": {
+        "additionalProperties": false,
+        "description": "A resolved (or unresolved) begin-task specification, persisted append-only.\n\n``task`` is a registered task-adapter key (``discovery-responses``) when the intent\nresolved, or ``None`` when it did not \u2014 an unresolved spec is recorded for the audit\ntrail but is NOT runnable (``runnable`` is ``False``): no run can start from it until\na later lane resolves the concept.",
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "folio_iri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folio Iri"
+          },
+          "folio_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folio Label"
+          },
+          "intent_text": {
+            "title": "Intent Text",
+            "type": "string"
+          },
+          "matter_id": {
+            "title": "Matter Id",
+            "type": "string"
+          },
+          "request_set_refs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Request Set Refs",
+            "type": "array"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "source_lane": {
+            "enum": [
+              "freeform",
+              "wizard",
+              "suggestion"
+            ],
+            "title": "Source Lane",
+            "type": "string"
+          },
+          "task": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task"
+          },
+          "task_spec_id": {
+            "title": "Task Spec Id",
+            "type": "string"
+          },
+          "utbms": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utbms"
+          }
+        },
+        "required": [
+          "task_spec_id",
+          "matter_id",
+          "task",
+          "source_lane",
+          "intent_text",
+          "created_at"
+        ],
+        "title": "TaskSpec",
+        "type": "object"
+      },
+      "TaskSpecResponse": {
+        "additionalProperties": false,
+        "description": "A single TaskSpec produced (or looked up) by an on-ramp. ``runnable`` mirrors the\ndomain property: false when the intent did not resolve to a runnable task.",
+        "properties": {
+          "kind": {
+            "const": "task_spec",
+            "default": "task_spec",
+            "title": "Kind",
+            "type": "string"
+          },
+          "runnable": {
+            "title": "Runnable",
+            "type": "boolean"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "task_spec": {
+            "$ref": "#/components/schemas/TaskSpec"
+          }
+        },
+        "required": [
+          "task_spec",
+          "runnable"
+        ],
+        "title": "TaskSpecResponse",
+        "type": "object"
+      },
+      "TaskSpecsResponse": {
+        "additionalProperties": false,
+        "description": "Every recorded TaskSpec for a matter (append order).",
+        "properties": {
+          "kind": {
+            "const": "task_specs",
+            "default": "task_specs",
+            "title": "Kind",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "specs": {
+            "items": {
+              "$ref": "#/components/schemas/TaskSpec"
+            },
+            "title": "Specs",
+            "type": "array"
+          }
+        },
+        "title": "TaskSpecsResponse",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Hosted write-tier API over per-matter vaults (Access-gated).",
+    "title": "MootLoop matter API",
+    "version": "0.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/csrf": {
+      "get": {
+        "operationId": "get_csrf_api_csrf_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CsrfToken"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Csrf"
+      }
+    },
+    "/api/download": {
+      "get": {
+        "description": "Validate a signed link, AUDIT-APPEND FIRST (fail closed), then stream the file.\n\nNot matter-scoped in the path \u2014 the token carries the (matter, run, deliverable)\naudience. The access audit MUST record before a byte streams: if the audit write\nfails, `AuditWriteError` propagates (500) and nothing is served (plan FD-3).",
+        "operationId": "download_deliverable_api_download_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download Deliverable"
+      }
+    },
+    "/api/matters": {
+      "get": {
+        "operationId": "list_matters_api_matters_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MatterSummary"
+                  },
+                  "title": "Response List Matters Api Matters Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Matters"
+      }
+    },
+    "/api/matters/{matter_id}/runs": {
+      "get": {
+        "operationId": "list_runs_api_matters__matter_id__runs_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RunSummary"
+                  },
+                  "title": "Response List Runs Api Matters  Matter Id  Runs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Runs"
+      },
+      "post": {
+        "operationId": "start_run_api_matters__matter_id__runs_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunStatusSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Run"
+      }
+    },
+    "/api/matters/{matter_id}/runs/{run_id}": {
+      "get": {
+        "operationId": "get_run_api_matters__matter_id__runs__run_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunStatusSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Run"
+      }
+    },
+    "/api/matters/{matter_id}/runs/{run_id}/attest": {
+      "post": {
+        "operationId": "attest_run_api_matters__matter_id__runs__run_id__attest_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Attest Run"
+      }
+    },
+    "/api/matters/{matter_id}/runs/{run_id}/continue": {
+      "post": {
+        "description": "Clear a gated-mode checkpoint so the run resumes (mirrors ``mootloop run\ncontinue``; the ``/resume`` route covers operator-paused runs).",
+        "operationId": "continue_run_api_matters__matter_id__runs__run_id__continue_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunActionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Continue Run"
+      }
+    },
+    "/api/matters/{matter_id}/runs/{run_id}/decisions": {
+      "get": {
+        "operationId": "get_run_decisions_api_matters__matter_id__runs__run_id__decisions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Run Decisions"
+      }
+    },
+    "/api/matters/{matter_id}/runs/{run_id}/decisions/{decision_id}/resolve": {
+      "post": {
+        "operationId": "resolve_decision_api_matters__matter_id__runs__run_id__decisions__decision_id__resolve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "decision_id",
+            "required": true,
+            "schema": {
+              "title": "Decision Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolveResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resolve Decision"
+      }
+    },
+    "/api/matters/{matter_id}/runs/{run_id}/deliverables": {
+      "get": {
+        "description": "List a run's deliverables with DRAFT/clean state and per-file downloadability\n(clean files are downloadable only once the run is export-ready; plan P-37).",
+        "operationId": "list_deliverables_api_matters__matter_id__runs__run_id__deliverables_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliverablesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Deliverables"
+      }
+    },
+    "/api/matters/{matter_id}/runs/{run_id}/deliverables/{name}/link": {
+      "post": {
+        "description": "Mint a short-expiry signed link for one deliverable. A clean (non-DRAFT) file\nthat is not export-ready yields a typed 403 (``export_not_ready``); DRAFT files are\nalways linkable (plan FD-7 / P-37).",
+        "operationId": "mint_download_link_api_matters__matter_id__runs__run_id__deliverables__name__link_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignedLinkResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mint Download Link"
+      }
+    },
+    "/api/matters/{matter_id}/runs/{run_id}/gates": {
+      "get": {
+        "operationId": "get_run_gates_api_matters__matter_id__runs__run_id__gates_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GateLedgerResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Run Gates"
+      }
+    },
+    "/api/matters/{matter_id}/runs/{run_id}/pause": {
+      "post": {
+        "operationId": "pause_run_human_api_matters__matter_id__runs__run_id__pause_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunActionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pause Run Human"
+      }
+    },
+    "/api/matters/{matter_id}/runs/{run_id}/raise-cap": {
+      "post": {
+        "description": "Raise a capped run's hard budget cap (absolute ``to_usd`` or ``delta_usd`` over\nthe current effective cap), reopening it for resumption (plan D5).",
+        "operationId": "raise_cap_api_matters__matter_id__runs__run_id__raise_cap_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RaiseCapRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunActionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Raise Cap"
+      }
+    },
+    "/api/matters/{matter_id}/runs/{run_id}/requests": {
+      "get": {
+        "operationId": "get_run_requests_api_matters__matter_id__runs__run_id__requests_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Run Requests"
+      }
+    },
+    "/api/matters/{matter_id}/runs/{run_id}/resume": {
+      "post": {
+        "operationId": "resume_run_human_api_matters__matter_id__runs__run_id__resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunActionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resume Run Human"
+      }
+    },
+    "/api/matters/{matter_id}/runs/{run_id}/stream": {
+      "get": {
+        "description": "Tail the run's journal as Server-Sent Events until it is terminal (plan FE-1).\n\nA GET, so `RateLimitMiddleware` (write-only) never throttles it.",
+        "operationId": "stream_run_api_matters__matter_id__runs__run_id__stream_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stream Run"
+      }
+    },
+    "/api/matters/{matter_id}/tasks": {
+      "get": {
+        "description": "List the matter's recorded TaskSpecs (all lanes, append order).",
+        "operationId": "list_tasks_api_matters__matter_id__tasks_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskSpecsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Tasks"
+      }
+    },
+    "/api/matters/{matter_id}/tasks/freeform": {
+      "post": {
+        "description": "Resolve free-text intent to a TaskSpec (deterministic v1; unmapped -> ``task=None``,\nrecorded but not runnable). Persists append-only at ``tasks/specs.jsonl`` (plan FE-2.5).",
+        "operationId": "create_freeform_task_api_matters__matter_id__tasks_freeform_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FreeformTaskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskSpecResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Freeform Task"
+      }
+    },
+    "/internal/matters/{matter_id}/runs/{run_id}/pause": {
+      "post": {
+        "operationId": "pause_run_internal_internal_matters__matter_id__runs__run_id__pause_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PauseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunActionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pause Run Internal"
+      }
+    },
+    "/internal/matters/{matter_id}/runs/{run_id}/resume": {
+      "post": {
+        "operationId": "resume_run_internal_internal_matters__matter_id__runs__run_id__resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunActionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resume Run Internal"
+      }
+    },
+    "/internal/ping": {
+      "get": {
+        "description": "Liveness probe for the driver/BFF internal path \u2014 demonstrates the internal\nauth guard is wired and introspectable; carries no matter data.",
+        "operationId": "internal_ping_internal_ping_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Internal Ping Internal Ping Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Internal Ping"
+      }
+    },
+    "/internal/queue/next": {
+      "get": {
+        "description": "Claim the next work item for ``worker_id`` (or 204 when the queue is idle).",
+        "operationId": "internal_queue_next_internal_queue_next_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "worker_id",
+            "required": true,
+            "schema": {
+              "title": "Worker Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Internal Queue Next"
+      }
+    }
+  }
+}

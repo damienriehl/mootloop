@@ -15,13 +15,15 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 from mootloop import attest as attest_svc
 from mootloop import decisions as decisions_svc
 from mootloop import orchestrator
+from mootloop import taskspec as taskspec_svc
 from mootloop.engine.queue import Queue as WorkQueue
 from mootloop.errors import OrchestratorError
+from mootloop.export import link as link_svc
 from mootloop.journal import load_state
 from mootloop.models.matters import MatterSummary
 from mootloop.registry import MatterRegistry
@@ -29,6 +31,7 @@ from mootloop.vault import safe_vault_path
 from mootloop.web import audit
 from mootloop.web.api import deps, models, readers
 from mootloop.web.api.deps import (
+    get_link_signer,
     get_queue,
     get_registry,
     issue_csrf_token,
@@ -49,6 +52,7 @@ Registry = Annotated[MatterRegistry, Depends(get_registry)]
 Csrf = Annotated[None, Depends(require_csrf)]
 Internal = Annotated[None, Depends(require_internal)]
 QueueDep = Annotated[WorkQueue, Depends(get_queue)]
+Signer = Annotated[link_svc.LinkSigner, Depends(get_link_signer)]
 
 
 def _now_iso() -> str:
@@ -194,7 +198,9 @@ def start_run(
     _csrf: Csrf,
     _audited: Annotated[None, Depends(_audit_dep("run_start"))],
 ) -> models.RunStatusSummary:
-    run_id = orchestrator.start_run(vault, body.task, _now_iso(), mode=body.mode)
+    run_id = orchestrator.start_run(
+        vault, body.task, _now_iso(), mode=body.mode, task_spec_id=body.task_spec_id
+    )
     return readers.run_status_summary(vault, run_id)
 
 
@@ -283,6 +289,35 @@ def attest_run(
     return models.AttestResponse(attestation=attestation)
 
 
+# --- begin-task on-ramp: freeform lane + TaskSpec listing -------------------
+
+
+@router.post("/api/matters/{matter_id}/tasks/freeform")
+def create_freeform_task(
+    matter_id: str,
+    body: models.FreeformTaskRequest,
+    vault: Vault,
+    principal: Principal,
+    _csrf: Csrf,
+    _audited: Annotated[None, Depends(_audit_dep("task_freeform"))],
+) -> models.TaskSpecResponse:
+    """Resolve free-text intent to a TaskSpec (deterministic v1; unmapped -> ``task=None``,
+    recorded but not runnable). Persists append-only at ``tasks/specs.jsonl`` (plan FE-2.5)."""
+    spec = taskspec_svc.create_freeform(vault, matter_id, body.intent_text, _now_iso())
+    return models.TaskSpecResponse(task_spec=spec, runnable=spec.runnable)
+
+
+@router.get("/api/matters/{matter_id}/tasks")
+def list_tasks(
+    matter_id: str,
+    vault: Vault,
+    _principal: Principal,
+    _audited: Annotated[None, Depends(_audit_dep("tasks_list"))],
+) -> models.TaskSpecsResponse:
+    """List the matter's recorded TaskSpecs (all lanes, append order)."""
+    return models.TaskSpecsResponse(specs=taskspec_svc.list_specs(vault))
+
+
 # --- run pause / resume (human; Access + CSRF + audited) --------------------
 
 
@@ -332,6 +367,83 @@ def stream_run(
 
     A GET, so `RateLimitMiddleware` (write-only) never throttles it."""
     return StreamingResponse(sse_run_events(vault, run_id), media_type="text/event-stream")
+
+
+# --- export: deliverables + signed download links (Access + audited) --------
+
+
+@router.get("/api/matters/{matter_id}/runs/{run_id}/deliverables")
+def list_deliverables(
+    matter_id: str,
+    run_id: str,
+    vault: Vault,
+    _principal: Principal,
+    _audited: Annotated[None, Depends(_audit_dep("deliverables_list"))],
+) -> models.DeliverablesResponse:
+    """List a run's deliverables with DRAFT/clean state and per-file downloadability
+    (clean files are downloadable only once the run is export-ready; plan P-37)."""
+    from mootloop import gate_ledger
+
+    ready, _blockers = gate_ledger.export_ready(vault, run_id)
+    entries = link_svc.list_deliverables(vault, run_id)
+    infos = [
+        models.DeliverableInfo(
+            name=e.name,
+            size_bytes=e.size_bytes,
+            is_draft=e.is_draft,
+            requires_export_ready=e.requires_export_ready,
+            downloadable=(ready if e.requires_export_ready else True),
+        )
+        for e in entries
+    ]
+    return models.DeliverablesResponse(run_id=run_id, export_ready=ready, deliverables=infos)
+
+
+@router.post("/api/matters/{matter_id}/runs/{run_id}/deliverables/{name:path}/link")
+def mint_download_link(
+    matter_id: str,
+    run_id: str,
+    name: str,
+    vault: Vault,
+    principal: Principal,
+    signer: Signer,
+    _csrf: Csrf,
+    _audited: Annotated[None, Depends(_audit_dep("deliverable_link"))],
+) -> models.SignedLinkResponse:
+    """Mint a short-expiry signed link for one deliverable. A clean (non-DRAFT) file
+    that is not export-ready yields a typed 403 (``export_not_ready``); DRAFT files are
+    always linkable (plan FD-7 / P-37)."""
+    link = link_svc.mint_link(vault, matter_id, run_id, name, _now_iso(), signer)
+    return models.SignedLinkResponse(
+        run_id=run_id,
+        doc=link.doc,
+        url=link.url,
+        token=link.token,
+        is_draft=link.is_draft,
+        expires_at=link.expires_at,
+    )
+
+
+@router.get("/api/download")
+def download_deliverable(
+    token: str,
+    principal: Principal,
+    registry: Registry,
+    signer: Signer,
+) -> FileResponse:
+    """Validate a signed link, AUDIT-APPEND FIRST (fail closed), then stream the file.
+
+    Not matter-scoped in the path — the token carries the (matter, run, deliverable)
+    audience. The access audit MUST record before a byte streams: if the audit write
+    fails, `AuditWriteError` propagates (500) and nothing is served (plan FD-3)."""
+    claims = link_svc.validate_token(token, _now_iso(), signer)
+    vault = registry.resolve(claims.matter_id)
+    path = link_svc.resolve_for_download(vault, claims)
+    # Fail closed: the download is not considered served unless it is durably recorded.
+    audit.record_download_audit(
+        vault, actor=principal.email, matter_id=claims.matter_id, resource=claims.doc
+    )
+    return FileResponse(path, filename=Path(claims.doc).name)
 
 
 # --- driver-only surface (InternalAuth) -------------------------------------
