@@ -17,6 +17,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
+import mootloop
 from mootloop import attest as attest_svc
 from mootloop import decisions as decisions_svc
 from mootloop import orchestrator
@@ -57,6 +58,19 @@ Signer = Annotated[link_svc.LinkSigner, Depends(get_link_signer)]
 
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
+
+
+# --- health (unauthenticated liveness) --------------------------------------
+
+
+@router.get("/health")
+def health() -> dict[str, str]:
+    """Unauthenticated liveness probe — no Access/Internal guard, no matter data.
+
+    A GET, so the write-only `RateLimitMiddleware` never throttles it; it carries only
+    the static app version so the container HEALTHCHECK and Coolify can probe readiness
+    without a valid Cloudflare Access token."""
+    return {"status": "ok", "version": mootloop.__version__}
 
 
 def _audit_dep(action: str) -> Callable[..., None]:
