@@ -45,6 +45,8 @@ from mootloop.models.events import (
     GateEvaluated,
     RunFinished,
     RunMode,
+    RunPaused,
+    RunResumed,
     RunStarted,
     RunState,
     SpendRecorded,
@@ -216,6 +218,9 @@ def plan_next(
     """The TurnSpecs that can execute now (per-request fan-out, cap-respecting)."""
     binding = _binding_for(vault_root, run_id)
     state = load_state(vault_root, run_id)
+    # A paused run schedules nothing and short-circuits the cap check (plan FE-1).
+    if state.status == "paused":
+        return []
     units = load_request_units(vault_root)
     # Budget hard cap (plan D5): at/over cap, gracefully checkpoint before planning.
     if not state.finished and _over_cap(vault_root, state):
@@ -515,8 +520,11 @@ def _effective_cap(vault_root: Path | str, state: RunState) -> float | None:
 
 
 def _over_cap(vault_root: Path | str, state: RunState) -> bool:
+    # Conservative cap (plan FD-6): count every unreconciled write-ahead intent at its
+    # max-plausible cost, so an in-flight turn presses against the cap until it settles.
+    projected = state.total_spend_usd + sum(state.pending_intents.values())
     cap = _effective_cap(vault_root, state)
-    return cap is not None and state.total_spend_usd >= cap
+    return cap is not None and projected >= cap
 
 
 def _cap_transition(
@@ -657,6 +665,7 @@ _STATE_MARKER: dict[str, str] = {
     "checkpoint": "ask-pending",
     "needs_attention": "blocked",
     "capped": "blocked",
+    "paused": "blocked",
     "finished": "done",
 }
 
@@ -692,6 +701,27 @@ def _maybe_checkpoint(
         vault_root, run_id, matter, "policy-delegable"
     ):
         append(vault_root, run_id, CheckpointReached(boundary="policy_decisions"))
+
+
+def pause_run(vault_root: Path | str, run_id: str, reason: str = "manual") -> None:
+    """Pause a live run (plan FE-1): append ``RunPaused`` so the worker stops ticking.
+
+    Refuses to pause a terminally-complete run (``finished`` / ``needs_attention`` /
+    ``capped``) — a paused run must be resumable, and those states are not."""
+    with RunLock(vault_root, run_id):
+        state = load_state(vault_root, run_id)
+        if state.is_terminal:
+            raise OrchestratorError(f"run {run_id!r} is complete ({state.status}); cannot pause")
+        append(vault_root, run_id, RunPaused(reason=reason))
+
+
+def resume_run(vault_root: Path | str, run_id: str) -> None:
+    """Resume a paused run (plan FE-1): append ``RunResumed`` so it reopens to running."""
+    with RunLock(vault_root, run_id):
+        state = load_state(vault_root, run_id)
+        if state.status != "paused":
+            raise OrchestratorError(f"run {run_id!r} is not paused")
+        append(vault_root, run_id, RunResumed())
 
 
 def continue_run(vault_root: Path | str, run_id: str) -> None:

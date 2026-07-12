@@ -18,9 +18,16 @@ from mootloop.models.run import TurnRecord
 # Run lifecycle statuses (plan D5/Phase 5). ``capped`` is a graceful budget
 # checkpoint reopened by ``CapRaised``; ``needs_decisions`` is a finish blocked on an
 # open hard-human attorney gate (reopened when it resolves); ``checkpoint`` is a
-# gated-mode stage-boundary pause reopened by ``CheckpointCleared``.
+# gated-mode stage-boundary pause reopened by ``CheckpointCleared``; ``paused`` is an
+# operator/worker pause reopened by ``RunResumed`` (plan FE-1).
 RunStatus = Literal[
-    "running", "finished", "needs_attention", "capped", "needs_decisions", "checkpoint"
+    "running",
+    "finished",
+    "needs_attention",
+    "capped",
+    "needs_decisions",
+    "checkpoint",
+    "paused",
 ]
 
 # Run execution mode (plan D12): autonomous batches gates, gated pauses at
@@ -70,6 +77,7 @@ class SpendRecorded(StrictModel):
     output_tokens: int
     model: str
     usd_equiv: float
+    billing_mode: Literal["subscription", "api"] = "subscription"
 
 
 class RunFinished(StrictModel):
@@ -114,6 +122,35 @@ class CheckpointCleared(StrictModel):
     boundary: str
 
 
+class RunPaused(StrictModel):
+    """The run paused without finishing (plan FE-1). ``reason`` is generic free-form
+    (e.g. ``"capacity"`` | ``"drain"`` | ``"manual"``). A paused run is non-terminal:
+    it stops ticking but is not complete, and ``RunResumed`` reopens it to ``running``."""
+
+    kind: Literal["run_paused"] = "run_paused"
+    reason: str
+
+
+class RunResumed(StrictModel):
+    """The operator/worker resumed a paused run; it reopens to ``running`` (plan FE-1)."""
+
+    kind: Literal["run_resumed"] = "run_resumed"
+
+
+class TurnIntent(StrictModel):
+    """A spend write-ahead ledger entry (plan FD-6): recorded *before* a turn calls the
+    provider. It is folded as *pending* spend until the matching ``TurnCompleted`` /
+    ``SpendRecorded`` for the same ``turn_id`` reconciles it. The cap counts every
+    unreconciled intent at ``max_plausible_usd`` (conservative), so an in-flight turn
+    can never push a run past its budget cap unnoticed."""
+
+    kind: Literal["turn_intent"] = "turn_intent"
+    turn_id: str
+    model: str
+    billing_mode: Literal["subscription", "api"]
+    max_plausible_usd: float
+
+
 JournalEvent = Annotated[
     RunStarted
     | StageStarted
@@ -125,7 +162,10 @@ JournalEvent = Annotated[
     | CapRaised
     | DecisionRecorded
     | CheckpointReached
-    | CheckpointCleared,
+    | CheckpointCleared
+    | RunPaused
+    | RunResumed
+    | TurnIntent,
     Field(discriminator="kind"),
 ]
 
@@ -149,10 +189,25 @@ class RunState(StrictModel):
     total_cache_write: int = 0
     total_output_tokens: int = 0
     cap_raised_to: float | None = None
+    # Write-ahead spend ledger (plan FD-6): turn_id -> max_plausible_usd for intents
+    # that have NOT yet been reconciled by their matching TurnCompleted/SpendRecorded.
+    pending_intents: dict[str, float] = Field(default_factory=dict)
 
     @property
     def finished(self) -> bool:
+        """Not schedulable *right now* — any non-``running`` status. This includes the
+        non-terminal pauses (``paused`` / ``checkpoint`` / ``needs_decisions``): the
+        planner emits no work while they hold. Use ``is_terminal`` to ask whether the
+        run has completed for good."""
         return self.status != "running"
+
+    @property
+    def is_terminal(self) -> bool:
+        """The run is complete for good — a terminal state no resume reopens.
+        ``paused`` / ``checkpoint`` / ``needs_decisions`` / ``running`` are all
+        NON-terminal (they stop ticking but are not done); only ``finished`` /
+        ``needs_attention`` / ``capped`` are terminal (plan FE-1)."""
+        return self.status in ("finished", "needs_attention", "capped")
 
     def is_completed(self, turn_id: str) -> bool:
         return turn_id in self.completed_turns

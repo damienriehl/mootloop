@@ -8,6 +8,12 @@ bodies are additionally written write-once to ``runs/<run-id>/turns/<turn-id>.js
 `read_events` tolerates a *torn final line* (a crash mid-append): it truncates the
 file back to the last complete line and warns, never crashing. A corrupt line that
 is not the final one is a hard error — that is real corruption, not a torn write.
+
+`tail_events` is the read-only incremental reader (plan FE-1): it returns the events
+appended since a byte offset and NEVER truncates. It tolerates a torn final line by
+leaving it in place for the writer (advancing the offset only past complete,
+newline-terminated lines); a malformed *complete* line still raises — that is real
+corruption, not a torn write.
 """
 
 from __future__ import annotations
@@ -26,12 +32,15 @@ from mootloop.models.events import (
     GateEvaluated,
     JournalEvent,
     RunFinished,
+    RunPaused,
+    RunResumed,
     RunStarted,
     RunState,
     SpendRecorded,
     StageStarted,
     TurnCompleted,
     TurnDiscarded,
+    TurnIntent,
 )
 from mootloop.models.run import TurnRecord
 from mootloop.vault import safe_vault_path
@@ -110,6 +119,38 @@ def read_events(vault_root: Path | str, run_id: str) -> list[JournalEvent]:
     return events
 
 
+def tail_events(path: Path | str, after_offset: int = 0) -> tuple[list[JournalEvent], int]:
+    """Read events appended since ``after_offset``; return ``(events, new_offset)``.
+
+    A read-only incremental reader (plan FE-1) — unlike `read_events`, it NEVER
+    truncates the file. It seeks to ``after_offset``, reads to EOF, and parses every
+    COMPLETE (newline-terminated) line. A torn/in-progress final line (no trailing
+    newline) is left untouched for the writer: it is not parsed and the returned
+    offset does not advance past it. Blank lines are skipped but their bytes still
+    count toward the offset. A malformed *complete* line raises (real corruption).
+    """
+    path = Path(path)
+    if not path.is_file():
+        return [], after_offset
+    with path.open("rb") as handle:
+        handle.seek(after_offset)
+        chunk = handle.read()
+    events: list[JournalEvent] = []
+    consumed = 0
+    start = 0
+    while True:
+        nl = chunk.find(b"\n", start)
+        if nl == -1:
+            break  # trailing bytes with no newline are a torn/in-progress line
+        line = chunk[start : nl + 1]
+        stripped = line.strip()
+        if stripped:
+            events.append(_EVENT_ADAPTER.validate_json(stripped))
+        consumed = nl + 1
+        start = nl + 1
+    return events, after_offset + consumed
+
+
 def _truncate(path: Path, size: int) -> None:
     """Best-effort truncate to the last complete line so future appends stay clean."""
     try:
@@ -138,6 +179,9 @@ def fold(events: list[JournalEvent]) -> RunState:
             state.current_stage = event.stage
         elif isinstance(event, TurnCompleted):
             state.completed_turns[event.record.spec.turn_id] = event.record
+            # Reconcile the write-ahead intent: a completed turn (even one with no
+            # usage) clears its pending max-plausible reservation (plan FD-6).
+            state.pending_intents.pop(event.record.spec.turn_id, None)
         elif isinstance(event, TurnDiscarded):
             state.discarded[event.turn_id] = event.attempt
         elif isinstance(event, SpendRecorded):
@@ -146,6 +190,9 @@ def fold(events: list[JournalEvent]) -> RunState:
             state.total_cache_read += event.cache_read
             state.total_cache_write += event.cache_write
             state.total_output_tokens += event.output_tokens
+            state.pending_intents.pop(event.turn_id, None)  # reconcile intent
+        elif isinstance(event, TurnIntent):
+            state.pending_intents[event.turn_id] = event.max_plausible_usd
         elif isinstance(event, RunFinished):
             state.status = event.status
         elif isinstance(event, CapRaised):
@@ -158,6 +205,11 @@ def fold(events: list[JournalEvent]) -> RunState:
             state.cleared_checkpoints.add(event.boundary)
             if state.status == "checkpoint":
                 state.status = "running"  # reopen a gated stage-boundary pause
+        elif isinstance(event, RunPaused):
+            state.status = "paused"
+        elif isinstance(event, RunResumed):
+            if state.status == "paused":
+                state.status = "running"  # reopen an operator/worker pause
         elif isinstance(event, (GateEvaluated, DecisionRecorded)):
             pass  # informational; authoritative copies ride on TurnRecord/decisions
     return state

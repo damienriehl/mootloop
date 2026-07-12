@@ -109,6 +109,26 @@ def cost_of(usage: TokenUsage, model: str, on: date) -> float:
     ) / 1e6
 
 
+def max_plausible_cost(
+    model: str,
+    on: date,
+    *,
+    max_output_tokens: int = 64_000,
+    max_input_tokens: int = 200_000,
+) -> float:
+    """A conservative upper-bound $ for one turn at ``model``'s rates on ``on``.
+
+    Used to fill ``TurnIntent.max_plausible_usd`` (plan FD-6): the write-ahead ledger
+    reserves this much against the cap until the turn's real ``SpendRecorded`` settles.
+    Prices all input as uncached (the priciest bucket); an unpriced model costs $0.
+    """
+    price = price_for(model, on)
+    if price is None:
+        return 0.0
+    rate_in, rate_out = price
+    return (max_input_tokens * rate_in + max_output_tokens * rate_out) / 1e6
+
+
 # --- pre-run estimate -------------------------------------------------------
 
 
@@ -207,5 +227,6 @@ __all__ = [
     "tier_models",
     "price_for",
     "cost_of",
+    "max_plausible_cost",
     "estimate_run",
 ]
