@@ -15,9 +15,12 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from mootloop import attest as attest_svc
 from mootloop import decisions as decisions_svc
+from mootloop import orchestrator
+from mootloop.engine.queue import Queue as WorkQueue
 from mootloop.journal import load_state
 from mootloop.models.matters import MatterSummary
 from mootloop.registry import MatterRegistry
@@ -25,6 +28,7 @@ from mootloop.vault import safe_vault_path
 from mootloop.web import audit
 from mootloop.web.api import deps, models
 from mootloop.web.api.deps import (
+    get_queue,
     get_registry,
     issue_csrf_token,
     require_access,
@@ -32,6 +36,7 @@ from mootloop.web.api.deps import (
     require_internal,
     resolve_matter,
 )
+from mootloop.web.api.sse import sse_run_events
 from mootloop.web.security import AccessPrincipal
 
 router = APIRouter()
@@ -42,6 +47,7 @@ Principal = Annotated[AccessPrincipal, Depends(require_access)]
 Registry = Annotated[MatterRegistry, Depends(get_registry)]
 Csrf = Annotated[None, Depends(require_csrf)]
 Internal = Annotated[None, Depends(require_internal)]
+QueueDep = Annotated[WorkQueue, Depends(get_queue)]
 
 
 def _now_iso() -> str:
@@ -172,7 +178,94 @@ def attest_run(
     return models.AttestResponse(attestation=attestation)
 
 
+# --- run pause / resume (human; Access + CSRF + audited) --------------------
+
+
+def _run_action(vault: Path, run_id: str, kind: str) -> models.RunActionResponse:
+    state = load_state(vault, run_id)
+    return models.RunActionResponse(kind=kind, run_id=run_id, status=state.status)  # type: ignore[arg-type]
+
+
+@router.post("/api/matters/{matter_id}/runs/{run_id}/pause")
+def pause_run_human(
+    matter_id: str,
+    run_id: str,
+    vault: Vault,
+    principal: Principal,
+    _csrf: Csrf,
+    _audited: Annotated[None, Depends(_audit_dep("pause"))],
+) -> models.RunActionResponse:
+    orchestrator.pause_run(vault, run_id, reason="manual")
+    return _run_action(vault, run_id, "run_paused")
+
+
+@router.post("/api/matters/{matter_id}/runs/{run_id}/resume")
+def resume_run_human(
+    matter_id: str,
+    run_id: str,
+    vault: Vault,
+    principal: Principal,
+    _csrf: Csrf,
+    _audited: Annotated[None, Depends(_audit_dep("resume"))],
+) -> models.RunActionResponse:
+    orchestrator.resume_run(vault, run_id)
+    return _run_action(vault, run_id, "run_resumed")
+
+
+# --- live run stream (SSE; Access + audited) --------------------------------
+
+
+@router.get("/api/matters/{matter_id}/runs/{run_id}/stream")
+def stream_run(
+    matter_id: str,
+    run_id: str,
+    vault: Vault,
+    principal: Principal,
+    _audited: Annotated[None, Depends(_audit_dep("stream"))],
+) -> StreamingResponse:
+    """Tail the run's journal as Server-Sent Events until it is terminal (plan FE-1).
+
+    A GET, so `RateLimitMiddleware` (write-only) never throttles it."""
+    return StreamingResponse(sse_run_events(vault, run_id), media_type="text/event-stream")
+
+
 # --- driver-only surface (InternalAuth) -------------------------------------
+
+
+@router.post("/internal/matters/{matter_id}/runs/{run_id}/pause")
+def pause_run_internal(
+    matter_id: str,
+    run_id: str,
+    body: models.PauseRequest,
+    vault: Vault,
+    _internal: Internal,
+) -> models.RunActionResponse:
+    orchestrator.pause_run(vault, run_id, reason=body.reason or "manual")
+    return _run_action(vault, run_id, "run_paused")
+
+
+@router.post("/internal/matters/{matter_id}/runs/{run_id}/resume")
+def resume_run_internal(
+    matter_id: str,
+    run_id: str,
+    vault: Vault,
+    _internal: Internal,
+) -> models.RunActionResponse:
+    orchestrator.resume_run(vault, run_id)
+    return _run_action(vault, run_id, "run_resumed")
+
+
+@router.get("/internal/queue/next")
+def internal_queue_next(
+    worker_id: str,
+    queue: QueueDep,
+    _internal: Internal,
+) -> Response:
+    """Claim the next work item for ``worker_id`` (or 204 when the queue is idle)."""
+    item = queue.claim(worker_id, datetime.now(UTC), visibility_timeout_s=300.0)
+    if item is None:
+        return Response(status_code=204)
+    return JSONResponse(content=item.model_dump(mode="json"))
 
 
 @router.get("/internal/ping")

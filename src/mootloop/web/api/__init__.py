@@ -21,10 +21,13 @@ from mootloop.errors import (
     AccessAuthError,
     AttestationBlockedError,
     AuditWriteError,
+    BackupError,
     DecisionError,
     InternalAuthError,
     LockHeldError,
     MatterNotFoundError,
+    OrchestratorError,
+    QueueError,
     VaultBoundaryError,
 )
 from mootloop.web.api import models, routes
@@ -54,6 +57,18 @@ def _install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(DecisionError)
     async def _decision(request: Request, exc: DecisionError) -> JSONResponse:
         return JSONResponse(status_code=400, content={"error": "decision", "detail": str(exc)})
+
+    @app.exception_handler(OrchestratorError)
+    async def _orchestrator(request: Request, exc: OrchestratorError) -> JSONResponse:
+        return JSONResponse(status_code=409, content={"error": "orchestrator", "detail": str(exc)})
+
+    @app.exception_handler(QueueError)
+    async def _queue(request: Request, exc: QueueError) -> JSONResponse:
+        return JSONResponse(status_code=409, content={"error": "queue", "detail": str(exc)})
+
+    @app.exception_handler(BackupError)
+    async def _backup(request: Request, exc: BackupError) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"error": "backup", "detail": str(exc)})
 
     @app.exception_handler(MatterNotFoundError)
     async def _not_found(request: Request, exc: MatterNotFoundError) -> JSONResponse:

@@ -31,6 +31,12 @@ class ResolveRequest(StrictModel):
     note: str = ""
 
 
+class PauseRequest(StrictModel):
+    """The optional body of a run-pause call; ``reason`` defaults to ``manual``."""
+
+    reason: str | None = None
+
+
 # --- responses --------------------------------------------------------------
 
 
@@ -66,6 +72,15 @@ class AttestResponse(VersionedModel):
     schema_version: str = SCHEMA_VERSION
     kind: Literal["attested"] = "attested"
     attestation: Attestation
+
+
+class RunActionResponse(VersionedModel):
+    """The result of a pause/resume call, exposing the run's resulting `RunStatus`."""
+
+    schema_version: str = SCHEMA_VERSION
+    kind: Literal["run_paused", "run_resumed"]
+    run_id: str
+    status: RunStatus
 
 
 class LockContentionBody(StrictModel):

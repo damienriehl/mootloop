@@ -254,6 +254,51 @@ MOOTLOOP_RATE_CAPACITY       # rate-limit bucket capacity (default 20)
 MOOTLOOP_RATE_REFILL_PER_SEC # rate-limit refill rate (default 2/s)
 ```
 
+## Engine (hosted driver, FE-1)
+
+> **Engine + run lifecycle — code-complete, awaiting a first live `claude -p` run.**
+> The same orchestrator core the CLI drives, wrapped in a supervised worker.
+
+- **Headless Claude provider** — a persona turn runs as a sandboxed `claude -p`
+  subprocess (`engine/claude_provider.py`), not an HTTP model call. The subprocess sees
+  a **minimal, explicitly-built env** (never a wholesale `os.environ` copy): the
+  subscription OAuth token (or an API key in `api` billing mode — never both), a per-run
+  config dir, and the auto-updater/telemetry kill switches. `--allowedTools` is a
+  **read-only allowlist** (no Bash / Write / Edit / web tools) and a per-run `--settings`
+  file denies reads/writes outside the vault realpath and denies the secrets file
+  outright. An optional `egress_wrapper` (e.g. a `bwrap` network jail) is prepended to
+  argv. Failures classify into `SeatLimitError` / `AuthError` / `TurnError`, with any
+  surfaced stderr redacted so a token can never leak.
+- **File-backed driver queue + worker** — a single advisory-locked JSONL queue
+  (`engine/queue.py`, no Redis) with two priority lanes (interactive preempts batch runs)
+  and self-healing visibility timeouts. The `Worker` (`engine/worker.py`) drains a
+  claimed run one `plan_next → assemble_prompt → run_turn → record_turn` tick at a time,
+  never holding the `RunLock` across a model call, with heartbeats and stale-worker
+  reclaim. A **seat limit pauses the run** (`RunPaused(reason="capacity")`) and releases
+  the queue slot for a scheduled resume; an auth failure finishes `needs_attention` and
+  drops a notification — the work is never silently lost.
+- **Pause/resume + write-ahead spend ledger** — `paused` is a first-class, non-terminal
+  run status (`run pause`/`run resume`). Each turn writes a `TurnIntent` **before** the
+  model call, reserving its max-plausible cost against the hard cap until the real
+  `SpendRecorded` reconciles it — the cap check is conservative (an in-flight turn counts
+  at its ceiling until it settles).
+- **SSE run stream** — the web tier tails the journal read-only (`tail_events`, which
+  **never truncates** a torn line — the truncating `read_events` would race the writer)
+  and frames each event as a Server-Sent Event with heartbeats.
+- **Driver-coordinated backup** — `mootloop backup` writes a consistent `tar.gz` snapshot
+  (`engine/backup.py`) while briefly holding the `RunLock`, refusing any destination
+  inside a sync folder or git repo and reading the archive back before returning.
+
+New CLI verbs:
+
+```bash
+mootloop driver run-once --matters-root <dir> --worker-id <id> [--fake]
+mootloop driver serve    --matters-root <dir> --worker-id <id>   # supervised, drains on SIGTERM
+mootloop run pause  <vault> <run-id> [--reason capacity]
+mootloop run resume <vault> <run-id>
+mootloop backup <vault> --dest <dir>
+```
+
 ## Guardrails
 
 - **Vault boundary:** matter data never lives in the repo; the vault path is

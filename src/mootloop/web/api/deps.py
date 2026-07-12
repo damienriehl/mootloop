@@ -17,6 +17,7 @@ from typing import Annotated, Any
 
 from fastapi import Depends, HTTPException, Request, Response
 
+from mootloop.engine.queue import Queue
 from mootloop.errors import AccessAuthError, InternalAuthError
 from mootloop.registry import MatterRegistry
 from mootloop.web.security import AccessPrincipal, CfAccessVerifier, InternalAuth
@@ -46,6 +47,11 @@ def get_verifier() -> CfAccessVerifier:
 def get_internal_auth() -> InternalAuth:
     """The driver/BFF internal-secret checker (fail-closed)."""
     return InternalAuth.from_env()
+
+
+def get_queue() -> Queue:
+    """The file-based driver work queue rooted at the matters-root. Overridden in tests."""
+    return Queue(MatterRegistry().root)
 
 
 # --- auth guards (introspectable) -------------------------------------------

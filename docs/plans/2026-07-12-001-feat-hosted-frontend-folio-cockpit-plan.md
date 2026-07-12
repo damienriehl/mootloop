@@ -123,6 +123,18 @@ Vault: /srv/mootloop-matters/<matter_id>/  (0700, outside all repos)
     - [ ] Coolify matter-tier apps + secrets provisioning (infra — not built)
     - [ ] Penetration-checklist gate run against a live origin (deploy-side — not run)
 - **FE-1 — Engine + run lifecycle (3 sessions):** driver worker (queue consumer, per-turn sandbox, spend ledger, seat-limit pause/notify/resume + failover per P-32, lock discipline, drain/reclaim); run APIs; SSE journal streaming with heartbeats. Gate: full synthetic run driven end-to-end on the server via real `claude -p` (one live smoke run — mock-green is a false signal).
+  - _Code engine delivered (branch `feat/fe-1-engine`, units 1-3):_
+    - [x] Headless Claude provider (`engine/claude_provider.py`; read-only allowlist, minimal explicit env, per-run deny/allow settings, egress-wrapper prepend, subscription/api billing, SeatLimit/Auth/Turn classification + redaction)
+    - [x] File-backed driver queue (`engine/queue.py`; advisory-locked JSONL, interactive/run lanes, visibility-timeout reclaim, paused-run slot release)
+    - [x] Driver worker (`engine/worker.py`; drain-per-tick `plan_next → run_turn → record_turn`, RunLock never held across the model call, heartbeat + stale reclaim; seat-limit → pause+reschedule, auth → needs_attention+notify, turn-error → backoff)
+    - [x] `paused` first-class run status + `RunPaused`/`RunResumed` pair; `run pause`/`run resume` (FD-5)
+    - [x] Write-ahead spend ledger with conservative cap: `TurnIntent` reserves max-plausible cost until `SpendRecorded` reconciles it, idempotent on turn id, billing-mode tag (FD-6)
+    - [x] Read-only `tail_events` (never truncates a torn line — writer-safe) + SSE journal streaming with heartbeats (`web/api/sse.py`)
+    - [x] Driver-coordinated consistent backup (`engine/backup.py`; RunLock-held snapshot, sync-folder/git refusal, tar readback) (FD-6 hosted-backup gate)
+    - [x] Two-process append gate: concurrent queue claim/enqueue + concurrent journal append prove no corruption and exactly-once claim (FD-6)
+    - [x] Driver CLI verbs (`mootloop driver serve|run-once`, `mootloop run pause|resume`, `mootloop backup`)
+    - [ ] Live-run gate: full synthetic run driven end-to-end on the server via real `claude -p` (deploy-side — not run)
+    - [ ] Seat-limit push notification (ntfy) + one-tap API failover per P-32 (not built — pause/reschedule seam in place)
 - **FE-2 — Cockpit + decision inbox (3 sessions):** Next.js chassis + the two rooms fronting existing primitives; decide/attest flows; run controls (start/pause/continue/raise-cap/failover). Gate: a phone-driven run of the synthetic matter start→decide→attest→export.
 - **FE-3 — On-ramps + task synthesis (3 sessions):** FOLIO catalog service + wizard (search-first tree, facet chips, "Available" semantics per P-30); TaskSpec; freeform lane with resolve-after-generate; task-synthesis flow (adapter YAML + derived rubric draft → attorney review/lock per P-31); suggestion surfacing (accept → TaskSpec).
 - **FE-4 — Strategy board (4 sessions):** StrategyBoard model + CRUD; extrapolation jobs (queue-metered); React Flow board (claims×defenses×elements axes, adjacency DAG, coverage coloring); curation → prompt-injection artifact + gap targets + derived-rubric overlay; run-findings auto-apply + system-edit feed/changelog per P-33.
