@@ -41,6 +41,10 @@ A **hosted web app at `mootloop.damienriehl.com`** (Hetzner, behind Cloudflare A
 | F-10 | Stack | Next.js/React 19/Radix/Tailwind/TanStack Query chassis (ontokit-web conventions) + folio-mapper components (React Flow DAG, FOLIO browser) + FastAPI backend extension; courtroom-ledger design identity |
 | F-11 | V1 scope | All six rooms, single-tenant (Damien); multi-user/firm tier waits for SDK extraction |
 | F-12 | Security workstream | First-class: threat-model the hosted matter tier before build (Cloudflare Access policy, firewall, secrets, backup encryption, audit logging of access, CSRF/session hardening) — built together with Damien |
+| F-13 | Board consumption | Curation drives all three: **persona prompt injection** (OC attacks along flagged defense axes), **fact/element gap targets** (green/red element coverage → client-question lists), **rubric criteria additions** (curation changes what judges score). Governing principle: **FOLIO = structure without constraint** — an ideation checklist the models extrapolate beyond; LLM-original ideas are first-class board citizens (grounded to IRIs when possible, `unmapped` welcome otherwise) |
+| F-14 | Suggestions + notify | **Event-driven suggestions** (new ingest → suggest responses+deadlines; run finished → suggest next; deadline horizon) + **push notifications** (run blocked on decisions, run finished, deadline nearing) + **daily digest** (open decisions, deadlines, suggestions, spend per matter) |
+| F-15 | Ingestion | **Full browser ingestion** (create matter + drag-drop upload with tagging UI) **plus cloud-directory connectors** (Drive/Dropbox/OneDrive): connected folders are **watched** — new documents trigger ingest suggestions and task suggestions (extends brainstorm D-16's connector layer with change-awareness) |
+| F-16 | Board lifetime | **Living document** per matter: run findings (OC attacks that landed, judge-panel weaknesses) and new facts flow back onto the board; it becomes the evolving theory-of-the-case map — the frontend face of the compounding loop |
 
 ## Resolved Questions
 
@@ -50,6 +54,10 @@ A **hosted web app at `mootloop.damienriehl.com`** (Hetzner, behind Cloudflare A
 - **Which FOLIO branches?** Litigation Document for catalog; Litigation Objectives for skeleton; areas_of_law as facet only (research-verified against the 18,325-class OWL).
 - **Which frontend property to build on?** ontokit-web chassis + folio-mapper components + folio-enrich data model + alea-intake grounding (F-10).
 - **HITL style?** Inbox + badge (F-8).
+- **What does board curation drive?** Persona prompts + gap targets + rubric criteria; structure without constraint (F-13).
+- **Suggestion triggers and remote awareness?** Events + push + digest (F-14).
+- **How does material get in?** Browser upload + watched cloud connectors (F-15).
+- **Board lifetime?** Living theory-of-the-case map (F-16).
 
 ## Open Questions
 
