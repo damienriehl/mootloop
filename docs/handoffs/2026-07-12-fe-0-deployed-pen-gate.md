@@ -1,10 +1,20 @@
-# HANDOFF — MootLoop matter tier DEPLOYED, pen-gate 11/13 (resume here)
+# HANDOFF — MootLoop matter tier DEPLOYED, pen-gate GREEN (resume here)
 
-**State (2026-07-12, session 2):** The hosted matter tier is **live and healthy** at
-https://mootloop.damienriehl.com behind Cloudflare Access. FE-0 penetration gate: **11
-PASS, 0 FAIL, 2 BLOCKED on operator credentials.** Attestation (interactive):
-`docs/evidence/fe-0-pen-gate.html` (published artifact + versioned in repo). PRs #15
-(deploy infra), #16 (auth-order fix), #17 (evidence pack) all merged to `main`.
+**State (2026-07-13, session 2 cont.):** The hosted matter tier is **live and healthy** at
+https://mootloop.damienriehl.com behind Cloudflare Access, with **per-hostname AOP live**
+— only Cloudflare reaches the origin (direct-to-origin fails the TLS handshake; verified).
+FE-0 penetration gate is **GREEN**: all 13 assertions hold (7 live-verified, 6 code-gated,
+0 failing/blocked). Attestation (interactive): `docs/evidence/fe-0-pen-gate.html`
+(published artifact + versioned in repo). PRs #15 (deploy infra), #16 (auth-order fix),
+#17 (evidence pack), #19 (AOP attach) merged to `main`.
+
+**AOP specifics (done):** client cert uploaded to CF per-hostname store (cert_id
+`73d666f6-4d78-4559-a13d-15478b3dfb50`, binding active); Traefik router carries
+`tls.options=mootloop-aop@file` via a compose label (router name is app-UUID-derived —
+re-derive if the app is recreated). CF token now has SSL/Certificates edit scope.
+
+**Coolify API token was rotated** (the old `/home/deploy/.coolify-token` expired
+mid-session; replaced with a fresh read-write token — deploys work again).
 
 ## What is deployed
 
@@ -23,24 +33,19 @@ PASS, 0 FAIL, 2 BLOCKED on operator credentials.** Attestation (interactive):
   `damienriehl@gmail.com`, 24h) → env `CF_ACCESS_AUD`; ACME-challenge bypass app so LE
   can validate behind Access. Coolify env vars set (names in `docs/deploy-matter.md`).
 
-## Blocked on Damien (the 2 open pen-gate items + engine)
+## Blocked on Damien (remaining — perimeter is DONE)
 
-1. **AOP (pen item 1) — token scope.** Per-hostname Authenticated Origin Pulls is fully
-   staged: CA + client cert at `/root/mootloop-aop/` on the box; Traefik v3.6
-   `tls.options` at `/data/coolify/proxy/dynamic/mootloop-aop.yaml` (CA copied to
-   `/traefik/certs-aop/`). Enforcement is INERT until (a) the client cert is uploaded to
-   Cloudflare's per-hostname store — the MootLoop token lacks **Zone → SSL and
-   Certificates → Edit** — and (b) the web router references
-   `tls.options=mootloop-aop@file`. **Do NOT set RequireAndVerifyClientCert before CF
-   presents the cert, or the live site breaks.** Interim: the origin already fails closed
-   on auth (matter routes → 401 without a JWT), so no matter data leaks meanwhile.
-2. **`claude setup-token`** on the box as the `mootloop` user (blocks the engine / any
-   live run) — the crown-jewel OAuth token.
-3. mootloop.org demo-prod: token can't create the zone (needs Zone→Create) — else Damien
-   adds registrar A records `@`/`www` → 204.168.246.227.
-4. CourtListener token (live citation gate); Google OAuth → "In Production" (FE-5 only).
-
-The evidence pack's rulings section captures decisions on items 1–3; paste them back.
+1. **Engine token — still needed for any live run.** `claude setup-token` must produce a
+   value starting `sk-ant-oat01-…`; write it to `~mootloop/.mootloop/secrets.env` as
+   `CLAUDE_CODE_OAUTH_TOKEN` (0600, service-user owned). (2026-07-13: Damien pasted a
+   non-`sk-ant-oat` value that was NOT written — re-run and confirm the prefix.)
+2. mootloop.org demo-prod DNS (Namecheap): no Namecheap API key on the box; needs API
+   access enabled + key + API user + IP allowlist (204.168.246.227, 97.116.181.129) → drop
+   at `~/.secrets/namecheap` for autonomous DNS. Else Damien adds A records `@`/`www` →
+   204.168.246.227 by hand. Low priority (demo-prod only).
+3. CourtListener token (live citation gate); Google OAuth → "In Production" (FE-5 only).
+4. **FD-6 gates before matter data** (not credential-blocked — to build/run): hosted
+   backup-restore drill; `mootloop close` inventory (does not exist yet).
 
 ## What the gate caught (fixed)
 
