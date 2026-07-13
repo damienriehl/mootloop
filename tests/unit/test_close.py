@@ -49,7 +49,7 @@ def test_close_backs_up_first(tmp_path: Path) -> None:
     record = close_matter(root, MID, actor="Clerk", now=NOW, backup_dir=dest)
     assert record.backup_ref is not None
     assert Path(record.backup_ref).exists()
-    assert list(dest.glob("*.tar.gz"))
+    assert list(dest.glob("*.tar.gz.enc"))  # hosted close produces an encrypted snapshot
 
 
 def test_close_requires_backup_dir_by_default(tmp_path: Path) -> None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -9,6 +10,21 @@ import pytest
 from mootloop.models.matter import MatterConfig
 
 NOW_ISO = "2026-07-11T00:00:00+00:00"
+
+
+@pytest.fixture(autouse=True)
+def _ephemeral_backup_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Never let a test mint/persist a real backup key into ``~/.mootloop/secrets.env``.
+
+    Any code path that reaches `load_or_create_backup_key` (e.g. `mootloop close`'s pre-purge
+    backup) gets a per-test in-memory AES key instead. Tests that pass an explicit ``key=``
+    bypass this entirely; the secrets loader itself is still exercised directly, with a tmp
+    secrets file, in ``test_secrets.py``.
+    """
+    key = os.urandom(32)
+    monkeypatch.setattr(
+        "mootloop.engine.backup.load_or_create_backup_key", lambda *a, **k: key
+    )
 
 
 def resolve_all_decisions(
