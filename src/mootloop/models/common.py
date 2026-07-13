@@ -45,3 +45,16 @@ class VersionedModel(StrictModel):
     """
 
     schema_version: str
+
+
+class MatterProvenanced(BaseModel):
+    """Mixin carrying the matter a persisted record derives from (plan FD-6).
+
+    v1 convention: existing matter-scoped models bind to their matter via the vault
+    path they are written under (the vault subtree *is* the matter boundary), so they
+    are not retrofitted with a redundant field. Every *new* persisted model that lives
+    off the matter vault (e.g. the matters-root close log) MUST mix this in, so its
+    matter of origin is explicit and machine-checkable even once the vault is gone.
+    """
+
+    source_matter_id: MatterId

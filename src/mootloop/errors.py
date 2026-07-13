@@ -126,6 +126,13 @@ class BackupError(MootloopError):
     tar readback did not list the expected members (plan FD-6 hosted-backup gate)."""
 
 
+class CloseError(MootloopError):
+    """A matter-close precondition failed (plan FD-6 close-inventory gate): a live run
+    holds the lock, a required fresh backup was refused/skipped without acknowledgement,
+    or the post-purge verification found vault residue. Fails closed — a close that
+    cannot prove full removal is not recorded as closed."""
+
+
 class TaskSpecError(MootloopError):
     """A begin-task on-ramp precondition failed (unknown TaskSpec id, malformed spec
     store, …). An *unresolved* intent is a valid TaskSpec (``task=None``), never an
