@@ -221,16 +221,19 @@ MOOTLOOP_DEMO_VAULT=/tmp/demo uv run uvicorn mootloop.web.app:app
 
 ## Hosted tier (FE-0)
 
-> **Perimeter foundation — deployed to a live origin; penetration gate all but passed.**
+> **Perimeter foundation — deployed to a live origin; penetration gate GREEN.**
 > The demo tier above stays read-only and untouched; this is a *separate* write-tier API
 > built behind a layered perimeter, ahead of any real matter data touching a server. The
 > matter tier (BFF + internal API + driver worker) runs at `mootloop.damienriehl.com`
-> behind Cloudflare Access. The 13-item penetration gate holds on 11 items (2 blocked on
-> operator credentials, 0 failing) — including a matter-ID oracle this gate caught and
+> behind Cloudflare Access with **per-hostname Authenticated Origin Pulls live** — only
+> Cloudflare can reach the origin (direct-to-origin fails the TLS handshake). All 13
+> penetration-gate assertions hold (7 verified live against the origin, 6 enforced in
+> code with green tests, 0 failing) — including a matter-ID oracle this gate caught and
 > fixed. See [`docs/security-frontend.md`](docs/security-frontend.md) for the threat
 > model, [`docs/deploy-matter.md`](docs/deploy-matter.md) for the runbook, and
 > [`docs/evidence/fe-0-pen-gate.html`](docs/evidence/fe-0-pen-gate.html) for the
-> attestation. **No real matter data until the gate is fully green.**
+> attestation. Before real matter data: the FD-6 backup-restore drill + `mootloop close`
+> inventory, and the engine credential for a live run.
 
 - **Layered perimeter** — every matter route sits behind three fail-closed controls:
   a **Cloudflare Access** JWT (`Cf-Access-Jwt-Assertion`, RS256 asserted by us, with

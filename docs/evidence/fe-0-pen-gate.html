@@ -214,19 +214,19 @@
       <div><dt>Host</dt><dd>mootloop.damienriehl.com</dd></div>
       <div><dt>Origin</dt><dd>204.168.246.227</dd></div>
       <div><dt>Date</dt><dd>2026-07-12</dd></div>
-      <div><dt>Gate</dt><dd id="gate-verdict">CONDITIONAL</dd></div>
+      <div><dt>Gate</dt><dd id="gate-verdict">PERIMETER GREEN</dd></div>
     </dl>
   </div>
 
   <div class="verdict-band">
-    <div class="seal pass"><div class="n">11</div><div class="l">Passed</div></div>
-    <div class="seal blocked"><div class="n">2</div><div class="l">Blocked on you</div></div>
-    <div class="seal fail"><div class="n">0</div><div class="l">Failed</div></div>
+    <div class="seal pass"><div class="n">7</div><div class="l">Live-verified</div></div>
+    <div class="seal pass"><div class="n">6</div><div class="l">Code-gated</div></div>
+    <div class="seal fail"><div class="n">0</div><div class="l">Failed / Blocked</div></div>
   </div>
 
   <div class="callout blood">
-    <h3>Hard rule still in force</h3>
-    <p>No real matter data on the server until all thirteen pass. Two items are blocked on actions only you can take (below). The rest hold, including a defect this gate <em>caught and fixed</em> before it could matter.</p>
+    <h3>Perimeter complete — matter data still gated</h3>
+    <p>All thirteen assertions now hold: seven verified live against the deployed origin (including the AOP origin-lock), six enforced in code with green unit tests. Zero failing, zero blocked. Before real matter data touches the server, two <em>non-perimeter</em> gates remain: the FD-6 hosted-backup restore drill and the <span class="mono">mootloop close</span> inventory, plus the engine credential for a live run.</p>
   </div>
 
   <section>
@@ -236,7 +236,7 @@
 
   <section>
     <h2><span class="num">§2</span> The thirteen assertions</h2>
-    <p class="lede">Expand any row for the method and the actual evidence. <span class="mono">PASS</span> = verified holding; <span class="mono">BLOCKED</span> = control staged, waiting on a credential only you hold; <span class="mono">code-gate</span> = enforced and covered by a green unit test where a live probe would require seeded matter data.</p>
+    <p class="lede">Expand any row for the method and the actual evidence. <span class="mono">PASS</span> = verified live against the deployed origin; <span class="mono">code-gate</span> = enforced and covered by a green unit test where a live probe would require seeded matter data or an FE-5 endpoint that doesn't exist yet.</p>
     <div class="ledger" id="ledger"></div>
   </section>
 
@@ -249,8 +249,8 @@
   <section>
     <h2><span class="num">§4</span> What is live right now</h2>
     <div class="callout">
-      <p><b>Deployed &amp; healthy:</b> Next.js BFF (public, Access-gated), FastAPI matter API (internal, unpublished), driver worker — all three containers healthy in Coolify project <span class="mono">mootloop</span>. Let's Encrypt origin cert issued (ACME-challenge Access-bypass in place). DNS proxied. Internal driver secret + download signing key seeded on the box under the <span class="mono">mootloop</span> service user (uid 3200), matters-root <span class="mono">/srv/mootloop-matters</span> at 0700.</p>
-      <p><b>Not yet:</b> per-hostname AOP enforcement (staged, needs the SSL token scope), <span class="mono">claude setup-token</span> on the box (blocks the engine), and the fence-matter seed (blocked behind the full gate).</p>
+      <p><b>Deployed &amp; healthy:</b> Next.js BFF (public, Access-gated), FastAPI matter API (internal, unpublished), driver worker — all three containers healthy in Coolify project <span class="mono">mootloop</span>. Let's Encrypt origin cert issued (ACME-challenge Access-bypass in place). DNS proxied. <b>Per-hostname AOP live</b> — only Cloudflare reaches the origin. Internal driver secret + download signing key seeded on the box under the <span class="mono">mootloop</span> service user (uid 3200), matters-root <span class="mono">/srv/mootloop-matters</span> at 0700.</p>
+      <p><b>Not yet:</b> <span class="mono">CLAUDE_CODE_OAUTH_TOKEN</span> on the box (blocks a live run — needs a valid <span class="mono">sk-ant-oat…</span> from <span class="mono">claude setup-token</span>), the FD-6 backup-restore drill + <span class="mono">mootloop close</span> inventory, and the fence-matter seed (all gated ahead of real matter data).</p>
     </div>
   </section>
 
@@ -261,9 +261,9 @@
 
 <script>
   const items = [
-    { n:1, verdict:"blocked", claim:"Direct-to-origin (bypassing Cloudflare) fails the TLS handshake — <b>per-hostname AOP</b>.",
-      how:"Control staged end-to-end on the box: CA + client cert generated, Traefik v3.6 <span class='mono'>tls.options</span> dynamic config written. Enforcement is INERT until the client cert is uploaded to Cloudflare's per-hostname store — which needs a token scope the current MootLoop token lacks (Zone → SSL and Certificates → Edit).",
-      pre:"<span class='dim'># staged, not yet enforcing:</span>\n/data/coolify/proxy/dynamic/mootloop-aop.yaml   <span class='dim'>(RequireAndVerifyClientCert)</span>\n/root/mootloop-aop/{aop-ca.crt,aop-client.crt,aop-client.key}\n<span class='bad'>CF cert upload -> 10000 Authentication error (missing SSL scope)</span>\n<span class='dim'># interim mitigation (verified below): origin fails closed on auth anyway</span>" },
+    { n:1, verdict:"pass", claim:"Direct-to-origin (bypassing Cloudflare) fails the TLS handshake — <b>per-hostname AOP</b>.",
+      how:"Fully live. The client cert is uploaded to Cloudflare's per-hostname store (binding active — CF presents it on origin pulls); Traefik requires + verifies it on this vhost only (option in the box's dynamic config, CA = the AOP CA). Verified against the deployed origin: no cert → connection refused; with the CF cert → 200; through Cloudflare → 302. Only Cloudflare can reach the origin.",
+      pre:"<span class='dim'># direct to origin, NO client cert:</span>\n  https://mootloop.damienriehl.com/ (SNI→127.0.0.1) -> <span class='ok'>refused (curl exit 56, http 000)</span>\n  same, from an external host at the origin IP     -> <span class='ok'>refused (curl exit 56, http 000)</span>\n<span class='dim'># direct to origin, WITH the Cloudflare client cert:</span>\n  --cert aop-client.crt --key aop-client.key        -> <span class='ok'>200</span>\n<span class='dim'># through Cloudflare (normal path):</span>\n  edge / -> <span class='ok'>302 (Access login)</span>\n<span class='dim'># CF binding: active | cert status: active</span>" },
     { n:2, verdict:"pass", claim:"No Access JWT on any matter route → <b>401</b>, regardless of whether the matter exists (no oracle).",
       how:"Probed the live origin directly (throwaway container on the app network, no Access JWT) after the PR #16 auth-ordering fix. Before the fix these leaked 400/404 pre-auth; now every shape returns an identical 401.",
       pre:"<span class='dim'># GET /api/matters/{id}/runs, no JWT — post-fix:</span>\n  nonexistent id     -> <span class='ok'>401 {\"detail\":\"access denied\"}</span>\n  charset-invalid id -> <span class='ok'>401 {\"detail\":\"access denied\"}</span>\n  list (contrast)    -> <span class='ok'>401 {\"detail\":\"access denied\"}</span>\n  POST start_run     -> <span class='ok'>401 {\"detail\":\"access denied\"}</span>\n<span class='dim'># existent vs nonexistent are now indistinguishable.</span>\n<span class='dim'># at the edge (through Cloudflare): 302 -> Access login.</span>" },
