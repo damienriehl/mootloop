@@ -1070,5 +1070,50 @@ def backup(
     typer.echo(f"backup written: {out}")
 
 
+@app.command()
+def close(
+    matter_id: Annotated[str, typer.Argument(help="Matter id under the matters-root")],
+    by: Annotated[str, typer.Option("--by", help="Who is closing the matter (audit actor)")],
+    backup_dir: Annotated[
+        Path | None, typer.Option("--backup-dir", help="Destination for the pre-close backup")
+    ] = None,
+    matters_root: Annotated[
+        Path | None,
+        typer.Option("--matters-root", help="Matters-root (defaults to MOOTLOOP_MATTERS_ROOT)"),
+    ] = None,
+    skip_backup: Annotated[
+        bool, typer.Option("--skip-backup", help="Skip the pre-close backup (unsafe)")
+    ] = False,
+    acknowledge_skip_backup: Annotated[
+        bool,
+        typer.Option(
+            "--yes-delete-without-backup",
+            help="Acknowledge that skipping the backup makes the data unrecoverable",
+        ),
+    ] = False,
+) -> None:
+    """Purge a closed matter's vault, retaining an anonymized tombstone (plan FD-6)."""
+    import os
+
+    from mootloop.close import close_matter
+    from mootloop.registry import DEFAULT_MATTERS_ROOT, MATTERS_ROOT_ENV
+
+    root = matters_root or Path(os.environ.get(MATTERS_ROOT_ENV, DEFAULT_MATTERS_ROOT))
+    try:
+        record = close_matter(
+            root,
+            matter_id,
+            actor=by,
+            now=_now(),
+            backup_dir=backup_dir,
+            skip_backup=skip_backup,
+            acknowledge_skip_backup=acknowledge_skip_backup,
+        )
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    removed = sum(record.removed_counts.values())
+    typer.echo(f"closed {matter_id}: {removed} file(s) purged; tombstone retained")
+
+
 if __name__ == "__main__":
     app()
