@@ -1060,7 +1060,7 @@ def backup(
     vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
     dest: Annotated[Path, typer.Option("--dest", help="Destination dir for the snapshot")],
 ) -> None:
-    """Write a consistent tar.gz snapshot of the matter vault (plan FD-6)."""
+    """Write a consistent, encrypted tar.gz.enc snapshot of the matter vault (plan FD-6)."""
     from mootloop.engine.backup import backup_matter
 
     try:
@@ -1068,6 +1068,26 @@ def backup(
     except MootloopError as exc:
         raise _fail(exc) from exc
     typer.echo(f"backup written: {out}")
+
+
+@app.command()
+def restore(
+    archive: Annotated[Path, typer.Argument(help="Path to the .tar.gz.enc backup archive")],
+    matters_root: Annotated[
+        Path, typer.Option("--matters-root", help="Matters-root to restore the vault into")
+    ],
+    overwrite: Annotated[
+        bool, typer.Option("--overwrite", help="Overwrite an existing non-empty vault")
+    ] = False,
+) -> None:
+    """Decrypt and safely restore a matter vault from a backup archive (plan FD-6)."""
+    from mootloop.engine.backup import restore_matter
+
+    try:
+        out = restore_matter(archive, matters_root, now=_now(), overwrite=overwrite)
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    typer.echo(f"restored vault: {out}")
 
 
 @app.command()

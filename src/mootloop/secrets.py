@@ -8,10 +8,14 @@ the journal or an artifact, so a token can never leak into an auditable trace.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import os
 import re
 import secrets as _secrets
 from pathlib import Path
+
+from mootloop.errors import BackupError
 
 SECRETS_FILE = Path.home() / ".mootloop" / "secrets.env"
 
@@ -19,6 +23,14 @@ SECRETS_FILE = Path.home() / ".mootloop" / "secrets.env"
 # Loaded from the service-user secrets (never hard-coded); derived + persisted on first
 # use if absent so the hosted tier can mint links without manual provisioning.
 DOWNLOAD_SIGNING_KEY = "MOOTLOOP_DOWNLOAD_SIGNING_KEY"
+
+# The AES-256-GCM key that encrypts vault backup archives at rest (plan FD-6 hosted-backup
+# gate). 32 raw bytes, stored base64/urlsafe. On the hosted box ``~/.mootloop`` is mounted
+# read-only, so this key must be pre-seeded there (see docs/backup.md) — the derive-on-first
+# -use path is for local/dev only. NEVER back this key up alongside the data it protects.
+BACKUP_KEY = "MOOTLOOP_BACKUP_KEY"
+
+_BACKUP_KEY_BYTES = 32
 
 # Secret-shaped patterns scrubbed from any text written to journal/artifacts. The
 # CourtListener token is 40 lowercase hex chars; ``Token``/``Bearer`` headers and
@@ -93,13 +105,49 @@ def load_or_create_signing_key(
         register_secret(existing)
         return existing
     value = _secrets.token_urlsafe(32)
+    _persist_secret(key, value, secrets_file=secrets_file)
+    register_secret(value)
+    return value
+
+
+def load_or_create_backup_key(key: str = BACKUP_KEY, *, secrets_file: Path = SECRETS_FILE) -> bytes:
+    """Return the 32-byte AES-256 backup key, deriving + persisting it on first use.
+
+    Resolves ``key`` via `load_secret` (secrets file, then env) as base64/urlsafe text. If
+    unset, mints 32 random bytes and appends them (base64-encoded) under the service-user
+    convention (dir ``0700``, file ``0600``). The base64 text is registered for redaction
+    and never logged. On the hosted box the secrets mount is read-only, so the key must be
+    pre-seeded — this derive path never fires there (an existing value is always found).
+    """
+    existing = load_secret(key, secrets_file=secrets_file)
+    if existing:
+        register_secret(existing)
+        return _decode_backup_key(existing)
+    raw = os.urandom(_BACKUP_KEY_BYTES)
+    value = base64.urlsafe_b64encode(raw).decode("ascii")
+    _persist_secret(key, value, secrets_file=secrets_file)
+    register_secret(value)
+    return raw
+
+
+def _decode_backup_key(value: str) -> bytes:
+    try:
+        raw = base64.urlsafe_b64decode(value)
+    except (binascii.Error, ValueError) as exc:
+        raise BackupError(f"{BACKUP_KEY} is not valid base64") from exc
+    if len(raw) != _BACKUP_KEY_BYTES:
+        raise BackupError(
+            f"{BACKUP_KEY} must decode to {_BACKUP_KEY_BYTES} bytes, got {len(raw)}"
+        )
+    return raw
+
+
+def _persist_secret(key: str, value: str, *, secrets_file: Path) -> None:
     secrets_file.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     fd = os.open(secrets_file, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
     with os.fdopen(fd, "a", encoding="utf-8") as handle:
         handle.write(f"{key}={value}\n")
     os.chmod(secrets_file, 0o600)
-    register_secret(value)
-    return value
 
 
 def redact(text: str, *, extra: tuple[str, ...] = ()) -> str:
