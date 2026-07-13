@@ -232,8 +232,10 @@ MOOTLOOP_DEMO_VAULT=/tmp/demo uv run uvicorn mootloop.web.app:app
 > fixed. See [`docs/security-frontend.md`](docs/security-frontend.md) for the threat
 > model, [`docs/deploy-matter.md`](docs/deploy-matter.md) for the runbook, and
 > [`docs/evidence/fe-0-pen-gate.html`](docs/evidence/fe-0-pen-gate.html) for the
-> attestation. Before real matter data: the FD-6 backup-restore drill + `mootloop close`
-> inventory, and the engine credential for a live run.
+> attestation. The **FD-6 data-lifecycle gates are done** too: `mootloop close` (inventory
+> registry + CI invariant + containment-safe purge + anonymized tombstone) and encrypted
+> backups with a verified restore drill (`docs/backup.md`). Before a first live run: land the
+> engine credential and seed the matter — that's it.
 
 - **Layered perimeter** — every matter route sits behind three fail-closed controls:
   a **Cloudflare Access** JWT (`Cf-Access-Jwt-Assertion`, RS256 asserted by us, with
