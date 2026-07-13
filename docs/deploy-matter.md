@@ -63,7 +63,8 @@ The `MOOTLOOP_INTERNAL_SECRET` and the download signing key also resolve on `api
 - Create the service user with a fixed id: `mootloop`, **UID 3200 / GID 3200** (must match the image users).
 - `/srv/mootloop-matters` — owned `mootloop:mootloop`, mode **0700**. Every vault lives under it, outside every repo tree.
 - `~mootloop/.mootloop/` — dir mode **0700**; `~mootloop/.mootloop/secrets.env` mode **0600**, owned `mootloop:mootloop`.
-- Populate the secrets file (`KEY=VALUE` lines): `MOOTLOOP_INTERNAL_SECRET`, **`MOOTLOOP_DOWNLOAD_SIGNING_KEY`** (pre-seed it on the host — the containers mount `~/.mootloop` read-only, so first-use auto-derivation would fail closed), and the subscription token via `claude setup-token` → `CLAUDE_CODE_OAUTH_TOKEN`.
+- Populate the secrets file (`KEY=VALUE` lines): `MOOTLOOP_INTERNAL_SECRET`, **`MOOTLOOP_DOWNLOAD_SIGNING_KEY`** and **`MOOTLOOP_BACKUP_KEY`** (pre-seed both on the host — the containers mount `~/.mootloop` read-only, so first-use auto-derivation would fail closed), and the subscription token via `claude setup-token` → `CLAUDE_CODE_OAUTH_TOKEN`.
+- **`MOOTLOOP_BACKUP_KEY`** is the AES-256 key that encrypts vault backups at rest (see `docs/backup.md`). Escrow it separately and **never** back it up alongside the archives it seals.
 - Run `claude setup-token` as the `mootloop` user so the token lands in that user's secrets file (the crown-jewel asset; never printed, never committed).
 
 ## Per-hostname AOP (Traefik `tls.options`) — hand-applied on the box
@@ -95,3 +96,9 @@ internal-secret + rate-limit + audit assertions). No vault touches the box until
 - `web` and `api` — **redeploy anytime**. They hold no in-flight turn state; a rolling restart is safe.
 - `driver` — **drain-required.** It may be mid-turn (a headless Claude persona turn, `timeout_s=600`). The compose sets `stop_grace_period: 630s` so SIGTERM lets the supervised loop finish the current turn before exit. Never `kill -9` a busy driver; never redeploy it during a live run without confirming the queue is idle.
 - Prod deploys are **ask-gated** (house rule) — confirm before deploying the matter tier.
+
+## Backup / restore
+
+Vault backups are idle-only, lock-consistent, **AES-256-GCM encrypted at rest**, and pushed
+off-box. The full posture — key pre-seeding, off-box `rclone`/`rsync` push, the stated RPO,
+and the restore procedure + drill — lives in `docs/backup.md`.
