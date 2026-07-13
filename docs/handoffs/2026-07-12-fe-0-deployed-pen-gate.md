@@ -1,4 +1,4 @@
-# HANDOFF — MootLoop matter tier DEPLOYED, pen-gate GREEN (resume here)
+# HANDOFF — MootLoop matter tier LIVE, pen-gate GREEN, FD-6 DONE (resume here)
 
 **State (2026-07-13, session 2 cont.):** The hosted matter tier is **live and healthy** at
 https://mootloop.damienriehl.com behind Cloudflare Access, with **per-hostname AOP live**
@@ -33,19 +33,31 @@ mid-session; replaced with a fresh read-write token — deploys work again).
   `damienriehl@gmail.com`, 24h) → env `CF_ACCESS_AUD`; ACME-challenge bypass app so LE
   can validate behind Access. Coolify env vars set (names in `docs/deploy-matter.md`).
 
-## Blocked on Damien (remaining — perimeter is DONE)
+## Remaining before first live run (perimeter DONE, FD-6 DONE)
 
-1. **Engine token — still needed for any live run.** `claude setup-token` must produce a
-   value starting `sk-ant-oat01-…`; write it to `~mootloop/.mootloop/secrets.env` as
-   `CLAUDE_CODE_OAUTH_TOKEN` (0600, service-user owned). (2026-07-13: Damien pasted a
+1. **Engine token — the one thing still needed for a live run.** `claude setup-token` must
+   produce a value starting `sk-ant-oat01-…`; write it to `~mootloop/.mootloop/secrets.env`
+   as `CLAUDE_CODE_OAUTH_TOKEN` (0600, service-user owned). (2026-07-13: Damien pasted a
    non-`sk-ant-oat` value that was NOT written — re-run and confirm the prefix.)
-2. mootloop.org demo-prod DNS (Namecheap): no Namecheap API key on the box; needs API
-   access enabled + key + API user + IP allowlist (204.168.246.227, 97.116.181.129) → drop
-   at `~/.secrets/namecheap` for autonomous DNS. Else Damien adds A records `@`/`www` →
-   204.168.246.227 by hand. Low priority (demo-prod only).
-3. CourtListener token (live citation gate); Google OAuth → "In Production" (FE-5 only).
-4. **FD-6 gates before matter data** (not credential-blocked — to build/run): hosted
-   backup-restore drill; `mootloop close` inventory (does not exist yet).
+2. **Fence-matter seed** — rsync the litigation from the Drive folder (link in
+   `~/.mootloop/secrets.env`) to the server vault at seed time. Then first live run (FE-7).
+3. **Pre-seed `MOOTLOOP_BACKUP_KEY`** on the box's `~mootloop/.mootloop/secrets.env` (the
+   api/driver mount is read-only, so first-use auto-derivation can't write) — needed before
+   the first hosted backup. See `docs/backup.md`.
+
+### FD-6 — DONE (2026-07-13, PRs #21-22)
+- **Close-inventory gate:** `src/mootloop/close.py` (declarative `MATTER_SCOPED_STORES`),
+  CI invariant `tests/invariants/test_close_inventory.py` (fails if any VersionedModel is
+  neither registered nor exempt), `mootloop close` (idle-only, backup-first, containment-safe
+  purge, post-purge residue assert, anonymized hash-chained tombstone in `matters-root/.closed/`).
+- **Backup gate:** AES-256-GCM encryption-at-rest (`*.tar.gz.enc`), traversal-safe
+  `restore_matter` + `mootloop restore`, restore drill (round-trip + wrong-key/tamper/truncation/
+  malicious-tar all fail-closed). RPO = last snapshot; off-box push documented. Runbook `docs/backup.md`.
+
+### Lower priority / your side
+- mootloop.org demo-prod: DNS now LIVE (apex serves; Namecheap API automated via `~/.secrets/namecheap`).
+  `www` left certless (needs a demo-prod redeploy — you deferred it). Rotate the Namecheap key (was in chat).
+- CourtListener token (live citation gate); Google OAuth → "In Production" (FE-5 only).
 
 ## What the gate caught (fixed)
 
@@ -54,12 +66,12 @@ token, leaking an unauthenticated 400/404 matter-ID oracle. PR #16 reorders auth
 `resolve_matter` on all 19 routes + adds a no-oracle regression test. Re-verified live:
 existent/nonexistent/charset-invalid ids all return an identical 401.
 
-## Next (after AOP unblocked + setup-token)
+## Next (perimeter GREEN, FD-6 DONE)
 
-Attach the AOP `tls.options` to the web router → re-run pen item 1 (direct-origin TLS
-handshake must fail) → flip the gate to fully green → FD-6 gates (hosted backup restore
-drill; `mootloop close` inventory — still to build) → SSH-seed the fence matter
-(Drive folder in `~/.mootloop/secrets.env`) → first live hosted run (FE-7).
+Only two steps remain to a first live hosted run: (1) land a valid `sk-ant-oat01-…` engine
+token on the box; (2) SSH-seed the fence matter (Drive folder in `~/.mootloop/secrets.env`)
++ pre-seed `MOOTLOOP_BACKUP_KEY` → first live run (FE-7). After the first run, the FD-10
+deferred layer: FE-3 wizard/synthesis, FE-4 board, FE-5 watchers, FE-6 dashboard.
 
 ## Standing rules
 CE end-to-end; Fable orchestrates, Opus performs; review deliverables = interactive HTML
