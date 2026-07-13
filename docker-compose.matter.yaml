@@ -26,6 +26,14 @@ services:
       CF_ACCESS_TEAM_DOMAIN: ${CF_ACCESS_TEAM_DOMAIN}
       CF_ACCESS_AUD: ${CF_ACCESS_AUD}
       CF_ACCESS_ALLOWED_EMAIL: ${CF_ACCESS_ALLOWED_EMAIL}
+    labels:
+      # Per-hostname Authenticated Origin Pulls (FD-2): require + verify the Cloudflare
+      # client cert on THIS vhost only. The referenced tls option lives in the box's
+      # Traefik dynamic config (/data/coolify/proxy/dynamic/mootloop-aop.yaml, caFiles =
+      # the AOP CA); Coolify generates the router, we only attach the option. The router
+      # name is Coolify-derived from the app UUID + service; re-derive if the app is
+      # recreated. Direct-to-origin requests (bypassing Cloudflare) fail the handshake.
+      - "traefik.http.routers.https-0-op3exbmxe1q21qyy69tlngk9-web.tls.options=mootloop-aop@file"
     depends_on:
       - api
 
