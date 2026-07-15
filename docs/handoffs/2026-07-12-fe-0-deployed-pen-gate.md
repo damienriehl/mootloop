@@ -1,3 +1,6 @@
+> **SUPERSEDED — read [`2026-07-15-RESUME.md`](2026-07-15-RESUME.md) instead** (single
+> self-contained source of truth). This file is kept for history.
+
 # HANDOFF — MootLoop matter tier LIVE, pen-gate GREEN, FD-6 DONE (resume here)
 
 **State (2026-07-13, session 2 cont.):** The hosted matter tier is **live and healthy** at
