@@ -65,6 +65,12 @@ Run the CLI with `uv run mootloop --help`.
   backup path is an idle-only, lock-checked snapshot.
 - **Matter/run IDs are validated** (`^[a-z0-9][a-z0-9._-]{0,63}$`); `.`, `..`, and
   path separators are rejected. Ingested filenames are metadata, never output paths.
+- **Matter-ID convention (Damien's 2026-07-15 ruling — supersedes "opaque, never
+  party-derived"):** `matter_id = YYYY-MM-DD-<client>-<descriptor>`, where the date is
+  the **first client contact** with the lawyer — so the matter ID itself sorts as the
+  first item on the case timeline. Owner/attorney/client's explicit call: readable,
+  timeline-leading IDs beat opacity here. Still bound by the regex above (lowercase,
+  no path separators). Example: `2025-10-16-riehl-fence`.
 
 ## Code Quality Settings
 
