@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -52,6 +53,22 @@ _AUTH_SIGNATURES: tuple[str, ...] = (
 
 TokenLoader = Callable[[], str | None]
 Clock = Callable[[], datetime]
+
+# A reply that is exactly one fenced code block (```json ... ```). The chat surface
+# wraps structured output in a fence; unwrapping it is transport normalization, not
+# output repair — schema validation downstream still rejects anything semantically off.
+_FENCED_BLOCK_RE = re.compile(r"^```[A-Za-z0-9_-]*[ \t]*\r?\n(.*?)\r?\n?```\s*$", re.DOTALL)
+
+
+def _unfence(text: str) -> str:
+    """Strip a single wrapping markdown code fence, if the whole reply is one block.
+
+    The inner-fence guard keeps multi-block replies untouched (backtracking under the
+    ``$`` anchor would otherwise merge them into one span)."""
+    match = _FENCED_BLOCK_RE.match(text.strip())
+    if match is not None and "```" not in match.group(1):
+        return match.group(1)
+    return text
 
 
 def _load_oauth() -> str | None:
@@ -266,7 +283,7 @@ class HeadlessClaudeProvider:
         if isinstance(session_id, str) and session_id:
             self._persist_session_id(key, session_id)
         usage = self._usage_from(payload)
-        return RawTurnResult(text=text, usage=usage)
+        return RawTurnResult(text=_unfence(text), usage=usage)
 
     @staticmethod
     def _usage_from(payload: dict[str, Any]) -> TokenUsage | None:
