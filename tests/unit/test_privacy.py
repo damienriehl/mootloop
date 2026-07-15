@@ -5,7 +5,36 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from mootloop.privacy import privacy_grep, seed_canary
+import pytest
+
+from mootloop.privacy import (
+    CANARY_REGISTRY_ENV,
+    _default_registry,
+    load_registry,
+    privacy_grep,
+    seed_canary,
+)
+
+
+def test_canary_registry_env_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The hosted tier's read-only ~/.mootloop is bypassed via the env override:
+    seeding with no explicit registry_path must write to the env-pointed path."""
+    writable = tmp_path / "matters-root" / ".canaries.json"
+    monkeypatch.setenv(CANARY_REGISTRY_ENV, str(writable))
+    assert _default_registry() == writable
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    token = seed_canary(vault, "hosted-matter")  # no registry_path -> env default
+
+    assert writable.is_file()
+    assert load_registry(writable)["canaries"][token] == "hosted-matter"
+
+
+def test_canary_registry_default_without_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unset env keeps the historical ~/.mootloop/canaries.json default (local dev)."""
+    monkeypatch.delenv(CANARY_REGISTRY_ENV, raising=False)
+    assert _default_registry() == Path.home() / ".mootloop" / "canaries.json"
 
 
 def _git_init(path: Path) -> None:

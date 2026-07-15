@@ -19,6 +19,19 @@ from mootloop.vault import CANARY_FILE, safe_vault_path
 
 CANARY_PREFIX = "MOOTLOOP-CANARY-"
 DEFAULT_REGISTRY = Path.home() / ".mootloop" / "canaries.json"
+CANARY_REGISTRY_ENV = "MOOTLOOP_CANARY_REGISTRY"
+
+
+def _default_registry() -> Path:
+    """Resolve the canary registry path.
+
+    Honors the ``MOOTLOOP_CANARY_REGISTRY`` env override so the hosted matter tier —
+    whose ``~/.mootloop`` is a *read-only* mount — can point the registry at a writable
+    location (e.g. under the matters-root). Local dev, with the var unset, keeps the
+    historical ``~/.mootloop/canaries.json`` default.
+    """
+    override = os.environ.get(CANARY_REGISTRY_ENV)
+    return Path(override) if override else DEFAULT_REGISTRY
 
 FindingKind = str  # "canary" | "denylist" | "unscannable"
 
@@ -41,7 +54,7 @@ def _empty_registry() -> dict[str, Any]:
 
 def load_registry(registry_path: Path | str | None = None) -> dict[str, Any]:
     """Load the canary/denylist registry. Missing file → empty registry."""
-    path = Path(registry_path) if registry_path is not None else DEFAULT_REGISTRY
+    path = Path(registry_path) if registry_path is not None else _default_registry()
     if not path.is_file():
         return _empty_registry()
     data = json.loads(path.read_text(encoding="utf-8"))
@@ -74,7 +87,7 @@ def seed_canary(
     canary_path = safe_vault_path(vault_root, CANARY_FILE)
     canary_path.write_text(token + "\n", encoding="utf-8")
 
-    reg_path = Path(registry_path) if registry_path is not None else DEFAULT_REGISTRY
+    reg_path = Path(registry_path) if registry_path is not None else _default_registry()
     registry = load_registry(reg_path)
     registry["canaries"][token] = matter_id
     _save_registry(registry, reg_path)

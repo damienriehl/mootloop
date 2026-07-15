@@ -47,6 +47,9 @@ services:
       - "8000"
     environment:
       MOOTLOOP_MATTERS_ROOT: /srv/mootloop-matters
+      # Canary registry lives under the writable matters-root, NOT ~/.mootloop
+      # (that mount is read-only, so the default path fails closed on matter create).
+      MOOTLOOP_CANARY_REGISTRY: /srv/mootloop-matters/.canaries.json
       CF_ACCESS_TEAM_DOMAIN: ${CF_ACCESS_TEAM_DOMAIN}
       CF_ACCESS_AUD: ${CF_ACCESS_AUD}
       CF_ACCESS_ALLOWED_EMAIL: ${CF_ACCESS_ALLOWED_EMAIL}
@@ -65,6 +68,8 @@ services:
     # INTERNAL only — no ports at all (no web surface).
     environment:
       MOOTLOOP_WORKER_ID: ${MOOTLOOP_WORKER_ID}
+      # Same writable canary registry as the api service (read-only ~/.mootloop mount).
+      MOOTLOOP_CANARY_REGISTRY: /srv/mootloop-matters/.canaries.json
     volumes:
       - /srv/mootloop-matters:/srv/mootloop-matters
       - /home/mootloop/.mootloop:/home/mootloop/.mootloop:ro
