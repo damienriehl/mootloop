@@ -21,7 +21,7 @@ from pathlib import Path
 import pytest
 
 from mootloop import secrets
-from mootloop.engine.claude_provider import HeadlessClaudeProvider
+from mootloop.engine.claude_provider import HeadlessClaudeProvider, _unfence
 from mootloop.errors import AuthError, SeatLimitError
 from mootloop.models.run import PersonaName, TurnSpec
 
@@ -181,6 +181,44 @@ def test_run_turn_parses_fake_claude_result(
     assert result.usage is not None
     assert result.usage.input_tokens == 120
     assert result.usage.output_tokens == 40
+
+
+_FENCED_BODY = """
+import json
+print(json.dumps({
+    "result": "```json\\n{\\"response_text\\": \\"Admitted.\\"}\\n```",
+    "session_id": "sess-fake-2",
+    "usage": {"input_tokens": 10, "output_tokens": 5,
+              "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0},
+    "model": "claude-opus-4-8",
+}))
+"""
+
+
+def test_run_turn_unwraps_fenced_json_result(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A reply that is one ```json fenced block is unwrapped to its raw JSON payload
+    (the live FE-7 failure mode: valid DraftOutput JSON wrapped in a markdown fence)."""
+    _install_fake_claude(tmp_path / "bin", _FENCED_BODY, monkeypatch)
+    result = _provider(tmp_path).run_turn(_spec(), "the prompt")
+    assert result.text == '{"response_text": "Admitted."}'
+
+
+def test_unfence_strips_single_wrapping_block() -> None:
+    assert _unfence('```json\n{"a": 1}\n```') == '{"a": 1}'
+    assert _unfence('```\n{"a": 1}\n```') == '{"a": 1}'
+    assert _unfence('  ```json\n{"a": 1}\n```  \n') == '{"a": 1}'
+
+
+def test_unfence_leaves_plain_and_partial_text_alone() -> None:
+    assert _unfence('{"a": 1}') == '{"a": 1}'
+    assert _unfence("plain prose") == "plain prose"
+    # Prose around a fence is NOT one wrapped block — schema validation must see it.
+    assert _unfence('intro ```json\n{"a": 1}\n``` outro') == 'intro ```json\n{"a": 1}\n``` outro'
+    # Multiple blocks stay untouched (greedy DOTALL must not merge them).
+    two = '```json\n{"a": 1}\n```\nmiddle\n```json\n{"b": 2}\n```'
+    assert _unfence(two) == two
 
 
 def test_run_turn_seat_limit_classified(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
