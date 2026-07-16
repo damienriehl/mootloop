@@ -23,6 +23,7 @@ from mootloop import decisions as decisions_svc
 from mootloop import orchestrator
 from mootloop import taskspec as taskspec_svc
 from mootloop.engine.queue import Queue as WorkQueue
+from mootloop.engine.queue import WorkItem
 from mootloop.errors import OrchestratorError
 from mootloop.export import link as link_svc
 from mootloop.journal import load_state
@@ -209,11 +210,23 @@ def start_run(
     body: models.StartRunRequest,
     principal: Principal,
     vault: Vault,
+    queue: QueueDep,
     _csrf: Csrf,
     _audited: Annotated[None, Depends(_audit_dep("run_start"))],
 ) -> models.RunStatusSummary:
     run_id = orchestrator.start_run(
         vault, body.task, _now_iso(), mode=body.mode, task_spec_id=body.task_spec_id
+    )
+    # Feed the driver queue so the worker actually picks the run up. Without this the
+    # run is created but never executes (both FE-7 runs were enqueued operationally).
+    queue.enqueue(
+        WorkItem.create(
+            lane="run",
+            matter_id=matter_id,
+            run_id=run_id,
+            kind="run_turn",
+            now=datetime.now(UTC),
+        )
     )
     return readers.run_status_summary(vault, run_id)
 
