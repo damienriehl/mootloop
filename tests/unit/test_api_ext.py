@@ -19,13 +19,14 @@ from typer.testing import CliRunner
 
 from mootloop import orchestrator
 from mootloop.cli import app as cli_app
+from mootloop.engine.queue import Queue
 from mootloop.errors import AccessAuthError
 from mootloop.models.common import DocId
 from mootloop.models.matter import MatterConfig
 from mootloop.models.requests import RequestItem, RequestSet, RequestType
 from mootloop.registry import MatterRegistry
 from mootloop.web.api import create_matter_api
-from mootloop.web.api.deps import get_registry, get_verifier
+from mootloop.web.api.deps import get_queue, get_registry, get_verifier
 from mootloop.web.security import AccessPrincipal
 
 _PRINCIPAL = AccessPrincipal(email="attorney@example.com", subject="sub-1", claims={})
@@ -52,6 +53,7 @@ def client(registry: MatterRegistry) -> TestClient:
     app = create_matter_api()
     app.dependency_overrides[get_verifier] = _StubVerifier
     app.dependency_overrides[get_registry] = lambda: registry
+    app.dependency_overrides[get_queue] = lambda: Queue(registry.root)
     return TestClient(app)
 
 

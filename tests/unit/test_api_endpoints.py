@@ -15,13 +15,14 @@ import pytest
 from fastapi.testclient import TestClient
 
 from mootloop import orchestrator
+from mootloop.engine.queue import Queue
 from mootloop.errors import AccessAuthError, LockHeldError
 from mootloop.models.attestations import Attestation
 from mootloop.models.matter import MatterConfig
 from mootloop.registry import MatterRegistry
 from mootloop.web import audit
 from mootloop.web.api import create_matter_api, routes
-from mootloop.web.api.deps import get_internal_auth, get_registry, get_verifier
+from mootloop.web.api.deps import get_internal_auth, get_queue, get_registry, get_verifier
 from mootloop.web.security import AccessPrincipal, InternalAuth
 
 _PRINCIPAL = AccessPrincipal(email="attorney@example.com", subject="sub-1", claims={})
@@ -46,10 +47,16 @@ def registry(tmp_path: Path, matter: MatterConfig) -> MatterRegistry:
 
 
 @pytest.fixture
-def client(registry: MatterRegistry) -> TestClient:
+def queue(registry: MatterRegistry) -> Queue:
+    return Queue(registry.root)
+
+
+@pytest.fixture
+def client(registry: MatterRegistry, queue: Queue) -> TestClient:
     app = create_matter_api()
     app.dependency_overrides[get_verifier] = _StubVerifier
     app.dependency_overrides[get_registry] = lambda: registry
+    app.dependency_overrides[get_queue] = lambda: queue
     return TestClient(app)
 
 
@@ -174,6 +181,29 @@ def test_runs_listing_returns_started_run(
     runs = resp.json()
     assert [r["run_id"] for r in runs] == [run_id]
     assert runs[0]["status"]
+
+
+def test_start_run_enqueues_run_lane_work_item(
+    client: TestClient, queue: Queue, matter: MatterConfig
+) -> None:
+    """POST /runs must feed the driver queue, not just create the run — otherwise the
+    worker never picks it up (the hosted enqueue gap both FE-7 runs worked around)."""
+    assert queue.snapshot() == []
+    headers = _with_csrf(client)
+    resp = client.post(
+        f"/api/matters/{matter.matter_id}/runs",
+        headers=headers,
+        json={"task": "discovery-responses"},
+    )
+    assert resp.status_code == 200
+    run_id = resp.json()["run_id"]
+    items = queue.snapshot()
+    assert len(items) == 1
+    item = items[0]
+    assert item.lane == "run"
+    assert item.kind == "run_turn"
+    assert item.matter_id == matter.matter_id
+    assert item.run_id == run_id
 
 
 def test_runs_unknown_matter_returns_404(client: TestClient) -> None:
