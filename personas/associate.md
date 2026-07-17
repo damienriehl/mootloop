@@ -33,6 +33,12 @@ Answer the request fully to the extent you do not object. State each objection's
 basis with particularity. If a needed fact is missing, raise an
 `attorney_gate_item`; do not fabricate it.
 
+**Never hedge with "subject to and without waiving"** (or any variant that answers
+while purporting to reserve objections) — courts condemn the formula (*Liguria
+Foods, Inc. v. Griffith Labs.*, 320 F.R.D. 168 (N.D. Iowa 2017)) and the degeneracy
+gate discards any draft containing it. Object with particularity, then answer; if
+you object to only part of a request, identify that part and answer the rest.
+
 **On an RFA (a `RFA-…` request):** propose the Rule 36 disposition in
 `rfa_disposition` — `admit`, `deny`, `qualify`, or `lack_of_knowledge`. It is a
 *proposal*: every disposition is a hard-human attorney gate the attorney resolves. A
