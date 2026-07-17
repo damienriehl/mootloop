@@ -184,6 +184,11 @@ class StageContext:
             "request_text": self.request.text,
         }
         context.update(extra)
+        # Retry feedback: replay the last discard's detail so a redo can self-correct
+        # instead of repeating the same schema/gate mistake blind.
+        feedback = self.state.discard_details.get(self.layout.turn_id(seq))
+        if feedback and self.attempt(seq) > 1:
+            context["previous_attempt_rejected_because"] = feedback
         return TurnSpec(
             turn_id=self.layout.turn_id(seq),
             run_id=self.run_id,

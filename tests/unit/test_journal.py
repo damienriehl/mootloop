@@ -295,3 +295,25 @@ def test_concurrent_appends_never_tear_a_line(tmp_path: Path) -> None:
     assert len(discarded) == _APPEND_PROCS * _APPEND_PER_PROC
     turn_ids = {e.turn_id for e in discarded}
     assert len(turn_ids) == _APPEND_PROCS * _APPEND_PER_PROC  # none lost or duplicated
+
+
+def test_fold_carries_discard_detail_for_retry_feedback(tmp_path: Path) -> None:
+    """A discard's detail replays into state so the retry prompt can self-correct;
+    detail-less events (the pre-field journal shape) fold without an entry."""
+    append(tmp_path, RUN, _started())
+    append(
+        tmp_path,
+        RUN,
+        TurnDiscarded(
+            turn_id=f"{RUN}-t0001",
+            reason="schema-invalid: 1 error(s)",
+            attempt=1,
+            detail="rulings.0.verdict: Extra inputs are not permitted",
+        ),
+    )
+    append(tmp_path, RUN, TurnDiscarded(turn_id=f"{RUN}-t0002", reason="degenerate: x", attempt=1))
+    state = fold(read_events(tmp_path, RUN))
+    assert state.discard_details[f"{RUN}-t0001"] == (
+        "rulings.0.verdict: Extra inputs are not permitted"
+    )
+    assert f"{RUN}-t0002" not in state.discard_details

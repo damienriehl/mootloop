@@ -63,6 +63,10 @@ class TurnDiscarded(StrictModel):
     turn_id: str
     reason: str
     attempt: int
+    # What exactly failed (compact validation errors / gate findings), replayed into
+    # the retry prompt so the next attempt can self-correct instead of repeating the
+    # mistake blind. Defaults empty so pre-existing journal events still parse.
+    detail: str = ""
 
 
 class GateEvaluated(StrictModel):
@@ -185,6 +189,9 @@ class RunState(StrictModel):
     current_stage: str | None = None
     completed_turns: dict[str, TurnRecord] = Field(default_factory=dict)
     discarded: dict[str, int] = Field(default_factory=dict)
+    # turn_id -> the most recent discard's detail (validation errors / gate findings);
+    # injected into that turn's retry prompt (plan: retry feedback).
+    discard_details: dict[str, str] = Field(default_factory=dict)
     cleared_checkpoints: set[str] = Field(default_factory=set)
     total_spend_usd: float = 0.0
     total_input_tokens: int = 0
