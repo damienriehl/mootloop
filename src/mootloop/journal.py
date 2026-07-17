@@ -184,6 +184,8 @@ def fold(events: list[JournalEvent]) -> RunState:
             state.pending_intents.pop(event.record.spec.turn_id, None)
         elif isinstance(event, TurnDiscarded):
             state.discarded[event.turn_id] = event.attempt
+            if event.detail:
+                state.discard_details[event.turn_id] = event.detail
         elif isinstance(event, SpendRecorded):
             state.total_spend_usd += event.usd_equiv
             state.total_input_tokens += event.input_tokens

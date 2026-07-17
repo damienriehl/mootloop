@@ -302,15 +302,31 @@ def _record_spec(
     try:
         output = model_cls.model_validate_json(raw_text)
     except ValidationError as exc:
+        detail = "; ".join(
+            f"{'.'.join(str(p) for p in err['loc'])}: {err['msg']}" for err in exc.errors()[:6]
+        )
         return _discard(
-            vault_root, run_id, spec, f"schema-invalid: {exc.error_count()} error(s)", max_attempts
+            vault_root,
+            run_id,
+            spec,
+            f"schema-invalid: {exc.error_count()} error(s)",
+            max_attempts,
+            detail=f"your previous output failed `{spec.output_schema_name}` validation — {detail}",
         )
 
     gate = degeneracy.evaluate(output)  # type: ignore[arg-type]
     append(vault_root, run_id, GateEvaluated(turn_id=spec.turn_id, result=gate))
     if gate.status != "pass":
         reasons = "; ".join(f.code for f in gate.findings)
-        return _discard(vault_root, run_id, spec, f"degenerate: {reasons}", max_attempts)
+        detail = "; ".join(f"{f.code}: {f.message}" for f in gate.findings[:6])
+        return _discard(
+            vault_root,
+            run_id,
+            spec,
+            f"degenerate: {reasons}",
+            max_attempts,
+            detail=f"your previous output was discarded by the degeneracy gate — {detail}",
+        )
 
     gate_results: list[GateResult] = [gate]
     # Deterministic completeness gate on every draft (presence criteria; plan D7) —
@@ -501,11 +517,21 @@ def _maybe_emit_rubric_gate(
 
 
 def _discard(
-    vault_root: Path | str, run_id: str, spec: TurnSpec, reason: str, max_attempts: int
+    vault_root: Path | str,
+    run_id: str,
+    spec: TurnSpec,
+    reason: str,
+    max_attempts: int,
+    *,
+    detail: str = "",
 ) -> DiscardedTurn:
     state = load_state(vault_root, run_id)
     attempt = state.discarded.get(spec.turn_id, 0) + 1
-    append(vault_root, run_id, TurnDiscarded(turn_id=spec.turn_id, reason=reason, attempt=attempt))
+    append(
+        vault_root,
+        run_id,
+        TurnDiscarded(turn_id=spec.turn_id, reason=reason, attempt=attempt, detail=detail),
+    )
     if attempt >= max_attempts:
         # Counter-capped: the run pauses, journal intact, never silently absorbed.
         append(vault_root, run_id, RunFinished(status="needs_attention"))
