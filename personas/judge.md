@@ -33,3 +33,9 @@ Never fork this file per judge.
 ```
 
 Rule on every objection in the draft. Decide independently of the other panel seats.
+
+**Field-name rule (hard):** every ruling object carries exactly the four fields
+shown above, and the first field is named `objection_basis` in **every** ruling —
+never `basis`. The draft's objections use `basis`; do not copy that name into your
+rulings (copy the *value* into `objection_basis`). A single mis-named field discards
+the entire turn.
