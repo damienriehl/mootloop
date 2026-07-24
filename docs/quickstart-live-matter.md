@@ -122,6 +122,20 @@ Budget: `uv run mootloop run estimate` before, `run status` during — both
 notional (plan mode). A `budget.hard_cap_usd` in `matter.yaml` checkpoints the
 run gracefully at the cap; `run raise-cap` reopens it.
 
+If the run halts at `needs_attention` (a turn burned its retry budget, or the driver
+hit an auth/provider failure), `run blockers` says what is holding it. Fix the cause
+first — that is always outside the run — then reopen it:
+
+```bash
+uv run mootloop run blockers ~/Matters/<matter-id> <run-id>
+uv run mootloop run reopen ~/Matters/<matter-id> <run-id> \
+    --reason "what you fixed" [--grant-attempts 2]
+```
+
+`--grant-attempts N` restores retry budget to a counter-capped turn (reopen refuses
+without it, unless you pass `--force`). Everything is journaled — run state is never
+edited by hand.
+
 ## 6. Resolve the attorney gates
 
 The run cannot finish past open hard-human decisions (privilege calls, RFA
