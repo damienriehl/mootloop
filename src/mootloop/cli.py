@@ -416,6 +416,67 @@ def run_resume(
     typer.echo(f"resumed {run_id}")
 
 
+@run_app.command("reopen")
+def run_reopen(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+    reason: Annotated[
+        str, typer.Option("--reason", help="Why the run may resume (logged to the journal)")
+    ],
+    grant_attempts: Annotated[
+        int,
+        typer.Option(
+            "--grant-attempts",
+            help="Extra retry attempts for counter-capped turns (clears that blocker)",
+        ),
+    ] = 0,
+    force: Annotated[
+        bool, typer.Option("--force", help="Reopen despite unresolved blockers (recorded)")
+    ] = False,
+    by: Annotated[str, typer.Option("--by", help="Who is reopening the run")] = "operator",
+) -> None:
+    """Reopen a `needs_attention` run once what blocked it is fixed (auth, a persona
+    body, a config change). Refuses while a counter-capped turn is unresolved unless
+    `--grant-attempts` restores its retry budget or `--force` overrides."""
+    try:
+        state = orchestrator.reopen_run(
+            vault_path,
+            run_id,
+            reason=reason,
+            grant_attempts=grant_attempts,
+            force=force,
+            reopened_by=by,
+        )
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    granted = f" (+{grant_attempts} attempt(s))" if grant_attempts else ""
+    typer.echo(
+        f"reopened {run_id}: {state.status}{granted} — resume with `run drive --fake` "
+        "(or let the driver pick it up)"
+    )
+
+
+@run_app.command("blockers")
+def run_blockers(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+    json_output: Annotated[bool, typer.Option("--json", help="Emit the blocker JSON")] = False,
+) -> None:
+    """List what a `needs_attention` run must clear before `run reopen` will restart it."""
+    try:
+        blockers = orchestrator.attention_blockers(vault_path, run_id)
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    if json_output:
+        typer.echo(json.dumps([b.model_dump(mode="json") for b in blockers]))
+        return
+    if not blockers:
+        typer.echo("No attention blockers.")
+        return
+    for blocker in blockers:
+        typer.secho(f"{blocker.kind}  {blocker.ref}  {blocker.detail}", fg=typer.colors.YELLOW)
+
+
 @run_app.command("gates")
 def run_gates(
     vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
