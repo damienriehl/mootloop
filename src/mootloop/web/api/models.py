@@ -73,6 +73,24 @@ class RaiseCapRequest(StrictModel):
         return self
 
 
+class ReopenRunRequest(StrictModel):
+    """The body of a reopen call — the operator's logged ``reason`` (required), an
+    optional grant of extra retry attempts to clear counter-capped turns, and an
+    explicit ``force`` override of the blocker check."""
+
+    reason: str
+    grant_attempts: int = 0
+    force: bool = False
+
+    @model_validator(mode="after")
+    def _non_empty_reason(self) -> ReopenRunRequest:
+        if not self.reason.strip():
+            raise ValueError("`reason` must be non-empty — it is the audit trail")
+        if self.grant_attempts < 0:
+            raise ValueError("`grant_attempts` must be >= 0")
+        return self
+
+
 # --- responses --------------------------------------------------------------
 
 
@@ -111,11 +129,11 @@ class AttestResponse(VersionedModel):
 
 
 class RunActionResponse(VersionedModel):
-    """The result of a pause/resume/continue/raise-cap call, exposing the run's
+    """The result of a pause/resume/continue/raise-cap/reopen call, exposing the run's
     resulting `RunStatus` (the discriminated domain state)."""
 
     schema_version: str = SCHEMA_VERSION
-    kind: Literal["run_paused", "run_resumed", "run_continued", "cap_raised"]
+    kind: Literal["run_paused", "run_resumed", "run_continued", "cap_raised", "run_reopened"]
     run_id: str
     status: RunStatus
 

@@ -267,6 +267,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/matters/{matter_id}/runs/{run_id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reopen Run
+         * @description Reopen a ``needs_attention`` run once the operator has fixed what blocked it
+         *     (mirrors ``mootloop run reopen``). Refuses — as a typed 4xx — while a counter-capped
+         *     turn is unresolved, unless ``grant_attempts`` restores its retry budget or ``force``
+         *     overrides. The verified Access email is the reopener recorded on the journal event.
+         */
+        post: operations["reopen_run_api_matters__matter_id__runs__run_id__reopen_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/matters/{matter_id}/runs/{run_id}/requests": {
         parameters: {
             query?: never;
@@ -358,6 +381,30 @@ export interface paths {
          *     recorded but not runnable). Persists append-only at ``tasks/specs.jsonl`` (plan FE-2.5).
          */
         post: operations["create_freeform_task_api_matters__matter_id__tasks_freeform_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Health
+         * @description Unauthenticated liveness probe — no Access/Internal guard, no matter data.
+         *
+         *     A GET, so the write-only `RateLimitMiddleware` never throttles it; it carries only
+         *     the static app version so the container HEALTHCHECK and Coolify can probe readiness
+         *     without a valid Cloudflare Access token.
+         */
+        get: operations["health_health_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -796,6 +843,26 @@ export interface components {
             to_usd?: number | null;
         };
         /**
+         * ReopenRunRequest
+         * @description The body of a reopen call — the operator's logged ``reason`` (required), an
+         *     optional grant of extra retry attempts to clear counter-capped turns, and an
+         *     explicit ``force`` override of the blocker check.
+         */
+        ReopenRunRequest: {
+            /**
+             * Force
+             * @default false
+             */
+            force: boolean;
+            /**
+             * Grant Attempts
+             * @default 0
+             */
+            grant_attempts: number;
+            /** Reason */
+            reason: string;
+        };
+        /**
          * RequestItem
          * @description One served request (or a subpart of one) as a unit of work.
          *
@@ -880,7 +947,7 @@ export interface components {
         };
         /**
          * RunActionResponse
-         * @description The result of a pause/resume/continue/raise-cap call, exposing the run's
+         * @description The result of a pause/resume/continue/raise-cap/reopen call, exposing the run's
          *     resulting `RunStatus` (the discriminated domain state).
          */
         RunActionResponse: {
@@ -888,7 +955,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "run_paused" | "run_resumed" | "run_continued" | "cap_raised";
+            kind: "run_paused" | "run_resumed" | "run_continued" | "cap_raised" | "run_reopened";
             /** Run Id */
             run_id: string;
             /**
@@ -1602,6 +1669,42 @@ export interface operations {
             };
         };
     };
+    reopen_run_api_matters__matter_id__runs__run_id__reopen_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matter_id: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReopenRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunActionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_run_requests_api_matters__matter_id__runs__run_id__requests_get: {
         parameters: {
             query?: never;
@@ -1760,6 +1863,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    health_health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
                 };
             };
         };
