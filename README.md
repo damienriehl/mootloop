@@ -10,6 +10,21 @@ The pipeline is task-agnostic; the first task adapter is **discovery responses**
 (interrogatories, requests for production, requests for admission) under the
 Minnesota / federal rules.
 
+## Who it's for
+
+- **Litigators** who want a first draft that has already survived an opposing-counsel
+  attack and a judge panel — and who keep the privilege, RFA, and attestation calls.
+- **Small firms and solos** carrying a discovery load without associate leverage.
+- **Legal-AI builders** looking at a worked example of rubric-gated multi-agent loops
+  with hard human gates, spend caps, and fabrication/citation guardrails.
+- **Anyone evaluating agentic legal work product** — every run leaves a journal,
+  ledger, decision log, and audit trail derived from facts, never LLM-asserted.
+
+Typical use cases: draft and harden a discovery response set; measure which objections
+survive a judge panel and restructure the weak ones; export court-formatted
+deliverables that stay DRAFT-watermarked until an attorney attests; run the whole thing
+under a hard budget cap with an auditable spend ledger.
+
 ## Status
 
 **Phase 6-7 — Panels, restructure & deliverable export.** The judge panel drives a
@@ -313,6 +328,23 @@ mootloop run resume <vault> <run-id>
 mootloop backup <vault> --dest <dir>
 ```
 
+## Matter cockpit (FE-2)
+
+The attorney-facing surface is a **Next.js 16 (App Router)** app in
+[`frontend/`](frontend/README.md) — the single Cloudflare-Access-verified origin in the
+FD-5 BFF topology. The browser talks only to same-origin `/api/*`, which proxies to the
+internal FastAPI matter API with the `X-Mootloop-Internal` shared secret; the browser
+never sees that secret and never reaches FastAPI directly. Two rooms: the **run cockpit**
+(instrument band, run controls, persona pipeline, gate ledger, live SSE iteration
+timeline) and the **decision inbox** (blocking vs. entered decision cards, attestation
+panel). Tailwind v4 courtroom-ledger tokens, class-based dark/light applied pre-paint.
+
+```bash
+cd frontend && npm install
+npm run dev        # http://localhost:8730
+npm run lint && npm run typecheck && npm test
+```
+
 ## Guardrails
 
 - **Vault boundary:** matter data never lives in the repo; the vault path is
@@ -323,6 +355,7 @@ mootloop backup <vault> --dest <dir>
 
 ## Documentation
 
+- **Frontend cockpit:** [`frontend/README.md`](frontend/README.md)
 - **Live-matter quickstart:** [`docs/quickstart-live-matter.md`](docs/quickstart-live-matter.md)
   — the full local workflow (vault → ingest → run → decide → attest → export)
 - **Demo deployment:** [`docs/deploy.md`](docs/deploy.md)
