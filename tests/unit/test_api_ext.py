@@ -11,6 +11,7 @@ run/gate/decision status envelopes (plan FD-8).
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -229,6 +230,69 @@ def test_continue_wrapper_rejects_non_checkpoint_run(
     assert resp.status_code == 409
 
 
+def _halt_needs_attention(vault: Path, run_id: str) -> str:
+    """Derail the first schedulable turn until the counter cap halts the run."""
+    turn_id = orchestrator.plan_next(vault, run_id)[0].turn_id
+    for _ in range(3):
+        orchestrator.record_turn(vault, run_id, turn_id, "not valid json", None, _NOW)
+    assert orchestrator.status_summary(vault, run_id)["status"] == "needs_attention"
+    return turn_id
+
+
+def test_reopen_wrapper_refuses_while_blocked_then_reopens_with_a_grant(
+    client: TestClient, registry: MatterRegistry, matter: MatterConfig
+) -> None:
+    vault = registry.resolve(matter.matter_id)
+    run_id = _seed_running_run(vault)
+    _halt_needs_attention(vault, run_id)
+    headers = _csrf(client)
+    url = f"/api/matters/{matter.matter_id}/runs/{run_id}/reopen"
+
+    blocked = client.post(url, headers=headers, json={"reason": "persona body fixed"})
+    assert blocked.status_code == 409  # OrchestratorError -> typed 409
+    assert "unresolved blocker" in blocked.json()["detail"]
+
+    ok = client.post(
+        url, headers=headers, json={"reason": "persona body fixed", "grant_attempts": 2}
+    )
+    assert ok.status_code == 200
+    assert ok.json()["kind"] == "run_reopened"
+    assert ok.json()["status"] == "running"
+    # Reopening re-queues the run so the driver actually picks it back up.
+    queued = Queue(registry.root).claim("w-1", datetime.now(UTC), visibility_timeout_s=60.0)
+    assert queued is not None
+    assert queued.run_id == run_id
+
+
+def test_reopen_wrapper_requires_a_reason(
+    client: TestClient, registry: MatterRegistry, matter: MatterConfig
+) -> None:
+    vault = registry.resolve(matter.matter_id)
+    run_id = _seed_running_run(vault)
+    _halt_needs_attention(vault, run_id)
+    headers = _csrf(client)
+    resp = client.post(
+        f"/api/matters/{matter.matter_id}/runs/{run_id}/reopen",
+        headers=headers,
+        json={"reason": "  ", "force": True},
+    )
+    assert resp.status_code == 422
+
+
+def test_reopen_wrapper_rejects_a_running_run(
+    client: TestClient, registry: MatterRegistry, matter: MatterConfig
+) -> None:
+    vault = registry.resolve(matter.matter_id)
+    run_id = _seed_running_run(vault)
+    headers = _csrf(client)
+    resp = client.post(
+        f"/api/matters/{matter.matter_id}/runs/{run_id}/reopen",
+        headers=headers,
+        json={"reason": "nothing to reopen"},
+    )
+    assert resp.status_code == 409
+
+
 # --- OpenAPI export CLI + discriminated-union structure ---------------------
 
 
@@ -247,6 +311,7 @@ def test_export_openapi_cli_writes_valid_json_with_new_paths(tmp_path: Path) -> 
     # POST wrappers present.
     assert "post" in paths["/api/matters/{matter_id}/runs"]
     assert "post" in paths["/api/matters/{matter_id}/runs/{run_id}/raise-cap"]
+    assert "post" in paths["/api/matters/{matter_id}/runs/{run_id}/reopen"]
 
 
 def test_openapi_components_show_discriminated_unions() -> None:

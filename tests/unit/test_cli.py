@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -219,6 +220,75 @@ def test_run_raise_cap_appends_event(tmp_path: Path) -> None:
     result = runner.invoke(app, ["run", "raise-cap", str(vault), run_id, "--to", "500"])
     assert result.exit_code == 0, result.output
     assert "raised cap" in result.output
+
+
+def _needs_attention_run(vault: Path) -> str:
+    """A run halted by the counter cap: derail the first turn until it exhausts its
+    attempts (the synthetic path into ``needs_attention``)."""
+    from mootloop.orchestrator import plan_next, record_turn
+
+    runner.invoke(app, ["facts", "add", str(vault), "--input", str(FIXTURE / "facts.json")])
+    run_id = runner.invoke(app, ["run", "start", str(vault)]).output.strip()
+    turn_id = plan_next(vault, run_id)[0].turn_id
+    for _ in range(3):
+        record_turn(vault, run_id, turn_id, "not valid json", None, "2026-07-11T00:00:00+00:00")
+    return run_id
+
+
+def test_run_blockers_lists_the_counter_capped_turn(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    _seed_requests(vault)
+    run_id = _needs_attention_run(vault)
+
+    result = runner.invoke(app, ["run", "blockers", str(vault), run_id, "--json"])
+    assert result.exit_code == 0, result.output
+    blockers = json.loads(result.output)
+    assert [b["kind"] for b in blockers] == ["counter_capped_turn"]
+
+
+def test_run_reopen_refuses_then_reopens_with_a_grant(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    _seed_requests(vault)
+    run_id = _needs_attention_run(vault)
+
+    refused = runner.invoke(
+        app, ["run", "reopen", str(vault), run_id, "--reason", "fixed the persona body"]
+    )
+    assert refused.exit_code == 1
+    assert "unresolved blocker" in refused.output
+
+    granted = runner.invoke(
+        app,
+        [
+            "run",
+            "reopen",
+            str(vault),
+            run_id,
+            "--reason",
+            "fixed the persona body",
+            "--grant-attempts",
+            "2",
+        ],
+    )
+    assert granted.exit_code == 0, granted.output
+    assert "reopened" in granted.output
+
+    status = runner.invoke(app, ["run", "status", str(vault), run_id, "--json"])
+    assert json.loads(status.output)["status"] == "running"
+
+
+def test_run_reopen_force_bypasses_blockers(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    _seed_requests(vault)
+    run_id = _needs_attention_run(vault)
+
+    result = runner.invoke(
+        app,
+        ["run", "reopen", str(vault), run_id, "--reason", "driving it by hand", "--force"],
+    )
+    assert result.exit_code == 0, result.output
+    status = runner.invoke(app, ["run", "status", str(vault), run_id, "--json"])
+    assert json.loads(status.output)["status"] == "running"
 
 
 def test_cite_verify_text_routes_federal_to_research(tmp_path: Path) -> None:
