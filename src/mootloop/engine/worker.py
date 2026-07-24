@@ -17,6 +17,11 @@ Failure routing around the provider call:
   - `SeatLimitError` -> pause the run (``capacity``), release the item to resume later.
   - `AuthError`      -> finish the run ``needs_attention`` + drop a notification file.
   - `TurnError`      -> release with backoff; after ``max_attempts`` finish + notify.
+
+A ``needs_attention`` finish is not the end of the run: once the operator fixes what
+caused it (a credential, a persona body, a config), ``orchestrator.reopen_run``
+(``mootloop run reopen``) transitions it back to ``running`` on an audited journal
+event and the next tick picks it up.
 """
 
 from __future__ import annotations

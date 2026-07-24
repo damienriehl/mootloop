@@ -33,6 +33,7 @@ from mootloop.models.events import (
     JournalEvent,
     RunFinished,
     RunPaused,
+    RunReopened,
     RunResumed,
     RunStarted,
     RunState,
@@ -210,6 +211,12 @@ def fold(events: list[JournalEvent]) -> RunState:
         elif isinstance(event, RunResumed):
             if state.status == "paused":
                 state.status = "running"  # reopen an operator/worker pause
+        elif isinstance(event, RunReopened):
+            # The grant lands whether or not the status flips, so a replayed journal
+            # always shows the retry ceiling the run actually ran under.
+            state.attempts_granted += event.grant_attempts
+            if state.status == "needs_attention":
+                state.status = "running"  # reopen an operator-cleared attention halt
         elif isinstance(event, (GateEvaluated, DecisionRecorded)):
             pass  # informational; authoritative copies ride on TurnRecord/decisions
     return state

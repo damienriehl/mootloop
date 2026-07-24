@@ -19,7 +19,9 @@ from mootloop.models.run import TurnRecord
 # checkpoint reopened by ``CapRaised``; ``needs_decisions`` is a finish blocked on an
 # open hard-human attorney gate (reopened when it resolves); ``checkpoint`` is a
 # gated-mode stage-boundary pause reopened by ``CheckpointCleared``; ``paused`` is an
-# operator/worker pause reopened by ``RunResumed`` (plan FE-1).
+# operator/worker pause reopened by ``RunResumed`` (plan FE-1); ``needs_attention`` is
+# an operator-blocked halt (a counter-capped turn or a driver auth/turn failure)
+# reopened by ``RunReopened`` (``mootloop run reopen``).
 RunStatus = Literal[
     "running",
     "finished",
@@ -140,6 +142,24 @@ class RunResumed(StrictModel):
     kind: Literal["run_resumed"] = "run_resumed"
 
 
+class RunReopened(StrictModel):
+    """The operator reopened a ``needs_attention`` run (``mootloop run reopen``) after
+    fixing what blocked it. Reopens the run to ``running``.
+
+    ``grant_attempts`` raises the run's retry ceiling by that many attempts, which is
+    what clears a *counter-capped* block: the turn that exhausted its attempts gets a
+    fresh budget instead of re-blocking on its next discard. ``reason`` is the
+    operator's (always required) justification, and ``forced`` records that the blocker
+    check was explicitly overridden — both exist so the journal alone explains why a
+    terminal run started running again."""
+
+    kind: Literal["run_reopened"] = "run_reopened"
+    reason: str
+    grant_attempts: int = 0
+    forced: bool = False
+    reopened_by: str = "operator"
+
+
 class TurnIntent(StrictModel):
     """A spend write-ahead ledger entry (plan FD-6): recorded *before* a turn calls the
     provider. It is folded as *pending* spend until the matching ``TurnCompleted`` /
@@ -168,6 +188,7 @@ JournalEvent = Annotated[
     | CheckpointCleared
     | RunPaused
     | RunResumed
+    | RunReopened
     | TurnIntent,
     Field(discriminator="kind"),
 ]
@@ -192,6 +213,9 @@ class RunState(StrictModel):
     total_cache_write: int = 0
     total_output_tokens: int = 0
     cap_raised_to: float | None = None
+    # Extra retry attempts granted by ``RunReopened`` events, added to the driver's
+    # ``max_attempts`` to form the run's effective per-turn retry ceiling.
+    attempts_granted: int = 0
     # Write-ahead spend ledger (plan FD-6): turn_id -> max_plausible_usd for intents
     # that have NOT yet been reconciled by their matching TurnCompleted/SpendRecorded.
     pending_intents: dict[str, float] = Field(default_factory=dict)
@@ -206,10 +230,14 @@ class RunState(StrictModel):
 
     @property
     def is_terminal(self) -> bool:
-        """The run is complete for good — a terminal state no resume reopens.
+        """The run is complete for good — a terminal state no *resume* reopens.
         ``paused`` / ``checkpoint`` / ``needs_decisions`` / ``running`` are all
         NON-terminal (they stop ticking but are not done); only ``finished`` /
-        ``needs_attention`` / ``capped`` are terminal (plan FE-1)."""
+        ``needs_attention`` / ``capped`` are terminal (plan FE-1).
+
+        Terminal is not irreversible: ``capped`` reopens on an explicit ``CapRaised``
+        and ``needs_attention`` on an explicit ``RunReopened``. Both are deliberate
+        operator verbs, never something the driver loop does on its own."""
         return self.status in ("finished", "needs_attention", "capped")
 
     def is_completed(self, turn_id: str) -> bool:
