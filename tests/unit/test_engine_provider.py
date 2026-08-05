@@ -14,6 +14,7 @@ Two layers:
 
 from __future__ import annotations
 
+import json
 import os
 import stat
 from pathlib import Path
@@ -194,7 +195,7 @@ def test_argv_prepends_egress_wrapper_and_has_flags(tmp_path: Path) -> None:
     wrapper = ["bwrap", "--dev-bind", "/", "/", "--unshare-net"]
     provider = _provider(tmp_path, egress_wrapper=wrapper)
     settings_path = tmp_path / "settings.json"
-    argv = provider.build_argv("PROMPT", settings_path)
+    argv = provider.build_argv(settings_path)
     assert argv[: len(wrapper)] == wrapper  # PREPENDED verbatim
     assert "--settings" in argv and str(settings_path) in argv
     assert "--allowedTools" in argv
@@ -211,7 +212,7 @@ def test_argv_appends_resume_when_session_present(tmp_path: Path) -> None:
     key = provider._session_key(_spec())
     provider._persist_session_id(key, "sess-123")
     settings_path = provider._write_settings()
-    argv = provider.build_argv("P", settings_path, session_id=provider._load_session_id(key))
+    argv = provider.build_argv(settings_path, session_id=provider._load_session_id(key))
     assert "--resume" in argv and "sess-123" in argv
 
 
@@ -389,6 +390,50 @@ def test_run_turn_fails_on_terminal_is_error_even_at_exit_zero(
         _provider(tmp_path).run_turn(_spec(), "the prompt")
 
 
+# --- the prompt is privileged: keep it off argv ------------------------------
+
+# Echoes back what the process could see: its own argv, and whatever arrived on stdin.
+_ECHO_BODY = r"""
+import json, sys
+print(json.dumps({
+    "type": "result", "is_error": False, "session_id": "s",
+    "result": json.dumps({"argv": sys.argv[1:], "stdin": sys.stdin.read()}),
+    "usage": {"input_tokens": 1, "output_tokens": 1},
+}))
+"""
+
+_PRIVILEGED = "PRIVILEGED-WORK-PRODUCT-b3f1e0"
+
+
+def test_prompt_travels_on_stdin_not_argv(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """REGRESSION. The persona prompt is privileged work product and was passed as an
+    argv element, where `/proc/<pid>/cmdline` exposes it to every local process for the
+    life of the turn — and where `subprocess.TimeoutExpired.__str__` embedded it into a
+    chained traceback."""
+    _install_fake_claude(tmp_path / "bin", _ECHO_BODY, monkeypatch)
+    provider = _provider(tmp_path)
+    seen = json.loads(provider.run_turn(_spec(), _PRIVILEGED).text)
+    assert _PRIVILEGED not in " ".join(seen["argv"])
+    assert seen["stdin"] == _PRIVILEGED
+    assert _PRIVILEGED not in " ".join(provider.build_argv(tmp_path / "s.json"))
+
+
+def test_timeout_does_not_chain_the_prompt_bearing_exception(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`TimeoutExpired` renders the child's argv and captured output; nothing from the
+    child may ride into an exception that gets logged."""
+    _install_fake_claude(tmp_path / "bin", "import time\ntime.sleep(5)\n", monkeypatch)
+    provider = _provider(tmp_path, timeout_s=0.5)
+    with pytest.raises(TurnError, match="timed out") as caught:
+        provider.run_turn(_spec(), _PRIVILEGED)
+    assert caught.value.__cause__ is None
+    assert caught.value.__context__ is None
+    assert _PRIVILEGED not in str(caught.value)
+
+
 def test_run_turn_seat_limit_classified(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _install_fake_claude(tmp_path / "bin", _SEAT_BODY, monkeypatch)
     with pytest.raises(SeatLimitError):
@@ -435,7 +480,7 @@ def test_planted_injection_seams_and_token_redaction(
     assert any(rule == "Read(//etc/**)" for rule in deny)  # outside-vault denied
     assert any(".mootloop/secrets.env" in rule for rule in deny)  # secrets denied
     settings_path = provider._write_settings()
-    assert str(settings_path) in provider.build_argv("p", settings_path)
+    assert str(settings_path) in provider.build_argv(settings_path)
 
     # Seam 2: the subprocess env's token is the injected SENTINEL, never a real token.
     assert provider.build_env()["CLAUDE_CODE_OAUTH_TOKEN"] == _SENTINEL
@@ -497,10 +542,8 @@ def test_argv_pins_the_tier_model(tmp_path: Path) -> None:
     """Without `--model` the CLI ran its own default, so the budget-tier map was
     decorative: a `low`-tier run reserved Haiku dollars and could burn Opus ones."""
     provider = _provider(tmp_path)
-    argv = provider.build_argv(
-        "PROMPT", tmp_path / "settings.json", model="claude-haiku-4-5"
-    )
+    argv = provider.build_argv(tmp_path / "settings.json", model="claude-haiku-4-5")
     assert "--model" in argv
     assert argv[argv.index("--model") + 1] == "claude-haiku-4-5"
     # Absent a planned model, no flag is emitted (the CLI keeps its default).
-    assert "--model" not in provider.build_argv("P", tmp_path / "s.json")
+    assert "--model" not in provider.build_argv(tmp_path / "s.json")

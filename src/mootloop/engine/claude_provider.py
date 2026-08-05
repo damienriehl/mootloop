@@ -14,6 +14,7 @@ Every escape hatch is closed by construction:
   ``deny``-beats-``allow`` turns into a total filesystem blackout (see
   `_outside_vault_read_deny`) — and denies the secrets file outright. Every rule path is
   anchored at the filesystem root with a DOUBLE leading slash (see `_abs`).
+- The persona prompt goes in on STDIN, never argv (`/proc/<pid>/cmdline` is world-readable).
 - A turn whose tools were refused is FAILED, not returned: the CLI exits 0 with a
   terminal ``is_error: false`` even then, so the per-tool ``is_error`` in the
   ``stream-json`` output is the only honest signal (see `_permission_denial`).
@@ -386,7 +387,6 @@ class HeadlessClaudeProvider:
 
     def build_argv(
         self,
-        prompt: str,
         settings_path: Path,
         *,
         session_id: str | None = None,
@@ -394,6 +394,12 @@ class HeadlessClaudeProvider:
     ) -> list[str]:
         """The full argv: ``egress_wrapper`` PREPENDED, then the non-interactive
         ``claude -p`` invocation, with ``--resume`` appended when a session persists.
+
+        The persona prompt is deliberately NOT here. It is privileged work product, and
+        argv is world-readable through ``/proc/<pid>/cmdline`` for as long as the turn
+        runs; it also lands verbatim in ``subprocess.TimeoutExpired``'s string form. The
+        prompt is fed on stdin instead (`run_turn`), which no other local process can
+        read.
 
         ``--output-format stream-json`` (with its required ``--verbose``) is what makes a
         denied turn detectable: the terminal ``result`` event reports ``is_error: false``
@@ -407,7 +413,6 @@ class HeadlessClaudeProvider:
             *self.egress_wrapper,
             self.claude_bin,
             "-p",
-            prompt,
             "--output-format",
             "stream-json",
             "--verbose",
@@ -470,23 +475,29 @@ class HeadlessClaudeProvider:
         key = self._session_key(spec)
         session_id = self._load_session_id(key)
         settings_path = self._write_settings()
-        argv = self.build_argv(
-            prompt, settings_path, session_id=session_id, model=spec.model
-        )
+        argv = self.build_argv(settings_path, session_id=session_id, model=spec.model)
         env = self.build_env()
+        completed: subprocess.CompletedProcess[str] | None
         try:
             completed = subprocess.run(  # noqa: S603 — argv is fully constructed here
                 argv,
+                input=prompt,  # NOT argv: /proc/<pid>/cmdline is world-readable
                 cwd=str(self._vault_real()),
                 env=env,
                 capture_output=True,
                 text=True,
                 timeout=self.timeout_s,
             )
-        except subprocess.TimeoutExpired as exc:
-            raise TurnError(f"headless turn timed out after {self.timeout_s}s") from exc
+        except subprocess.TimeoutExpired:
+            completed = None
         except OSError as exc:
             raise TurnError(f"headless turn could not start: {exc}") from exc
+        if completed is None:
+            # Raised OUTSIDE the handler so `TimeoutExpired` is neither the cause nor the
+            # context: it carries the child's argv and its captured partial stdout, which
+            # is matter text. Nothing from the child belongs in an exception that is
+            # logged, and the prompt itself is no longer on argv to begin with.
+            raise TurnError(f"headless turn timed out after {self.timeout_s}s")
 
         if completed.returncode != 0:
             self._raise_classified(completed.stdout, completed.stderr, completed.returncode)
