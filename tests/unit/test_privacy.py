@@ -90,6 +90,30 @@ def test_internal_symlink_to_tracked_file_is_safe(tmp_path: Path) -> None:
     assert findings == []
 
 
+def test_internal_symlink_to_untracked_target_is_scanned(tmp_path: Path) -> None:
+    """A tracked symlink pointing at an UNTRACKED file inside the repo is a hole.
+
+    Nothing else scans that content — there is no tracked entry for it — so skipping
+    the link on "the target is scanned on its own" leaked a canary past the grep.
+    """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git_init(repo)
+    registry = tmp_path / "canaries.json"
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    token = seed_canary(vault, "leaky-matter", registry_path=registry)
+
+    # An untracked (gitignored) scratch file inside the repo, holding matter text.
+    (repo / "scratch.txt").write_text(f"pasted {token} while debugging")
+    (repo / ".gitignore").write_text("scratch.txt\n")
+    (repo / "notes.md").symlink_to("scratch.txt")
+    _git_add(repo, ".gitignore", "notes.md")
+
+    findings = privacy_grep(repo, registry_path=registry)
+    assert any(f.kind == "canary" and f.path == "notes.md" for f in findings)
+
+
 def test_binary_file_unscannable(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
