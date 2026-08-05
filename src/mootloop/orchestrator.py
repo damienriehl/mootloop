@@ -480,6 +480,25 @@ def _operative_citations(vault_root: Path | str, run_id: str) -> list[Citation]:
     return list(found.values())
 
 
+def operative_draft_turn_ids(vault_root: Path | str, run_id: str) -> dict[str, str]:
+    """``request_id -> turn_id`` of each request's operative (final) draft.
+
+    The gate ledger uses this to answer "which draft's gate verdict governs export":
+    the one whose text would actually be served, not every draft the run ever made.
+    """
+    binding = _binding_for(vault_root, run_id)
+    state = load_state(vault_root, run_id)
+    units = load_request_units(vault_root)
+    facts = _load_facts(vault_root)
+    out: dict[str, str] = {}
+    for i in range(len(units)):
+        ctx = _context_for(run_id, state, binding, units, facts, i, DEFAULT_MAX_ATTEMPTS)
+        record = ctx.operative_draft()
+        if record is not None:
+            out[str(units[i].request_id)] = record.spec.turn_id
+    return out
+
+
 def operative_drafts(
     vault_root: Path | str, run_id: str
 ) -> list[tuple[RequestItem, DraftOutput | None]]:
