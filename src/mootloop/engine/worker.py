@@ -13,6 +13,11 @@ within a single tick; the Unit-3 tests that loop ``run_once`` until completion s
 pass. A provider seat limit interrupts the drain: the run pauses and the item is
 released with a scheduled resume, so the work is rescheduled, never lost.
 
+A shutdown request interrupts it the same way. Because a drain is a whole run, the
+drain loop — not just the tick loop — has to watch for it, or ``SIGTERM`` would sit
+unread for hours while systemd waited out ``TimeoutStopSec`` and then ``SIGKILL``ed
+the process wherever it happened to be.
+
 Failure routing around the provider call:
   - `SeatLimitError` -> pause the run (``capacity``), release the item to resume later.
   - `AuthError`      -> finish the run ``needs_attention`` + drop a notification file.
@@ -92,6 +97,7 @@ class Worker:
         self.max_attempts = max_attempts
         self._reclaimed = False
         self._stop_requested = False
+        self._stop: Stop | None = None
 
     # -- heartbeat + stale reclaim --
 
@@ -123,6 +129,16 @@ class Worker:
                 continue
             if now - ts > timedelta(seconds=self.stale_threshold_s):
                 self.queue.release_all_claimed_by(other_id)
+
+    # -- shutdown --
+
+    def should_stop(self) -> bool:
+        """True once shutdown has been requested — by SIGTERM or by `serve`'s ``stop``.
+
+        One predicate for both, so everything that has to notice a shutdown notices
+        the same thing whether the signal is real or injected by a test.
+        """
+        return self._stop_requested or (self._stop is not None and self._stop())
 
     @staticmethod
     def _staging_gc() -> None:
@@ -200,6 +216,18 @@ class Worker:
         provider = self.provider_factory(vault, run_dir, self.billing_mode)
         now_iso = now.isoformat()
         while True:
+            if self.should_stop():
+                # The safe boundary: the previous turn is journaled, no provider call
+                # is in flight, and nothing is half-written. Hand the item back
+                # unclaimed so the run RESUMES here (the journal fold makes that
+                # exact) instead of waiting out the visibility lease.
+                logger.info(
+                    "worker %s: shutdown requested; releasing item %s at a turn boundary",
+                    self.worker_id,
+                    item.item_id,
+                )
+                self.queue.release(item.item_id, self.worker_id)
+                return True
             specs = orchestrator.plan_next(vault, run_id)
             if not specs:
                 # Nothing schedulable: the run is finished / paused / blocked.
@@ -298,7 +326,7 @@ class Worker:
     # -- supervised loop --
 
     def _on_sigterm(self, _signum: int, _frame: object) -> None:
-        # Drain: finish the current turn (run_once completes its drain), then exit.
+        # Finish the turn in flight, stop at the next turn boundary, release the item.
         self._stop_requested = True
 
     def serve(
@@ -312,13 +340,19 @@ class Worker:
         """Loop ``run_once`` until ``stop()`` (or SIGTERM) is set, sleeping when idle.
 
         A real ``SIGTERM`` sets the same stop flag the injected ``stop`` uses, so a
-        test can drive a bounded number of ticks without signals."""
+        test can drive a bounded number of ticks without signals. Both reach the
+        drain itself through `should_stop`, so shutdown is observed WITHIN a tick and
+        not only between ticks — ``run_once`` drains a whole run, which is hours."""
         self._stop_requested = False
+        self._stop = stop
         with contextlib.suppress(ValueError):  # signal only installs on the main thread
             signal.signal(signal.SIGTERM, self._on_sigterm)
-        while not (stop() or self._stop_requested):
-            did_work = self.run_once(now_fn())
-            if stop() or self._stop_requested:
-                break
-            if not did_work:
-                sleep_fn(interval)
+        try:
+            while not self.should_stop():
+                did_work = self.run_once(now_fn())
+                if self.should_stop():
+                    break
+                if not did_work:
+                    sleep_fn(interval)
+        finally:
+            self._stop = None

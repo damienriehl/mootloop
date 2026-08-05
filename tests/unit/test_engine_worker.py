@@ -8,6 +8,7 @@ lost). Consolidates the earlier smoke test.
 
 from __future__ import annotations
 
+import signal
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -274,6 +275,72 @@ def test_serve_survives_a_poison_item(tmp_path: Path) -> None:
         return ticks[0] > 4
 
     worker.serve(now_fn=lambda: NOW, sleep_fn=lambda _s: None, stop=stop, interval=0.0)
+
+
+# --- shutdown must interrupt a drain ----------------------------------------
+
+
+class _SigtermAfterFirstTurn:
+    """Raises the worker's real SIGTERM flag once a turn has been journaled."""
+
+    def __init__(self, worker: Worker) -> None:
+        self._inner = FakeLLMProvider()
+        self._worker = worker
+        self.armed = True
+        self.calls = 0
+
+    def run_turn(self, spec: TurnSpec, prompt: str) -> RawTurnResult:
+        self.calls += 1
+        result = self._inner.run_turn(spec, prompt)
+        if self.armed:
+            self._worker._on_sigterm(signal.SIGTERM, None)  # systemd stopping us mid-drain
+        return result
+
+
+def test_sigterm_stops_a_drain_at_a_turn_boundary(tmp_path: Path) -> None:
+    """A drain is a whole run, so SIGTERM has to be observed INSIDE `run_once`.
+
+    The flag was only read between ticks, so a stop request sat unread for the rest
+    of the run: systemd waits out TimeoutStopSec and SIGKILLs the process wherever it
+    is, which for this loop is somewhere in a journal append.
+    """
+    root, run_id = _build_matters_root(tmp_path)
+    queue = Queue(root)
+    _enqueue_run_turn(queue, run_id, "wi-1")
+    vault = MatterRegistry(root=root).resolve(MATTER_ID)
+
+    provider: _SigtermAfterFirstTurn | None = None
+
+    def factory(vault_root: Path, run_dir: Path, billing_mode: str) -> LLMProvider:
+        assert provider is not None
+        return provider  # type: ignore[return-value]
+
+    worker = Worker(root, "w1", queue, factory)
+    provider = _SigtermAfterFirstTurn(worker)
+
+    assert worker.run_once(NOW) is True
+
+    # Stopped after the turn in flight, not part-way through one and not at the end.
+    assert provider.calls == 1
+    state = load_state(vault, run_id)
+    assert len(state.completed_turns) == 1
+    assert state.is_terminal is False  # the run is unfinished, and says so
+
+    # The item is back on the queue, unclaimed and visible: the work is rescheduled,
+    # never lost, and no other worker had to wait out our visibility lease.
+    [pending] = queue.snapshot()
+    assert pending.item_id == "wi-1"
+    assert pending.claimed_by is None
+
+    # A restarted worker resumes from the journal and carries the run to completion.
+    provider.armed = False
+    worker._stop_requested = False
+    for _ in range(_MAX_TICKS):
+        worker.run_once(NOW)
+        if load_state(vault, run_id).is_terminal:
+            break
+    assert load_state(vault, run_id).status == "finished"
+    assert queue.snapshot() == []
 
 
 # --- the hard cap must fire on spend a REAL provider reports -----------------
