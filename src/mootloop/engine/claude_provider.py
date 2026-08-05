@@ -9,8 +9,11 @@ Every escape hatch is closed by construction:
   carrying only the subscription OAuth token, a per-run config dir, and the
   auto-updater/telemetry kill switches.
 - ``--allowedTools`` is a READ-ONLY allowlist (no Bash / Write / Edit / web tools).
-- A per-run ``--settings`` file denies reads/writes outside the vault realpath and
-  denies the secrets file outright.
+- A per-run ``--settings`` file denies reads outside the vault realpath — by enumerating
+  the vault's siblings at every ancestor level, NOT by a blanket ``Read(/**)``, which
+  ``deny``-beats-``allow`` turns into a total filesystem blackout (see
+  `_outside_vault_read_deny`) — and denies the secrets file outright. Every rule path is
+  anchored at the filesystem root with a DOUBLE leading slash (see `_abs`).
 - An optional ``egress_wrapper`` (e.g. a ``bwrap`` network jail) is PREPENDED to argv;
   the jail itself is deployment config, but the seam and the prepend live here.
 
@@ -96,6 +99,30 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+def _abs(path: Path | str) -> str:
+    """Render ``path`` as a permission-rule pattern anchored at the FILESYSTEM root.
+
+    Claude Code reads a rule path with a single leading slash as relative to the
+    directory holding the settings file; only a DOUBLE leading slash means "absolute".
+    Every absolute deny in the original settings — the secrets file, the secrets
+    directory, the credential store — carried one slash, so none of them denied anything.
+    They read as `<run_dir>/home/…`, a path that does not exist. Verified against
+    ``claude`` 2.1.222: with ``Read(/<tmp>/outside/**)`` the file is returned; with
+    ``Read(//<tmp>/outside/**)`` the same read comes back
+    "File is in a directory that is denied by your permission settings."
+    """
+    return f"/{path}"
+
+
+def _looks_like_dir(path: Path) -> bool:
+    """Fail-closed ``is_dir``: an entry we cannot stat is treated as a directory, so the
+    recursive ``/**`` deny is emitted rather than silently skipped."""
+    try:
+        return path.is_dir()
+    except OSError:
+        return True
+
+
 def _slug(value: str) -> str:
     """A filesystem-safe slug (``ROG-3(a)`` -> ``rog-3-a``) for a session-key filename."""
     out = "".join(ch if ch.isalnum() else "-" for ch in value.lower())
@@ -149,27 +176,83 @@ class HeadlessClaudeProvider:
 
     # -- pure seams (unit-3 tests inspect these without executing claude) --
 
+    def _outside_vault_read_deny(self) -> list[str]:
+        """Deny rules covering every path outside the vault, built by ENUMERATING the
+        vault's siblings at each ancestor level.
+
+        This exists because ``Read(/**)`` cannot be used. Claude Code evaluates ``deny``
+        BEFORE ``allow`` and a denied path is never re-opened, so the old
+        "deny ``Read(/**)``, then re-allow ``Read(<vault>/**)``" pairing denied the vault
+        as well: the allow rule was dead on arrival. Worse, ``Read(/**)`` gates *path*
+        read access rather than the tool named ``Read``, so ``Glob`` and ``Grep`` over the
+        vault were denied too — a persona turn had no filesystem access of any kind and
+        drafted from its prompt alone.
+
+        The complement construction gets the documented posture with the semantics the
+        permission engine actually has: walk from the vault up to ``/`` and deny every
+        entry that is NOT on the vault's own path. The vault and its ancestors are the
+        only paths left unmatched, so ``allow`` still has something to grant.
+
+        Limits, stated plainly: the enumeration is a snapshot taken when the per-run
+        settings file is written, so a directory created afterwards is not named here.
+        That residual is covered by the second layer — the subprocess runs with
+        ``cwd=<vault>`` under ``--permission-mode dontAsk`` and a per-run
+        ``CLAUDE_CONFIG_DIR`` holding no user allow rules, so a path that is neither the
+        workspace nor allow-listed is refused rather than prompted for.
+        """
+        vault = self._vault_real()
+        rules: list[str] = []
+        seen: set[str] = set()
+        child = vault
+        for parent in vault.parents:
+            try:
+                entries = sorted(parent.iterdir())
+            except OSError:  # unreadable ancestor: nothing to enumerate, keep climbing
+                entries = []
+            for entry in entries:
+                if entry == child:
+                    continue
+                path = _abs(entry)
+                if path in seen:
+                    continue
+                seen.add(path)
+                rules.append(f"Read({path})")
+                if _looks_like_dir(entry):
+                    rules.append(f"Read({path}/**)")
+            child = parent
+        return rules
+
     def build_settings(self) -> dict[str, Any]:
         """The per-run ``--settings`` dict: deny everything outside the vault and deny
         the secrets file; allow only read-only tools scoped to the vault realpath."""
-        vault = str(self._vault_real())
-        secrets_path = str(self._secrets_real())
-        secrets_dir = str(self._secrets_real().parent)
-        config_dir = str(self._config_dir())
+        vault = _abs(self._vault_real())
+        secrets_path = _abs(self._secrets_real())
+        secrets_dir = _abs(self._secrets_real().parent)
+        config_dir = _abs(self._config_dir())
         return {
             "permissions": {
-                # Deny reads/writes anywhere on disk, then re-allow only the vault.
                 "deny": [
-                    "Read(/**)",
-                    "Write(/**)",
-                    "Edit(/**)",
-                    f"Read({secrets_path})",
-                    f"Read({secrets_dir}/**)",
-                    # Belt and braces: the CLI's own state dir holds `.credentials.json`.
-                    f"Read({config_dir}/**)",
+                    # Writes go nowhere. A blanket write deny is safe in a way a blanket
+                    # read deny is not: no `allow` rule needs to survive it.
+                    "Write(//**)",
+                    "Edit(//**)",
                     "Bash",
                     "WebFetch",
                     "WebSearch",
+                    # The secrets file and its directory, named explicitly rather than
+                    # left to the enumeration below.
+                    f"Read({secrets_path})",
+                    f"Read({secrets_dir}/**)",
+                    # The CLI's own state dir holds `.credentials.json` — the
+                    # subscription token. Deny this run's dir, the CLI's default dir, and
+                    # any credential store anywhere.
+                    f"Read({config_dir})",
+                    f"Read({config_dir}/**)",
+                    f"Read({_abs(engine_config_root())}/**)",
+                    f"Read({_abs(Path.home() / '.claude')}/**)",
+                    "Read(//**/.credentials.json)",
+                    # Everything else outside the vault.
+                    *self._outside_vault_read_deny(),
                 ],
                 "allow": [f"{tool}({vault}/**)" for tool in READ_ONLY_TOOLS],
             }

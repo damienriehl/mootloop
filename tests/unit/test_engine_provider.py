@@ -108,18 +108,83 @@ def test_env_fails_closed_without_token(tmp_path: Path) -> None:
 
 
 def test_settings_deny_outside_vault_and_secrets(tmp_path: Path) -> None:
+    outsider = tmp_path / "outsider"
+    outsider.mkdir()
     settings = _provider(tmp_path).build_settings()
     deny = settings["permissions"]["deny"]
-    assert any(rule.startswith("Read(/**") for rule in deny)  # outside-vault restriction
+    assert f"Read(/{outsider})" in deny  # outside-vault restriction
+    assert f"Read(/{outsider}/**)" in deny
     assert any(".mootloop/secrets.env" in rule for rule in deny)  # secrets file denied
     assert "Bash" in deny and "WebFetch" in deny and "WebSearch" in deny
+
+
+def test_every_path_rule_is_anchored_at_the_filesystem_root(tmp_path: Path) -> None:
+    """REGRESSION. Claude Code resolves a rule path with ONE leading slash against the
+    directory holding the settings file; only `//` means absolute. So
+    `Read(/home/you/.mootloop/secrets.env)` denied `<run_dir>/home/you/…` — a path that
+    does not exist — and the secrets file was never actually protected by a rule of its
+    own. Proved against `claude` 2.1.222: single-slash deny returns the file, double-slash
+    deny returns the permission-settings refusal."""
+    settings = _provider(tmp_path).build_settings()
+    for section in ("deny", "allow"):
+        for rule in settings["permissions"][section]:
+            if "(" not in rule:
+                continue  # bare tool name, e.g. "Bash"
+            spec = rule[rule.index("(") + 1 : -1]
+            if not spec.startswith("/"):
+                continue  # an intentionally relative pattern, if any
+            assert spec.startswith("//"), f"{section} rule {rule!r} is settings-relative"
+
+
+def test_settings_never_blanket_deny_reads(tmp_path: Path) -> None:
+    """REGRESSION. `build_settings` denied `Read(/**)` and then re-allowed
+    `Read(<vault>/**)`. Claude Code evaluates deny before allow with no re-open, so the
+    allow was dead and the persona could not open a single file — and because `Read(/**)`
+    gates path access rather than the tool named `Read`, `Glob` and `Grep` over the vault
+    were denied too. Every headless turn ran blind, drafting from prompt text alone.
+
+    Proved against `claude` 2.1.222: with this rule a vault Read returns
+    "File is in a directory that is denied by your permission settings"; delete the one
+    string and the identical prompt returns the file's contents."""
+    provider = _provider(tmp_path)
+    settings = provider.build_settings()
+    deny = settings["permissions"]["deny"]
+    vault_real = Path(os.path.realpath(provider.vault_root))
+
+    assert "Read(/**)" not in deny and "Read(//**)" not in deny
+    # More generally: no read-deny rule may cover the vault or any ancestor of it, or the
+    # allow list below it is inert.
+    protected = {f"/{vault_real}", *(f"/{p}" for p in vault_real.parents)}
+    for rule in deny:
+        if not rule.startswith("Read("):
+            continue
+        target = rule[len("Read(") : -1].removesuffix("/**")
+        assert target not in protected, f"deny rule {rule!r} swallows the vault"
+
+
+def test_settings_deny_reaches_the_whole_ancestor_chain(tmp_path: Path) -> None:
+    """The complement construction must cover siblings at EVERY level, not just the
+    vault's own directory — otherwise `/etc`, `~/.ssh` and friends stay readable."""
+    nested = tmp_path / "a" / "b" / "vault"
+    nested.mkdir(parents=True)
+    (tmp_path / "a" / "cousin.txt").write_text("x", encoding="utf-8")
+    (tmp_path / "aunt").mkdir()
+    provider = HeadlessClaudeProvider(
+        vault_root=nested,
+        run_dir=nested / "runs" / "r1",
+        oauth_token_loader=lambda: "sk-ant-oat-TESTTOKEN",
+    )
+    deny = provider.build_settings()["permissions"]["deny"]
+    assert f"Read(/{tmp_path / 'a' / 'cousin.txt'})" in deny  # one level up
+    assert f"Read(/{tmp_path / 'aunt'}/**)" in deny  # two levels up
+    assert "Read(//etc/**)" in deny  # all the way to the root
 
 
 def test_settings_allow_scoped_to_vault_realpath(tmp_path: Path) -> None:
     provider = _provider(tmp_path)
     allow = provider.build_settings()["permissions"]["allow"]
     vault_real = str(Path(os.path.realpath(provider.vault_root)))
-    assert allow == [f"{tool}({vault_real}/**)" for tool in ("Read", "Glob", "Grep", "LS")]
+    assert allow == [f"{tool}(/{vault_real}/**)" for tool in ("Read", "Glob", "Grep", "LS")]
 
 
 # --- pure seams: argv -------------------------------------------------------
@@ -268,7 +333,7 @@ def test_planted_injection_seams_and_token_redaction(
     # and the argv carries the --settings path pointing at those rules.
     settings = provider.build_settings()
     deny = settings["permissions"]["deny"]
-    assert any(rule.startswith("Read(/**") for rule in deny)  # outside-vault denied
+    assert any(rule == "Read(//etc/**)" for rule in deny)  # outside-vault denied
     assert any(".mootloop/secrets.env" in rule for rule in deny)  # secrets denied
     settings_path = provider._write_settings()
     assert str(settings_path) in provider.build_argv("p", settings_path)
