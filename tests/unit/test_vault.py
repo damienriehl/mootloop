@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import multiprocessing
 import os
+import time
 from datetime import timedelta
 from pathlib import Path
 
@@ -316,4 +318,69 @@ def test_run_lock_refuses_cross_host_without_override(tmp_path: Path) -> None:
     lock = RunLock(vault, "run-4", override=True)
     lock.acquire()
     assert json.loads(lock._path.read_text())["run_id"] == "run-4"
+    lock.release()
+
+
+# --- run lock: acquisition is atomic, not read-then-write --------------------
+
+
+def _hammer_lock(vault: Path, barrier_dir: Path, idx: int) -> int:
+    """Child process: take the lock, prove exclusivity with a marker file, release."""
+    marker = barrier_dir / "held"
+    try:
+        with RunLock(vault, f"run-{idx}"):
+            if marker.exists():
+                return 2  # someone else was inside the critical section
+            marker.write_text(str(idx), encoding="utf-8")
+            time.sleep(0.02)
+            marker.unlink()
+            return 0
+    except LockHeldError:
+        return 1  # correctly refused — this is the expected loser outcome
+
+
+def test_concurrent_acquire_never_lets_two_processes_in(tmp_path: Path) -> None:
+    """`acquire` used to read, then write, with no atomic gate. Two processes that both
+    read "free" before either wrote both believed they held the lock — and this lock is
+    the only thing serializing `record_turn`'s load-fold-append cycle."""
+    vault = tmp_path / "vault"
+    (vault / "runs").mkdir(parents=True)
+    barrier = tmp_path / "barrier"
+    barrier.mkdir()
+
+    ctx = multiprocessing.get_context("fork")
+    with ctx.Pool(6) as pool:
+        codes = pool.starmap(_hammer_lock, [(vault, barrier, i) for i in range(6)])
+
+    assert 2 not in codes, f"two processes were inside the critical section: {codes}"
+    assert codes.count(0) >= 1, f"nobody acquired the lock: {codes}"
+
+
+def test_unreadable_lock_file_fails_closed(tmp_path: Path) -> None:
+    """A lock whose contents cannot be parsed is a blocker, not a green light — the
+    same posture the cross-host branch already takes. Overriding is the escape hatch."""
+    vault = tmp_path / "vault"
+    lock_path = vault / "runs" / ".lock"
+    lock_path.parent.mkdir(parents=True)
+    lock_path.write_text("not json at all", encoding="utf-8")
+
+    with pytest.raises(LockHeldError):
+        RunLock(vault, "run-x").acquire()
+
+    lock = RunLock(vault, "run-x", override=True)
+    lock.acquire()
+    assert json.loads(lock_path.read_text())["run_id"] == "run-x"
+    lock.release()
+
+
+def test_lock_file_is_never_observable_half_written(tmp_path: Path) -> None:
+    """The lock is published by `os.link` from a finished temp file, so a contender's
+    read after losing the race always sees complete JSON."""
+    vault = tmp_path / "vault"
+    (vault / "runs").mkdir(parents=True)
+    lock = RunLock(vault, "run-1")
+    lock.acquire()
+    payload = json.loads((vault / "runs" / ".lock").read_text(encoding="utf-8"))
+    assert payload["run_id"] == "run-1" and payload["pid"] == os.getpid()
+    assert {"pid", "hostname", "run_id", "started_at", "heartbeat_at"} <= payload.keys()
     lock.release()

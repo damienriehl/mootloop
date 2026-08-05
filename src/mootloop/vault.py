@@ -351,11 +351,37 @@ class RunLock:
 
     # -- lifecycle --
     def acquire(self) -> RunLock:
+        """Take the lock, or raise `LockHeldError`.
+
+        The gate is an atomic exclusive create, NOT a read followed by a write. Two
+        processes that both read "no lock" before either wrote would both have believed
+        they held it — and this lock is the only thing serializing `record_turn`'s
+        load-fold-append cycle, `attest`, decision resolution, and the backup snapshot
+        that documents itself as never racing an active run. The `Queue` alongside it
+        already takes an `flock`; this did not.
+
+        The file is published by `os.link` from a fully-written temp file, so it is
+        never observable half-written — a loser's follow-up read always sees complete
+        JSON and can make a real takeover decision.
+        """
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        existing = self._read()
-        if existing is not None:
-            self._check_takeover(existing)
-        self._write(started_at=_now())
+        started = _now()
+        try:
+            self._create_exclusive(started_at=started)
+        except FileExistsError:
+            existing = self._read()
+            if existing is None:
+                # The lock exists but says nothing readable. Fail closed rather than
+                # steal it: an unreadable control is a blocker, not a green light.
+                if not self.override:
+                    raise LockHeldError(
+                        f"lock file {self._path} is unreadable or corrupt; pass "
+                        "override=True to take it over"
+                    ) from None
+                logger.warning("overriding an unreadable lock at %s", self._path)
+            else:
+                self._check_takeover(existing)
+            self._write(started_at=started)
         self._acquired = True
         return self
 
@@ -414,16 +440,37 @@ class RunLock:
             return None
         return data if isinstance(data, dict) else None
 
+    def _payload(self, started_at: datetime) -> str:
+        return json.dumps(
+            {
+                "pid": self.pid,
+                "hostname": self.hostname,
+                "run_id": self.run_id,
+                "started_at": started_at.isoformat(),
+                "heartbeat_at": _now().isoformat(),
+            },
+            indent=2,
+        )
+
+    def _create_exclusive(self, *, started_at: datetime) -> None:
+        """Publish a complete lock file, or raise `FileExistsError` if one is there.
+
+        `os.link` is the atomic step: the destination either does not exist (and now
+        holds the finished bytes) or it does (and we lost). `O_CREAT|O_EXCL` alone would
+        expose a window where the file exists but is still empty, and a loser reading it
+        then would see "corrupt" and steal the lock it had just lost.
+        """
+        fd, tmp = tempfile.mkstemp(dir=str(self._path.parent), prefix=".lock-")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(self._payload(started_at))
+            os.link(tmp, self._path)
+        finally:
+            with contextlib.suppress(OSError):
+                os.unlink(tmp)
+
     def _write(self, *, started_at: datetime) -> None:
-        now = _now()
-        payload = {
-            "pid": self.pid,
-            "hostname": self.hostname,
-            "run_id": self.run_id,
-            "started_at": started_at.isoformat(),
-            "heartbeat_at": now.isoformat(),
-        }
-        self._path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        atomic_write_text(self._path, self._payload(started_at))
 
     # -- context manager --
     def __enter__(self) -> RunLock:
