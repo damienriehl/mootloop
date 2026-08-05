@@ -58,6 +58,7 @@ _SYNC_NAME_MARKERS: tuple[str, ...] = (
     "Google Drive",
     "GoogleDrive",
     "Mobile Documents",  # iCloud Drive on macOS
+    "OneDrive",  # named in the non-negotiable rule but previously undetected
 )
 _SYNC_FILE_MARKERS: tuple[str, ...] = (
     ".dropbox",
@@ -71,10 +72,17 @@ _SYNC_FILE_MARKERS: tuple[str, ...] = (
 
 
 def validate_id(value: str, *, kind: str = "id") -> str:
-    """Validate a matter/run id. Rejects ``.``, ``..``, and path separators."""
+    """Validate a matter/run id. Rejects ``.``, ``..``, and path separators.
+
+    ``fullmatch``, not ``match``: Python's ``$`` also matches immediately before a
+    trailing newline, so ``match`` accepted ``"abc\\n"`` — while the pydantic
+    ``MatterIdStr`` field built from the same pattern (rust regex, true end anchor)
+    rejected it. The two validators disagreeing is the bug; ids reach the run lock,
+    on-disk filenames, and the canary token body through this function.
+    """
     if value in {".", ".."} or "/" in value or "\\" in value or os.sep in value:
         raise VaultBoundaryError(f"invalid {kind} {value!r}: path components are not allowed")
-    if not MATTER_ID_RE.match(value):
+    if not MATTER_ID_RE.fullmatch(value):
         raise VaultBoundaryError(f"invalid {kind} {value!r}: must match {MATTER_ID_PATTERN}")
     return value
 
@@ -96,6 +104,10 @@ def safe_vault_path(vault_root: Path | str, *parts: str) -> Path:
     The single choke-point before any vault write. Absolute parts, ``..``, and
     symlinks that escape the vault all resolve outside the root and are rejected.
     """
+    # A NUL byte makes `realpath` raise ValueError, which callers mapping
+    # `VaultBoundaryError` to a typed 400 would surface as a 500 instead.
+    if any("\0" in part for part in parts):
+        raise VaultBoundaryError("path parts must not contain a NUL byte")
     root_real = _real(vault_root)
     candidate = _real(root_real.joinpath(*parts))
     if not _is_within(candidate, root_real):
@@ -158,6 +170,21 @@ def assert_vault_outside_repo(vault_root: Path | str, repo_root: Path | str) -> 
 # --- Sync-folder detection --------------------------------------------------
 
 
+def _is_sync_dir_name(name: str) -> bool:
+    """True for a sync-root directory name, including its tenant-scoped variants.
+
+    Exact case-sensitive equality missed the shapes these clients actually create:
+    ``OneDrive - Riehl Law`` (business tenants) and ``GoogleDrive-user@example.com``
+    (the modern macOS mount under ``~/Library/CloudStorage``).
+    """
+    folded = name.casefold()
+    for marker in _SYNC_NAME_MARKERS:
+        base = marker.casefold()
+        if folded == base or folded.startswith((f"{base} -", f"{base}-", f"{base}_")):
+            return True
+    return False
+
+
 def detect_sync_folder(vault_root: Path | str) -> str | None:
     """Walk the vault's ancestors for background-sync markers.
 
@@ -166,7 +193,7 @@ def detect_sync_folder(vault_root: Path | str) -> str | None:
     """
     start = _real(vault_root)
     for ancestor in (start, *start.parents):
-        if ancestor.name in _SYNC_NAME_MARKERS:
+        if _is_sync_dir_name(ancestor.name):
             return ancestor.name
         for marker in _SYNC_FILE_MARKERS:
             if (ancestor / marker).exists():
@@ -225,20 +252,42 @@ def matter_validation_issues(vault_root: Path | str) -> list[dict[str, str]]:
     return []
 
 
+def preflight_vault_location(vault_path: Path | str, *, allow_sync_folder: bool = False) -> None:
+    """Assert a vault may be created here: outside any repo, outside any sync folder.
+
+    Lives here, and is called by `create_vault`, so EVERY creation path inherits it.
+    It used to sit only in `init_vault`, which meant `MatterRegistry.create` — the
+    documented single entry point for the hosted tier — happily provisioned a
+    privileged vault inside a git work tree or under ``~/OneDrive``.
+    """
+    repo = enclosing_git_repo(vault_path)
+    if repo is not None:
+        assert_vault_outside_repo(vault_path, repo)
+    marker = detect_sync_folder(vault_path)
+    if marker and not allow_sync_folder:
+        raise VaultBoundaryError(
+            f"vault path is inside a background-sync folder ({marker}); active "
+            "vaults must not live in sync folders — pass allow_sync_folder to override"
+        )
+
+
 def create_vault(
     vault_root: Path | str,
     matter: MatterConfig,
     *,
     registry_path: Path | str | None = None,
+    allow_sync_folder: bool = False,
 ) -> Path:
     """Create the canonical vault tree, write ``matter.yaml``, and seed a canary.
 
-    Refuses if the target directory already exists and is non-empty.
+    Refuses if the target directory already exists and is non-empty, or if the location
+    fails `preflight_vault_location`.
     """
     # Lazy import breaks the vault<->privacy cycle (privacy imports vault helpers).
     from mootloop.privacy import seed_canary
 
     validate_id(matter.matter_id, kind="matter_id")
+    preflight_vault_location(vault_root, allow_sync_folder=allow_sync_folder)
     root = Path(vault_root)
     if root.exists() and any(root.iterdir()):
         raise VaultBoundaryError(f"refusing to create vault: {root} exists and is non-empty")
@@ -292,17 +341,16 @@ def init_vault(
     allow_sync_folder: bool = False,
     registry_path: Path | str | None = None,
 ) -> Path:
-    """Preflight (repo boundary + sync-folder) then create the vault."""
-    repo = enclosing_git_repo(vault_path)
-    if repo is not None:
-        assert_vault_outside_repo(vault_path, repo)
-    marker = detect_sync_folder(vault_path)
-    if marker and not allow_sync_folder:
-        raise VaultBoundaryError(
-            f"vault path is inside a background-sync folder ({marker}); active "
-            "vaults must not live in sync folders — pass allow_sync_folder to override"
-        )
-    return create_vault(vault_path, matter, registry_path=registry_path)
+    """Preflight (repo boundary + sync-folder) then create the vault.
+
+    The preflight now lives in `create_vault`, so this is a thin alias kept for the CLI
+    and the demo baker; both paths get the identical checks."""
+    return create_vault(
+        vault_path,
+        matter,
+        registry_path=registry_path,
+        allow_sync_folder=allow_sync_folder,
+    )
 
 
 # --- Run lock ---------------------------------------------------------------

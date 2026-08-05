@@ -26,6 +26,7 @@ from mootloop.vault import (
     safe_vault_path,
     validate_id,
 )
+from tests.conftest import make_matter
 
 # --- ID validation ----------------------------------------------------------
 
@@ -384,3 +385,62 @@ def test_lock_file_is_never_observable_half_written(tmp_path: Path) -> None:
     assert payload["run_id"] == "run-1" and payload["pid"] == os.getpid()
     assert {"pid", "hostname", "run_id", "started_at", "heartbeat_at"} <= payload.keys()
     lock.release()
+
+
+# --- boundary hardening ------------------------------------------------------
+
+
+@pytest.mark.parametrize("bad", ["abc\n", "abc\r", "abc\n\n", "ok-id\n"])
+def test_validate_id_rejects_trailing_whitespace_and_newlines(bad: str) -> None:
+    """Python's `$` also matches before a trailing newline, so `re.match` accepted
+    `"abc\\n"` — while the pydantic field built from the same pattern rejected it. Ids
+    from here reach the run lock, on-disk filenames, and the canary token body."""
+    with pytest.raises(VaultBoundaryError):
+        validate_id(bad, kind="matter_id")
+
+
+def test_safe_vault_path_rejects_a_nul_byte_as_a_boundary_error(tmp_path: Path) -> None:
+    """`realpath` raises ValueError on a NUL, which the web tier would surface as a 500
+    instead of the typed 400 it maps `VaultBoundaryError` to."""
+    with pytest.raises(VaultBoundaryError):
+        safe_vault_path(tmp_path, "runs", "a\0b")
+
+
+@pytest.mark.parametrize(
+    "dirname",
+    [
+        "OneDrive",  # named in the non-negotiable rule, previously undetected
+        "OneDrive - Riehl Law",  # the business-tenant shape
+        "GoogleDrive-attorney@example.com",  # modern macOS ~/Library/CloudStorage mount
+        "dropbox",  # casing is not a bypass
+    ],
+)
+def test_detect_sync_folder_covers_onedrive_and_scoped_mounts(
+    tmp_path: Path, dirname: str
+) -> None:
+    vault = tmp_path / dirname / "matters" / "m1"
+    vault.mkdir(parents=True)
+    assert detect_sync_folder(vault) is not None
+
+
+def test_create_vault_refuses_a_location_inside_a_git_repo(tmp_path: Path) -> None:
+    """The preflight used to live only in `init_vault`, so every other creation path
+    (notably `MatterRegistry.create`) skipped the non-negotiable repo-boundary rule."""
+    (tmp_path / ".git").mkdir()
+    (tmp_path / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+    matter = make_matter("m1")
+    with pytest.raises(VaultBoundaryError, match="repo"):
+        create_vault(tmp_path / "vault", matter, registry_path=tmp_path / "c.json")
+
+
+def test_create_vault_refuses_a_sync_folder(tmp_path: Path) -> None:
+    dest = tmp_path / "OneDrive" / "matters" / "m1"
+    dest.parent.mkdir(parents=True)
+    matter = make_matter("m1")
+    with pytest.raises(VaultBoundaryError, match="sync"):
+        create_vault(dest, matter, registry_path=tmp_path / "c.json")
+    # The documented override still works.
+    create_vault(
+        dest, matter, registry_path=tmp_path / "c.json", allow_sync_folder=True
+    )
+    assert (dest / MATTER_YAML).is_file()
