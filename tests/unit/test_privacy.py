@@ -123,3 +123,62 @@ def test_clean_repo_no_findings(tmp_path: Path) -> None:
 
     findings = privacy_grep(repo, registry_path=tmp_path / "empty.json")
     assert findings == []
+
+
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "naïve.txt",  # accented latin — routine in a legal corpus
+        "Müller Decl.txt",
+        "smart’quote.txt",
+        "訴状.txt",  # CJK
+    ],
+)
+def test_canary_is_found_in_a_file_git_would_quote(tmp_path: Path, filename: str) -> None:
+    """`git ls-files` C-quotes non-ASCII paths under the default `core.quotePath`, and
+    the quoted literal names no real file — so these leaks were skipped as if they were
+    staged deletions. Fail-open in the only pre-commit leak blocker."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git_init(repo)
+    registry = tmp_path / "canaries.json"
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    token = seed_canary(vault, "leaky-matter", registry_path=registry)
+    (repo / filename).write_text(f"privileged excerpt {token}", encoding="utf-8")
+    _git_add(repo, "-A")
+
+    findings = privacy_grep(repo, registry_path=registry)
+    assert any(f.kind == "canary" and f.path == filename for f in findings), findings
+
+
+def test_staged_non_ascii_path_is_scanned_too(tmp_path: Path) -> None:
+    """The staged list (`diff --cached --name-only`) quotes identically."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git_init(repo)
+    registry = tmp_path / "canaries.json"
+    registry.write_text('{"canaries": {}, "denylist": ["SuperSecretParty"]}')
+    (repo / "Peña Decl.txt").write_text("re: SuperSecretParty v. Others", encoding="utf-8")
+    _git_add(repo, "-A")
+
+    findings = privacy_grep(repo, registry_path=registry)
+    assert any(f.kind == "denylist" for f in findings), findings
+
+
+def test_unstattable_entry_is_unscannable_not_skipped(tmp_path: Path) -> None:
+    """An entry the process cannot stat is a finding, not a silent pass — `exists()`
+    swallows every OSError, so an unsearchable parent read as "staged deletion"."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git_init(repo)
+    sub = repo / "sealed"
+    sub.mkdir()
+    (sub / "exhibit.txt").write_text("privileged", encoding="utf-8")
+    _git_add(repo, "-A")
+    sub.chmod(0o000)
+    try:
+        findings = privacy_grep(repo, registry_path=tmp_path / "empty.json")
+    finally:
+        sub.chmod(0o755)
+    assert any(f.kind == "unscannable" for f in findings), findings
