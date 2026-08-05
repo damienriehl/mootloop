@@ -9,6 +9,16 @@ bodies are additionally written write-once to ``runs/<run-id>/turns/<turn-id>.js
 file back to the last complete line and warns, never crashing. A corrupt line that
 is not the final one is a hard error — that is real corruption, not a torn write.
 
+It also reads INCREMENTALLY. A turn folds the journal about ten times, so parsing
+the whole file every call made a run quadratic in its own length: doubling the turns
+quadrupled the bytes re-validated. The cache below keeps the parsed prefix of a
+journal and re-reads only the bytes appended since, which is sound precisely because
+the file is append-only. Soundness is not assumed, though — the cached prefix is
+re-verified against the file's bytes on every call (`_prefix_intact`), so a shorter
+file, a rewritten one, or another process's torn-tail truncation all fall back to a
+full parse. Every event still comes from the file, and the fold is still the pure
+replay of every event; nothing about the audit chain is taken on trust.
+
 `tail_events` is the read-only incremental reader (plan FE-1): it returns the events
 appended since a byte offset and NEVER truncates. It tolerates a torn final line by
 leaving it in place for the writer (advancing the offset only past complete,
@@ -20,7 +30,10 @@ from __future__ import annotations
 
 import logging
 import os
+from collections import OrderedDict
+from dataclasses import dataclass
 from pathlib import Path
+from typing import BinaryIO
 
 from pydantic import TypeAdapter, ValidationError
 
@@ -85,37 +98,113 @@ def write_turn_body(vault_root: Path | str, run_id: str, record: TurnRecord) -> 
     return path
 
 
-# --- read (torn-line tolerant) ----------------------------------------------
+# --- read (torn-line tolerant, incremental) ---------------------------------
+
+# Bytes of the parsed prefix kept to prove the file still starts with what we parsed.
+# It sits at the prefix's END, where an append-only file's last write landed, so any
+# rewrite of the region we skip re-reading has to reproduce these bytes exactly.
+_ANCHOR_BYTES = 64
+# Journals held in the cache. A process drives one run at a time; a handful covers
+# export/audit paths that interleave runs without pinning many event lists in memory.
+_MAX_CACHED = 4
+
+
+@dataclass
+class _ParsedPrefix:
+    """The parsed, newline-terminated prefix of one journal file."""
+
+    offset: int  # bytes consumed: complete lines only, never a trailing partial one
+    events: list[JournalEvent]
+    anchor: bytes  # the last <= _ANCHOR_BYTES bytes ending at `offset`
+
+
+_CACHE: OrderedDict[str, _ParsedPrefix] = OrderedDict()
+
+
+def clear_cache() -> None:
+    """Drop every cached prefix, forcing the next read to parse from byte zero."""
+    _CACHE.clear()
+
+
+def _store(key: str, prefix: _ParsedPrefix) -> None:
+    _CACHE[key] = prefix
+    _CACHE.move_to_end(key)
+    while len(_CACHE) > _MAX_CACHED:
+        _CACHE.popitem(last=False)
+
+
+def _prefix_intact(handle: BinaryIO, prefix: _ParsedPrefix) -> bool:
+    """True when the file still begins with the bytes we parsed into ``prefix``.
+
+    Checks the length (a shorter file means a truncated torn tail, or a rewrite) and
+    the anchor bytes at the prefix's end. Anything else and the caller reparses from
+    zero — the cache is an optimization that must never decide what the log says.
+    """
+    if prefix.offset == 0:
+        return True
+    if not prefix.anchor:
+        return False
+    if handle.seek(0, os.SEEK_END) < prefix.offset:
+        return False
+    handle.seek(prefix.offset - len(prefix.anchor))
+    return handle.read(len(prefix.anchor)) == prefix.anchor
 
 
 def read_events(vault_root: Path | str, run_id: str) -> list[JournalEvent]:
-    """Read every event, tolerating a torn final line by truncating it away."""
+    """Read every event, tolerating a torn final line by truncating it away.
+
+    Lines are split on ``\\n`` — the byte the writer actually appends — so a record
+    carrying a raw U+2028/U+2029 or form feed stays one line, as `tail_events` has
+    always treated it.
+    """
     path = journal_path(vault_root, run_id)
+    key = str(path)
     if not path.is_file():
+        _CACHE.pop(key, None)
         return []
-    raw = path.read_text(encoding="utf-8")
-    lines = raw.splitlines(keepends=True)
-    events: list[JournalEvent] = []
-    good_bytes = 0
-    for idx, line in enumerate(lines):
+
+    with path.open("rb") as handle:
+        cached = _CACHE.get(key)
+        if cached is not None and not _prefix_intact(handle, cached):
+            cached = None
+        start = cached.offset if cached is not None else 0
+        events: list[JournalEvent] = list(cached.events) if cached is not None else []
+        handle.seek(start)
+        chunk = handle.read()
+
+    # An empty chunk (nothing appended, or an empty file) falls through: the loop does
+    # not run, and the store below re-seats the unchanged prefix and keeps it hot.
+    consumed = 0  # bytes of complete lines parsed out of `chunk`
+    cacheable = len(events)  # events at `start + consumed`
+    pos = 0
+    while pos < len(chunk):
+        newline = chunk.find(b"\n", pos)
+        line = chunk[pos:] if newline == -1 else chunk[pos : newline + 1]
         stripped = line.strip()
-        if not stripped:
-            good_bytes += len(line.encode("utf-8"))
-            continue
-        try:
-            events.append(_EVENT_ADAPTER.validate_json(stripped))
-        except ValidationError:
-            is_last = idx == len(lines) - 1
-            if is_last:
+        if stripped:
+            try:
+                events.append(_EVENT_ADAPTER.validate_json(stripped))
+            except ValidationError:
+                if newline != -1 and newline + 1 != len(chunk):
+                    raise  # a bad line with good lines after it is real corruption
                 logger.warning(
                     "journal %s: torn final line dropped (%d valid events kept)",
                     run_id,
                     len(events),
                 )
-                _truncate(path, good_bytes)
+                _truncate(path, start + consumed)
                 break
-            raise
-        good_bytes += len(line.encode("utf-8"))
+        if newline == -1:
+            # A final line with no newline that nonetheless parsed. Return it, but
+            # leave it out of the cached prefix: only a newline proves the writer
+            # finished with it, and the cache must never freeze a half-written line.
+            break
+        pos = newline + 1
+        consumed = pos
+        cacheable = len(events)
+
+    tail = ((cached.anchor if cached is not None else b"") + chunk[:consumed])[-_ANCHOR_BYTES:]
+    _store(key, _ParsedPrefix(start + consumed, events[:cacheable], tail))
     return events
 
 

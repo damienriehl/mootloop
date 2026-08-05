@@ -8,8 +8,13 @@ from __future__ import annotations
 import multiprocessing as mp
 from pathlib import Path
 
+import pytest
+
+from mootloop import journal
 from mootloop.journal import (
+    _EVENT_ADAPTER,
     append,
+    clear_cache,
     fold,
     journal_path,
     read_events,
@@ -317,3 +322,116 @@ def test_fold_carries_discard_detail_for_retry_feedback(tmp_path: Path) -> None:
         "rulings.0.verdict: Extra inputs are not permitted"
     )
     assert f"{RUN}-t0002" not in state.discard_details
+
+
+# --- incremental reads (the quadratic re-fold) ------------------------------
+
+
+class _CountingAdapter:
+    """Wraps the event TypeAdapter to count the bytes actually re-validated."""
+
+    def __init__(self) -> None:
+        self.bytes = 0
+
+    def validate_json(self, data: bytes | str):  # type: ignore[no-untyped-def]
+        self.bytes += len(data)
+        return _EVENT_ADAPTER.validate_json(data)
+
+    def dump_json(self, obj: object) -> bytes:
+        return _EVENT_ADAPTER.dump_json(obj)  # type: ignore[arg-type]
+
+
+def _parsed_bytes(monkeypatch: pytest.MonkeyPatch) -> _CountingAdapter:
+    counter = _CountingAdapter()
+    monkeypatch.setattr(journal, "_EVENT_ADAPTER", counter)
+    return counter
+
+
+def test_repeated_reads_parse_only_the_appended_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A turn folds the journal ~10 times; re-parsing it whole each time is quadratic.
+
+    Doubling the run's length quadrupled the bytes re-validated, which is a scaling
+    defect for exactly the long drains this tool is for.
+    """
+    clear_cache()
+    append(tmp_path, RUN, _started())
+    for i in range(20):
+        append(tmp_path, RUN, TurnCompleted(record=_turn_record(f"{RUN}-t{i:04d}")))
+    size = journal_path(tmp_path, RUN).stat().st_size
+
+    read_events(tmp_path, RUN)  # prime: this one legitimately parses everything
+    counter = _parsed_bytes(monkeypatch)
+    for _ in range(10):
+        events = read_events(tmp_path, RUN)
+    assert len(events) == 21  # same answer as a full parse
+    assert counter.bytes == 0  # ...for none of the bytes re-read
+
+    # One more event: only THAT line is parsed, not the 21 before it.
+    append(tmp_path, RUN, RunFinished(status="finished"))
+    events = read_events(tmp_path, RUN)
+    assert len(events) == 22
+    assert counter.bytes < size / 10
+
+
+def test_cached_prefix_is_reverified_against_the_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The cache may never answer for bytes the file no longer has.
+
+    Another process truncating a torn tail, or any rewrite, has to force a full
+    reparse — the journal is the audit record, and a stale prefix would let a run
+    fold from events that are no longer on disk.
+    """
+    clear_cache()
+    append(tmp_path, RUN, _started())
+    append(tmp_path, RUN, TurnCompleted(record=_turn_record(f"{RUN}-t0000")))
+    assert len(read_events(tmp_path, RUN)) == 2  # prime the cache
+
+    # Rewrite the file behind our back with a DIFFERENT, longer history.
+    path = journal_path(tmp_path, RUN)
+    path.unlink()
+    append(tmp_path, RUN, _started())
+    append(tmp_path, RUN, RunPaused(reason="manual"))
+    append(tmp_path, RUN, RunResumed())
+
+    events = read_events(tmp_path, RUN)
+    assert [type(e) for e in events] == [RunStarted, RunPaused, RunResumed]
+
+
+def test_cache_survives_a_torn_tail_truncation(tmp_path: Path) -> None:
+    """The torn-tail path must leave the cache consistent with the truncated file."""
+    clear_cache()
+    append(tmp_path, RUN, _started())
+    assert len(read_events(tmp_path, RUN)) == 1  # prime the cache
+    path = journal_path(tmp_path, RUN)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write('{"kind": "turn_completed", "record": {"spec"')
+
+    assert len(read_events(tmp_path, RUN)) == 1  # torn line dropped + truncated
+    append(tmp_path, RUN, RunFinished(status="finished"))
+    events = read_events(tmp_path, RUN)
+    assert [type(e) for e in events] == [RunStarted, RunFinished]
+
+
+def test_unterminated_final_line_is_returned_but_never_cached(tmp_path: Path) -> None:
+    """A parseable line with no trailing newline is not proof the writer finished it.
+
+    It is returned (that is the historical behavior) but kept out of the cached
+    prefix, so the completed line the writer eventually lands is not shadowed by the
+    partial one we happened to read first.
+    """
+    clear_cache()
+    append(tmp_path, RUN, _started())
+    path = journal_path(tmp_path, RUN)
+    line = _EVENT_ADAPTER.dump_json(RunPaused(reason="manual")).decode("utf-8")
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(line)  # complete JSON, no newline yet
+
+    assert [type(e) for e in read_events(tmp_path, RUN)] == [RunStarted, RunPaused]
+    # The writer finishes the line and appends the next event.
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write("\n")
+    append(tmp_path, RUN, RunResumed())
+    assert [type(e) for e in read_events(tmp_path, RUN)] == [RunStarted, RunPaused, RunResumed]
