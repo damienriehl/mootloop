@@ -15,7 +15,12 @@ from mootloop.citations import courtlistener, mn_revisor
 from mootloop.citations.extract import extract_citations
 from mootloop.citations.http import HttpRequest, fetch
 from mootloop.citations.ledger import ResearchQueue
-from mootloop.citations.ratelimit import TokenBucket
+from mootloop.citations.ratelimit import (
+    CL_CAPACITY,
+    TokenBucket,
+    default_limiter,
+    reset_default_limiter,
+)
 from mootloop.citations.verify import (
     CITATOR_DISCLOSURE,
     citation_gate,
@@ -352,3 +357,20 @@ def test_token_bucket_sleeps_only_when_empty() -> None:
     assert slept == []  # first two are free
     bucket.acquire()
     assert slept and slept[0] == pytest.approx(1.0)  # third waits one refill
+
+
+def test_default_limiter_is_one_shared_process_wide_bucket() -> None:
+    """The documented 60/min budget is only real if every caller draws on ONE bucket.
+
+    A fresh bucket per call meant N concurrent verifications could issue 60N
+    requests a minute at CourtListener while each looked compliant.
+    """
+    reset_default_limiter()
+    try:
+        first = default_limiter()
+        assert default_limiter() is first  # same instance, not a look-alike
+        first.acquire(CL_CAPACITY)  # drain the whole minute's budget
+        # A caller that asks for "the" limiter now inherits the drained budget.
+        assert default_limiter().tokens < 1.0
+    finally:
+        reset_default_limiter()
