@@ -5,7 +5,9 @@ record shapes written one-per-line.
 A `Fact` with empty ``provenance`` is unsupported and should be flagged downstream.
 ``version`` starts at 1 and increments on revision; ``superseded_by`` names the
 fact that replaced this one (set on the predecessor's *re-emitted* line, never by
-mutating the original — the fold resolves it).
+mutating the original — the fold resolves it). ``supersedes`` is the same edge
+written the other way, on the successor, so ONE durable line carries the whole
+transition and a crash between the two appends cannot leave it ambiguous.
 """
 
 from __future__ import annotations
@@ -30,6 +32,10 @@ class Fact(VersionedModel):
 
     ``provenance`` may be empty (unsupported → flagged). ``confidence`` is in
     ``[0, 1]``. Each `RESPONSE_ITEM` pins the fact ``version`` it grounded on.
+
+    ``supersedes`` names the predecessor this version replaces. It is optional so
+    every record written before it existed still validates; ``None`` on a v1 fact
+    is the normal case, not a missing value.
     """
 
     schema_version: str = SCHEMA_VERSION
@@ -39,3 +45,4 @@ class Fact(VersionedModel):
     confidence: float = Field(ge=0.0, le=1.0)
     version: int = Field(ge=1)
     superseded_by: str | None = None
+    supersedes: str | None = None

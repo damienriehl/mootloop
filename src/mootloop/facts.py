@@ -6,6 +6,12 @@ predecessor with ``superseded_by`` set; `fold` (a pure function) replays the log
 last-line-per-id winning, so the current view reflects both without any in-place
 edit. Each distinct version carries its own content-derived ``fact_id``, so every
 version stays independently retrievable.
+
+The successor also carries ``supersedes`` (the predecessor's id), and `fold`
+derives the supersession from it when the re-emitted predecessor line is missing.
+That makes the revision atomic at the FIRST append: a crash before the second one
+leaves a log the fold still reads unambiguously, rather than two records that both
+look current.
 """
 
 from __future__ import annotations
@@ -35,10 +41,23 @@ def fold(records: list[Fact]) -> dict[str, Fact]:
     Pure and total: unit-testable resume with no I/O. A re-emitted predecessor
     shares its ``fact_id`` with the original line, so its ``superseded_by`` update
     lands here without mutating the earlier record.
+
+    Second pass: a successor's ``supersedes`` back-pointer closes the transition
+    even when the predecessor's re-emitted line never landed (a crash between the
+    two appends). The derivation is view-only — it fills ``superseded_by`` on the
+    FOLDED copy and never rewrites the log — and it defers to an explicit
+    ``superseded_by`` already on the record, so history stays authoritative.
+    First successor wins, so a duplicated revision cannot flip a settled edge.
     """
     state: dict[str, Fact] = {}
     for record in records:
         state[record.fact_id] = record
+    for record in records:
+        predecessor = state.get(record.supersedes) if record.supersedes else None
+        if predecessor is not None and predecessor.superseded_by is None:
+            state[predecessor.fact_id] = predecessor.model_copy(
+                update={"superseded_by": record.fact_id}
+            )
     return state
 
 
@@ -112,7 +131,16 @@ class FactStore:
         provenance: list[Provenance] | None = None,
         confidence: float,
     ) -> Fact:
-        """Append a new version and mark the predecessor superseded (append-only)."""
+        """Append a new version and mark the predecessor superseded (append-only).
+
+        The successor line carries ``supersedes``, so the revision is complete — and
+        readable as complete — the moment that first line is fsync'd. The re-emitted
+        predecessor that follows records the same edge from the other side; it is
+        what keeps a raw ``grep`` of the log honest, and is no longer what the fold
+        depends on. Crashing between the two appends can no longer leave two records
+        that both read as current, which for a fact log behind a court filing means
+        two contradictory versions of the same assertion, both citable.
+        """
         current = fold(self._records())
         predecessor = current.get(predecessor_id)
         if predecessor is None:
@@ -130,6 +158,7 @@ class FactStore:
             confidence=confidence,
             version=version,
             superseded_by=None,
+            supersedes=predecessor.fact_id,
         )
         self._append(successor)
         # Re-emit the predecessor (same fact_id) carrying the supersession pointer.

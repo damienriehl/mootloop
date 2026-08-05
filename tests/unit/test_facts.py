@@ -93,6 +93,47 @@ def test_revise_already_superseded_raises(tmp_path: Path) -> None:
         store.revise_fact(v1.fact_id, "C.", confidence=0.5)
 
 
+def test_revise_survives_a_crash_between_the_two_appends(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A revision is two appends; a crash between them must not leave two currents.
+
+    Without the successor's ``supersedes`` back-pointer, the predecessor's re-emitted
+    line is the ONLY record of the transition — so losing it left both versions
+    reading as current, i.e. two contradictory statements of the same fact, each one
+    citable by a draft.
+    """
+    vault = _vault(tmp_path)
+    store = FactStore(vault)
+    v1 = store.add_fact("The fence was installed in 2003.", provenance=[_prov()], confidence=0.7)
+
+    real_append = FactStore._append
+    appends = {"n": 0}
+
+    def crashing_append(self: FactStore, fact: Fact) -> None:
+        appends["n"] += 1
+        if appends["n"] == 2:  # the predecessor re-emission never lands
+            raise OSError("power loss between the two appends")
+        real_append(self, fact)
+
+    monkeypatch.setattr(FactStore, "_append", crashing_append)
+    with pytest.raises(OSError):
+        store.revise_fact(
+            v1.fact_id, "The fence was installed in 2004.", provenance=[_prov()], confidence=0.9
+        )
+    monkeypatch.undo()
+
+    # Re-open: exactly one current version, and it is the revision.
+    reopened = FactStore(vault)
+    assert [f.statement for f in reopened.get_current()] == ["The fence was installed in 2004."]
+    pred = reopened.get(v1.fact_id)
+    assert pred is not None and pred.superseded_by is not None
+    # And the store is not wedged: the half-written revision is settled, so a second
+    # revision of the predecessor is correctly refused rather than silently allowed.
+    with pytest.raises(FactError):
+        reopened.revise_fact(v1.fact_id, "The fence was installed in 2005.", confidence=0.9)
+
+
 def test_fold_is_pure_last_write_wins() -> None:
     a1 = Fact(fact_id=DocId("fact-a"), statement="a", confidence=0.5, version=1)  # type: ignore[arg-type]
     a2 = Fact(  # re-emission of same id with supersession pointer
