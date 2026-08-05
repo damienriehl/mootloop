@@ -276,7 +276,13 @@ def record_turn(
     with RunLock(vault_root, run_id):
         state = load_state(vault_root, run_id)
         if turn_id in state.completed_turns:
-            return state.completed_turns[turn_id]  # idempotent
+            record = state.completed_turns[turn_id]
+            # Idempotent for the RECORD, never for the money: this call reached a
+            # provider and burned tokens even though the slot was already filled (a
+            # lost lease, a re-drained queue item). Booking is suppressed only for an
+            # exact replay of a result already on the ledger — see `_book_spend`.
+            _book_spend(vault_root, run_id, turn_id, usage, record.spec.model, now, dedupe=True)
+            return record
         units = load_request_units(vault_root)
         facts = _load_facts(vault_root)
         specs = _plan(run_id, state, binding, units, facts, max_attempts, _tier_models(vault_root))
@@ -284,6 +290,60 @@ def record_turn(
         return _record_spec(
             vault_root, run_id, spec, raw_text, usage, now, binding, units, state, max_attempts
         )
+
+
+def _book_spend(
+    vault_root: Path | str,
+    run_id: str,
+    turn_id: str,
+    usage: TokenUsage | None,
+    model: str | None,
+    now: str,
+    *,
+    dedupe: bool = False,
+) -> None:
+    """Append the ``SpendRecorded`` for one provider call.
+
+    ``model`` is the model the run PLANNED (``spec.model``) — the identity
+    ``TurnIntent.max_plausible_usd`` reserved against — so the write-ahead reservation
+    and its settlement can never be priced off two different keys; ``usage.model``
+    still records what the provider reported.
+
+    ``dedupe`` guards the one path that can be reached without a fresh provider call:
+    re-recording an already-completed turn. A byte-identical usage tuple already on
+    this turn's ledger is a replay of the same money, so it is skipped; anything else
+    is a distinct call that really was paid for.
+    """
+    if usage is None:
+        return
+    if dedupe:
+        prior = (
+            (e.input_tokens, e.cache_read, e.cache_write, e.output_tokens, e.model)
+            for e in read_events(vault_root, run_id)
+            if isinstance(e, SpendRecorded) and e.turn_id == turn_id
+        )
+        signature = (
+            usage.input_tokens,
+            usage.cache_read,
+            usage.cache_write,
+            usage.output_tokens,
+            usage.model,
+        )
+        if signature in prior:
+            return
+    append(
+        vault_root,
+        run_id,
+        SpendRecorded(
+            turn_id=turn_id,
+            input_tokens=usage.input_tokens,
+            cache_read=usage.cache_read,
+            cache_write=usage.cache_write,
+            output_tokens=usage.output_tokens,
+            model=usage.model,
+            usd_equiv=budget.cost_of(usage, model or usage.model, _date_of(now)),
+        ),
+    )
 
 
 def _record_spec(
@@ -311,6 +371,8 @@ def _record_spec(
             spec,
             f"schema-invalid: {exc.error_count()} error(s)",
             max_attempts,
+            usage=usage,
+            now=now,
             detail=f"your previous output failed `{spec.output_schema_name}` validation — {detail}",
         )
 
@@ -325,6 +387,8 @@ def _record_spec(
             spec,
             f"degenerate: {reasons}",
             max_attempts,
+            usage=usage,
+            now=now,
             detail=f"your previous output was discarded by the degeneracy gate — {detail}",
         )
 
@@ -354,24 +418,7 @@ def _record_spec(
     # Attorney-gate decisions (plan P-28): every draft/bolster turn may imply gates.
     if isinstance(output, DraftOutput):
         decisions.derive_and_store(vault_root, run_id, spec, output, units)
-    if usage is not None:
-        append(
-            vault_root,
-            run_id,
-            SpendRecorded(
-                turn_id=spec.turn_id,
-                input_tokens=usage.input_tokens,
-                cache_read=usage.cache_read,
-                cache_write=usage.cache_write,
-                output_tokens=usage.output_tokens,
-                model=usage.model,
-                # Meter against the model the run PLANNED (and, via `--model`, asked
-                # for) — the same identity `TurnIntent.max_plausible_usd` reserved
-                # against, so the write-ahead reservation and its settlement can never
-                # be priced off two different keys.
-                usd_equiv=budget.cost_of(usage, spec.model or usage.model, _date_of(now)),
-            ),
-        )
+    _book_spend(vault_root, run_id, spec.turn_id, usage, spec.model, now)
 
     # Final rubric gate: aggregate the decorrelated panel once the last seat lands.
     _maybe_emit_rubric_gate(vault_root, run_id, spec, binding, units)
@@ -527,8 +574,15 @@ def _discard(
     reason: str,
     max_attempts: int,
     *,
+    usage: TokenUsage | None = None,
+    now: str,
     detail: str = "",
 ) -> DiscardedTurn:
+    # A discarded turn is thrown away, but it was not free: the provider ran and
+    # billed for it. Book it BEFORE the discard so the cap sees the money even on the
+    # attempt that trips `max_attempts`, and so the turn's write-ahead `TurnIntent`
+    # reservation is reconciled by a real settlement instead of lingering as pending.
+    _book_spend(vault_root, run_id, spec.turn_id, usage, spec.model, now)
     state = load_state(vault_root, run_id)
     attempt = state.discarded.get(spec.turn_id, 0) + 1
     append(
