@@ -83,3 +83,43 @@ def test_candidate_citations_yield_pending() -> None:
     result = check(draft, [_fact()], CORPUS)
     assert result.status == "pending"
     assert any(f.code == "citations_pending" for f in result.findings)
+
+
+# --- objection text is served, so it needs provenance too ---------------------
+
+
+def test_unsupported_amount_in_an_objection_fails() -> None:
+    """`export/master.py::_objection_lines` writes objection text into the filed
+    document; scanning only ``response_text`` left a fabrication route to the court."""
+    draft = _draft(
+        response_text="See the objections below.",
+        objections=[{"basis": "relevance", "text": "Overbroad as to the $999,999 payment."}],
+    )
+    result = check(draft, [_fact()], CORPUS)
+    assert result.status == "fail"
+    assert any(f.code == "unsupported_amount" for f in result.findings)
+    assert any(f.locator == "objections[0].text" for f in result.findings)
+
+
+def test_unsupported_date_and_quote_in_an_objection_fail() -> None:
+    draft = _draft(
+        response_text="See the objections below.",
+        objections=[
+            {
+                "basis": "relevance",
+                "text": 'Irrelevant to July 4, 2021 and to "the parties never met at all".',
+            }
+        ],
+    )
+    result = check(draft, [_fact()], CORPUS)
+    assert result.status == "fail"
+    codes = {f.code for f in result.findings}
+    assert {"unsupported_date", "unsupported_quote"} <= codes
+
+
+def test_supported_amount_in_an_objection_still_passes() -> None:
+    draft = _draft(
+        response_text="See the objections below.",
+        objections=[{"basis": "relevance", "text": "Overbroad as to the $148,500 payment."}],
+    )
+    assert check(draft, [_fact()], CORPUS).status == "pass"

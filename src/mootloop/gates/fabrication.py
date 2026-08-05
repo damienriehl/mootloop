@@ -44,6 +44,20 @@ def _no_space(text: str) -> str:
     return re.sub(r"\s+", "", text)
 
 
+def _served_text(draft: DraftOutput) -> list[tuple[str, str]]:
+    """Every (locator, text) span of a draft that is rendered into the served document.
+
+    Objection text is not commentary: `export/master.py::_objection_lines` writes each
+    ``OBJECTION (basis): text`` straight into the master and thus the filed DOCX. An
+    amount, date, or quotation asserted there needs provenance exactly as much as one in
+    ``response_text`` — checking only ``response_text`` left a fabrication route that
+    reached the court through a field no gate read.
+    """
+    return [("response_text", draft.response_text)] + [
+        (f"objections[{idx}].text", obj.text) for idx, obj in enumerate(draft.objections)
+    ]
+
+
 def build_corpus_text(vault_root: Path | str) -> str:
     """Concatenate every normalized corpus document's text (fabrication provenance)."""
     manifest = Manifest.load(vault_root)
@@ -88,36 +102,36 @@ def check(draft: DraftOutput, facts: list[Fact], corpus_text: str) -> GateResult
     supported = _squash(" ".join(supported_parts))
     supported_nospace = _no_space(supported)
 
-    response = draft.response_text
-    for amount in _MONEY_RE.findall(response):
-        if _no_space(amount) not in supported_nospace:
-            findings.append(
-                GateFinding(
-                    code="unsupported_amount",
-                    message=f"dollar amount {amount.strip()!r} traces to no cited fact/corpus",
-                    locator="response_text",
+    for locator, text in _served_text(draft):
+        for amount in _MONEY_RE.findall(text):
+            if _no_space(amount) not in supported_nospace:
+                findings.append(
+                    GateFinding(
+                        code="unsupported_amount",
+                        message=f"dollar amount {amount.strip()!r} traces to no cited fact/corpus",
+                        locator=locator,
+                    )
                 )
-            )
-    for match in _DATE_RE.finditer(response):
-        date = _squash(match.group(0))
-        if _no_space(date) not in supported_nospace:
-            findings.append(
-                GateFinding(
-                    code="unsupported_date",
-                    message=f"date {date!r} traces to no cited fact or corpus text",
-                    locator="response_text",
+        for match in _DATE_RE.finditer(text):
+            date = _squash(match.group(0))
+            if _no_space(date) not in supported_nospace:
+                findings.append(
+                    GateFinding(
+                        code="unsupported_date",
+                        message=f"date {date!r} traces to no cited fact or corpus text",
+                        locator=locator,
+                    )
                 )
-            )
-    for match in _QUOTE_RE.finditer(response):
-        span = _squash(match.group(1))
-        if _no_space(span) not in supported_nospace:
-            findings.append(
-                GateFinding(
-                    code="unsupported_quote",
-                    message=f"quoted span {span!r} appears in no cited fact or corpus text",
-                    locator="response_text",
+        for match in _QUOTE_RE.finditer(text):
+            span = _squash(match.group(1))
+            if _no_space(span) not in supported_nospace:
+                findings.append(
+                    GateFinding(
+                        code="unsupported_quote",
+                        message=f"quoted span {span!r} appears in no cited fact or corpus text",
+                        locator=locator,
+                    )
                 )
-            )
 
     if findings:
         return GateFail(gate=GATE_NAME, findings=findings)

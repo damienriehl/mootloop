@@ -11,6 +11,7 @@ Returns a `GateResult`; it never raises for a mere failure.
 
 from __future__ import annotations
 
+from mootloop.gates import HEDGE_DESCRIPTION, has_hedge
 from mootloop.models.gates import GateFail, GateFinding, GatePass, GateResult
 from mootloop.models.run import CritiqueOutput, DraftOutput, JudgeOutput, RubricScoreOutput
 
@@ -18,10 +19,6 @@ GATE_NAME = "degeneracy"
 
 # Case-insensitive markers that betray an unfinished draft.
 _PLACEHOLDERS: tuple[str, ...] = ("[todo", "[insert", "lorem")
-
-# The condemned "subject to and without waiving" hedge (Liguria Foods; plan D7) —
-# answering while reserving objections is a deterministic failure, never served.
-_HEDGE = "subject to and without waiving"
 
 
 def _placeholder_findings(text: str, locator: str) -> list[GateFinding]:
@@ -49,11 +46,11 @@ def _check_draft(draft: DraftOutput) -> list[GateFinding]:
     findings.extend(_placeholder_findings(draft.response_text, "response_text"))
     for idx, objection in enumerate(draft.objections):
         findings.extend(_placeholder_findings(objection.text, f"objections[{idx}].text"))
-    if _HEDGE in draft.response_text.lower():
+    if has_hedge(draft.response_text, *(o.text for o in draft.objections)):
         findings.append(
             GateFinding(
                 code="hedge_subject_to",
-                message='response hedges "subject to and without waiving" (Liguria Foods)',
+                message=f"response hedges {HEDGE_DESCRIPTION}",
                 locator="response_text",
             )
         )
