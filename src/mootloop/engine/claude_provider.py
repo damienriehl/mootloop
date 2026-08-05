@@ -14,6 +14,9 @@ Every escape hatch is closed by construction:
   ``deny``-beats-``allow`` turns into a total filesystem blackout (see
   `_outside_vault_read_deny`) — and denies the secrets file outright. Every rule path is
   anchored at the filesystem root with a DOUBLE leading slash (see `_abs`).
+- A turn whose tools were refused is FAILED, not returned: the CLI exits 0 with a
+  terminal ``is_error: false`` even then, so the per-tool ``is_error`` in the
+  ``stream-json`` output is the only honest signal (see `_permission_denial`).
 - An optional ``egress_wrapper`` (e.g. a ``bwrap`` network jail) is PREPENDED to argv;
   the jail itself is deployment config, but the seam and the prepend live here.
 
@@ -28,7 +31,7 @@ from __future__ import annotations
 import json
 import os
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -97,6 +100,97 @@ def _load_api_key() -> str | None:
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+# Markers of a sandbox refusal, matched ONLY against tool results the CLI itself flagged
+# `is_error: true` — never against persona prose. That distinction is the whole design:
+# a filing about a discovery dispute may well contain "denied", and a persona paraphrasing
+# its own refusal ("I don't have permission to…") is a symptom, not the signal. These two
+# strings are the CLI's own verbatim wording for a blocked path.
+_DENIAL_MARKERS: tuple[str, ...] = (
+    "denied by your permission settings",
+    "permission to read",
+)
+
+
+def _json_events(stdout: str) -> list[dict[str, Any]]:
+    """Parse ``stream-json`` output into its event objects.
+
+    Tolerates a single whole-document JSON object too, so a caller (or a test double)
+    emitting ``--output-format json`` still parses."""
+    events: list[dict[str, Any]] = []
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict):
+            events.append(obj)
+    if events:
+        return events
+    try:
+        whole = json.loads(stdout)
+    except json.JSONDecodeError:
+        return []
+    return [whole] if isinstance(whole, dict) else []
+
+
+def _final_payload(events: list[dict[str, Any]]) -> dict[str, Any]:
+    """The terminal ``result`` event — the one carrying the reply text and usage."""
+    for event in reversed(events):
+        if event.get("type") == "result":
+            return event
+    return events[-1]
+
+
+def _content_text(content: Any) -> str:
+    """Flatten a tool-result ``content`` (string, or a list of content blocks)."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for block in content:
+            if isinstance(block, str):
+                parts.append(block)
+            elif isinstance(block, dict):
+                text = block.get("text")
+                parts.append(text if isinstance(text, str) else json.dumps(block))
+        return "\n".join(parts)
+    return json.dumps(content)
+
+
+def _iter_error_tool_results(node: Any) -> Iterator[str]:
+    """Yield the text of every ``is_error: true`` tool result anywhere in an event.
+
+    Walks structurally rather than assuming a message shape, so a change to how the CLI
+    nests tool results downgrades this to "found nothing new", never to a parse crash."""
+    if isinstance(node, dict):
+        if node.get("is_error") is True and "content" in node:
+            yield _content_text(node["content"])
+        for value in node.values():
+            yield from _iter_error_tool_results(value)
+    elif isinstance(node, list):
+        for item in node:
+            yield from _iter_error_tool_results(item)
+
+
+def _permission_denial(events: list[dict[str, Any]], payload: dict[str, Any]) -> str | None:
+    """A short, redacted description of the sandbox refusal in this turn, or None."""
+    for event in events:
+        for text in _iter_error_tool_results(event):
+            lowered = text.lower()
+            if any(marker in lowered for marker in _DENIAL_MARKERS):
+                return secrets.redact(" ".join(text.split()))[:200]
+    denials = payload.get("permission_denials")
+    if isinstance(denials, list) and denials:
+        tools = sorted(
+            {d.get("tool_name", "?") for d in denials if isinstance(d, dict)},
+        )
+        return f"the CLI reported permission_denials for {', '.join(str(t) for t in tools)}"
+    return None
 
 
 def _abs(path: Path | str) -> str:
@@ -301,6 +395,11 @@ class HeadlessClaudeProvider:
         """The full argv: ``egress_wrapper`` PREPENDED, then the non-interactive
         ``claude -p`` invocation, with ``--resume`` appended when a session persists.
 
+        ``--output-format stream-json`` (with its required ``--verbose``) is what makes a
+        denied turn detectable: the terminal ``result`` event reports ``is_error: false``
+        even when every tool call was refused, and ``permission_denials`` is empty on some
+        refusals. Only the per-tool ``is_error`` in the stream is reliable.
+
         ``--model`` pins the tier's chosen model. Without it the CLI ran whatever it
         defaults to, which made the whole budget-tier map decorative: a ``low``-tier run
         reserved Haiku dollars against the cap and could burn Opus ones."""
@@ -310,7 +409,8 @@ class HeadlessClaudeProvider:
             "-p",
             prompt,
             "--output-format",
-            "json",
+            "stream-json",
+            "--verbose",
             "--max-turns",
             str(self.max_turns),
             "--permission-mode",
@@ -395,12 +495,26 @@ class HeadlessClaudeProvider:
     # -- result parsing + failure classification --
 
     def _parse_result(self, stdout: str, key: str) -> RawTurnResult:
-        try:
-            payload = json.loads(stdout)
-        except json.JSONDecodeError as exc:
-            raise TurnError("headless turn returned unparseable JSON") from exc
+        events = _json_events(stdout)
+        if not events:
+            raise TurnError("headless turn returned unparseable JSON")
+        payload = _final_payload(events)
         if not isinstance(payload, dict):
             raise TurnError("headless turn JSON was not an object")
+
+        # Fail closed BEFORE the text is treated as work product. A turn whose tools were
+        # refused still exits 0 with a terminal `is_error: false`, so without this check a
+        # persona's apology for not being able to open the vault is returned — and parsed,
+        # scored, and filed — as its answer.
+        denial = _permission_denial(events, payload)
+        if denial is not None:
+            raise TurnError(f"headless turn was denied filesystem access: {denial}")
+        if payload.get("is_error") is True:
+            reported = payload.get("result")
+            detail = secrets.redact(reported).strip()[:500] if isinstance(reported, str) else ""
+            self._classify(detail.lower())
+            raise TurnError(f"headless turn reported an error: {detail}")
+
         text = payload.get("result")
         if not isinstance(text, str):
             raise TurnError("headless turn JSON had no 'result' text")
@@ -433,12 +547,16 @@ class HeadlessClaudeProvider:
         )
 
     @staticmethod
-    def _raise_classified(stdout: str, stderr: str, returncode: int) -> None:
-        haystack = f"{stdout}\n{stderr}".lower()
+    def _classify(haystack: str) -> None:
+        """Raise the specific failure class if ``haystack`` carries its signature."""
         if any(sig in haystack for sig in _SEAT_SIGNATURES):
             raise SeatLimitError("headless Claude hit a seat/rate limit")
         if any(sig in haystack for sig in _AUTH_SIGNATURES):
             raise AuthError("headless Claude authentication failed")
+
+    @classmethod
+    def _raise_classified(cls, stdout: str, stderr: str, returncode: int) -> None:
+        cls._classify(f"{stdout}\n{stderr}".lower())
         raise TurnError(
             f"headless turn failed (exit {returncode}): {secrets.redact(stderr).strip()[:500]}"
         )

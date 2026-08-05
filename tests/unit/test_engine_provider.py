@@ -26,7 +26,7 @@ from mootloop.engine.claude_provider import (
     HeadlessClaudeProvider,
     _unfence,
 )
-from mootloop.errors import AuthError, SeatLimitError
+from mootloop.errors import AuthError, SeatLimitError, TurnError
 from mootloop.models.run import PersonaName, TurnSpec
 
 
@@ -199,8 +199,9 @@ def test_argv_prepends_egress_wrapper_and_has_flags(tmp_path: Path) -> None:
     assert "--settings" in argv and str(settings_path) in argv
     assert "--allowedTools" in argv
     assert "--permission-mode" in argv
-    # --output-format json present as an adjacent pair.
-    assert argv[argv.index("--output-format") + 1] == "json"
+    # stream-json (+ its required --verbose) is what exposes per-tool is_error.
+    assert argv[argv.index("--output-format") + 1] == "stream-json"
+    assert "--verbose" in argv
     tools = argv[argv.index("--allowedTools") + 1]
     assert "Bash" not in tools
 
@@ -288,6 +289,104 @@ def test_unfence_leaves_plain_and_partial_text_alone() -> None:
     # Multiple blocks stay untouched (greedy DOTALL must not merge them).
     two = '```json\n{"a": 1}\n```\nmiddle\n```json\n{"b": 2}\n```'
     assert _unfence(two) == two
+
+
+# --- fail closed when the sandbox refuses a tool -----------------------------
+
+# A denied turn as `claude` 2.1.222 actually reports it: the Read tool result carries
+# `is_error: true` with the CLI's verbatim refusal, and the TERMINAL event still says
+# `is_error: false` and exits 0. The old code returned the apology as the answer.
+_DENIED_STREAM_BODY = r"""
+import json, sys
+for event in [
+    {"type": "system", "subtype": "init", "session_id": "sess-denied"},
+    {"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "Read", "input": {"file_path": "/vault/exhibit-a.txt"}}]}},
+    {"type": "user", "message": {"content": [
+        {"type": "tool_result", "is_error": True,
+         "content": "<tool_use_error>File is in a directory that is denied by your "
+                    "permission settings.</tool_use_error>"}]}},
+    {"type": "result", "is_error": False, "session_id": "sess-denied",
+     "result": "I need permission to read that file. Would you like to grant access?",
+     "usage": {"input_tokens": 9, "output_tokens": 3}},
+]:
+    sys.stdout.write(json.dumps(event) + "\n")
+"""
+
+# The other observed shape: no error-flagged tool result reaches the stream, but the
+# terminal event lists what was refused.
+_DENIALS_FIELD_BODY = r"""
+import json
+print(json.dumps({
+    "type": "result", "is_error": False, "session_id": "s",
+    "result": "GLOB=fail GREP=fail",
+    "permission_denials": [
+        {"tool_name": "Glob", "tool_input": {"pattern": "*.txt"}},
+        {"tool_name": "Grep", "tool_input": {"pattern": "x"}},
+    ],
+    "usage": {"input_tokens": 1, "output_tokens": 1},
+}))
+"""
+
+
+def test_run_turn_fails_closed_when_a_tool_was_permission_denied(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """REGRESSION. A denied turn exits 0 with a terminal `is_error: false`, so
+    `returncode != 0` never fired and the model's apology for being unable to open the
+    vault was parsed, scored and filed as the persona's work product."""
+    _install_fake_claude(tmp_path / "bin", _DENIED_STREAM_BODY, monkeypatch)
+    with pytest.raises(TurnError, match="denied filesystem access"):
+        _provider(tmp_path).run_turn(_spec(), "the prompt")
+
+
+def test_run_turn_fails_closed_on_reported_permission_denials(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _install_fake_claude(tmp_path / "bin", _DENIALS_FIELD_BODY, monkeypatch)
+    with pytest.raises(TurnError, match="Glob, Grep"):
+        _provider(tmp_path).run_turn(_spec(), "the prompt")
+
+
+# Persona prose that merely DISCUSSES denial — a discovery-dispute filing is full of it.
+# The detector reads tool results the CLI flagged, never the reply, so this must pass.
+_DISCOVERY_PROSE_BODY = r"""
+import json, sys
+for event in [
+    {"type": "assistant", "message": {"content": [{"type": "text", "text": "drafting"}]}},
+    {"type": "result", "is_error": False, "session_id": "s",
+     "result": "Plaintiff's motion to compel is denied by your permission settings "
+               "argument, which misreads Rule 37; permission to read the file was "
+               "never at issue. Request No. 4 is DENIED as overbroad.",
+     "usage": {"input_tokens": 5, "output_tokens": 5}},
+]:
+    sys.stdout.write(json.dumps(event) + "\n")
+"""
+
+
+def test_denial_detector_ignores_persona_prose_about_denials(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Both marker strings appear verbatim in the reply text; neither appears in an
+    error-flagged tool result. A legitimate turn must not be destroyed by its subject."""
+    _install_fake_claude(tmp_path / "bin", _DISCOVERY_PROSE_BODY, monkeypatch)
+    result = _provider(tmp_path).run_turn(_spec(), "the prompt")
+    assert "DENIED as overbroad" in result.text
+
+
+_TOP_LEVEL_ERROR_BODY = r"""
+import json
+print(json.dumps({"type": "result", "is_error": True, "session_id": "s",
+                  "result": "Not logged in - Please run /login", "subtype": "error"}))
+"""
+
+
+def test_run_turn_fails_on_terminal_is_error_even_at_exit_zero(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _install_fake_claude(tmp_path / "bin", _TOP_LEVEL_ERROR_BODY, monkeypatch)
+    with pytest.raises(TurnError, match="reported an error"):
+        _provider(tmp_path).run_turn(_spec(), "the prompt")
 
 
 def test_run_turn_seat_limit_classified(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
