@@ -144,3 +144,131 @@ def test_worker_idle_returns_false(tmp_path: Path) -> None:
     root.mkdir()
     worker = Worker(root, "w1", Queue(root), _fake_factory)
     assert worker.run_once(NOW) is False
+
+
+# --- lease extension uses WALL time, not the tick's frozen timestamp ----------
+
+
+class _ClockAdvancingProvider:
+    """A fake provider that burns simulated wall time on every turn and records the
+    queue lease as it stood at that moment."""
+
+    def __init__(self, clock: list[datetime], queue: Queue, seen: list[str]) -> None:
+        self._clock = clock
+        self._queue = queue
+        self._seen = seen
+        self._inner = FakeLLMProvider()
+
+    def run_turn(self, spec: TurnSpec, prompt: str) -> object:
+        self._clock[0] = self._clock[0] + timedelta(seconds=40)
+        snap = self._queue.snapshot()
+        if snap:
+            self._seen.append(snap[0].visible_at)
+        return self._inner.run_turn(spec, prompt)
+
+
+def test_lease_is_extended_with_wall_time_not_the_tick_stamp(tmp_path: Path) -> None:
+    """`Queue.heartbeat` writes ``visible_at = <the stamp passed> + timeout``. The worker
+    passed the tick's FROZEN `now`, so every heartbeat rewrote the lease to its original
+    expiry and it could never move forward. A single-request drain is ~11 provider calls
+    (each up to `timeout_s`), so the lease lapsed mid-drain on essentially every real run
+    and a second worker claimed the same run — both paying for the same turns."""
+    root, run_id = _build_matters_root(tmp_path)
+    queue = Queue(root)
+    _enqueue_run_turn(queue, run_id, "wi-lease")
+    clock = [NOW]
+    leases: list[str] = []
+    worker = Worker(
+        root,
+        "wA",
+        queue,
+        lambda v, r, b: _ClockAdvancingProvider(clock, queue, leases),  # type: ignore[arg-type,return-value]
+        visibility_timeout_s=60.0,
+        now_fn=lambda: clock[0],
+    )
+    worker.run_once(NOW)
+
+    assert clock[0] > NOW + timedelta(seconds=60), "the drain should outlast one lease"
+    assert len(leases) > 2, "expected a multi-turn drain"
+    # The lease strictly advances; it never sits at claim-time + timeout while the
+    # worker keeps working (which is what made the item stealable mid-drain).
+    assert leases == sorted(leases) and leases[-1] > leases[0], leases
+    stamps = [datetime.fromisoformat(v) for v in leases]
+    assert stamps[-1] > NOW + timedelta(seconds=60)
+
+
+def test_worker_stops_draining_when_it_loses_the_lease(tmp_path: Path) -> None:
+    """A lost heartbeat means someone else owns the run; keep draining and both workers
+    execute the same turns. The return value used to be discarded entirely."""
+    root, run_id = _build_matters_root(tmp_path)
+    queue = Queue(root)
+    _enqueue_run_turn(queue, run_id, "wi-stolen")
+    worker = Worker(root, "wA", queue, _fake_factory)
+    item = queue.claim("wA", NOW, visibility_timeout_s=300.0)
+    assert item is not None
+    # Simulate the steal: another worker now owns the item, so wA's heartbeat fails.
+    queue.release(item.item_id, "wA")
+    stolen = queue.claim("wB", NOW, visibility_timeout_s=300.0)
+    assert stolen is not None
+
+    handled = worker._drain(item, NOW)
+    assert handled is True
+    vault = MatterRegistry(root=root).resolve(MATTER_ID)
+    # wA bailed after its first turn instead of driving the whole run behind wB's back.
+    assert not load_state(vault, run_id).is_terminal
+    assert queue.snapshot()[0].claimed_by == "wB"
+
+
+# --- a poison item must never kill the driver --------------------------------
+
+
+def _poison_item(queue: Queue, item_id: str, attempts: int = 0) -> None:
+    queue.enqueue(
+        WorkItem.create(
+            lane="run",
+            matter_id=MATTER_ID,
+            run_id="ghost-run",  # started nowhere: plan_next raises OrchestratorError
+            kind="run_turn",
+            now=NOW,
+            item_id=item_id,
+        ).model_copy(update={"attempts": attempts})
+    )
+
+
+def test_poison_item_does_not_escape_the_tick(tmp_path: Path) -> None:
+    root, _run_id = _build_matters_root(tmp_path)
+    queue = Queue(root)
+    _poison_item(queue, "wi-poison")
+    worker = Worker(root, "wP", queue, _fake_factory, backoff_s=30.0)
+
+    assert worker.run_once(NOW) is True  # no exception escapes
+    snap = queue.snapshot()
+    assert len(snap) == 1 and snap[0].claimed_by is None  # released with backoff
+    assert queue.claim("wP", NOW, visibility_timeout_s=60) is None
+
+
+def test_poison_item_is_dead_lettered_at_max_attempts(tmp_path: Path) -> None:
+    root, _run_id = _build_matters_root(tmp_path)
+    queue = Queue(root)
+    worker = Worker(root, "wP", queue, _fake_factory, max_attempts=3)
+    _poison_item(queue, "wi-poison", attempts=3)
+
+    assert worker.run_once(NOW) is True
+    assert queue.snapshot() == []  # off the queue, not crash-looping the driver
+    notifications = list((root / ".queue" / "notifications").glob("*.json"))
+    assert notifications, "a dead-lettered poison item must leave an operator notification"
+
+
+def test_serve_survives_a_poison_item(tmp_path: Path) -> None:
+    """`serve` had no handler either, so under Restart=always this crash-looped."""
+    root, _run_id = _build_matters_root(tmp_path)
+    queue = Queue(root)
+    _poison_item(queue, "wi-poison")
+    worker = Worker(root, "wP", queue, _fake_factory)
+    ticks = [0]
+
+    def stop() -> bool:
+        ticks[0] += 1
+        return ticks[0] > 4
+
+    worker.serve(now_fn=lambda: NOW, sleep_fn=lambda _s: None, stop=stop, interval=0.0)

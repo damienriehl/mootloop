@@ -23,7 +23,9 @@ from __future__ import annotations
 
 import contextlib
 import json
+import logging
 import os
+import re
 import signal
 import socket
 from collections.abc import Callable
@@ -38,6 +40,8 @@ from mootloop.llm import LLMProvider
 from mootloop.models.events import RunFinished, TurnIntent
 from mootloop.vault import RunLock, validate_id
 
+logger = logging.getLogger("mootloop.engine.worker")
+
 # Provider factory seam: (vault_root, run_dir, billing_mode) -> an LLMProvider.
 ProviderFactory = Callable[[Path, Path, str], LLMProvider]
 NowFn = Callable[[], datetime]
@@ -49,6 +53,12 @@ _DEFAULT_RESUME_DELAY_S = 900.0
 _DEFAULT_BACKOFF_S = 30.0
 _DEFAULT_STALE_S = 900.0
 _DEFAULT_MAX_ATTEMPTS = 5
+
+_UNSAFE_STEM_RE = re.compile(r"[^A-Za-z0-9._-]")
+
+
+def default_now() -> datetime:
+    return datetime.now(UTC)
 
 
 class Worker:
@@ -67,7 +77,9 @@ class Worker:
         backoff_s: float = _DEFAULT_BACKOFF_S,
         stale_threshold_s: float = _DEFAULT_STALE_S,
         max_attempts: int = _DEFAULT_MAX_ATTEMPTS,
+        now_fn: NowFn = default_now,
     ) -> None:
+        self.now_fn = now_fn
         self.matters_root = Path(matters_root)
         self.worker_id = worker_id
         self.queue = queue
@@ -139,8 +151,51 @@ class Worker:
         return self.matters_root / matter_id
 
     def _process(self, item: WorkItem, now: datetime) -> bool:
+        """Drain the item, and never let an unexpected failure escape the tick.
+
+        Only the three provider errors were caught before, so anything else — an
+        `OrchestratorError` from a run with no `RunStarted` event, a corrupt journal
+        line, a `VaultBoundaryError`, an `OSError` — propagated out through `run_once`
+        and `serve` and killed the process. The item stayed claimable, so under
+        ``Restart=always`` one poison item crash-looped the driver forever and starved
+        every other matter's queue. Route it down the same backoff/dead-letter ladder a
+        `TurnError` takes.
+        """
+        try:
+            return self._drain(item, now)
+        except Exception:  # noqa: BLE001 — a poison item must never kill the driver loop
+            logger.exception(
+                "worker %s: unexpected failure on item %s (matter=%s run=%s)",
+                self.worker_id,
+                item.item_id,
+                item.matter_id,
+                item.run_id,
+            )
+            self._on_poison(item, now)
+            return True
+
+    def _on_poison(self, item: WorkItem, now: datetime) -> None:
+        """Back off, then dead-letter at ``max_attempts`` — best-effort throughout.
+
+        The run may not be journalable at all (that can be *why* the item is poison), so
+        every vault touch is suppressed; getting the item off the queue is what matters.
+        """
+        if item.attempts < self.max_attempts:
+            self.queue.release(
+                item.item_id, self.worker_id, visible_at=now + timedelta(seconds=self.backoff_s)
+            )
+            return
+        with contextlib.suppress(Exception):
+            vault = self._resolve_vault(item.matter_id)
+            with RunLock(vault, item.run_id):
+                append(vault, item.run_id, RunFinished(status="needs_attention"))
+        with contextlib.suppress(OSError):
+            self._write_notification(item.matter_id, item.run_id, reason="poison_item", now=now)
+        self.queue.complete(item.item_id, self.worker_id)
+
+    def _drain(self, item: WorkItem, now: datetime) -> bool:
         vault = self._resolve_vault(item.matter_id)
-        run_id = item.run_id
+        run_id = validate_id(item.run_id, kind="run_id")
         run_dir = vault / "runs" / run_id
         provider = self.provider_factory(vault, run_dir, self.billing_mode)
         now_iso = now.isoformat()
@@ -183,9 +238,25 @@ class Worker:
             orchestrator.record_turn(
                 vault, run_id, spec.turn_id, result.text, result.usage, now_iso
             )
-            self.queue.heartbeat(
-                item.item_id, self.worker_id, now, visibility_timeout_s=self.visibility_timeout_s
-            )
+            # WALL time, not the tick's frozen `now`: `Queue.heartbeat` writes
+            # `visible_at = <the time passed> + timeout`, so heartbeating with the
+            # claim-time stamp rewrote the lease to its original expiry and could never
+            # extend it. A drain is many provider calls (each up to `timeout_s`), so the
+            # lease lapsed mid-drain and a second worker claimed the same run — two
+            # workers paying for the same turns, the loser dying on `LockHeldError`.
+            # And the result was discarded, so the worker never learned it lost the item.
+            if not self.queue.heartbeat(
+                item.item_id,
+                self.worker_id,
+                self.now_fn(),
+                visibility_timeout_s=self.visibility_timeout_s,
+            ):
+                logger.warning(
+                    "worker %s: lost the lease on item %s mid-drain; stopping",
+                    self.worker_id,
+                    item.item_id,
+                )
+                return True
 
     # -- failure routing --
 
@@ -213,7 +284,9 @@ class Worker:
         notif_dir = self.matters_root / ".queue" / "notifications"
         notif_dir.mkdir(parents=True, exist_ok=True)
         stamp = "".join(ch for ch in now.isoformat() if ch.isdigit())
-        path = notif_dir / f"{run_id}-{stamp}.json"
+        # The run_id reaches a filename here. `_drain` validates it, but the poison
+        # handler runs precisely when that validation may have failed, so slugify.
+        path = notif_dir / f"{_UNSAFE_STEM_RE.sub('_', run_id)[:64]}-{stamp}.json"
         payload = {
             "run_id": run_id,
             "matter_id": matter_id,
@@ -249,7 +322,3 @@ class Worker:
                 break
             if not did_work:
                 sleep_fn(interval)
-
-
-def default_now() -> datetime:
-    return datetime.now(UTC)
