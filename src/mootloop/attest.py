@@ -6,6 +6,14 @@ ledger head hash, append-only, in ``runs/<run-id>/attestations.jsonl``.
 ``check_attestation`` recomputes those hashes and, on a mismatch, appends an
 invalidation record (re-imposing DRAFT). Export reads attestation state; it never
 sets it — the gate ledger is the single export gate.
+
+The attested "master" hash covers the md-master **and** the matter chrome, because the
+served document is built from both. The md-master carries only the response bodies; the
+caption, case number, party names, our-side labels and the signing attorney's block all
+come from ``matter.yaml`` at export time. Hashing the deliverable alone would let an
+edit to ``matter.yaml`` change the case number or the signature line of a document that
+still reports a ``valid`` attestation — a defective filing under a live signature. The
+matter is therefore folded into ``master_sha256``; a change to either re-imposes DRAFT.
 """
 
 from __future__ import annotations
@@ -21,7 +29,7 @@ from mootloop.errors import AttestationBlockedError, OrchestratorError
 from mootloop.journal import load_state
 from mootloop.models.attestations import Attestation, AttestationCheckStatus
 from mootloop.tasks import get_binding
-from mootloop.vault import RunLock, safe_vault_path
+from mootloop.vault import RunLock, load_matter, safe_vault_path
 
 ATTESTATIONS_JSONL = ("attestations.jsonl",)
 
@@ -53,12 +61,21 @@ def master_deliverable_path(vault_root: Path | str, run_id: str) -> Path | None:
     return safe_vault_path(vault_root, "deliverables", binding.config.deliverables[0])
 
 
+def matter_sha256(vault_root: Path | str) -> str:
+    """A canonical digest of ``matter.yaml`` — the chrome the served document renders
+    from (caption, case number, parties, our-side, signing attorney)."""
+    return _sha256(load_matter(vault_root).model_dump_json())
+
+
 def current_master_sha256(vault_root: Path | str, run_id: str) -> str | None:
-    """The canonicalized md-master hash, or None if the deliverable is not written."""
+    """The attested content hash — the canonicalized md-master bound to the matter
+    chrome — or None if the deliverable is not written (see the module docstring for
+    why the matter is part of it)."""
     path = master_deliverable_path(vault_root, run_id)
     if path is None or not path.is_file():
         return None
-    return _sha256(canonicalize(path.read_text(encoding="utf-8")))
+    canonical = canonicalize(path.read_text(encoding="utf-8"))
+    return _sha256(f"{canonical}\x1f{matter_sha256(vault_root)}")
 
 
 def current_ledger_head_sha256(vault_root: Path | str) -> str:
@@ -155,7 +172,9 @@ def attestation_state(vault_root: Path | str, run_id: str) -> AttestationCheck:
         return AttestationCheck("invalidated", latest.reason)
     master = current_master_sha256(vault_root, run_id)
     if master != latest.master_sha256:
-        return AttestationCheck("invalidated", "md-master changed after attestation")
+        return AttestationCheck(
+            "invalidated", "md-master or matter.yaml changed after attestation"
+        )
     if current_ledger_head_sha256(vault_root) != latest.ledger_head_sha256:
         return AttestationCheck("invalidated", "citation ledger changed after attestation")
     return AttestationCheck("valid")

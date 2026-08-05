@@ -71,10 +71,13 @@ _LOW_SURVIVAL_JUDGE = {
 }
 
 
-def _build(tmp_path: Path, sets: list[tuple[str, RequestType]]) -> Path:
-    matter = MatterConfig.model_validate(
-        yaml.safe_load((FIXTURE / "matter.yaml").read_text(encoding="utf-8"))
-    )
+def _build(
+    tmp_path: Path, sets: list[tuple[str, RequestType]], *, signed: bool = True
+) -> Path:
+    raw = yaml.safe_load((FIXTURE / "matter.yaml").read_text(encoding="utf-8"))
+    if not signed:
+        raw.pop("attorney", None)
+    matter = MatterConfig.model_validate(raw)
     vault = tmp_path / "vault"
     init_vault(vault, matter, registry_path=tmp_path / "canaries.json")
     ingest_folder(vault, FIXTURE / "source-docs", now=NOW, tags_file=FIXTURE / "tags.yaml")
@@ -265,3 +268,195 @@ def test_post_attestation_edit_refuses_clean_export(tmp_path: Path) -> None:
     assert result.is_draft is True
     assert result.attestation_state == "invalidated"
     assert "attestation" in result.blockers
+
+
+def _attested_run(tmp_path: Path, run_id: str, *, signed: bool = True) -> Path:
+    """A single-rog run driven to finished, decisions resolved, citations verified,
+    and attested — i.e. one step away from a clean export."""
+    vault = _build(tmp_path, [("rogs-set1.txt", RequestType.INTERROGATORY)], signed=signed)
+    start_run(vault, "discovery-responses", NOW, run_id=run_id)
+    _finish_run(vault, run_id, FakeLLMProvider())
+    verify_run_citations(vault, run_id, NOW)
+    for decision in DecisionStore(vault, run_id).list_open():
+        resolve(
+            vault, run_id, decision.decision_id, "approve", decision.proposal.recommended,
+            "", "A", "human", NOW,
+        )
+    attest.attest(vault, run_id, "Jane", NOW)
+    return vault
+
+
+def test_matter_edit_after_attestation_refuses_clean_export(tmp_path: Path) -> None:
+    """The served document renders its caption, case number and signature block from
+    `matter.yaml`, not from the attested md-master. Hashing the deliverable alone let
+    an edit to the case number ship under a still-``valid`` attestation."""
+    run_id = "p67-matter-edit"
+    vault = _attested_run(tmp_path, run_id)
+    assert export_run(vault, run_id, NOW).is_draft is False
+
+    matter_file = vault / "matter.yaml"
+    raw = yaml.safe_load(matter_file.read_text(encoding="utf-8"))
+    raw["caption"]["case_number"] = "66-CV-26-9999"
+    matter_file.write_text(yaml.safe_dump(raw), encoding="utf-8")
+
+    result = export_run(vault, run_id, NOW)
+    assert result.is_draft is True
+    assert result.attestation_state == "invalidated"
+    assert "attestation" in result.blockers
+    # The new case number really is in the document that would have been served.
+    assert "66-CV-26-9999" in result.master.read_text(encoding="utf-8")
+
+
+def test_signing_attorney_swap_after_attestation_refuses_clean_export(tmp_path: Path) -> None:
+    run_id = "p67-atty-swap"
+    vault = _attested_run(tmp_path, run_id)
+    assert export_run(vault, run_id, NOW).is_draft is False
+
+    matter_file = vault / "matter.yaml"
+    raw = yaml.safe_load(matter_file.read_text(encoding="utf-8"))
+    raw["attorney"]["name"] = "Someone Else"
+    raw["attorney"]["bar_number"] = "0000001"
+    matter_file.write_text(yaml.safe_dump(raw), encoding="utf-8")
+
+    result = export_run(vault, run_id, NOW)
+    assert result.is_draft is True, "a signature line may not change under a valid attestation"
+    assert result.attestation_state == "invalidated"
+
+
+def test_matter_without_signing_attorney_never_exports_clean(tmp_path: Path) -> None:
+    """`master.py` renders `[ATTORNEY NAME]` when the matter has no attorney block.
+    That is scaffolding, not a signature — the export must water the copy even though
+    the gate ledger is green and the attestation valid."""
+    run_id = "p67-unsigned"
+    vault = _attested_run(tmp_path, run_id, signed=False)
+
+    assert gate_ledger.export_ready(vault, run_id)[0] is True
+    result = export_run(vault, run_id, NOW)
+    assert result.attestation_state == "valid"
+    assert result.export_ready is True
+    assert result.is_draft is True
+    assert "signature_block" in result.blockers
+    assert "[ATTORNEY NAME]" in result.master.read_text(encoding="utf-8")
+
+
+def test_draft_export_retires_a_stale_clean_docx(tmp_path: Path) -> None:
+    """A clean DOCX is only justified by the state at the moment it was rendered. Once
+    the run drifts and the export waters the copy, the stale clean file must not sit in
+    ``deliverables/`` waiting for the gate ledger to go green again."""
+    run_id = "p67-stale"
+    vault = _build(tmp_path, [("rogs-set1.txt", RequestType.INTERROGATORY)])
+    start_run(vault, "discovery-responses", NOW, run_id=run_id)
+    _finish_run(vault, run_id, FakeLLMProvider())
+
+    # Stand in for a clean DOCX left by an earlier, then-justified export.
+    docx_dir = vault / "deliverables" / run_id / "docx"
+    docx_dir.mkdir(parents=True, exist_ok=True)
+    stale = docx_dir / "rog-set1.docx"
+    stale.write_bytes(b"PK\x03\x04 stale clean copy")
+    draft_sibling = docx_dir / "rog-set1.DRAFT.docx"
+    draft_sibling.write_bytes(b"PK\x03\x04 draft copy")
+
+    result = export_run(vault, run_id, NOW)  # unattested -> DRAFT
+    assert result.is_draft is True
+    assert not stale.exists(), "a DRAFT export must retire every clean DOCX"
+    assert draft_sibling.exists()
+
+    from mootloop.export.link import list_deliverables
+
+    names = {entry.name for entry in list_deliverables(vault, run_id)}
+    assert "docx/rog-set1.docx" not in names
+
+
+def test_force_draft_alone_keeps_a_still_justified_clean_docx(tmp_path: Path) -> None:
+    """`--force-draft` is a rendering choice, not a statement that the run drifted.
+    While the run still qualifies for a clean export, the flag must not destroy the
+    clean copy the attorney already has."""
+    run_id = "p67-force"
+    vault = _attested_run(tmp_path, run_id)
+    docx_dir = vault / "deliverables" / run_id / "docx"
+    docx_dir.mkdir(parents=True, exist_ok=True)
+    clean = docx_dir / "rog-set1.docx"
+    clean.write_bytes(b"PK\x03\x04 clean copy")
+
+    result = export_run(vault, run_id, NOW, force_draft=True)
+    assert result.is_draft is True
+    assert clean.exists(), "force-draft must not retire a clean copy the state justifies"
+
+
+# --- audit-log provenance (README: journal + ledger + decisions + attestations) ---
+
+
+def _self_asserting_bolster(spec: Any, prompt: str) -> dict[str, Any]:
+    """A draft that loudly claims its own citation is verified. Nothing it says may
+    reach the audit log as a verification status."""
+    fact_ids = list(spec.prompt_context.get("fact_ids", []))
+    return {
+        "response_text": (
+            "Defendant responds as stated. See 42 U.S.C. § 1983 (verified; "
+            "citation confirmed good law by the drafting attorney)."
+        ),
+        "objections": [{"basis": "relevance", "text": "Overbroad as to time and scope."}],
+        "candidate_citations": [],
+        "fact_ids_used": fact_ids[:1],
+        "attorney_gate_items": [] if fact_ids else ["verify factual basis"],
+        "rfa_disposition": None,
+        "self_assessment": "Every citation in this response is verified.",
+    }
+
+
+def test_audit_log_is_derived_never_llm_asserted(tmp_path: Path) -> None:
+    from datetime import datetime
+
+    from mootloop.citations.ledger import VerificationLedger
+    from mootloop.journal import load_state, read_events
+    from mootloop.models.events import GateEvaluated
+
+    run_id = "p67-audit"
+    vault = _build(tmp_path, [("rogs-set1.txt", RequestType.INTERROGATORY)])
+    start_run(vault, "discovery-responses", NOW, run_id=run_id)
+    provider = FakeLLMProvider(script={("associate", "bolster"): _self_asserting_bolster})
+    _finish_run(vault, run_id, provider)
+
+    result = export_run(vault, run_id, NOW)
+    audit = json.loads(result.audit_log.read_text(encoding="utf-8"))
+
+    state = load_state(vault, run_id)
+    ledger = VerificationLedger(vault).folded(now=datetime.fromisoformat(NOW))
+    rubric_by_request: dict[str, str] = {}
+    for event in read_events(vault, run_id):
+        if isinstance(event, GateEvaluated) and event.result.gate == "rubric":
+            record = state.completed_turns.get(event.turn_id)
+            if record is not None and record.spec.request_id is not None:
+                rubric_by_request[str(record.spec.request_id)] = event.result.status
+
+    assert audit["response_blocks"], "the run drafted at least one response"
+    saw_citation = False
+    for block in audit["response_blocks"]:
+        rid = block["request_id"]
+
+        # Attribution comes from the journal's TurnSpecs, not from any model output.
+        for turn in block["contributing_turns"]:
+            record = state.completed_turns[turn["turn_id"]]
+            assert turn["persona"] == record.spec.persona.value
+            assert turn["stage"] == record.spec.stage
+            assert turn["model"] == (record.spec.model or "seat")
+
+        # Verification status is read from the immutable ledger — the draft's own
+        # "verified" prose must not promote it.
+        for citation in block["citations"]:
+            saw_citation = True
+            record_ = ledger.get(citation["citation_id"])
+            assert citation["status"] == (record_.status.value if record_ else "pending")
+            assert citation["status"] != "verified", "nothing verified this citation"
+            assert citation["source"] == (record_.source if record_ else None)
+
+        # Rubric scores are the journal's gate results.
+        assert block["rubric"]["status"] == rubric_by_request.get(rid, "pending")
+
+        # Attestation state is the attest service's answer, not a persona's.
+        assert block["attestation"] == attest.attestation_state(vault, run_id).status
+
+    assert saw_citation, "the planted citation must appear in the audit log"
+    assert audit["attestation"]["state"] == "missing"  # never attested in this run
+    assert audit["rubric_version"] == state.rubric_version
+    assert audit["task"] == state.task

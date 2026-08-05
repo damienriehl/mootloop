@@ -1,9 +1,11 @@
 """Attestation manifest vocabulary (plan D9/H8): the append-only record that binds a
 reviewer to the exact bytes they attested.
 
-An attestation captures the canonicalized md-master hash + the citation-ledger head
-hash at attest time. A later mismatch (a post-attestation edit) re-imposes DRAFT and
-logs an invalidation record — the ledger is append-only, so nothing is rewritten.
+An attestation captures the citation-ledger head hash plus ``master_sha256``: the
+canonicalized md-master bound to a digest of ``matter.yaml`` (see `mootloop.attest` —
+the served document is rendered from both, so both must be attested). A later mismatch
+(a post-attestation edit to either) re-imposes DRAFT and logs an invalidation record —
+the ledger is append-only, so nothing is rewritten.
 """
 
 from __future__ import annotations
