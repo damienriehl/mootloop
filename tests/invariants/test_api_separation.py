@@ -87,6 +87,66 @@ def test_at_least_one_mutating_route_exists() -> None:
     assert mutating, "expected at least one mutating route in the matter API"
 
 
+# Routes that are deliberately reachable without an auth guard. Anything else — read
+# or write — must declare one. Adding a path here is the explicit, reviewable act.
+_UNAUTHENTICATED_ALLOWLIST = {"/health"}
+
+
+def test_every_route_declares_auth_unless_explicitly_allowlisted() -> None:
+    """The mutating-only check above cannot see a NEW read route that serves matter
+    data. `/api/download` streams privileged work product over GET, and the SSE stream
+    tails a live run's journal — a future GET added without a `Principal` would have
+    passed every structural test in this file."""
+    app = create_matter_api()
+    unguarded: list[str] = []
+    for route in _iter_api_routes(app):
+        if route.path in _UNAUTHENTICATED_ALLOWLIST:
+            continue
+        if not (route_auth_kinds(route) & _AUTH_KINDS):
+            unguarded.append(f"{sorted(route.methods or set())} {route.path}")
+    assert not unguarded, f"routes without an auth guard: {unguarded}"
+
+
+def test_the_unauthenticated_allowlist_is_real_and_minimal() -> None:
+    """Every allowlisted path must exist (a typo would silently exempt nothing — or,
+    after a rename, silently exempt the wrong thing)."""
+    paths = {r.path for r in _iter_api_routes(create_matter_api())}
+    assert paths >= _UNAUTHENTICATED_ALLOWLIST, _UNAUTHENTICATED_ALLOWLIST - paths
+
+
+def test_matter_scoped_read_routes_are_audited() -> None:
+    """Every matter-scoped route records an access-audit entry. FD-3 makes the audit
+    the fail-closed precondition for serving matter data, so a route that resolves a
+    matter but records nothing serves privileged content off the books."""
+    app = create_matter_api()
+    unaudited: list[str] = []
+    for route in _iter_api_routes(app):
+        if "{matter_id}" not in route.path:
+            continue
+        names = {
+            getattr(dep.call, "__qualname__", "")
+            for dep in _walk_dependencies(route)
+            if dep.call is not None
+        }
+        if not any("_audit_dep" in name or "_record" in name for name in names):
+            unaudited.append(f"{sorted(route.methods or set())} {route.path}")
+    assert not unaudited, f"matter-scoped routes with no access audit: {unaudited}"
+
+
+def _walk_dependencies(route: APIRoute) -> list[object]:
+    out: list[object] = []
+    stack: list[object] = [route.dependant]
+    seen: set[int] = set()
+    while stack:
+        node = stack.pop()
+        if id(node) in seen:
+            continue
+        seen.add(id(node))
+        out.append(node)
+        stack.extend(getattr(node, "dependencies", []))
+    return out
+
+
 # --- 3. access-audit chain: fold == recompute, tamper breaks it -------------
 
 

@@ -99,6 +99,27 @@ def _audit_dep(action: str) -> Callable[..., None]:
     return _record
 
 
+# The driver has no verified email, but a state change on a matter is a state change on
+# a matter: FD-3 makes the hash-chained audit the record of everything that touched one,
+# and the internal pause/resume routes were leaving no trace at all.
+INTERNAL_ACTOR = "internal:driver"
+
+
+def _internal_audit_dep(action: str) -> Callable[..., None]:
+    """Audit dependency for the driver-only surface (no `AccessPrincipal` to name)."""
+
+    def _record(request: Request, matter_id: str, vault: Vault) -> None:
+        audit.append(
+            vault,
+            actor=INTERNAL_ACTOR,
+            action=action,
+            matter_id=matter_id,
+            resource=request.url.path,
+        )
+
+    return _record
+
+
 def _runs_for(vault: Path) -> list[models.RunSummary]:
     runs_dir = safe_vault_path(vault, "runs")
     if not runs_dir.is_dir():
@@ -483,6 +504,7 @@ def pause_run_internal(
     body: models.PauseRequest,
     _internal: Internal,
     vault: Vault,
+    _audited: Annotated[None, Depends(_internal_audit_dep("pause"))],
 ) -> models.RunActionResponse:
     orchestrator.pause_run(vault, run_id, reason=body.reason or "manual")
     return _run_action(vault, run_id, "run_paused")
@@ -494,6 +516,7 @@ def resume_run_internal(
     run_id: str,
     _internal: Internal,
     vault: Vault,
+    _audited: Annotated[None, Depends(_internal_audit_dep("resume"))],
 ) -> models.RunActionResponse:
     orchestrator.resume_run(vault, run_id)
     return _run_action(vault, run_id, "run_resumed")
