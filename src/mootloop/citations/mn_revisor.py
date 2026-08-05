@@ -6,9 +6,12 @@ URL assumptions (documented so a break is obvious):
 - **Statutes**: ``https://www.revisor.mn.gov/statutes/cite/<section>`` — ``<section>``
   is the number after the ``§`` (e.g. ``336.2-207``). This is the Revisor's canonical
   per-section permalink.
-- **Court rules**: ``https://www.revisor.mn.gov/court_rules/cp/id/<n>/`` — ``<n>`` is
-  the rule number *before the decimal* (e.g. ``33`` for ``Minn. R. Civ. P. 33.01``),
-  since the Revisor indexes civil-procedure rules by whole-rule id.
+- **Court rules**: ``https://www.revisor.mn.gov/court_rules/<index>/id/<n>/`` — ``<n>``
+  is the rule number *before the decimal* (e.g. ``33`` for ``Minn. R. Civ. P. 33.01``),
+  since the Revisor indexes rules by whole-rule id, and ``<index>`` is the segment for
+  the rule BODY the cite belongs to (``cp`` = Rules of Civil Procedure, ``gp`` =
+  General Rules of Practice). Each body is a separate set of rules with its own
+  independent numbering — see `_RULE_INDEXES`.
 
 Verified iff HTTP 200 *and* the page text contains the cite's number (content check,
 not just a 200 — the Revisor serves a soft page for unknown cites); ``content_sha256``
@@ -33,6 +36,40 @@ MN_HOST = "www.revisor.mn.gov"
 
 _STATUTE_SECTION_RE = re.compile(r"§+\s*([0-9][0-9A-Za-z.\-]*)")
 _RULE_NUMBER_RE = re.compile(r"(\d+(?:\.\d+)?)")
+
+# Rule-body token -> the Revisor's court-rule index segment. The Minnesota General
+# Rules of Practice are a DIFFERENT body from the Rules of Civil Procedure, numbered
+# independently: `Minn. Gen. R. Prac. 115.03` sent to the civil-procedure index 404s,
+# and a 404 here means `invalid` — the tool telling an attorney that a correct cite is
+# fabricated. Only a body with a pinned index is fetched; anything else is unsupported
+# (see `revisor_index_for`) rather than guessed into some other body's numbering.
+_RULE_INDEXES: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"\bGen\.\s*R\.\s*Prac\.", re.IGNORECASE), "gp"),
+    (re.compile(r"\bR\.\s*Civ\.\s*P\.", re.IGNORECASE), "cp"),
+)
+
+
+def revisor_index_for(citation: Citation) -> str | None:
+    """The Revisor court-rule index segment for ``citation``, or None if this rule body
+    has no pinned index (the free stack cannot verify it — route it to research)."""
+    if citation.authority_type != AuthorityType.COURT_RULE:
+        return None
+    for pattern, segment in _RULE_INDEXES:
+        if pattern.search(citation.normalized):
+            return segment
+    return None
+
+
+def can_verify(citation: Citation) -> bool:
+    """True iff this citation is a shape the Revisor scraper can actually answer."""
+    if citation.authority_type == AuthorityType.STATE_STATUTE:
+        return _statute_section(citation.normalized) is not None
+    if citation.authority_type == AuthorityType.COURT_RULE:
+        return (
+            revisor_index_for(citation) is not None
+            and _rule_number(citation.normalized) is not None
+        )
+    return False
 
 
 def _statute_section(normalized: str) -> str | None:
@@ -68,11 +105,12 @@ def _build_request(citation: Citation) -> tuple[http.HttpRequest, str] | None:
             return None
         return http.HttpRequest("GET", MN_HOST, f"/statutes/cite/{section}"), section
     if citation.authority_type == AuthorityType.COURT_RULE:
+        index = revisor_index_for(citation)
         parsed = _rule_number(citation.normalized)
-        if parsed is None:
+        if index is None or parsed is None:
             return None
         whole, full = parsed
-        return http.HttpRequest("GET", MN_HOST, f"/court_rules/cp/id/{whole}/"), full
+        return http.HttpRequest("GET", MN_HOST, f"/court_rules/{index}/id/{whole}/"), full
     return None
 
 
@@ -85,7 +123,10 @@ def verify_mn(
     """Verify a MN statute or court-rule citation against the Revisor's stable URLs."""
     built = _build_request(citation)
     if built is None:
-        return _pending(citation, now, "not a MN Revisor citation shape")
+        # No pinned index for this shape: say so. Fetching it against a DIFFERENT rule
+        # body's index would 404 and be recorded `invalid`, which is a false accusation
+        # against a citation we simply cannot check.
+        return _pending(citation, now, "no pinned MN Revisor index for this citation shape")
     request, needle = built
     source_url = f"https://{MN_HOST}{request.path}"
     try:
