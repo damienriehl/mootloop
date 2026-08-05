@@ -2,8 +2,9 @@
 turns into a per-objection survival distribution and persist the derived view.
 
 The pure fold (`fold_objection_results`) pairs each objection in the *judged* draft
-with the panel's rulings (positional, judges rule in objection order) and counts the
-"would survive a motion to compel" votes. `build_panel_report` reconstructs the run's
+with the panel's rulings — one ruling per objection, basis first and position as the
+fallback (see `_align_rulings`) — and counts the "would survive a motion to compel"
+votes. `build_panel_report` reconstructs the run's
 requests, judged drafts, and judge turns, folds every objection, writes the report to
 ``runs/<run-id>/scores/panels/report.json``, and returns it.
 
@@ -26,18 +27,44 @@ DEFAULT_RESTRUCTURE_THRESHOLD = 0.5
 _MAX_REASONING_SAMPLES = 3
 
 
-def _match_ruling(
-    judge_output: JudgeOutput, objection: Objection, index: int
-) -> ObjectionRuling | None:
-    """The panel member's ruling on ``objection`` — by matching basis, else by the
-    objection's position (judges rule on each objection in order)."""
-    basis = objection.basis.strip().lower()
-    for ruling in judge_output.rulings:
-        if ruling.objection_basis.strip().lower() == basis:
-            return ruling
-    if index < len(judge_output.rulings):
-        return judge_output.rulings[index]
-    return None
+def _align_rulings(
+    objections: list[Objection], judge_output: JudgeOutput
+) -> list[ObjectionRuling | None]:
+    """One ruling per objection for a single panel member, or None where the judge
+    ruled on fewer objections than the draft asserts.
+
+    A ruling is consumed once. Matching the same basis repeatedly is the bug this
+    exists to prevent: a draft that asserts two objections on the *same* basis (say
+    two relevance objections) would otherwise score both against the judge's FIRST
+    relevance ruling — so a second objection the judge said would not survive is
+    counted as surviving, and `RestructureStage` never re-enters to fix it.
+
+    Basis match wins over position (judges may list rulings out of order), preferring
+    the index-aligned ruling when several share a basis; unmatched objections fall
+    back to their positional ruling if it is still unclaimed.
+    """
+    rulings = judge_output.rulings
+    aligned: list[ObjectionRuling | None] = [None] * len(objections)
+    claimed: set[int] = set()
+
+    for index, objection in enumerate(objections):
+        basis = objection.basis.strip().lower()
+        candidates = [
+            j
+            for j, ruling in enumerate(rulings)
+            if j not in claimed and ruling.objection_basis.strip().lower() == basis
+        ]
+        if not candidates:
+            continue
+        chosen = index if index in candidates else candidates[0]
+        claimed.add(chosen)
+        aligned[index] = rulings[chosen]
+
+    for index in range(len(objections)):
+        if aligned[index] is None and index < len(rulings) and index not in claimed:
+            claimed.add(index)
+            aligned[index] = rulings[index]
+    return aligned
 
 
 def fold_objection_results(
@@ -47,13 +74,14 @@ def fold_objection_results(
     judge_outputs: list[JudgeOutput],
 ) -> list[PanelResult]:
     """Fold the panel's rulings into one `PanelResult` per objection (pure)."""
+    aligned = [_align_rulings(objections, judge_output) for judge_output in judge_outputs]
     results: list[PanelResult] = []
     for index, objection in enumerate(objections):
         survive = 0
         total = 0
         samples: list[str] = []
-        for judge_output in judge_outputs:
-            ruling = _match_ruling(judge_output, objection, index)
+        for per_judge in aligned:
+            ruling = per_judge[index]
             if ruling is None:
                 continue
             total += 1
