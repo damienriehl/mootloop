@@ -365,7 +365,11 @@ def _record_spec(
                 cache_write=usage.cache_write,
                 output_tokens=usage.output_tokens,
                 model=usage.model,
-                usd_equiv=budget.cost_of(usage, usage.model, _date_of(now)),
+                # Meter against the model the run PLANNED (and, via `--model`, asked
+                # for) — the same identity `TurnIntent.max_plausible_usd` reserved
+                # against, so the write-ahead reservation and its settlement can never
+                # be priced off two different keys.
+                usd_equiv=budget.cost_of(usage, spec.model or usage.model, _date_of(now)),
             ),
         )
 

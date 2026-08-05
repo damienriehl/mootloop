@@ -327,3 +327,16 @@ def test_settings_deny_the_credential_store(tmp_path: Path) -> None:
     provider = _provider(tmp_path)
     deny = provider.build_settings()["permissions"]["deny"]
     assert any(str(provider._config_dir()) in rule for rule in deny)
+
+
+def test_argv_pins_the_tier_model(tmp_path: Path) -> None:
+    """Without `--model` the CLI ran its own default, so the budget-tier map was
+    decorative: a `low`-tier run reserved Haiku dollars and could burn Opus ones."""
+    provider = _provider(tmp_path)
+    argv = provider.build_argv(
+        "PROMPT", tmp_path / "settings.json", model="claude-haiku-4-5"
+    )
+    assert "--model" in argv
+    assert argv[argv.index("--model") + 1] == "claude-haiku-4-5"
+    # Absent a planned model, no flag is emitted (the CLI keeps its default).
+    assert "--model" not in provider.build_argv("P", tmp_path / "s.json")

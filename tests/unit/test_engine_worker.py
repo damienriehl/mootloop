@@ -11,11 +11,13 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import yaml
+
 from mootloop.engine.queue import Queue, WorkItem
 from mootloop.engine.worker import Worker
 from mootloop.errors import SeatLimitError
 from mootloop.journal import load_state, read_events
-from mootloop.llm import FakeLLMProvider, LLMProvider
+from mootloop.llm import FakeLLMProvider, LLMProvider, RawTurnResult, TokenUsage
 from mootloop.models.common import DocId
 from mootloop.models.events import RunPaused, SpendRecorded, TurnIntent
 from mootloop.models.requests import RequestItem, RequestSet, RequestType
@@ -272,3 +274,51 @@ def test_serve_survives_a_poison_item(tmp_path: Path) -> None:
         return ticks[0] > 4
 
     worker.serve(now_fn=lambda: NOW, sleep_fn=lambda _s: None, stop=stop, interval=0.0)
+
+
+# --- the hard cap must fire on spend a REAL provider reports -----------------
+
+
+class _DatedIdProvider:
+    """A provider that reports a dated model id, as `claude -p --output-format json`
+    does — the shape the price table never resolved."""
+
+    def __init__(self) -> None:
+        self._inner = FakeLLMProvider()
+
+    def run_turn(self, spec: TurnSpec, prompt: str) -> RawTurnResult:
+        result = self._inner.run_turn(spec, prompt)
+        return RawTurnResult(
+            text=result.text,
+            usage=TokenUsage(
+                input_tokens=150_000,
+                cache_read=0,
+                cache_write=0,
+                output_tokens=30_000,
+                model=f"{spec.model or 'claude'}-20251101",
+            ),
+        )
+
+
+def test_hard_cap_fires_on_spend_reported_with_a_dated_model_id(tmp_path: Path) -> None:
+    """Every id a real provider reports was unpriced, so `usd_equiv` was $0.00 for
+    every turn, `total_spend_usd` never moved, and the hard cap never fired."""
+    root, run_id = _build_matters_root(tmp_path)
+    vault = MatterRegistry(root=root).resolve(MATTER_ID)
+    config = yaml.safe_load((vault / "matter.yaml").read_text(encoding="utf-8"))
+    config["budget"]["hard_cap_usd"] = 6.0
+    (vault / "matter.yaml").write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    queue = Queue(root)
+    _enqueue_run_turn(queue, run_id, "wi-cap")
+    worker = Worker(root, "wC", queue, lambda v, r, b: _DatedIdProvider())  # type: ignore[arg-type,return-value]
+    for _ in range(_MAX_TICKS):
+        worker.run_once(NOW)
+        if load_state(vault, run_id).is_terminal:
+            break
+
+    # Each turn is 150k in + 30k out at Opus rates = $1.50 settled, so the cap is
+    # reached after a few turns. Priced at $0.00 the run simply completes, unbounded.
+    state = load_state(vault, run_id)
+    assert state.total_spend_usd > 0.0, "a dated model id must still meter real dollars"
+    assert state.status == "capped", state.status

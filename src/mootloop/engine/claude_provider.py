@@ -208,10 +208,19 @@ class HeadlessClaudeProvider:
         return env
 
     def build_argv(
-        self, prompt: str, settings_path: Path, *, session_id: str | None = None
+        self,
+        prompt: str,
+        settings_path: Path,
+        *,
+        session_id: str | None = None,
+        model: str | None = None,
     ) -> list[str]:
         """The full argv: ``egress_wrapper`` PREPENDED, then the non-interactive
-        ``claude -p`` invocation, with ``--resume`` appended when a session persists."""
+        ``claude -p`` invocation, with ``--resume`` appended when a session persists.
+
+        ``--model`` pins the tier's chosen model. Without it the CLI ran whatever it
+        defaults to, which made the whole budget-tier map decorative: a ``low``-tier run
+        reserved Haiku dollars against the cap and could burn Opus ones."""
         argv = [
             *self.egress_wrapper,
             self.claude_bin,
@@ -228,6 +237,8 @@ class HeadlessClaudeProvider:
             "--settings",
             str(settings_path),
         ]
+        if model:
+            argv += ["--model", model]
         if session_id:
             argv += ["--resume", session_id]
         return argv
@@ -276,7 +287,9 @@ class HeadlessClaudeProvider:
         key = self._session_key(spec)
         session_id = self._load_session_id(key)
         settings_path = self._write_settings()
-        argv = self.build_argv(prompt, settings_path, session_id=session_id)
+        argv = self.build_argv(
+            prompt, settings_path, session_id=session_id, model=spec.model
+        )
         env = self.build_env()
         try:
             completed = subprocess.run(  # noqa: S603 — argv is fully constructed here

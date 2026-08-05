@@ -13,6 +13,8 @@ from mootloop.llm import TokenUsage
 from mootloop.models.budget import EstimateAssumptions
 from mootloop.tasks import get_binding
 
+ON = date(2026, 7, 1)
+
 
 def test_sonnet_price_switches_on_the_boundary() -> None:
     assert budget.price_for("claude-sonnet-5", date(2026, 8, 31)) == (2.0, 10.0)
@@ -82,3 +84,54 @@ def test_estimate_range_and_judge_multiplier_term() -> None:
     # The final rubric gate is priced at the rubric-role model, panel-sized.
     gate_row = next(r for r in estimate.breakdown if r.stage == "rubric_gate")
     assert gate_row.min_calls == config.panels.rubric_judges * requests
+
+
+# --- an unpriced model must never silently meter at $0 -----------------------
+
+
+@pytest.mark.parametrize(
+    "reported",
+    [
+        "claude-opus-4-8-20260101",  # dated variant of a table entry
+        "claude-sonnet-5-20260401",
+    ],
+)
+def test_dated_model_ids_resolve_to_the_table_rate(reported: str) -> None:
+    """`claude -p --output-format json` reports a DATED id; the table keys the bare
+    name. Unresolved, the recorded spend was $0.00 for every real turn."""
+    assert budget.price_for(reported, ON) == budget.price_for(
+        budget.normalize_model(reported), ON
+    )
+    assert budget.price_for(reported, ON) is not None
+
+
+@pytest.mark.parametrize("unknown", ["claude", "claude-opus-9-9", "some-new-model"])
+def test_unknown_model_meters_at_the_priciest_rate_not_zero(unknown: str) -> None:
+    """The hosted provider records whatever id the CLI reports. Metering an unknown one
+    at $0 meant `total_spend_usd` never moved and the hard cap could not fire —
+    unbounded spend. Charge the priciest known rate instead (fail closed)."""
+    usage = TokenUsage(
+        input_tokens=200_000, cache_read=0, cache_write=0, output_tokens=64_000,
+        model=unknown,
+    )
+    cost = budget.cost_of(usage, unknown, ON)
+    assert cost > 0.0
+    assert cost == pytest.approx(budget.max_plausible_cost(unknown, ON))
+    # And it is at least as expensive as the priciest priced model.
+    assert cost >= budget.cost_of(usage, budget.MODEL_OPUS, ON)
+
+
+def test_explicitly_free_models_still_cost_nothing() -> None:
+    usage = TokenUsage(
+        input_tokens=1000, cache_read=0, cache_write=0, output_tokens=1000, model="fake"
+    )
+    for free in ("fake", "seat", ""):
+        assert budget.cost_of(usage, free, ON) == 0.0
+        assert budget.max_plausible_cost(free, ON) == 0.0
+
+
+def test_every_tier_model_is_priced() -> None:
+    """A tier whose model is unpriced would reserve and settle at the fallback rate."""
+    for tier in budget.TIERS:
+        for role, model in budget.tier_models(tier).items():
+            assert budget.price_for(model, ON) is not None, f"{tier}/{role}={model}"

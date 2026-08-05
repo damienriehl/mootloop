@@ -16,6 +16,7 @@ every run, so tiers move the persona/judge/rubric/cite model, not just panel siz
 
 from __future__ import annotations
 
+import re
 from datetime import date
 
 from mootloop.errors import BudgetError
@@ -84,23 +85,64 @@ def tier_models(tier: str) -> dict[str, str]:
 # --- metering ---------------------------------------------------------------
 
 
+# Models that genuinely cost nothing. ONLY these meter at $0 — see `_rate_for`.
+FREE_MODELS: frozenset[str] = frozenset({"fake", "seat", ""})
+
+# Providers report a dated id (`claude-opus-4-8-20260101`) for a model the table keys
+# without the date. Strip the suffix before lookup.
+_DATE_SUFFIX_RE = re.compile(r"-\d{8}$")
+
+
+def normalize_model(model: str) -> str:
+    """The price-table key for a provider-reported model id."""
+    return _DATE_SUFFIX_RE.sub("", model.strip())
+
+
 def price_for(model: str, on: date) -> tuple[float, float] | None:
     """The (input, output) $/1e6 rate for ``model`` on ``on``, or None if unpriced."""
-    for window in PRICES.get(model, ()):
+    for window in PRICES.get(normalize_model(model), ()):
         if window.covers(on):
             return (window.input_per_mtok, window.output_per_mtok)
     return None
 
 
+def most_expensive_rate(on: date) -> tuple[float, float]:
+    """The priciest (input, output) rate in the table on ``on`` — the fail-closed rate."""
+    rates = [
+        (w.input_per_mtok, w.output_per_mtok)
+        for windows in PRICES.values()
+        for w in windows
+        if w.covers(on)
+    ]
+    return max(rates, key=lambda r: r[1]) if rates else (0.0, 0.0)
+
+
+def _rate_for(model: str, on: date) -> tuple[float, float]:
+    """The rate to meter ``model`` at — never silently zero for a real model.
+
+    An unpriced model used to cost $0, and every id a real provider reports is
+    unpriced: the table keys the project's pinned names, while `claude -p --output-format
+    json` reports a dated id (or literally ``claude`` when the field is absent). So on
+    the hosted tier every `SpendRecorded.usd_equiv` was $0.00, `total_spend_usd` never
+    moved, and the hard cap could not fire — an unbounded-spend bypass of the control
+    that gates real money. An unknown model now meters at the priciest known rate, which
+    presses the cap early rather than never; only `FREE_MODELS` is free.
+    """
+    price = price_for(model, on)
+    if price is not None:
+        return price
+    if normalize_model(model) in FREE_MODELS:
+        return (0.0, 0.0)
+    return most_expensive_rate(on)
+
+
 def cost_of(usage: TokenUsage, model: str, on: date) -> float:
     """The metered dollar cost of one call under the four-bucket formula (plan D5).
 
-    An unpriced model (e.g. the ``fake`` test provider) costs $0.
+    Only a `FREE_MODELS` entry (e.g. the ``fake`` test provider) costs $0; any other
+    unpriced model meters at the priciest known rate (fail closed).
     """
-    price = price_for(model, on)
-    if price is None:
-        return 0.0
-    rate_in, rate_out = price
+    rate_in, rate_out = _rate_for(model, on)
     return (
         usage.input_tokens * rate_in
         + usage.cache_write * 1.25 * rate_in
@@ -120,12 +162,10 @@ def max_plausible_cost(
 
     Used to fill ``TurnIntent.max_plausible_usd`` (plan FD-6): the write-ahead ledger
     reserves this much against the cap until the turn's real ``SpendRecorded`` settles.
-    Prices all input as uncached (the priciest bucket); an unpriced model costs $0.
+    Prices all input as uncached (the priciest bucket); only a `FREE_MODELS` entry
+    reserves $0.
     """
-    price = price_for(model, on)
-    if price is None:
-        return 0.0
-    rate_in, rate_out = price
+    rate_in, rate_out = _rate_for(model, on)
     return (max_input_tokens * rate_in + max_output_tokens * rate_out) / 1e6
 
 
