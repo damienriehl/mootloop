@@ -194,6 +194,73 @@ def test_unknown_deliverable_is_rejected(ready_vault: Path, signer: LinkSigner) 
         mint_link(ready_vault, MATTER, RUN, "nope.docx", NOW, signer)
 
 
+# --- traversal: the name is confined to THIS run's deliverable dir ------------
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "../../matter.yaml",
+        "../../.canary",
+        "./../../matter.yaml",
+        "docx/../../../matter.yaml",
+        "/etc/passwd",
+        "..\\..\\matter.yaml",
+    ],
+)
+def test_traversal_name_never_escapes_the_run_directory(
+    ready_vault: Path, signer: LinkSigner, name: str
+) -> None:
+    """`safe_vault_path` only keeps a path inside the VAULT — ``deliverables/<run>/..``
+    stays inside it. Without a run-scoped check these names mint a link to any vault
+    file (``matter.yaml``, the ``.canary`` tripwire) and stream it from /api/download."""
+    (ready_vault / "matter.yaml").write_text("schema_version: '1.0'\n", encoding="utf-8")
+    (ready_vault / ".canary").write_text("MOOTLOOP-CANARY-deadbeef\n", encoding="utf-8")
+    with pytest.raises(ExportLinkError):
+        mint_link(ready_vault, MATTER, RUN, name, NOW, signer)
+
+
+def test_traversal_cannot_bypass_another_runs_export_gate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, signer: LinkSigner
+) -> None:
+    """The clean-file gate is evaluated against the run in the token, so a name that
+    reaches a SIBLING run's directory would serve an unattested filing under a ready
+    run's authority — the one thing the export gate exists to prevent."""
+    _seed(tmp_path, "ready.docx")
+    other = tmp_path / "deliverables" / "run-not-ready"
+    other.mkdir(parents=True)
+    (other / "unattested.docx").write_bytes(b"UNATTESTED FILING BYTES")
+    monkeypatch.setattr(
+        "mootloop.gate_ledger.export_ready",
+        lambda v, r: (True, []) if r == RUN else (False, ["attestation"]),
+    )
+    with pytest.raises(ExportLinkError):
+        mint_link(tmp_path, MATTER, RUN, "../run-not-ready/unattested.docx", NOW, signer)
+
+
+def test_symlinked_deliverable_pointing_out_of_the_run_is_rejected(
+    ready_vault: Path, signer: LinkSigner
+) -> None:
+    """Containment is asserted on the REALPATH, so a symlink planted in the run's
+    deliverable dir cannot re-export a file from elsewhere in the vault."""
+    (ready_vault / "matter.yaml").write_text("schema_version: '1.0'\n", encoding="utf-8")
+    (ready_vault / "deliverables" / RUN / "leak.md").symlink_to(ready_vault / "matter.yaml")
+    with pytest.raises(ExportLinkError):
+        mint_link(ready_vault, MATTER, RUN, "leak.md", NOW, signer)
+
+
+def test_resolve_for_download_also_refuses_a_forged_traversal_claim(
+    ready_vault: Path, signer: LinkSigner
+) -> None:
+    """Defense in depth: even a validly-signed token whose ``doc`` claim traverses (one
+    minted before this guard existed) must not resolve a byte on the way back in."""
+    (ready_vault / "matter.yaml").write_text("schema_version: '1.0'\n", encoding="utf-8")
+    token = signer.sign({"m": MATTER, "r": RUN, "d": "../../matter.yaml", "exp": 9e12})
+    claims = validate_token(token, NOW, signer)
+    with pytest.raises(ExportLinkError):
+        resolve_for_download(ready_vault, claims)
+
+
 # --- helpers -----------------------------------------------------------------
 
 

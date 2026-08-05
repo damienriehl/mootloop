@@ -80,13 +80,22 @@ def list_deliverables(vault_root: Path | str, run_id: str) -> list[DeliverableEn
 def _resolve_deliverable(vault_root: Path | str, run_id: str, name: str) -> Path:
     """Resolve a deliverable name to its on-disk path (containment-checked).
 
-    ``name`` is a run-relative POSIX path (it may name a ``docx/…`` subfile);
-    `safe_vault_path` rejects any part that escapes the run's deliverable dir.
+    ``name`` is a run-relative POSIX path (it may name a ``docx/…`` subfile). It is
+    confined to THIS run's deliverable directory: `safe_vault_path` only keeps a path
+    inside the vault, and ``deliverables/<run>/../<other-run>/clean.docx`` stays inside
+    the vault while escaping the run — which would both read arbitrary vault files and
+    evaluate the export-ready gate against the wrong run. So reject path-shaped parts
+    up front and re-assert containment under the run's own directory.
     """
     parts = [p for p in name.split("/") if p]
     if not parts:
         raise ExportLinkError(f"empty deliverable name for run {run_id!r}")
+    if name.startswith("/") or "\\" in name or any(p in (".", "..") for p in parts):
+        raise ExportLinkError(f"invalid deliverable name {name!r} for run {run_id!r}")
+    base = safe_vault_path(vault_root, "deliverables", run_id)
     path = safe_vault_path(vault_root, "deliverables", run_id, *parts)
+    if base not in path.parents:
+        raise ExportLinkError(f"invalid deliverable name {name!r} for run {run_id!r}")
     if not path.is_file():
         raise ExportLinkError(f"unknown deliverable {name!r} for run {run_id!r}")
     return path
