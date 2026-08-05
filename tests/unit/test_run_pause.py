@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import json
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
 
+from mootloop import vault as vault_module
 from mootloop.errors import OrchestratorError
 from mootloop.journal import append, load_state, read_events
+from mootloop.llm import FakeLLMProvider, RawTurnResult
 from mootloop.models.common import DocId
 from mootloop.models.events import (
     RunFinished,
@@ -18,13 +22,16 @@ from mootloop.models.events import (
 )
 from mootloop.models.matter import MatterConfig
 from mootloop.models.requests import RequestItem, RequestSet, RequestType
+from mootloop.models.run import TurnSpec
 from mootloop.orchestrator import (
     pause_run,
     plan_next,
     resume_run,
+    run_with_provider,
     start_run,
     status_summary,
 )
+from mootloop.vault import DEFAULT_HEARTBEAT_THRESHOLD, LOCK_FILE
 
 
 def _projected_spend(vault: Path, run_id: str) -> float:
@@ -163,3 +170,52 @@ def test_conservative_cap_counts_unreconciled_intent(tmp_path: Path) -> None:
     )
     assert plan_next(vault, run_id) == []
     assert status_summary(vault, run_id)["status"] == "capped"
+
+
+# --- run-lock heartbeat across a long run -----------------------------------
+
+
+class _AgingProvider:
+    """A fake provider that ages a fake clock, recording the lock's age each turn.
+
+    Stands in for the real thing: a turn is a model call, and a real drain is
+    hundreds of them, so wall time inside `run_with_provider` runs far past the
+    lock's staleness window.
+    """
+
+    def __init__(self, lock_path: Path, clock: list[datetime], step: timedelta) -> None:
+        self._inner = FakeLLMProvider()
+        self._lock_path = lock_path
+        self._clock = clock
+        self._step = step
+        self.ages: list[timedelta] = []
+
+    def run_turn(self, spec: TurnSpec, prompt: str) -> RawTurnResult:
+        self._clock[0] += self._step
+        payload = json.loads(self._lock_path.read_text(encoding="utf-8"))
+        self.ages.append(self._clock[0] - datetime.fromisoformat(payload["heartbeat_at"]))
+        return self._inner.run_turn(spec, prompt)
+
+
+def test_long_run_keeps_its_lock_heartbeat_fresh(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`run_with_provider` holds the lock for the whole run, so it must heartbeat it.
+
+    Without that, `heartbeat_at` froze at acquire time and the lock aged past
+    `heartbeat_threshold` while the run was still appending to the journal — so
+    `_check_takeover` would hand the vault to a second process mid-run.
+    """
+    vault = _build_vault(tmp_path)
+    run_id = start_run(vault, "discovery-responses", NOW, run_id="pause-0007")
+
+    clock = [datetime(2026, 7, 11, tzinfo=UTC)]
+    monkeypatch.setattr(vault_module, "_now", lambda: clock[0])
+    step = DEFAULT_HEARTBEAT_THRESHOLD * 0.6  # each turn burns most of a window
+    provider = _AgingProvider(vault / "runs" / LOCK_FILE, clock, step)
+
+    run_with_provider(vault, run_id, provider, NOW)  # type: ignore[arg-type]
+
+    assert len(provider.ages) >= 3  # long enough to outlive the window without refreshes
+    # At no point was the live run's own lock old enough for another process to take.
+    assert max(provider.ages) <= DEFAULT_HEARTBEAT_THRESHOLD

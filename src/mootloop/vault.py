@@ -433,12 +433,37 @@ class RunLock:
         self._acquired = True
         return self
 
-    def heartbeat(self) -> None:
-        if not self._acquired:
-            raise LockHeldError("cannot heartbeat a lock that is not held")
-        current = self._read()
-        started = current["started_at"] if current else _now().isoformat()
-        self._write(started_at=datetime.fromisoformat(started))
+    def heartbeat(self, *, best_effort: bool = False) -> bool:
+        """Refresh ``heartbeat_at`` so a held lock does not age into looking stale.
+
+        A long run holds this lock for hours. Nothing else moves ``heartbeat_at``,
+        so without periodic refreshes the lock crosses `heartbeat_threshold` and
+        `_check_takeover` hands the vault to a second process while the first is
+        still writing to it — the exact collision the lock exists to prevent.
+
+        ``best_effort`` is for that run loop: it returns ``False`` instead of
+        raising, because a transient failure to touch a lock file (a full disk, a
+        blipping mount) must never be what kills an otherwise healthy run mid-turn.
+        The next turn tries again; if the condition persists, the run degrades to
+        exactly the takeover-eligible state it had before this existed.
+        """
+        try:
+            if not self._acquired:
+                raise LockHeldError("cannot heartbeat a lock that is not held")
+            current = self._read()
+            started = current["started_at"] if current else _now().isoformat()
+            self._write(started_at=datetime.fromisoformat(started))
+        except (LockHeldError, OSError, KeyError, TypeError, ValueError):
+            if not best_effort:
+                raise
+            logger.warning(
+                "heartbeat failed for lock %s (run %s); it may age into takeover-eligible",
+                self._path,
+                self.run_id,
+                exc_info=True,
+            )
+            return False
+        return True
 
     def release(self) -> None:
         if not self._acquired:

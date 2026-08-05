@@ -950,8 +950,15 @@ def run_with_provider(
     """Drive plan_next/record_turn to completion via ``provider`` (sync in v1)."""
     binding = _binding_for(vault_root, run_id)
     tier_models = _tier_models(vault_root)
-    with RunLock(vault_root, run_id):
+    # This is the one path that holds the run lock for the WHOLE run — hundreds of
+    # turns, hours of wall time — so it is the one path that has to keep the lock's
+    # heartbeat current. Nothing did, so any run outliving `heartbeat_threshold`
+    # (15 min) advertised itself as stale while it was actively appending to the
+    # journal, and the next process to open the vault would take the lock over: two
+    # writers in one matter vault, which is what this lock exists to prevent.
+    with RunLock(vault_root, run_id) as lock:
         while True:
+            lock.heartbeat(best_effort=True)
             state = load_state(vault_root, run_id)
             if state.finished:
                 break
@@ -969,7 +976,11 @@ def run_with_provider(
                 fresh = load_state(vault_root, run_id)
                 if fresh.finished or spec.turn_id in fresh.completed_turns:
                     continue
+                # Both sides of the provider call: the call is the long part, and the
+                # refresh after it is what keeps the NEXT one inside the window.
+                lock.heartbeat(best_effort=True)
                 result: RawTurnResult = provider.run_turn(spec, render_prompt(spec))
+                lock.heartbeat(best_effort=True)
                 _record_spec(
                     vault_root,
                     run_id,
