@@ -111,6 +111,55 @@ def test_courtlistener_status_mapping(cl_status: int, expected: VerificationStat
         assert record.source_url == "https://www.courtlistener.com/opinion/108713/roe-v-wade/"
 
 
+def test_prefix_citation_never_borrows_another_results_verdict() -> None:
+    """A reporter page number that prefixes another (`900 N.W.2d 1` vs `... 100`) must
+    not inherit the longer cite's `200` and cluster URL. The substring match that did
+    this wrote a HALLUCINATED cite into the ledger as `verified` with a real case's URL —
+    the exact failure the citation subsystem exists to prevent."""
+    real, fake = extract_citations(
+        "Smith v. Jones, 900 N.W.2d 100 (Minn. 2017); Ghost v. Nobody, 900 N.W.2d 1 (Minn. 2017)."
+    )
+    payload = [
+        {
+            "citation": "900 N.W.2d 100",
+            "normalized_citations": ["900 N.W.2d 100"],
+            "status": 200,
+            "clusters": [{"absolute_url": "/opinion/1/smith-v-jones/"}],
+        },
+        {
+            "citation": "900 N.W.2d 1",
+            "normalized_citations": ["900 N.W.2d 1"],
+            "status": 404,
+            "clusters": [],
+        },
+    ]
+    records = {
+        r.citation_id: r
+        for r in courtlistener.verify_cases(
+            [real, fake], now=NOW, transport=_cl_transport(payload)
+        )
+    }
+    assert records[real.citation_id].status == VerificationStatus.VERIFIED
+    assert records[fake.citation_id].status == VerificationStatus.UNCONFIRMED
+    assert records[fake.citation_id].source_url is None
+
+
+def test_citation_absent_from_the_response_is_unconfirmed_not_verified() -> None:
+    """Fail closed: a cite the API simply did not answer for gets no other cite's row."""
+    case = _case()
+    payload = [
+        {
+            "citation": "999 U.S. 999",
+            "normalized_citations": ["999 U.S. 999"],
+            "status": 200,
+            "clusters": [{"absolute_url": "/opinion/2/other/"}],
+        }
+    ]
+    [record] = courtlistener.verify_cases([case], now=NOW, transport=_cl_transport(payload))
+    assert record.status == VerificationStatus.UNCONFIRMED
+    assert record.source_url is None
+
+
 def test_courtlistener_http_429_is_pending() -> None:
     case = _case()
     [record] = courtlistener.verify_cases([case], now=NOW, transport=_cl_transport([], status=429))

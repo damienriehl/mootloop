@@ -53,11 +53,19 @@ def _cluster_url(result: dict[str, Any]) -> str | None:
 
 
 def _result_matches(result: dict[str, Any], citation: Citation) -> bool:
+    """Exact identity only — a citation never borrows another result's verdict.
+
+    The ``citation`` field was previously matched with ``in`` (substring). Reporter
+    page numbers routinely prefix one another, so ``900 N.W.2d 1`` matched the result
+    for ``900 N.W.2d 100`` — and since the first matching result wins, a HALLUCINATED
+    cite inherited a real case's ``200`` status and cluster URL and was written into
+    the immutable ledger as ``verified``. A cite with no exact result falls through to
+    ``unconfirmed``, which is the fail-closed answer.
+    """
     normalized = result.get("normalized_citations")
     if isinstance(normalized, list) and citation.normalized in normalized:
         return True
-    cite = result.get("citation")
-    return isinstance(cite, str) and citation.normalized in cite
+    return result.get("citation") == citation.normalized
 
 
 def _record_for(
