@@ -54,6 +54,19 @@ _AUTH_SIGNATURES: tuple[str, ...] = (
 TokenLoader = Callable[[], str | None]
 Clock = Callable[[], datetime]
 
+# Where Claude Code keeps its own state (including `.credentials.json`, which holds the
+# subscription token). This MUST NOT be inside the matter vault: the vault is the one
+# tree the persona sandbox opens for reading, and it is what `mootloop backup` archives.
+# Overridable for hosted deployments whose `~/.mootloop` is a read-only mount, mirroring
+# the `MOOTLOOP_CANARY_REGISTRY` convention.
+ENGINE_CONFIG_ENV = "MOOTLOOP_ENGINE_CONFIG_DIR"
+DEFAULT_ENGINE_CONFIG_DIR = Path.home() / ".mootloop" / "engine-config"
+
+
+def engine_config_root() -> Path:
+    override = os.environ.get(ENGINE_CONFIG_ENV)
+    return Path(override) if override else DEFAULT_ENGINE_CONFIG_DIR
+
 # A reply that is exactly one fenced code block (```json ... ```). The chat surface
 # wraps structured output in a fence; unwrapping it is transport normalization, not
 # output repair — schema validation downstream still rejects anything semantically off.
@@ -114,9 +127,22 @@ class HeadlessClaudeProvider:
         return Path(os.path.realpath(self.vault_root))
 
     def _config_dir(self) -> Path:
+        """Claude Code's state dir for this run — deliberately OUTSIDE the vault.
+
+        It defaulted to ``<vault>/runs/<run_id>/claude-config``, which put the
+        subscription token's `.credentials.json` inside the vault: inside the tree
+        `build_settings` grants ``Read(<vault>/**)`` on, and inside every
+        ``mootloop backup`` archive (`_exclude_staging` drops only ``<matter>/staging``).
+        The deny list carefully closes the door on ``~/.mootloop/secrets.env`` while the
+        credential sat in the room behind it. AGENTS.md: secrets live in
+        ``~/.mootloop/secrets.env`` or the keychain — "never in matter.yaml, config, or
+        the vault".
+        """
         if self.config_dir is not None:
             return Path(self.config_dir)
-        return self.run_dir / "claude-config"
+        run_dir = self.run_dir
+        matter = run_dir.parent.parent.name or "matter"
+        return engine_config_root() / _slug(matter) / _slug(run_dir.name)
 
     def _secrets_real(self) -> Path:
         return Path(os.path.realpath(SECRETS_FILE))
@@ -129,6 +155,7 @@ class HeadlessClaudeProvider:
         vault = str(self._vault_real())
         secrets_path = str(self._secrets_real())
         secrets_dir = str(self._secrets_real().parent)
+        config_dir = str(self._config_dir())
         return {
             "permissions": {
                 # Deny reads/writes anywhere on disk, then re-allow only the vault.
@@ -138,6 +165,8 @@ class HeadlessClaudeProvider:
                     "Edit(/**)",
                     f"Read({secrets_path})",
                     f"Read({secrets_dir}/**)",
+                    # Belt and braces: the CLI's own state dir holds `.credentials.json`.
+                    f"Read({config_dir}/**)",
                     "Bash",
                     "WebFetch",
                     "WebSearch",

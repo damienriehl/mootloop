@@ -21,7 +21,11 @@ from pathlib import Path
 import pytest
 
 from mootloop import secrets
-from mootloop.engine.claude_provider import HeadlessClaudeProvider, _unfence
+from mootloop.engine.claude_provider import (
+    ENGINE_CONFIG_ENV,
+    HeadlessClaudeProvider,
+    _unfence,
+)
 from mootloop.errors import AuthError, SeatLimitError
 from mootloop.models.run import PersonaName, TurnSpec
 
@@ -29,7 +33,7 @@ from mootloop.models.run import PersonaName, TurnSpec
 def _provider(tmp_path: Path, **kw: object) -> HeadlessClaudeProvider:
     vault = tmp_path / "vault"
     vault.mkdir(exist_ok=True)
-    run_dir = tmp_path / "vault" / "runs" / "r1"
+    run_dir = Path(kw.pop("run_dir", tmp_path / "vault" / "runs" / "r1"))  # type: ignore[arg-type]
     run_dir.mkdir(parents=True, exist_ok=True)
     kw.setdefault("oauth_token_loader", lambda: "sk-ant-oat-TESTTOKEN")
     kw.setdefault("api_key_loader", lambda: "sk-ant-api-TESTKEY")
@@ -282,3 +286,44 @@ def test_planted_injection_seams_and_token_redaction(
     scrubbed = secrets.redact(result.text)
     assert _SENTINEL not in scrubbed
     assert "***REDACTED***" in scrubbed
+
+
+# --- the CLI's credential store must never live in the vault ------------------
+
+
+def test_config_dir_defaults_outside_the_vault(tmp_path: Path) -> None:
+    """`CLAUDE_CONFIG_DIR` is where Claude Code persists `.credentials.json` — the
+    subscription token. It defaulted to `<vault>/runs/<run>/claude-config`, i.e. inside
+    the one tree `build_settings` grants `Read(<vault>/**)` on, and inside every
+    `mootloop backup` archive (which excludes only `<matter>/staging`)."""
+    provider = _provider(tmp_path)
+    vault_real = Path(os.path.realpath(provider.vault_root))
+    config_real = Path(os.path.realpath(provider._config_dir()))
+    assert config_real != vault_real
+    assert vault_real not in config_real.parents, (
+        f"the credential store {config_real} is inside the vault {vault_real}"
+    )
+    assert provider.build_env()["CLAUDE_CONFIG_DIR"] == str(provider._config_dir())
+
+
+def test_config_dir_honours_the_env_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Hosted deployments mount `~/.mootloop` read-only (see MOOTLOOP_CANARY_REGISTRY)."""
+    monkeypatch.setenv(ENGINE_CONFIG_ENV, str(tmp_path / "engine-cfg"))
+    provider = _provider(tmp_path)
+    assert str(provider._config_dir()).startswith(str(tmp_path / "engine-cfg"))
+
+
+def test_config_dir_is_per_run_so_sessions_resume(tmp_path: Path) -> None:
+    """`--resume` needs a stable config dir per run, and two runs must not collide."""
+    a = _provider(tmp_path, run_dir=tmp_path / "vault" / "runs" / "run-a")
+    b = _provider(tmp_path, run_dir=tmp_path / "vault" / "runs" / "run-b")
+    assert a._config_dir() != b._config_dir()
+    assert a._config_dir() == _provider(tmp_path, run_dir=a.run_dir)._config_dir()
+
+
+def test_settings_deny_the_credential_store(tmp_path: Path) -> None:
+    provider = _provider(tmp_path)
+    deny = provider.build_settings()["permissions"]["deny"]
+    assert any(str(provider._config_dir()) in rule for rule in deny)
