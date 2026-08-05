@@ -14,9 +14,12 @@ from mootloop.models.matter import MatterConfig
 from mootloop.vault import (
     MATTER_YAML,
     RunLock,
+    _real,
     assert_vault_outside_repo,
     create_vault,
     detect_sync_folder,
+    enclosing_git_repo,
+    init_vault,
     load_matter,
     safe_vault_path,
     validate_id,
@@ -95,6 +98,48 @@ def test_disjoint_vault_repo_ok(tmp_path: Path) -> None:
     repo.mkdir()
     vault.mkdir()
     assert_vault_outside_repo(vault, repo)  # no raise
+
+
+# --- what counts as an enclosing repo ---------------------------------------
+
+
+def test_enclosing_git_repo_finds_a_real_repo(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    (repo / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+    vault = repo / "matters" / "m1"
+    vault.mkdir(parents=True)
+    assert enclosing_git_repo(vault) == _real(repo)
+
+
+def test_enclosing_git_repo_accepts_a_gitlink_file(tmp_path: Path) -> None:
+    """Worktrees and submodules carry a .git *file* pointing at the real dir."""
+    repo = tmp_path / "worktree"
+    repo.mkdir()
+    (repo / ".git").write_text("gitdir: /elsewhere/.git/worktrees/wt\n", encoding="utf-8")
+    assert enclosing_git_repo(repo) == _real(repo)
+
+
+def test_empty_git_directory_is_not_a_repo(tmp_path: Path) -> None:
+    """A stray empty .git (they turn up in shared parents like /tmp) must not
+    make every directory beneath it look like a repo — git would not resolve it."""
+    (tmp_path / ".git").mkdir()
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    assert enclosing_git_repo(vault) is None
+
+
+def test_stray_git_directory_does_not_block_vault_creation(
+    tmp_path: Path, matter: MatterConfig
+) -> None:
+    """End-to-end: a vault under a stray empty .git still initializes."""
+    (tmp_path / ".git").mkdir()
+    vault = init_vault(
+        tmp_path / "vault",
+        matter,
+        registry_path=tmp_path / "canaries.json",
+    )
+    assert (vault / MATTER_YAML).is_file()
 
 
 # --- sync-folder detection --------------------------------------------------

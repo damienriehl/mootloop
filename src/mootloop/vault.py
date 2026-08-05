@@ -258,6 +258,20 @@ def create_vault(
     return root
 
 
+def _is_git_marker(dot_git: Path) -> bool:
+    """True when ``.git`` really marks a repo, mirroring git's own test.
+
+    A gitlink file (worktree/submodule) counts. A directory counts only when it
+    carries ``HEAD`` — an empty or partial ``.git`` directory is not a repo, and
+    git itself would not resolve one. Stray ``.git`` directories do appear in
+    shared parents like ``/tmp``; treating those as repos would wrongly forbid
+    every vault beneath them.
+    """
+    if dot_git.is_file():
+        return True
+    return (dot_git / "HEAD").exists()
+
+
 def enclosing_git_repo(path: Path | str) -> Path | None:
     """Return the git work-tree root enclosing ``path`` (or the nearest existing
     ancestor), or None. Used to keep vaults out of any repo."""
@@ -266,7 +280,7 @@ def enclosing_git_repo(path: Path | str) -> Path | None:
         cur = cur.parent
     cur = _real(cur)
     for ancestor in (cur, *cur.parents):
-        if (ancestor / ".git").exists():
+        if _is_git_marker(ancestor / ".git"):
             return ancestor
     return None
 
