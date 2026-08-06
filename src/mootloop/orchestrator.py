@@ -35,7 +35,7 @@ from mootloop.journal import (
     read_events,
     write_turn_body,
 )
-from mootloop.llm import LLMProvider, RawTurnResult, TokenUsage
+from mootloop.llm import LLMProvider, TokenUsage
 from mootloop.models.budget import EstimateRange
 from mootloop.models.citations import Citation
 from mootloop.models.events import (
@@ -67,6 +67,8 @@ from mootloop.models.run import (
     TurnRecord,
     TurnSpec,
 )
+from mootloop.provider_driver import assemble as _assemble
+from mootloop.provider_driver import write_observed_status as _write_observed_status
 from mootloop.stages import (
     RUBRIC_GATE_STAGE,
     RubricGateStage,
@@ -272,20 +274,116 @@ def record_turn(
     now: str,
     *,
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+    provider_call_id: str | None = None,
 ) -> TurnRecord | DiscardedTurn:
     """Validate -> degeneracy gate -> journal. Derailment => discard (never repair)."""
     binding = _binding_for(vault_root, run_id)
     with RunLock(vault_root, run_id):
         state = load_state(vault_root, run_id)
         if turn_id in state.completed_turns:
-            return state.completed_turns[turn_id]  # idempotent
+            record = state.completed_turns[turn_id]
+            # Idempotent for the RECORD, never for the money: this call reached a
+            # provider and burned tokens even though the slot was already filled (a
+            # lost lease, a re-drained queue item). Booking is suppressed only for an
+            # exact replay of a result already on the ledger — see `_book_spend`.
+            _book_spend(
+                vault_root,
+                run_id,
+                turn_id,
+                usage,
+                record.spec.model,
+                now,
+                dedupe=True,
+                provider_call_id=provider_call_id,
+            )
+            return record
         units = load_request_units(vault_root)
         facts = _load_facts(vault_root)
         specs = _plan(run_id, state, binding, units, facts, max_attempts, _tier_models(vault_root))
         spec = _find_spec_in(specs, turn_id)
         return _record_spec(
-            vault_root, run_id, spec, raw_text, usage, now, binding, units, state, max_attempts
+            vault_root,
+            run_id,
+            spec,
+            raw_text,
+            usage,
+            now,
+            binding,
+            units,
+            state,
+            max_attempts,
+            provider_call_id,
         )
+
+
+def _book_spend(
+    vault_root: Path | str,
+    run_id: str,
+    turn_id: str,
+    usage: TokenUsage | None,
+    model: str | None,
+    now: str,
+    *,
+    dedupe: bool = False,
+    provider_call_id: str | None = None,
+) -> None:
+    """Append the ``SpendRecorded`` for one provider call.
+
+    ``model`` is the model the run PLANNED (``spec.model``) — the identity
+    ``TurnIntent.max_plausible_usd`` reserved against — so the write-ahead reservation
+    and its settlement can never be priced off two different keys; ``usage.model``
+    still records what the provider reported.
+
+    ``dedupe`` guards the one path that can be reached without a fresh provider call:
+    re-recording an already-completed turn. New providers identify the invocation
+    directly. Legacy callers without an identity retain the historical usage-signature
+    fallback so old integrations and journals remain idempotent.
+    """
+    if usage is None:
+        return
+    if dedupe:
+        prior = (
+            e
+            for e in read_events(vault_root, run_id)
+            if isinstance(e, SpendRecorded) and e.turn_id == turn_id
+        )
+        if provider_call_id is not None:
+            if any(e.provider_call_id == provider_call_id for e in prior):
+                return
+        else:
+            signature = (
+                usage.input_tokens,
+                usage.cache_read,
+                usage.cache_write,
+                usage.output_tokens,
+                usage.model,
+            )
+            if any(
+                (
+                    e.input_tokens,
+                    e.cache_read,
+                    e.cache_write,
+                    e.output_tokens,
+                    e.model,
+                )
+                == signature
+                for e in prior
+            ):
+                return
+    append(
+        vault_root,
+        run_id,
+        SpendRecorded(
+            turn_id=turn_id,
+            input_tokens=usage.input_tokens,
+            cache_read=usage.cache_read,
+            cache_write=usage.cache_write,
+            output_tokens=usage.output_tokens,
+            model=usage.model,
+            usd_equiv=budget.cost_of(usage, model or usage.model, _date_of(now)),
+            provider_call_id=provider_call_id,
+        ),
+    )
 
 
 def _record_spec(
@@ -299,20 +397,43 @@ def _record_spec(
     units: list[RequestItem],
     state: RunState,
     max_attempts: int,
+    provider_call_id: str | None,
 ) -> TurnRecord | DiscardedTurn:
     model_cls = OUTPUT_SCHEMAS[spec.output_schema_name]
     try:
         output = model_cls.model_validate_json(raw_text)
     except ValidationError as exc:
+        detail = "; ".join(
+            f"{'.'.join(str(p) for p in err['loc'])}: {err['msg']}" for err in exc.errors()[:6]
+        )
         return _discard(
-            vault_root, run_id, spec, f"schema-invalid: {exc.error_count()} error(s)", max_attempts
+            vault_root,
+            run_id,
+            spec,
+            f"schema-invalid: {exc.error_count()} error(s)",
+            max_attempts,
+            usage=usage,
+            now=now,
+            detail=f"your previous output failed `{spec.output_schema_name}` validation — {detail}",
+            provider_call_id=provider_call_id,
         )
 
     gate = degeneracy.evaluate(output)  # type: ignore[arg-type]
     append(vault_root, run_id, GateEvaluated(turn_id=spec.turn_id, result=gate))
     if gate.status != "pass":
         reasons = "; ".join(f.code for f in gate.findings)
-        return _discard(vault_root, run_id, spec, f"degenerate: {reasons}", max_attempts)
+        detail = "; ".join(f"{f.code}: {f.message}" for f in gate.findings[:6])
+        return _discard(
+            vault_root,
+            run_id,
+            spec,
+            f"degenerate: {reasons}",
+            max_attempts,
+            usage=usage,
+            now=now,
+            detail=f"your previous output was discarded by the degeneracy gate — {detail}",
+            provider_call_id=provider_call_id,
+        )
 
     gate_results: list[GateResult] = [gate]
     # Deterministic completeness gate on every draft (presence criteria; plan D7) —
@@ -340,20 +461,15 @@ def _record_spec(
     # Attorney-gate decisions (plan P-28): every draft/bolster turn may imply gates.
     if isinstance(output, DraftOutput):
         decisions.derive_and_store(vault_root, run_id, spec, output, units)
-    if usage is not None:
-        append(
-            vault_root,
-            run_id,
-            SpendRecorded(
-                turn_id=spec.turn_id,
-                input_tokens=usage.input_tokens,
-                cache_read=usage.cache_read,
-                cache_write=usage.cache_write,
-                output_tokens=usage.output_tokens,
-                model=usage.model,
-                usd_equiv=budget.cost_of(usage, usage.model, _date_of(now)),
-            ),
-        )
+    _book_spend(
+        vault_root,
+        run_id,
+        spec.turn_id,
+        usage,
+        spec.model,
+        now,
+        provider_call_id=provider_call_id,
+    )
 
     # Final rubric gate: aggregate the decorrelated panel once the last seat lands.
     _maybe_emit_rubric_gate(vault_root, run_id, spec, binding, units)
@@ -413,6 +529,25 @@ def _operative_citations(vault_root: Path | str, run_id: str) -> list[Citation]:
             for citation in extract_citations(text, source_turn_id=record.spec.turn_id):
                 found.setdefault(citation.citation_id, citation)
     return list(found.values())
+
+
+def operative_draft_turn_ids(vault_root: Path | str, run_id: str) -> dict[str, str]:
+    """``request_id -> turn_id`` of each request's operative (final) draft.
+
+    The gate ledger uses this to answer "which draft's gate verdict governs export":
+    the one whose text would actually be served, not every draft the run ever made.
+    """
+    binding = _binding_for(vault_root, run_id)
+    state = load_state(vault_root, run_id)
+    units = load_request_units(vault_root)
+    facts = _load_facts(vault_root)
+    out: dict[str, str] = {}
+    for i in range(len(units)):
+        ctx = _context_for(run_id, state, binding, units, facts, i, DEFAULT_MAX_ATTEMPTS)
+        record = ctx.operative_draft()
+        if record is not None:
+            out[str(units[i].request_id)] = record.spec.turn_id
+    return out
 
 
 def operative_drafts(
@@ -509,11 +644,37 @@ def effective_max_attempts(state: RunState, max_attempts: int = DEFAULT_MAX_ATTE
 
 
 def _discard(
-    vault_root: Path | str, run_id: str, spec: TurnSpec, reason: str, max_attempts: int
+    vault_root: Path | str,
+    run_id: str,
+    spec: TurnSpec,
+    reason: str,
+    max_attempts: int,
+    *,
+    usage: TokenUsage | None = None,
+    now: str,
+    detail: str = "",
+    provider_call_id: str | None = None,
 ) -> DiscardedTurn:
+    # A discarded turn is thrown away, but it was not free: the provider ran and
+    # billed for it. Book it BEFORE the discard so the cap sees the money even on the
+    # attempt that trips `max_attempts`, and so the turn's write-ahead `TurnIntent`
+    # reservation is reconciled by a real settlement instead of lingering as pending.
+    _book_spend(
+        vault_root,
+        run_id,
+        spec.turn_id,
+        usage,
+        spec.model,
+        now,
+        provider_call_id=provider_call_id,
+    )
     state = load_state(vault_root, run_id)
     attempt = state.discarded.get(spec.turn_id, 0) + 1
-    append(vault_root, run_id, TurnDiscarded(turn_id=spec.turn_id, reason=reason, attempt=attempt))
+    append(
+        vault_root,
+        run_id,
+        TurnDiscarded(turn_id=spec.turn_id, reason=reason, attempt=attempt, detail=detail),
+    )
     if attempt >= effective_max_attempts(state, max_attempts):
         # Counter-capped: the run pauses, journal intact, never silently absorbed.
         append(vault_root, run_id, RunFinished(status="needs_attention"))
@@ -850,99 +1011,6 @@ def reopen_enqueue_pending(vault_root: Path | str, run_id: str) -> bool:
         and isinstance(events[-1], RunReopened)
         and load_state(vault_root, run_id).status == "running"
     )
-
-
-def _write_observed_status(
-    vault_root: Path | str,
-    run_id: str,
-    binding: TaskBinding,
-    units: list[RequestItem],
-) -> None:
-    """Observed mode: overwrite ``runs/<run-id>/STATUS.md`` (a derived view)."""
-    state = load_state(vault_root, run_id)
-    if state.mode != "observed":
-        return
-    path = safe_vault_path(vault_root, "runs", run_id, "STATUS.md")
-    atomic_write_text(path, _render_status_md(vault_root, run_id, binding, units, state))
-
-
-def _render_status_md(
-    vault_root: Path | str,
-    run_id: str,
-    binding: TaskBinding,
-    units: list[RequestItem],
-    state: RunState,
-) -> str:
-    matter = load_matter(vault_root)
-    facts = _load_facts(vault_root)
-    lines: list[str] = [
-        f"# Run status — `{run_id}`",
-        "",
-        f"- Matter: `{matter.matter_id}`",
-        f"- Task: `{state.task}`  ·  Mode: `{state.mode}`  ·  Status: `{state.status}`",
-        f"- Spend so far: ${state.total_spend_usd:.4f} (notional)",
-        "",
-        "## Stage progress",
-        "",
-        "| request | stage |",
-        "| --- | --- |",
-    ]
-    for i in range(len(units)):
-        ctx = _context_for(run_id, state, binding, units, facts, i, DEFAULT_MAX_ATTEMPTS)
-        stage = first_incomplete_stage(ctx) or "complete"
-        lines.append(f"| `{units[i].request_id}` | {stage} |")
-    open_decisions = decisions.DecisionStore(vault_root, run_id).list_open()
-    lines += ["", "## Open decisions", ""]
-    if not open_decisions:
-        lines.append("_none_")
-    else:
-        for decision in open_decisions:
-            mode = decisions.gate_mode_for(matter, decision.kind)
-            lines.append(f"- `{decision.decision_id}` [{mode}] {decision.proposal.summary}")
-    lines += ["", f"STATE: {state_marker(state.status)}", ""]
-    return "\n".join(lines)
-
-
-def _assemble(
-    vault_root: Path | str,
-    run_id: str,
-    binding: TaskBinding,
-    units: list[RequestItem],
-    state: RunState,
-) -> Path:
-    """Write the deliverable: a markdown master with one fenced anchor per request."""
-    facts = _load_facts(vault_root)
-    lines: list[str] = [
-        f"# Discovery Responses — {binding.config.task}",
-        "",
-        f"Run: `{run_id}` · Requests: {len(units)} · Rubric: {binding.config.rubric_id}",
-        "",
-    ]
-    for i in range(len(units)):
-        request = units[i]
-        ctx = _context_for(run_id, state, binding, units, facts, i, DEFAULT_MAX_ATTEMPTS)
-        record = ctx.operative_draft()
-        draft = DraftOutput.model_validate(record.output) if record else None
-        lines.append(f"::: {{#resp-{request.request_id}}}")
-        lines.append(f"## {request.request_id}")
-        lines.append("")
-        lines.append(draft.response_text if draft else "_no response drafted_")
-        if draft and draft.objections:
-            lines.append("")
-            lines.append("**Objections**")
-            for objection in draft.objections:
-                lines.append(f"- {objection.basis} — {objection.text}")
-        lines.append("")
-        lines.append(":::")
-        lines.append("")
-    deliverable = binding.config.deliverables[0] if binding.config.deliverables else "draft.md"
-    path = safe_vault_path(vault_root, "deliverables", deliverable)
-    from mootloop.vault import atomic_write_text
-
-    atomic_write_text(path, "\n".join(lines))
-    return path
-
-
 # --- public: drive (fake/headless provider) ---------------------------------
 
 
@@ -956,41 +1024,16 @@ def run_with_provider(
     max_concurrency: int = 1,
 ) -> RunState:
     """Drive plan_next/record_turn to completion via ``provider`` (sync in v1)."""
-    binding = _binding_for(vault_root, run_id)
-    tier_models = _tier_models(vault_root)
-    with RunLock(vault_root, run_id):
-        while True:
-            state = load_state(vault_root, run_id)
-            if state.finished:
-                break
-            units = load_request_units(vault_root)
-            if _over_cap(vault_root, state):
-                _cap_transition(vault_root, run_id, binding, units)
-                break
-            facts = _load_facts(vault_root)
-            specs = _plan(run_id, state, binding, units, facts, max_attempts, tier_models)
-            if not specs:
-                _finalize(vault_root, run_id, binding, units, now)
-                _write_observed_status(vault_root, run_id, binding, units)
-                break
-            for spec in specs:
-                fresh = load_state(vault_root, run_id)
-                if fresh.finished or spec.turn_id in fresh.completed_turns:
-                    continue
-                result: RawTurnResult = provider.run_turn(spec, render_prompt(spec))
-                _record_spec(
-                    vault_root,
-                    run_id,
-                    spec,
-                    result.text,
-                    result.usage,
-                    now,
-                    binding,
-                    units,
-                    fresh,
-                    max_attempts,
-                )
-    return load_state(vault_root, run_id)
+    from mootloop.provider_driver import run_with_provider as drive
+
+    return drive(
+        vault_root,
+        run_id,
+        provider,
+        now,
+        max_attempts=max_attempts,
+        max_concurrency=max_concurrency,
+    )
 
 
 # --- internals --------------------------------------------------------------

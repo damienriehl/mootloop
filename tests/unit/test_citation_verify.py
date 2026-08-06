@@ -15,7 +15,12 @@ from mootloop.citations import courtlistener, mn_revisor
 from mootloop.citations.extract import extract_citations
 from mootloop.citations.http import HttpRequest, fetch
 from mootloop.citations.ledger import ResearchQueue
-from mootloop.citations.ratelimit import TokenBucket
+from mootloop.citations.ratelimit import (
+    CL_CAPACITY,
+    TokenBucket,
+    default_limiter,
+    reset_default_limiter,
+)
 from mootloop.citations.verify import (
     CITATOR_DISCLOSURE,
     citation_gate,
@@ -109,6 +114,55 @@ def test_courtlistener_status_mapping(cl_status: int, expected: VerificationStat
     assert record.status == expected
     if expected == VerificationStatus.VERIFIED:
         assert record.source_url == "https://www.courtlistener.com/opinion/108713/roe-v-wade/"
+
+
+def test_prefix_citation_never_borrows_another_results_verdict() -> None:
+    """A reporter page number that prefixes another (`900 N.W.2d 1` vs `... 100`) must
+    not inherit the longer cite's `200` and cluster URL. The substring match that did
+    this wrote a HALLUCINATED cite into the ledger as `verified` with a real case's URL —
+    the exact failure the citation subsystem exists to prevent."""
+    real, fake = extract_citations(
+        "Smith v. Jones, 900 N.W.2d 100 (Minn. 2017); Ghost v. Nobody, 900 N.W.2d 1 (Minn. 2017)."
+    )
+    payload = [
+        {
+            "citation": "900 N.W.2d 100",
+            "normalized_citations": ["900 N.W.2d 100"],
+            "status": 200,
+            "clusters": [{"absolute_url": "/opinion/1/smith-v-jones/"}],
+        },
+        {
+            "citation": "900 N.W.2d 1",
+            "normalized_citations": ["900 N.W.2d 1"],
+            "status": 404,
+            "clusters": [],
+        },
+    ]
+    records = {
+        r.citation_id: r
+        for r in courtlistener.verify_cases(
+            [real, fake], now=NOW, transport=_cl_transport(payload)
+        )
+    }
+    assert records[real.citation_id].status == VerificationStatus.VERIFIED
+    assert records[fake.citation_id].status == VerificationStatus.UNCONFIRMED
+    assert records[fake.citation_id].source_url is None
+
+
+def test_citation_absent_from_the_response_is_unconfirmed_not_verified() -> None:
+    """Fail closed: a cite the API simply did not answer for gets no other cite's row."""
+    case = _case()
+    payload = [
+        {
+            "citation": "999 U.S. 999",
+            "normalized_citations": ["999 U.S. 999"],
+            "status": 200,
+            "clusters": [{"absolute_url": "/opinion/2/other/"}],
+        }
+    ]
+    [record] = courtlistener.verify_cases([case], now=NOW, transport=_cl_transport(payload))
+    assert record.status == VerificationStatus.UNCONFIRMED
+    assert record.source_url is None
 
 
 def test_courtlistener_http_429_is_pending() -> None:
@@ -303,3 +357,20 @@ def test_token_bucket_sleeps_only_when_empty() -> None:
     assert slept == []  # first two are free
     bucket.acquire()
     assert slept and slept[0] == pytest.approx(1.0)  # third waits one refill
+
+
+def test_default_limiter_is_one_shared_process_wide_bucket() -> None:
+    """The documented 60/min budget is only real if every caller draws on ONE bucket.
+
+    A fresh bucket per call meant N concurrent verifications could issue 60N
+    requests a minute at CourtListener while each looked compliant.
+    """
+    reset_default_limiter()
+    try:
+        first = default_limiter()
+        assert default_limiter() is first  # same instance, not a look-alike
+        first.acquire(CL_CAPACITY)  # drain the whole minute's budget
+        # A caller that asks for "the" limiter now inherits the drained budget.
+        assert default_limiter().tokens < 1.0
+    finally:
+        reset_default_limiter()

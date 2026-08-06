@@ -17,7 +17,7 @@ from mootloop import attest
 from mootloop.decisions import DecisionStore
 from mootloop.journal import load_state, read_events
 from mootloop.models.events import GateEvaluated
-from mootloop.orchestrator import load_request_units
+from mootloop.orchestrator import load_request_units, operative_draft_turn_ids
 from mootloop.vault import atomic_write_text, safe_vault_path
 
 # Per-request turn gates, in report order, plus the run-level gates. Degeneracy and
@@ -39,11 +39,31 @@ def _worse(a: str, b: str) -> str:
     return a if _SEVERITY.get(a, 1) >= _SEVERITY.get(b, 1) else b
 
 
-def _turn_gate_status(vault_root: Path | str, run_id: str) -> tuple[dict[str, dict[str, str]], str]:
-    """Fold per-request turn-gate statuses and the run-level citation status from the
-    journal. Absent gates default to ``pending`` (fail closed)."""
+def _turn_gate_status(
+    vault_root: Path | str, run_id: str
+) -> tuple[dict[str, dict[str, str]], dict[str, dict[str, str]], str]:
+    """Fold per-request turn-gate statuses and the run-level citation status.
+
+    Returns ``(operative, superseded, citation_status)``. A turn gate recorded on the
+    request's *operative* draft is answered by that draft: it is the text that would be
+    served, so its verdict is the one that gates export. Taking the worst status across
+    every draft the run ever produced meant a fabrication finding raised on draft N and
+    genuinely cured in draft N+1 kept the run non-exportable forever — the loop's whole
+    purpose is to cure findings, and the ledger refused to notice.
+
+    A gate NOT recorded on the operative draft (the run-level rubric gate rides its own
+    rubric-seat turn) keeps the worst-across-turns fold, and so does a request whose
+    operative draft is missing the gate entirely — fail closed on both.
+
+    ``superseded`` keeps the audit trail inside the derived view: for every gate whose
+    operative verdict is better than the run's historical worst, it records what that
+    worst was. The journal's ``GateEvaluated`` events are append-only and untouched;
+    nothing is erased, only the gating decision changes.
+    """
     state = load_state(vault_root, run_id)
-    per_request: dict[str, dict[str, str]] = {}
+    operative_turn = operative_draft_turn_ids(vault_root, run_id)
+    per_turn: dict[str, dict[str, str]] = {}
+    worst: dict[str, dict[str, str]] = {}
     citation_status = "pending"  # never verified -> blocks (plan H8, fail closed)
     for event in read_events(vault_root, run_id):
         if not isinstance(event, GateEvaluated):
@@ -58,9 +78,21 @@ def _turn_gate_status(vault_root: Path | str, run_id: str) -> tuple[dict[str, di
         if record is None or record.spec.request_id is None:
             continue
         rid = str(record.spec.request_id)
-        bucket = per_request.setdefault(rid, {})
+        per_turn.setdefault(event.turn_id, {})[gate] = status  # re-evaluation wins
+        bucket = worst.setdefault(rid, {})
         bucket[gate] = _worse(bucket.get(gate, "pass"), status) if gate in bucket else status
-    return per_request, citation_status
+
+    per_request: dict[str, dict[str, str]] = {}
+    superseded: dict[str, dict[str, str]] = {}
+    for rid, historical in worst.items():
+        on_operative = per_turn.get(operative_turn.get(rid, ""), {})
+        row: dict[str, str] = {}
+        for gate, was in historical.items():
+            row[gate] = on_operative.get(gate, was)
+            if row[gate] != was:
+                superseded.setdefault(rid, {})[gate] = was
+        per_request[rid] = row
+    return per_request, superseded, citation_status
 
 
 @dataclass(frozen=True)
@@ -72,6 +104,10 @@ class GateLedgerDoc:
     blockers: list[str]
     overall: dict[str, str]
     gates: dict[str, dict[str, str]]
+    # request_id -> gate -> the worst status this run ever recorded for that gate, when
+    # the operative draft has since cured it. The finding is not erased by being cured;
+    # it stops gating, and stays visible here (and in the journal) as history.
+    superseded: dict[str, dict[str, str]]
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -80,12 +116,13 @@ class GateLedgerDoc:
             "blockers": self.blockers,
             "overall": self.overall,
             "gates": self.gates,
+            "superseded": self.superseded,
         }
 
 
 def build_ledger(vault_root: Path | str, run_id: str) -> GateLedgerDoc:
     """Assemble the gate-ledger document (pure; no writes)."""
-    per_request, citation_status = _turn_gate_status(vault_root, run_id)
+    per_request, superseded, citation_status = _turn_gate_status(vault_root, run_id)
     units = load_request_units(vault_root)
     open_decisions = DecisionStore(vault_root, run_id).list_open()
     open_by_request: dict[str, int] = {}
@@ -124,6 +161,7 @@ def build_ledger(vault_root: Path | str, run_id: str) -> GateLedgerDoc:
             "attestation": attestation_status,
         },
         gates=gates,
+        superseded=superseded,
     )
 
 

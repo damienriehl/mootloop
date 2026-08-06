@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import multiprocessing
 import os
+import time
 from datetime import timedelta
 from pathlib import Path
 
@@ -14,13 +16,17 @@ from mootloop.models.matter import MatterConfig
 from mootloop.vault import (
     MATTER_YAML,
     RunLock,
+    _real,
     assert_vault_outside_repo,
     create_vault,
     detect_sync_folder,
+    enclosing_git_repo,
+    init_vault,
     load_matter,
     safe_vault_path,
     validate_id,
 )
+from tests.conftest import make_matter
 
 # --- ID validation ----------------------------------------------------------
 
@@ -95,6 +101,48 @@ def test_disjoint_vault_repo_ok(tmp_path: Path) -> None:
     repo.mkdir()
     vault.mkdir()
     assert_vault_outside_repo(vault, repo)  # no raise
+
+
+# --- what counts as an enclosing repo ---------------------------------------
+
+
+def test_enclosing_git_repo_finds_a_real_repo(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    (repo / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+    vault = repo / "matters" / "m1"
+    vault.mkdir(parents=True)
+    assert enclosing_git_repo(vault) == _real(repo)
+
+
+def test_enclosing_git_repo_accepts_a_gitlink_file(tmp_path: Path) -> None:
+    """Worktrees and submodules carry a .git *file* pointing at the real dir."""
+    repo = tmp_path / "worktree"
+    repo.mkdir()
+    (repo / ".git").write_text("gitdir: /elsewhere/.git/worktrees/wt\n", encoding="utf-8")
+    assert enclosing_git_repo(repo) == _real(repo)
+
+
+def test_empty_git_directory_is_not_a_repo(tmp_path: Path) -> None:
+    """A stray empty .git (they turn up in shared parents like /tmp) must not
+    make every directory beneath it look like a repo — git would not resolve it."""
+    (tmp_path / ".git").mkdir()
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    assert enclosing_git_repo(vault) is None
+
+
+def test_stray_git_directory_does_not_block_vault_creation(
+    tmp_path: Path, matter: MatterConfig
+) -> None:
+    """End-to-end: a vault under a stray empty .git still initializes."""
+    (tmp_path / ".git").mkdir()
+    vault = init_vault(
+        tmp_path / "vault",
+        matter,
+        registry_path=tmp_path / "canaries.json",
+    )
+    assert (vault / MATTER_YAML).is_file()
 
 
 # --- sync-folder detection --------------------------------------------------
@@ -239,6 +287,22 @@ def test_run_lock_takes_over_stale_heartbeat(tmp_path: Path) -> None:
     lock.release()
 
 
+def test_stale_owner_cannot_heartbeat_after_takeover(tmp_path: Path) -> None:
+    """A replaced owner must not be able to overwrite its successor's lock."""
+    vault = tmp_path / "vault"
+    (vault / "runs").mkdir(parents=True)
+    old = RunLock(vault, "old", heartbeat_threshold=timedelta(0))
+    old.acquire()
+
+    new = RunLock(vault, "new", heartbeat_threshold=timedelta(0))
+    new.acquire()
+
+    with pytest.raises(LockHeldError):
+        old.heartbeat()
+    assert json.loads(new._path.read_text(encoding="utf-8"))["run_id"] == "new"
+    new.release()
+
+
 def test_run_lock_refuses_live_local_lock(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     (vault / "runs").mkdir(parents=True)
@@ -272,3 +336,181 @@ def test_run_lock_refuses_cross_host_without_override(tmp_path: Path) -> None:
     lock.acquire()
     assert json.loads(lock._path.read_text())["run_id"] == "run-4"
     lock.release()
+
+
+# --- run lock: acquisition is atomic, not read-then-write --------------------
+
+
+def _hammer_lock(vault: Path, barrier_dir: Path, idx: int) -> int:
+    """Child process: take the lock, prove exclusivity with a marker file, release."""
+    marker = barrier_dir / "held"
+    try:
+        with RunLock(vault, f"run-{idx}"):
+            if marker.exists():
+                return 2  # someone else was inside the critical section
+            marker.write_text(str(idx), encoding="utf-8")
+            time.sleep(0.02)
+            marker.unlink()
+            return 0
+    except LockHeldError:
+        return 1  # correctly refused — this is the expected loser outcome
+
+
+def _race_stale_takeover(vault: Path, barrier: object, idx: int, results: object) -> None:
+    """Force two processes past the stale check at the same time."""
+    lock = RunLock(vault, f"contender-{idx}")
+    check = lock._check_takeover
+
+    def synchronized_check(existing: dict[str, object]) -> None:
+        check(existing)
+        time.sleep(0.1)
+
+    lock._check_takeover = synchronized_check  # type: ignore[method-assign]
+    try:
+        barrier.wait()  # type: ignore[attr-defined]
+        lock.acquire()
+    except LockHeldError:
+        results.put(False)  # type: ignore[attr-defined]
+    else:
+        results.put(True)  # type: ignore[attr-defined]
+
+
+def test_concurrent_acquire_never_lets_two_processes_in(tmp_path: Path) -> None:
+    """`acquire` used to read, then write, with no atomic gate. Two processes that both
+    read "free" before either wrote both believed they held the lock — and this lock is
+    the only thing serializing `record_turn`'s load-fold-append cycle."""
+    vault = tmp_path / "vault"
+    (vault / "runs").mkdir(parents=True)
+    barrier = tmp_path / "barrier"
+    barrier.mkdir()
+
+    ctx = multiprocessing.get_context("fork")
+    with ctx.Pool(6) as pool:
+        codes = pool.starmap(_hammer_lock, [(vault, barrier, i) for i in range(6)])
+
+    assert 2 not in codes, f"two processes were inside the critical section: {codes}"
+    assert codes.count(0) >= 1, f"nobody acquired the lock: {codes}"
+
+
+def test_concurrent_stale_takeover_has_exactly_one_winner(tmp_path: Path) -> None:
+    """Two contenders observing one stale generation cannot both acquire it."""
+    vault = tmp_path / "vault"
+    lock_path = vault / "runs" / ".lock"
+    lock_path.parent.mkdir(parents=True)
+    lock_path.write_text(
+        json.dumps(
+            {
+                "pid": 999999,
+                "hostname": __import__("socket").gethostname(),
+                "run_id": "stale",
+                "started_at": "2020-01-01T00:00:00+00:00",
+                "heartbeat_at": "2020-01-01T00:00:00+00:00",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    ctx = multiprocessing.get_context("fork")
+    barrier = ctx.Barrier(2)
+    results = ctx.Queue()
+    processes = [
+        ctx.Process(target=_race_stale_takeover, args=(vault, barrier, idx, results))
+        for idx in range(2)
+    ]
+    for process in processes:
+        process.start()
+    for process in processes:
+        process.join(timeout=5)
+        assert process.exitcode == 0
+
+    winners = [results.get(timeout=1) for _ in processes]
+    assert winners.count(True) == 1
+
+
+def test_unreadable_lock_file_fails_closed(tmp_path: Path) -> None:
+    """A lock whose contents cannot be parsed is a blocker, not a green light — the
+    same posture the cross-host branch already takes. Overriding is the escape hatch."""
+    vault = tmp_path / "vault"
+    lock_path = vault / "runs" / ".lock"
+    lock_path.parent.mkdir(parents=True)
+    lock_path.write_text("not json at all", encoding="utf-8")
+
+    with pytest.raises(LockHeldError):
+        RunLock(vault, "run-x").acquire()
+
+    lock = RunLock(vault, "run-x", override=True)
+    lock.acquire()
+    assert json.loads(lock_path.read_text())["run_id"] == "run-x"
+    lock.release()
+
+
+def test_lock_file_is_never_observable_half_written(tmp_path: Path) -> None:
+    """The lock is published by `os.link` from a finished temp file, so a contender's
+    read after losing the race always sees complete JSON."""
+    vault = tmp_path / "vault"
+    (vault / "runs").mkdir(parents=True)
+    lock = RunLock(vault, "run-1")
+    lock.acquire()
+    payload = json.loads((vault / "runs" / ".lock").read_text(encoding="utf-8"))
+    assert payload["run_id"] == "run-1" and payload["pid"] == os.getpid()
+    assert {"pid", "hostname", "run_id", "started_at", "heartbeat_at"} <= payload.keys()
+    lock.release()
+
+
+# --- boundary hardening ------------------------------------------------------
+
+
+@pytest.mark.parametrize("bad", ["abc\n", "abc\r", "abc\n\n", "ok-id\n"])
+def test_validate_id_rejects_trailing_whitespace_and_newlines(bad: str) -> None:
+    """Python's `$` also matches before a trailing newline, so `re.match` accepted
+    `"abc\\n"` — while the pydantic field built from the same pattern rejected it. Ids
+    from here reach the run lock, on-disk filenames, and the canary token body."""
+    with pytest.raises(VaultBoundaryError):
+        validate_id(bad, kind="matter_id")
+
+
+def test_safe_vault_path_rejects_a_nul_byte_as_a_boundary_error(tmp_path: Path) -> None:
+    """`realpath` raises ValueError on a NUL, which the web tier would surface as a 500
+    instead of the typed 400 it maps `VaultBoundaryError` to."""
+    with pytest.raises(VaultBoundaryError):
+        safe_vault_path(tmp_path, "runs", "a\0b")
+
+
+@pytest.mark.parametrize(
+    "dirname",
+    [
+        "OneDrive",  # named in the non-negotiable rule, previously undetected
+        "OneDrive - Riehl Law",  # the business-tenant shape
+        "GoogleDrive-attorney@example.com",  # modern macOS ~/Library/CloudStorage mount
+        "dropbox",  # casing is not a bypass
+    ],
+)
+def test_detect_sync_folder_covers_onedrive_and_scoped_mounts(
+    tmp_path: Path, dirname: str
+) -> None:
+    vault = tmp_path / dirname / "matters" / "m1"
+    vault.mkdir(parents=True)
+    assert detect_sync_folder(vault) is not None
+
+
+def test_create_vault_refuses_a_location_inside_a_git_repo(tmp_path: Path) -> None:
+    """The preflight used to live only in `init_vault`, so every other creation path
+    (notably `MatterRegistry.create`) skipped the non-negotiable repo-boundary rule."""
+    (tmp_path / ".git").mkdir()
+    (tmp_path / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+    matter = make_matter("m1")
+    with pytest.raises(VaultBoundaryError, match="repo"):
+        create_vault(tmp_path / "vault", matter, registry_path=tmp_path / "c.json")
+
+
+def test_create_vault_refuses_a_sync_folder(tmp_path: Path) -> None:
+    dest = tmp_path / "OneDrive" / "matters" / "m1"
+    dest.parent.mkdir(parents=True)
+    matter = make_matter("m1")
+    with pytest.raises(VaultBoundaryError, match="sync"):
+        create_vault(dest, matter, registry_path=tmp_path / "c.json")
+    # The documented override still works.
+    create_vault(
+        dest, matter, registry_path=tmp_path / "c.json", allow_sync_folder=True
+    )
+    assert (dest / MATTER_YAML).is_file()

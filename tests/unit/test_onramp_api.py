@@ -286,3 +286,51 @@ def test_download_requires_access(
 def test_download_rejects_tampered_token(client: TestClient, matter: MatterConfig) -> None:
     resp = client.get("/api/download", params={"token": "garbage.token"}, headers=_AUTH)
     assert resp.status_code == 400
+
+
+# --- the mint route's {name:path} must not escape the run's deliverable dir ---
+
+
+def test_mint_route_refuses_a_traversing_deliverable_name(
+    client: TestClient,
+    registry: MatterRegistry,
+    matter: MatterConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``{name:path}`` accepts slashes, so ``../..`` in the name reaches any vault file.
+    It must 400 rather than mint a link to ``matter.yaml`` or the ``.canary`` tripwire.
+
+    The dot segments are percent-encoded because httpx normalizes a literal ``..`` out
+    of the URL; an attacker's client (or any proxy that forwards ``%2e%2e``) does not."""
+    vault = registry.resolve(matter.matter_id)
+    _seed_deliverables(vault, "r1", "responses.docx")
+    monkeypatch.setattr("mootloop.gate_ledger.export_ready", lambda v, r: (True, []))
+    resp = client.post(
+        f"/api/matters/{matter.matter_id}/runs/r1/deliverables/%2e%2e/%2e%2e/matter.yaml/link",
+        headers=_csrf(client),
+    )
+    assert resp.status_code == 400, resp.text
+    assert resp.json()["error"] == "invalid_link"
+
+
+def test_mint_route_cannot_reach_a_sibling_runs_ungated_filing(
+    client: TestClient,
+    registry: MatterRegistry,
+    matter: MatterConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The export gate is keyed on the run in the URL, so a name that walks into another
+    run would stream that run's unattested clean DOCX under a ready run's authority."""
+    vault = registry.resolve(matter.matter_id)
+    _seed_deliverables(vault, "r1", "responses.docx")
+    _seed_deliverables(vault, "r2-not-ready", "unattested.docx")
+    monkeypatch.setattr(
+        "mootloop.gate_ledger.export_ready",
+        lambda v, r: (True, []) if r == "r1" else (False, ["attestation"]),
+    )
+    resp = client.post(
+        f"/api/matters/{matter.matter_id}/runs/r1"
+        "/deliverables/%2e%2e/r2-not-ready/unattested.docx/link",
+        headers=_csrf(client),
+    )
+    assert resp.status_code == 400, resp.text

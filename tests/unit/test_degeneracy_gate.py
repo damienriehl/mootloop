@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from mootloop.gates.degeneracy import evaluate
 from mootloop.models.run import CritiqueOutput, DraftOutput, JudgeOutput, Objection
 
@@ -69,3 +71,48 @@ def test_critique_needs_self_assessment() -> None:
 
 def test_judge_output_passes_with_assessment() -> None:
     assert evaluate(JudgeOutput(rulings=[], self_assessment="ruled")).status == "pass"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Subject to and without waiving the foregoing, Defendant answers.",
+        # The comma'd form is the MORE common drafting of the same boilerplate.
+        "Subject to, and without waiving, the foregoing objections, Defendant answers.",
+        "Subject to  and  without  waiving the foregoing, Defendant answers.",
+        # A paste out of Word carries non-breaking spaces between the words.
+        "Subject\xa0to\xa0and\xa0without\xa0waiving the foregoing, Defendant answers.",
+        "Subject to and without waiver of the foregoing, Defendant answers.",
+    ],
+)
+def test_subject_to_hedge_survives_punctuation_and_spacing_variants(text: str) -> None:
+    result = evaluate(_draft(response_text=text))
+    assert result.status == "fail"
+    assert any(f.code == "hedge_subject_to" for f in result.findings)
+
+
+def test_hedge_inside_an_objection_also_fails() -> None:
+    """Objection text is rendered into the served document too (`export/master.py`)."""
+    result = evaluate(
+        _draft(
+            response_text="Defendant answers as follows.",
+            objections=[
+                Objection(
+                    basis="relevance",
+                    text="Overbroad. Subject to, and without waiving, this objection, see below.",
+                )
+            ],
+        )
+    )
+    assert result.status == "fail"
+    assert any(f.code == "hedge_subject_to" for f in result.findings)
+
+
+def test_hedge_matcher_does_not_fire_on_ordinary_prose() -> None:
+    """Guard against the looser matcher over-firing on unrelated wording."""
+    for benign in (
+        "Defendant is subject to the protective order and will produce accordingly.",
+        "Plaintiff waived the objection without further argument.",
+        "This response is subject to the Court's scheduling order.",
+    ):
+        assert evaluate(_draft(response_text=benign)).status == "pass", benign

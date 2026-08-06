@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import secrets
+import stat
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -97,20 +98,29 @@ def seed_canary(
 # --- fail-closed grep -------------------------------------------------------
 
 
+def _git_paths(repo_root: Path, *args: str) -> list[str]:
+    """Run a path-listing git command with NUL-delimited output.
+
+    ``-z`` is not optional here. Without it git applies ``core.quotePath`` (on by
+    default) and emits a C-quoted, backslash-escaped literal — ``"na\\303\\257ve.txt"``,
+    quotes included — for any path with a non-ASCII, quote, backslash, or control
+    character in it. That string names no real file, so the scanner used to skip it as
+    a staged deletion. A legal corpus is full of such names (``Müller``, ``Peña``, a
+    smart quote), and each one was a hole straight through the only leak blocker.
+    """
+    out = subprocess.run(
+        ["git", "-C", str(repo_root), *args, "-z"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    return [p for p in out.split("\0") if p]
+
+
 def _tracked_files(repo_root: Path) -> list[str]:
-    tracked = subprocess.run(
-        ["git", "-C", str(repo_root), "ls-files"],
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout.splitlines()
-    staged = subprocess.run(
-        ["git", "-C", str(repo_root), "diff", "--cached", "--name-only"],
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout.splitlines()
-    return sorted({p for p in (*tracked, *staged) if p})
+    tracked = _git_paths(repo_root, "ls-files")
+    staged = _git_paths(repo_root, "diff", "--cached", "--name-only")
+    return sorted({*tracked, *staged})
 
 
 def privacy_grep(
@@ -121,8 +131,8 @@ def privacy_grep(
 
     Fails closed: an unreadable file, a binary that cannot be decoded, or a symlink
     that escapes the repo is reported as an ``unscannable`` finding (a failure). An
-    internal symlink resolving to a regular file inside the repo is safe — its
-    content is already covered by the target's own tracked entry — and is skipped.
+    internal symlink is skipped ONLY when its target is itself tracked — that is the
+    entire justification for skipping it, and it has to be checked, not assumed.
     """
     root = Path(repo_root)
     root_real = Path(os.path.realpath(root))
@@ -131,17 +141,33 @@ def privacy_grep(
     denylist = [s for s in registry["denylist"] if s]
 
     findings: list[Finding] = []
-    for rel in _tracked_files(root):
+    entries = _tracked_files(root)
+    tracked = set(entries)
+    for rel in entries:
         full = root / rel
-        if full.is_symlink():
+        # lstat first, and distinguish its failures. `Path.exists()`/`is_symlink()`
+        # swallow every OSError, so an entry the process cannot stat (an unsearchable
+        # parent directory) used to read as "staged deletion" and be skipped silently.
+        try:
+            st = full.lstat()
+        except FileNotFoundError:
+            continue  # staged deletion — nothing to leak
+        except OSError as exc:
+            findings.append(Finding(rel, "unscannable", f"unstattable: {exc}"))
+            continue
+        if stat.S_ISLNK(st.st_mode):
             target = Path(os.path.realpath(full))
             inside = target == root_real or root_real in target.parents
-            if inside and target.is_file():
-                continue  # internal symlink; target scanned on its own
-            findings.append(Finding(rel, "unscannable", "symlink escapes repo (fail closed)"))
-            continue
-        if not full.exists():
-            continue  # staged deletion — nothing to leak
+            if not (inside and target.is_file()):
+                findings.append(Finding(rel, "unscannable", "symlink escapes repo (fail closed)"))
+                continue
+            # "The target is scanned on its own entry" is only true if the target IS an
+            # entry. A link to an UNTRACKED path inside the repo — a gitignored scratch
+            # file, `matters/`, a build dir — was skipped on that reasoning while nothing
+            # else ever looked at it: a hole straight through the leak scanner, sitting
+            # under a committed name. Scan it here, through the link, like any file.
+            if target.relative_to(root_real).as_posix() in tracked:
+                continue  # covered by the target's own tracked entry
         try:
             text = full.read_text(encoding="utf-8")
         except UnicodeDecodeError:

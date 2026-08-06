@@ -17,6 +17,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 
+from mootloop.gates import has_hedge
 from mootloop.models.gates import GateFail, GateFinding, GatePass, GateResult
 from mootloop.models.rubric import Rubric
 from mootloop.models.run import DraftOutput
@@ -26,7 +27,6 @@ GATE_NAME = "completeness"
 _SPECIFICITY_MIN = 12  # an objection's text must carry a request-specific string
 _BOILERPLATE = "overly broad and unduly burdensome"
 _BOILERPLATE_MIN = 80  # boilerplate is only OK when specific reasons are appended
-_HEDGE = "subject to and without waiving"
 _TOKEN_RE = re.compile(r"[a-z0-9]{4,}")
 
 
@@ -56,9 +56,7 @@ def _no_boilerplate_general_objection(draft: DraftOutput, req_text: str) -> bool
 
 
 def _no_hedge_subject_to(draft: DraftOutput, req_text: str) -> bool:
-    haystack = draft.response_text.lower()
-    haystack += " " + " ".join(o.text.lower() for o in draft.objections)
-    return _HEDGE not in haystack
+    return not has_hedge(draft.response_text, *(o.text for o in draft.objections))
 
 
 def _rfp_withheld_statement(draft: DraftOutput, req_text: str) -> bool:

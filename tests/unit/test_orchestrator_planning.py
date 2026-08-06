@@ -146,3 +146,23 @@ def test_completed_turn_record_is_idempotent(tmp_path: Path) -> None:
     # Re-recording the same turn returns the stored record, not a new one.
     again = record_turn(vault, run_id, spec.turn_id, result.text, result.usage, NOW)
     assert first == again
+
+
+def test_retry_spec_carries_discard_feedback(tmp_path: Path) -> None:
+    """A respawned slot's prompt context names WHY the last attempt was rejected —
+    schema errors and gate findings alike — so the redo can self-correct."""
+    vault = _build_single_request_vault(tmp_path)
+    run_id = start_run(vault, "discovery-responses", NOW, run_id="unit-0007")
+
+    spec = plan_next(vault, run_id)[0]
+    first = record_turn(vault, run_id, spec.turn_id, '{"unexpected": true}', None, NOW)
+    assert isinstance(first, DiscardedTurn)
+
+    respawn = plan_next(vault, run_id)[0]
+    assert respawn.turn_id == spec.turn_id
+    feedback = respawn.prompt_context["previous_attempt_rejected_because"]
+    assert "validation" in feedback
+    assert "unexpected" in feedback
+
+    # A first attempt never carries feedback (fresh slots elsewhere are unaffected).
+    assert "previous_attempt_rejected_because" not in spec.prompt_context

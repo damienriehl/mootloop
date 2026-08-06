@@ -144,3 +144,21 @@ def test_constructor_arg_overrides_env(tmp_path: Path, monkeypatch: pytest.Monke
     monkeypatch.setenv(MATTERS_ROOT_ENV, "/srv/should-not-be-used")
     reg = MatterRegistry(root=tmp_path)
     assert reg.root == tmp_path
+
+
+def test_create_refuses_a_matters_root_inside_a_git_repo(tmp_path: Path) -> None:
+    """`MatterRegistry.create` is the hosted tier's documented single entry point for
+    matter creation, and it went straight to `create_vault` — skipping the repo-boundary
+    and sync-folder preflight that AGENTS.md calls non-negotiable. Point
+    MOOTLOOP_MATTERS_ROOT at a dev checkout or a bind mount and it provisioned a
+    privileged vault inside the repo tree without complaint."""
+    (tmp_path / ".git").mkdir()
+    (tmp_path / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+    with pytest.raises(VaultBoundaryError):
+        MatterRegistry(root=tmp_path / "matters").create(_matter("m1"))
+
+
+def test_create_refuses_a_matters_root_in_a_sync_folder(tmp_path: Path) -> None:
+    root = tmp_path / "OneDrive - Riehl Law" / "matters"
+    with pytest.raises(VaultBoundaryError):
+        MatterRegistry(root=root).create(_matter("m1"))

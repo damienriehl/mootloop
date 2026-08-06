@@ -13,6 +13,11 @@ within a single tick; the Unit-3 tests that loop ``run_once`` until completion s
 pass. A provider seat limit interrupts the drain: the run pauses and the item is
 released with a scheduled resume, so the work is rescheduled, never lost.
 
+A shutdown request interrupts it the same way. Because a drain is a whole run, the
+drain loop — not just the tick loop — has to watch for it, or ``SIGTERM`` would sit
+unread for hours while systemd waited out ``TimeoutStopSec`` and then ``SIGKILL``ed
+the process wherever it happened to be.
+
 Failure routing around the provider call:
   - `SeatLimitError` -> pause the run (``capacity``), release the item to resume later.
   - `AuthError`      -> finish the run ``needs_attention`` + drop a notification file.
@@ -28,9 +33,12 @@ from __future__ import annotations
 
 import contextlib
 import json
+import logging
 import os
+import re
 import signal
 import socket
+import threading
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -39,9 +47,12 @@ from mootloop import budget, orchestrator
 from mootloop.engine.queue import Queue, WorkItem
 from mootloop.errors import AuthError, SeatLimitError, TurnError
 from mootloop.journal import append
-from mootloop.llm import LLMProvider
+from mootloop.llm import LLMProvider, RawTurnResult
 from mootloop.models.events import RunFinished, TurnIntent
+from mootloop.models.run import TurnSpec
 from mootloop.vault import RunLock, validate_id
+
+logger = logging.getLogger("mootloop.engine.worker")
 
 # Provider factory seam: (vault_root, run_dir, billing_mode) -> an LLMProvider.
 ProviderFactory = Callable[[Path, Path, str], LLMProvider]
@@ -54,6 +65,17 @@ _DEFAULT_RESUME_DELAY_S = 900.0
 _DEFAULT_BACKOFF_S = 30.0
 _DEFAULT_STALE_S = 900.0
 _DEFAULT_MAX_ATTEMPTS = 5
+
+_UNSAFE_STEM_RE = re.compile(r"[^A-Za-z0-9._-]")
+_PERMISSION_DENIAL_PREFIX = "headless turn was denied filesystem access:"
+
+
+class _LeaseLostError(Exception):
+    """Internal control flow: the queue item is no longer owned by this worker."""
+
+
+def default_now() -> datetime:
+    return datetime.now(UTC)
 
 
 class Worker:
@@ -72,7 +94,9 @@ class Worker:
         backoff_s: float = _DEFAULT_BACKOFF_S,
         stale_threshold_s: float = _DEFAULT_STALE_S,
         max_attempts: int = _DEFAULT_MAX_ATTEMPTS,
+        now_fn: NowFn = default_now,
     ) -> None:
+        self.now_fn = now_fn
         self.matters_root = Path(matters_root)
         self.worker_id = worker_id
         self.queue = queue
@@ -85,6 +109,7 @@ class Worker:
         self.max_attempts = max_attempts
         self._reclaimed = False
         self._stop_requested = False
+        self._stop: Stop | None = None
 
     # -- heartbeat + stale reclaim --
 
@@ -117,6 +142,16 @@ class Worker:
             if now - ts > timedelta(seconds=self.stale_threshold_s):
                 self.queue.release_all_claimed_by(other_id)
 
+    # -- shutdown --
+
+    def should_stop(self) -> bool:
+        """True once shutdown has been requested — by SIGTERM or by `serve`'s ``stop``.
+
+        One predicate for both, so everything that has to notice a shutdown notices
+        the same thing whether the signal is real or injected by a test.
+        """
+        return self._stop_requested or (self._stop is not None and self._stop())
+
     @staticmethod
     def _staging_gc() -> None:
         """Placeholder for staging-dir garbage collection (Unit-3 fills this in)."""
@@ -144,12 +179,67 @@ class Worker:
         return self.matters_root / matter_id
 
     def _process(self, item: WorkItem, now: datetime) -> bool:
+        """Drain the item, and never let an unexpected failure escape the tick.
+
+        Only the three provider errors were caught before, so anything else — an
+        `OrchestratorError` from a run with no `RunStarted` event, a corrupt journal
+        line, a `VaultBoundaryError`, an `OSError` — propagated out through `run_once`
+        and `serve` and killed the process. The item stayed claimable, so under
+        ``Restart=always`` one poison item crash-looped the driver forever and starved
+        every other matter's queue. Route it down the same backoff/dead-letter ladder a
+        `TurnError` takes.
+        """
+        try:
+            return self._drain(item, now)
+        except Exception:  # noqa: BLE001 — a poison item must never kill the driver loop
+            logger.exception(
+                "worker %s: unexpected failure on item %s (matter=%s run=%s)",
+                self.worker_id,
+                item.item_id,
+                item.matter_id,
+                item.run_id,
+            )
+            self._on_poison(item, now)
+            return True
+
+    def _on_poison(self, item: WorkItem, now: datetime) -> None:
+        """Back off, then dead-letter at ``max_attempts`` — best-effort throughout.
+
+        The run may not be journalable at all (that can be *why* the item is poison), so
+        every vault touch is suppressed; getting the item off the queue is what matters.
+        """
+        if item.attempts < self.max_attempts:
+            self.queue.release(
+                item.item_id, self.worker_id, visible_at=now + timedelta(seconds=self.backoff_s)
+            )
+            return
+        with contextlib.suppress(Exception):
+            vault = self._resolve_vault(item.matter_id)
+            with RunLock(vault, item.run_id):
+                append(vault, item.run_id, RunFinished(status="needs_attention"))
+        with contextlib.suppress(OSError):
+            self._write_notification(item.matter_id, item.run_id, reason="poison_item", now=now)
+        self.queue.complete(item.item_id, self.worker_id)
+
+    def _drain(self, item: WorkItem, now: datetime) -> bool:
         vault = self._resolve_vault(item.matter_id)
-        run_id = item.run_id
+        run_id = validate_id(item.run_id, kind="run_id")
         run_dir = vault / "runs" / run_id
         provider = self.provider_factory(vault, run_dir, self.billing_mode)
         now_iso = now.isoformat()
         while True:
+            if self.should_stop():
+                # The safe boundary: the previous turn is journaled, no provider call
+                # is in flight, and nothing is half-written. Hand the item back
+                # unclaimed so the run RESUMES here (the journal fold makes that
+                # exact) instead of waiting out the visibility lease.
+                logger.info(
+                    "worker %s: shutdown requested; releasing item %s at a turn boundary",
+                    self.worker_id,
+                    item.item_id,
+                )
+                self.queue.release(item.item_id, self.worker_id)
+                return True
             specs = orchestrator.plan_next(vault, run_id)
             if not specs:
                 # Nothing schedulable: the run is finished / paused / blocked.
@@ -169,7 +259,15 @@ class Worker:
             )
             prompt = orchestrator.assemble_prompt(vault, run_id, spec.turn_id)
             try:
-                result = provider.run_turn(spec, prompt)
+                result = self._run_turn_with_lease(item, provider, spec, prompt)
+            except _LeaseLostError:
+                logger.warning(
+                    "worker %s: lost the lease on item %s during provider call; "
+                    "discarding its result",
+                    self.worker_id,
+                    item.item_id,
+                )
+                return True
             except SeatLimitError:
                 orchestrator.pause_run(vault, run_id, reason="capacity")
                 self.queue.release(
@@ -181,16 +279,112 @@ class Worker:
             except AuthError:
                 self._finish_needs_attention(vault, run_id, item, reason="auth", now=now)
                 return True
-            except TurnError:
+            except TurnError as exc:
+                if str(exc).startswith(_PERMISSION_DENIAL_PREFIX):
+                    self._finish_needs_attention(
+                        vault, run_id, item, reason="permission_denied", now=now
+                    )
+                    return True
                 self._on_turn_error(vault, run_id, item, now=now)
                 return True
             # record_turn takes the RunLock itself — never held across the call above.
             orchestrator.record_turn(
-                vault, run_id, spec.turn_id, result.text, result.usage, now_iso
+                vault,
+                run_id,
+                spec.turn_id,
+                result.text,
+                result.usage,
+                now_iso,
+                provider_call_id=result.provider_call_id,
             )
-            self.queue.heartbeat(
-                item.item_id, self.worker_id, now, visibility_timeout_s=self.visibility_timeout_s
-            )
+            # WALL time, not the tick's frozen `now`: `Queue.heartbeat` writes
+            # `visible_at = <the time passed> + timeout`, so heartbeating with the
+            # claim-time stamp rewrote the lease to its original expiry and could never
+            # extend it. A drain is many provider calls (each up to `timeout_s`), so the
+            # lease lapsed mid-drain and a second worker claimed the same run — two
+            # workers paying for the same turns, the loser dying on `LockHeldError`.
+            # And the result was discarded, so the worker never learned it lost the item.
+            if not self.queue.heartbeat(
+                item.item_id,
+                self.worker_id,
+                self.now_fn(),
+                visibility_timeout_s=self.visibility_timeout_s,
+            ):
+                logger.warning(
+                    "worker %s: lost the lease on item %s mid-drain; stopping",
+                    self.worker_id,
+                    item.item_id,
+                )
+                return True
+
+    def _run_turn_with_lease(
+        self,
+        item: WorkItem,
+        provider: LLMProvider,
+        spec: TurnSpec,
+        prompt: str,
+    ) -> RawTurnResult:
+        """Renew the file-queue lease while the blocking provider process runs.
+
+        The queue opens and locks its own files for every operation, so the helper
+        thread shares no database connection or mutable transaction with the worker.
+        A final ownership check closes the race at provider return; if ownership was
+        lost, the caller discards the paid result and performs no journal mutation.
+        """
+        stop = threading.Event()
+        lost = threading.Event()
+        interval = max(0.01, min(self.visibility_timeout_s / 3.0, 30.0))
+
+        def heartbeat() -> bool:
+            try:
+                return self.queue.heartbeat(
+                    item.item_id,
+                    self.worker_id,
+                    self.now_fn(),
+                    visibility_timeout_s=self.visibility_timeout_s,
+                )
+            except Exception:
+                logger.exception(
+                    "worker %s: queue heartbeat failed for item %s; treating lease as lost",
+                    self.worker_id,
+                    item.item_id,
+                )
+                return False
+
+        def renew() -> None:
+            while not stop.wait(interval):
+                if not heartbeat():
+                    lost.set()
+                    return
+
+        # Fail closed before paying for provider work if the claim is already gone or
+        # the queue cannot prove ownership.
+        if not heartbeat():
+            raise _LeaseLostError
+
+        keeper = threading.Thread(
+            target=renew,
+            name=f"lease-{self.worker_id}-{item.item_id}",
+            daemon=True,
+        )
+        keeper.start()
+        result: RawTurnResult | None = None
+        error: BaseException | None = None
+        try:
+            result = provider.run_turn(spec, prompt)
+        except BaseException as exc:  # preserve provider exception after ownership check
+            error = exc
+        finally:
+            stop.set()
+            keeper.join()
+
+        still_owned = not lost.is_set() and heartbeat()
+        if not still_owned:
+            raise _LeaseLostError
+        if error is not None:
+            raise error
+        assert result is not None
+        return result
 
     # -- failure routing --
 
@@ -218,7 +412,9 @@ class Worker:
         notif_dir = self.matters_root / ".queue" / "notifications"
         notif_dir.mkdir(parents=True, exist_ok=True)
         stamp = "".join(ch for ch in now.isoformat() if ch.isdigit())
-        path = notif_dir / f"{run_id}-{stamp}.json"
+        # The run_id reaches a filename here. `_drain` validates it, but the poison
+        # handler runs precisely when that validation may have failed, so slugify.
+        path = notif_dir / f"{_UNSAFE_STEM_RE.sub('_', run_id)[:64]}-{stamp}.json"
         payload = {
             "run_id": run_id,
             "matter_id": matter_id,
@@ -230,7 +426,7 @@ class Worker:
     # -- supervised loop --
 
     def _on_sigterm(self, _signum: int, _frame: object) -> None:
-        # Drain: finish the current turn (run_once completes its drain), then exit.
+        # Finish the turn in flight, stop at the next turn boundary, release the item.
         self._stop_requested = True
 
     def serve(
@@ -244,17 +440,19 @@ class Worker:
         """Loop ``run_once`` until ``stop()`` (or SIGTERM) is set, sleeping when idle.
 
         A real ``SIGTERM`` sets the same stop flag the injected ``stop`` uses, so a
-        test can drive a bounded number of ticks without signals."""
+        test can drive a bounded number of ticks without signals. Both reach the
+        drain itself through `should_stop`, so shutdown is observed WITHIN a tick and
+        not only between ticks — ``run_once`` drains a whole run, which is hours."""
         self._stop_requested = False
+        self._stop = stop
         with contextlib.suppress(ValueError):  # signal only installs on the main thread
             signal.signal(signal.SIGTERM, self._on_sigterm)
-        while not (stop() or self._stop_requested):
-            did_work = self.run_once(now_fn())
-            if stop() or self._stop_requested:
-                break
-            if not did_work:
-                sleep_fn(interval)
-
-
-def default_now() -> datetime:
-    return datetime.now(UTC)
+        try:
+            while not self.should_stop():
+                did_work = self.run_once(now_fn())
+                if self.should_stop():
+                    break
+                if not did_work:
+                    sleep_fn(interval)
+        finally:
+            self._stop = None

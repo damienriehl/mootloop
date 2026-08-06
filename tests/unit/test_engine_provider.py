@@ -14,6 +14,7 @@ Two layers:
 
 from __future__ import annotations
 
+import json
 import os
 import stat
 from pathlib import Path
@@ -21,15 +22,19 @@ from pathlib import Path
 import pytest
 
 from mootloop import secrets
-from mootloop.engine.claude_provider import HeadlessClaudeProvider, _unfence
-from mootloop.errors import AuthError, SeatLimitError
+from mootloop.engine.claude_provider import (
+    ENGINE_CONFIG_ENV,
+    HeadlessClaudeProvider,
+    _unfence,
+)
+from mootloop.errors import AuthError, SeatLimitError, TurnError
 from mootloop.models.run import PersonaName, TurnSpec
 
 
 def _provider(tmp_path: Path, **kw: object) -> HeadlessClaudeProvider:
     vault = tmp_path / "vault"
     vault.mkdir(exist_ok=True)
-    run_dir = tmp_path / "vault" / "runs" / "r1"
+    run_dir = Path(kw.pop("run_dir", tmp_path / "vault" / "runs" / "r1"))  # type: ignore[arg-type]
     run_dir.mkdir(parents=True, exist_ok=True)
     kw.setdefault("oauth_token_loader", lambda: "sk-ant-oat-TESTTOKEN")
     kw.setdefault("api_key_loader", lambda: "sk-ant-api-TESTKEY")
@@ -104,18 +109,83 @@ def test_env_fails_closed_without_token(tmp_path: Path) -> None:
 
 
 def test_settings_deny_outside_vault_and_secrets(tmp_path: Path) -> None:
+    outsider = tmp_path / "outsider"
+    outsider.mkdir()
     settings = _provider(tmp_path).build_settings()
     deny = settings["permissions"]["deny"]
-    assert any(rule.startswith("Read(/**") for rule in deny)  # outside-vault restriction
+    assert f"Read(/{outsider})" in deny  # outside-vault restriction
+    assert f"Read(/{outsider}/**)" in deny
     assert any(".mootloop/secrets.env" in rule for rule in deny)  # secrets file denied
     assert "Bash" in deny and "WebFetch" in deny and "WebSearch" in deny
+
+
+def test_every_path_rule_is_anchored_at_the_filesystem_root(tmp_path: Path) -> None:
+    """REGRESSION. Claude Code resolves a rule path with ONE leading slash against the
+    directory holding the settings file; only `//` means absolute. So
+    `Read(/home/you/.mootloop/secrets.env)` denied `<run_dir>/home/you/…` — a path that
+    does not exist — and the secrets file was never actually protected by a rule of its
+    own. Proved against `claude` 2.1.222: single-slash deny returns the file, double-slash
+    deny returns the permission-settings refusal."""
+    settings = _provider(tmp_path).build_settings()
+    for section in ("deny", "allow"):
+        for rule in settings["permissions"][section]:
+            if "(" not in rule:
+                continue  # bare tool name, e.g. "Bash"
+            spec = rule[rule.index("(") + 1 : -1]
+            if not spec.startswith("/"):
+                continue  # an intentionally relative pattern, if any
+            assert spec.startswith("//"), f"{section} rule {rule!r} is settings-relative"
+
+
+def test_settings_never_blanket_deny_reads(tmp_path: Path) -> None:
+    """REGRESSION. `build_settings` denied `Read(/**)` and then re-allowed
+    `Read(<vault>/**)`. Claude Code evaluates deny before allow with no re-open, so the
+    allow was dead and the persona could not open a single file — and because `Read(/**)`
+    gates path access rather than the tool named `Read`, `Glob` and `Grep` over the vault
+    were denied too. Every headless turn ran blind, drafting from prompt text alone.
+
+    Proved against `claude` 2.1.222: with this rule a vault Read returns
+    "File is in a directory that is denied by your permission settings"; delete the one
+    string and the identical prompt returns the file's contents."""
+    provider = _provider(tmp_path)
+    settings = provider.build_settings()
+    deny = settings["permissions"]["deny"]
+    vault_real = Path(os.path.realpath(provider.vault_root))
+
+    assert "Read(/**)" not in deny and "Read(//**)" not in deny
+    # More generally: no read-deny rule may cover the vault or any ancestor of it, or the
+    # allow list below it is inert.
+    protected = {f"/{vault_real}", *(f"/{p}" for p in vault_real.parents)}
+    for rule in deny:
+        if not rule.startswith("Read("):
+            continue
+        target = rule[len("Read(") : -1].removesuffix("/**")
+        assert target not in protected, f"deny rule {rule!r} swallows the vault"
+
+
+def test_settings_deny_reaches_the_whole_ancestor_chain(tmp_path: Path) -> None:
+    """The complement construction must cover siblings at EVERY level, not just the
+    vault's own directory — otherwise `/etc`, `~/.ssh` and friends stay readable."""
+    nested = tmp_path / "a" / "b" / "vault"
+    nested.mkdir(parents=True)
+    (tmp_path / "a" / "cousin.txt").write_text("x", encoding="utf-8")
+    (tmp_path / "aunt").mkdir()
+    provider = HeadlessClaudeProvider(
+        vault_root=nested,
+        run_dir=nested / "runs" / "r1",
+        oauth_token_loader=lambda: "sk-ant-oat-TESTTOKEN",
+    )
+    deny = provider.build_settings()["permissions"]["deny"]
+    assert f"Read(/{tmp_path / 'a' / 'cousin.txt'})" in deny  # one level up
+    assert f"Read(/{tmp_path / 'aunt'}/**)" in deny  # two levels up
+    assert "Read(//etc/**)" in deny  # all the way to the root
 
 
 def test_settings_allow_scoped_to_vault_realpath(tmp_path: Path) -> None:
     provider = _provider(tmp_path)
     allow = provider.build_settings()["permissions"]["allow"]
     vault_real = str(Path(os.path.realpath(provider.vault_root)))
-    assert allow == [f"{tool}({vault_real}/**)" for tool in ("Read", "Glob", "Grep", "LS")]
+    assert allow == [f"{tool}(/{vault_real}/**)" for tool in ("Read", "Glob", "Grep", "LS")]
 
 
 # --- pure seams: argv -------------------------------------------------------
@@ -125,13 +195,14 @@ def test_argv_prepends_egress_wrapper_and_has_flags(tmp_path: Path) -> None:
     wrapper = ["bwrap", "--dev-bind", "/", "/", "--unshare-net"]
     provider = _provider(tmp_path, egress_wrapper=wrapper)
     settings_path = tmp_path / "settings.json"
-    argv = provider.build_argv("PROMPT", settings_path)
+    argv = provider.build_argv(settings_path)
     assert argv[: len(wrapper)] == wrapper  # PREPENDED verbatim
     assert "--settings" in argv and str(settings_path) in argv
     assert "--allowedTools" in argv
     assert "--permission-mode" in argv
-    # --output-format json present as an adjacent pair.
-    assert argv[argv.index("--output-format") + 1] == "json"
+    # stream-json (+ its required --verbose) is what exposes per-tool is_error.
+    assert argv[argv.index("--output-format") + 1] == "stream-json"
+    assert "--verbose" in argv
     tools = argv[argv.index("--allowedTools") + 1]
     assert "Bash" not in tools
 
@@ -141,7 +212,7 @@ def test_argv_appends_resume_when_session_present(tmp_path: Path) -> None:
     key = provider._session_key(_spec())
     provider._persist_session_id(key, "sess-123")
     settings_path = provider._write_settings()
-    argv = provider.build_argv("P", settings_path, session_id=provider._load_session_id(key))
+    argv = provider.build_argv(settings_path, session_id=provider._load_session_id(key))
     assert "--resume" in argv and "sess-123" in argv
 
 
@@ -221,6 +292,148 @@ def test_unfence_leaves_plain_and_partial_text_alone() -> None:
     assert _unfence(two) == two
 
 
+# --- fail closed when the sandbox refuses a tool -----------------------------
+
+# A denied turn as `claude` 2.1.222 actually reports it: the Read tool result carries
+# `is_error: true` with the CLI's verbatim refusal, and the TERMINAL event still says
+# `is_error: false` and exits 0. The old code returned the apology as the answer.
+_DENIED_STREAM_BODY = r"""
+import json, sys
+for event in [
+    {"type": "system", "subtype": "init", "session_id": "sess-denied"},
+    {"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "Read", "input": {"file_path": "/vault/exhibit-a.txt"}}]}},
+    {"type": "user", "message": {"content": [
+        {"type": "tool_result", "is_error": True,
+         "content": "<tool_use_error>File is in a directory that is denied by your "
+                    "permission settings.</tool_use_error>"}]}},
+    {"type": "result", "is_error": False, "session_id": "sess-denied",
+     "result": "I need permission to read that file. Would you like to grant access?",
+     "usage": {"input_tokens": 9, "output_tokens": 3}},
+]:
+    sys.stdout.write(json.dumps(event) + "\n")
+"""
+
+# The other observed shape: no error-flagged tool result reaches the stream, but the
+# terminal event lists what was refused.
+_DENIALS_FIELD_BODY = r"""
+import json
+print(json.dumps({
+    "type": "result", "is_error": False, "session_id": "s",
+    "result": "GLOB=fail GREP=fail",
+    "permission_denials": [
+        {"tool_name": "Glob", "tool_input": {"pattern": "*.txt"}},
+        {"tool_name": "Grep", "tool_input": {"pattern": "x"}},
+    ],
+    "usage": {"input_tokens": 1, "output_tokens": 1},
+}))
+"""
+
+
+def test_run_turn_fails_closed_when_a_tool_was_permission_denied(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """REGRESSION. A denied turn exits 0 with a terminal `is_error: false`, so
+    `returncode != 0` never fired and the model's apology for being unable to open the
+    vault was parsed, scored and filed as the persona's work product."""
+    _install_fake_claude(tmp_path / "bin", _DENIED_STREAM_BODY, monkeypatch)
+    with pytest.raises(TurnError, match="denied filesystem access"):
+        _provider(tmp_path).run_turn(_spec(), "the prompt")
+
+
+def test_run_turn_fails_closed_on_reported_permission_denials(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _install_fake_claude(tmp_path / "bin", _DENIALS_FIELD_BODY, monkeypatch)
+    with pytest.raises(TurnError, match="Glob, Grep"):
+        _provider(tmp_path).run_turn(_spec(), "the prompt")
+
+
+# Persona prose that merely DISCUSSES denial — a discovery-dispute filing is full of it.
+# The detector reads tool results the CLI flagged, never the reply, so this must pass.
+_DISCOVERY_PROSE_BODY = r"""
+import json, sys
+for event in [
+    {"type": "assistant", "message": {"content": [{"type": "text", "text": "drafting"}]}},
+    {"type": "result", "is_error": False, "session_id": "s",
+     "result": "Plaintiff's motion to compel is denied by your permission settings "
+               "argument, which misreads Rule 37; permission to read the file was "
+               "never at issue. Request No. 4 is DENIED as overbroad.",
+     "usage": {"input_tokens": 5, "output_tokens": 5}},
+]:
+    sys.stdout.write(json.dumps(event) + "\n")
+"""
+
+
+def test_denial_detector_ignores_persona_prose_about_denials(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Both marker strings appear verbatim in the reply text; neither appears in an
+    error-flagged tool result. A legitimate turn must not be destroyed by its subject."""
+    _install_fake_claude(tmp_path / "bin", _DISCOVERY_PROSE_BODY, monkeypatch)
+    result = _provider(tmp_path).run_turn(_spec(), "the prompt")
+    assert "DENIED as overbroad" in result.text
+
+
+_TOP_LEVEL_ERROR_BODY = r"""
+import json
+print(json.dumps({"type": "result", "is_error": True, "session_id": "s",
+                  "result": "Not logged in - Please run /login", "subtype": "error"}))
+"""
+
+
+def test_run_turn_fails_on_terminal_is_error_even_at_exit_zero(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _install_fake_claude(tmp_path / "bin", _TOP_LEVEL_ERROR_BODY, monkeypatch)
+    with pytest.raises(TurnError, match="reported an error"):
+        _provider(tmp_path).run_turn(_spec(), "the prompt")
+
+
+# --- the prompt is privileged: keep it off argv ------------------------------
+
+# Echoes back what the process could see: its own argv, and whatever arrived on stdin.
+_ECHO_BODY = r"""
+import json, sys
+print(json.dumps({
+    "type": "result", "is_error": False, "session_id": "s",
+    "result": json.dumps({"argv": sys.argv[1:], "stdin": sys.stdin.read()}),
+    "usage": {"input_tokens": 1, "output_tokens": 1},
+}))
+"""
+
+_PRIVILEGED = "PRIVILEGED-WORK-PRODUCT-b3f1e0"
+
+
+def test_prompt_travels_on_stdin_not_argv(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """REGRESSION. The persona prompt is privileged work product and was passed as an
+    argv element, where `/proc/<pid>/cmdline` exposes it to every local process for the
+    life of the turn — and where `subprocess.TimeoutExpired.__str__` embedded it into a
+    chained traceback."""
+    _install_fake_claude(tmp_path / "bin", _ECHO_BODY, monkeypatch)
+    provider = _provider(tmp_path)
+    seen = json.loads(provider.run_turn(_spec(), _PRIVILEGED).text)
+    assert _PRIVILEGED not in " ".join(seen["argv"])
+    assert seen["stdin"] == _PRIVILEGED
+    assert _PRIVILEGED not in " ".join(provider.build_argv(tmp_path / "s.json"))
+
+
+def test_timeout_does_not_chain_the_prompt_bearing_exception(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`TimeoutExpired` renders the child's argv and captured output; nothing from the
+    child may ride into an exception that gets logged."""
+    _install_fake_claude(tmp_path / "bin", "import time\ntime.sleep(5)\n", monkeypatch)
+    provider = _provider(tmp_path, timeout_s=0.5)
+    with pytest.raises(TurnError, match="timed out") as caught:
+        provider.run_turn(_spec(), _PRIVILEGED)
+    assert caught.value.__cause__ is None
+    assert caught.value.__context__ is None
+    assert _PRIVILEGED not in str(caught.value)
+
+
 def test_run_turn_seat_limit_classified(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _install_fake_claude(tmp_path / "bin", _SEAT_BODY, monkeypatch)
     with pytest.raises(SeatLimitError):
@@ -264,10 +477,10 @@ def test_planted_injection_seams_and_token_redaction(
     # and the argv carries the --settings path pointing at those rules.
     settings = provider.build_settings()
     deny = settings["permissions"]["deny"]
-    assert any(rule.startswith("Read(/**") for rule in deny)  # outside-vault denied
+    assert any(rule == "Read(//etc/**)" for rule in deny)  # outside-vault denied
     assert any(".mootloop/secrets.env" in rule for rule in deny)  # secrets denied
     settings_path = provider._write_settings()
-    assert str(settings_path) in provider.build_argv("p", settings_path)
+    assert str(settings_path) in provider.build_argv(settings_path)
 
     # Seam 2: the subprocess env's token is the injected SENTINEL, never a real token.
     assert provider.build_env()["CLAUDE_CODE_OAUTH_TOKEN"] == _SENTINEL
@@ -282,3 +495,55 @@ def test_planted_injection_seams_and_token_redaction(
     scrubbed = secrets.redact(result.text)
     assert _SENTINEL not in scrubbed
     assert "***REDACTED***" in scrubbed
+
+
+# --- the CLI's credential store must never live in the vault ------------------
+
+
+def test_config_dir_defaults_outside_the_vault(tmp_path: Path) -> None:
+    """`CLAUDE_CONFIG_DIR` is where Claude Code persists `.credentials.json` — the
+    subscription token. It defaulted to `<vault>/runs/<run>/claude-config`, i.e. inside
+    the one tree `build_settings` grants `Read(<vault>/**)` on, and inside every
+    `mootloop backup` archive (which excludes only `<matter>/staging`)."""
+    provider = _provider(tmp_path)
+    vault_real = Path(os.path.realpath(provider.vault_root))
+    config_real = Path(os.path.realpath(provider._config_dir()))
+    assert config_real != vault_real
+    assert vault_real not in config_real.parents, (
+        f"the credential store {config_real} is inside the vault {vault_real}"
+    )
+    assert provider.build_env()["CLAUDE_CONFIG_DIR"] == str(provider._config_dir())
+
+
+def test_config_dir_honours_the_env_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Hosted deployments mount `~/.mootloop` read-only (see MOOTLOOP_CANARY_REGISTRY)."""
+    monkeypatch.setenv(ENGINE_CONFIG_ENV, str(tmp_path / "engine-cfg"))
+    provider = _provider(tmp_path)
+    assert str(provider._config_dir()).startswith(str(tmp_path / "engine-cfg"))
+
+
+def test_config_dir_is_per_run_so_sessions_resume(tmp_path: Path) -> None:
+    """`--resume` needs a stable config dir per run, and two runs must not collide."""
+    a = _provider(tmp_path, run_dir=tmp_path / "vault" / "runs" / "run-a")
+    b = _provider(tmp_path, run_dir=tmp_path / "vault" / "runs" / "run-b")
+    assert a._config_dir() != b._config_dir()
+    assert a._config_dir() == _provider(tmp_path, run_dir=a.run_dir)._config_dir()
+
+
+def test_settings_deny_the_credential_store(tmp_path: Path) -> None:
+    provider = _provider(tmp_path)
+    deny = provider.build_settings()["permissions"]["deny"]
+    assert any(str(provider._config_dir()) in rule for rule in deny)
+
+
+def test_argv_pins_the_tier_model(tmp_path: Path) -> None:
+    """Without `--model` the CLI ran its own default, so the budget-tier map was
+    decorative: a `low`-tier run reserved Haiku dollars and could burn Opus ones."""
+    provider = _provider(tmp_path)
+    argv = provider.build_argv(tmp_path / "settings.json", model="claude-haiku-4-5")
+    assert "--model" in argv
+    assert argv[argv.index("--model") + 1] == "claude-haiku-4-5"
+    # Absent a planned model, no flag is emitted (the CLI keeps its default).
+    assert "--model" not in provider.build_argv(tmp_path / "s.json")

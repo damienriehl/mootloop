@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from mootloop.models.panels import PanelReport
 from mootloop.models.run import JudgeOutput, Objection, ObjectionRuling
 from mootloop.panels import DEFAULT_RESTRUCTURE_THRESHOLD, fold_objection_results
 
@@ -78,3 +79,53 @@ def test_minority_survival_is_below_threshold() -> None:
 
 def test_no_objections_folds_to_empty() -> None:
     assert fold_objection_results("run-1", "ROG-1", [], [_judge()]) == []
+
+
+def test_duplicate_basis_objections_get_their_own_ruling() -> None:
+    # Two objections on the same basis: each must be scored against its OWN ruling.
+    # Re-using the first basis match scored the second objection as surviving when
+    # the judge said it would not — and `RestructureStage` then never re-enters.
+    objections = [
+        Objection(basis="relevance", text="Overbroad as to time."),
+        Objection(basis="relevance", text="Seeks unrelated product lines."),
+    ]
+    panel = [_judge(_ruling("relevance", True), _ruling("relevance", False))]
+    first, second = fold_objection_results("run-1", "ROG-4", objections, panel)
+    assert (first.objection_index, first.survive_votes, first.total_votes) == (0, 1, 1)
+    assert (second.objection_index, second.survive_votes, second.total_votes) == (1, 0, 1)
+
+
+def test_duplicate_basis_below_threshold_triggers_restructure() -> None:
+    objections = [
+        Objection(basis="relevance", text="a"),
+        Objection(basis="relevance", text="b"),
+    ]
+    # Every judge sustains the first relevance objection and rejects the second.
+    panel = [_judge(_ruling("relevance", True), _ruling("relevance", False)) for _ in range(3)]
+    results = fold_objection_results("run-1", "ROG-5", objections, panel)
+    report = PanelReport(run_id="run-1", results=results)
+    weak = report.weak(DEFAULT_RESTRUCTURE_THRESHOLD)
+    assert [r.objection_index for r in weak] == [1]
+
+
+def test_ruling_is_never_counted_twice() -> None:
+    # One ruling, two objections sharing its basis: the unmatched objection records
+    # no vote rather than borrowing the first objection's ruling.
+    objections = [Objection(basis="relevance", text="a"), Objection(basis="relevance", text="b")]
+    panel = [_judge(_ruling("relevance", False))]
+    first, second = fold_objection_results("run-1", "ROG-6", objections, panel)
+    assert (first.total_votes, first.survive_votes) == (1, 0)
+    assert (second.total_votes, second.survive_votes) == (0, 0)
+
+
+def test_index_aligned_ruling_wins_among_same_basis() -> None:
+    objections = [
+        Objection(basis="privilege", text="a"),
+        Objection(basis="relevance", text="b"),
+        Objection(basis="relevance", text="c"),
+    ]
+    panel = [
+        _judge(_ruling("privilege", True), _ruling("relevance", False), _ruling("relevance", True))
+    ]
+    results = fold_objection_results("run-1", "ROG-7", objections, panel)
+    assert [r.survive_votes for r in results] == [1, 0, 1]

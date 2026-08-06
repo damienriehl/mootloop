@@ -96,7 +96,9 @@ def test_backup_plaintext_opt_in_still_works(tmp_path: Path) -> None:
 
 def test_backup_refuses_destination_inside_git_repo(tmp_path: Path) -> None:
     vault = _make_vault(tmp_path)
-    (tmp_path / "repo" / ".git").mkdir(parents=True)
+    dot_git = tmp_path / "repo" / ".git"
+    dot_git.mkdir(parents=True)
+    (dot_git / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
     with pytest.raises(BackupError):
         backup_matter(vault, tmp_path / "repo" / "backups", NOW, key=_key())
 

@@ -10,6 +10,7 @@ golden tests.
 from __future__ import annotations
 
 import json
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -41,6 +42,11 @@ class RawTurnResult:
 
     text: str
     usage: TokenUsage | None
+    # Stable identity for this provider invocation.  Callers may retry journal writes
+    # with the same result without charging twice, while two calls that happen to have
+    # identical token counts remain distinguishable.  Optional for third-party and
+    # legacy providers implementing the seam.
+    provider_call_id: str | None = None
 
 
 class LLMProvider(Protocol):
@@ -85,7 +91,9 @@ class FakeLLMProvider:
             # Honor the tier-resolved model so metering/cap tests exercise real rates.
             model=spec.model or "fake",
         )
-        return RawTurnResult(text=json.dumps(output), usage=usage)
+        return RawTurnResult(
+            text=json.dumps(output), usage=usage, provider_call_id=uuid.uuid4().hex
+        )
 
     def _resolve(self, spec: TurnSpec) -> ScriptEntry:
         for key in (spec.turn_id, (spec.persona.value, spec.stage), spec.stage):

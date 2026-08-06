@@ -9,6 +9,7 @@ structurally out of the repo tree.
 from __future__ import annotations
 
 import contextlib
+import fcntl
 import json
 import logging
 import os
@@ -16,6 +17,8 @@ import re
 import shutil
 import socket
 import tempfile
+import uuid
+from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import TracebackType
@@ -58,6 +61,7 @@ _SYNC_NAME_MARKERS: tuple[str, ...] = (
     "Google Drive",
     "GoogleDrive",
     "Mobile Documents",  # iCloud Drive on macOS
+    "OneDrive",  # named in the non-negotiable rule but previously undetected
 )
 _SYNC_FILE_MARKERS: tuple[str, ...] = (
     ".dropbox",
@@ -71,10 +75,17 @@ _SYNC_FILE_MARKERS: tuple[str, ...] = (
 
 
 def validate_id(value: str, *, kind: str = "id") -> str:
-    """Validate a matter/run id. Rejects ``.``, ``..``, and path separators."""
+    """Validate a matter/run id. Rejects ``.``, ``..``, and path separators.
+
+    ``fullmatch``, not ``match``: Python's ``$`` also matches immediately before a
+    trailing newline, so ``match`` accepted ``"abc\\n"`` — while the pydantic
+    ``MatterIdStr`` field built from the same pattern (rust regex, true end anchor)
+    rejected it. The two validators disagreeing is the bug; ids reach the run lock,
+    on-disk filenames, and the canary token body through this function.
+    """
     if value in {".", ".."} or "/" in value or "\\" in value or os.sep in value:
         raise VaultBoundaryError(f"invalid {kind} {value!r}: path components are not allowed")
-    if not MATTER_ID_RE.match(value):
+    if not MATTER_ID_RE.fullmatch(value):
         raise VaultBoundaryError(f"invalid {kind} {value!r}: must match {MATTER_ID_PATTERN}")
     return value
 
@@ -96,6 +107,10 @@ def safe_vault_path(vault_root: Path | str, *parts: str) -> Path:
     The single choke-point before any vault write. Absolute parts, ``..``, and
     symlinks that escape the vault all resolve outside the root and are rejected.
     """
+    # A NUL byte makes `realpath` raise ValueError, which callers mapping
+    # `VaultBoundaryError` to a typed 400 would surface as a 500 instead.
+    if any("\0" in part for part in parts):
+        raise VaultBoundaryError("path parts must not contain a NUL byte")
     root_real = _real(vault_root)
     candidate = _real(root_real.joinpath(*parts))
     if not _is_within(candidate, root_real):
@@ -158,6 +173,21 @@ def assert_vault_outside_repo(vault_root: Path | str, repo_root: Path | str) -> 
 # --- Sync-folder detection --------------------------------------------------
 
 
+def _is_sync_dir_name(name: str) -> bool:
+    """True for a sync-root directory name, including its tenant-scoped variants.
+
+    Exact case-sensitive equality missed the shapes these clients actually create:
+    ``OneDrive - Riehl Law`` (business tenants) and ``GoogleDrive-user@example.com``
+    (the modern macOS mount under ``~/Library/CloudStorage``).
+    """
+    folded = name.casefold()
+    for marker in _SYNC_NAME_MARKERS:
+        base = marker.casefold()
+        if folded == base or folded.startswith((f"{base} -", f"{base}-", f"{base}_")):
+            return True
+    return False
+
+
 def detect_sync_folder(vault_root: Path | str) -> str | None:
     """Walk the vault's ancestors for background-sync markers.
 
@@ -166,7 +196,7 @@ def detect_sync_folder(vault_root: Path | str) -> str | None:
     """
     start = _real(vault_root)
     for ancestor in (start, *start.parents):
-        if ancestor.name in _SYNC_NAME_MARKERS:
+        if _is_sync_dir_name(ancestor.name):
             return ancestor.name
         for marker in _SYNC_FILE_MARKERS:
             if (ancestor / marker).exists():
@@ -225,20 +255,42 @@ def matter_validation_issues(vault_root: Path | str) -> list[dict[str, str]]:
     return []
 
 
+def preflight_vault_location(vault_path: Path | str, *, allow_sync_folder: bool = False) -> None:
+    """Assert a vault may be created here: outside any repo, outside any sync folder.
+
+    Lives here, and is called by `create_vault`, so EVERY creation path inherits it.
+    It used to sit only in `init_vault`, which meant `MatterRegistry.create` — the
+    documented single entry point for the hosted tier — happily provisioned a
+    privileged vault inside a git work tree or under ``~/OneDrive``.
+    """
+    repo = enclosing_git_repo(vault_path)
+    if repo is not None:
+        assert_vault_outside_repo(vault_path, repo)
+    marker = detect_sync_folder(vault_path)
+    if marker and not allow_sync_folder:
+        raise VaultBoundaryError(
+            f"vault path is inside a background-sync folder ({marker}); active "
+            "vaults must not live in sync folders — pass allow_sync_folder to override"
+        )
+
+
 def create_vault(
     vault_root: Path | str,
     matter: MatterConfig,
     *,
     registry_path: Path | str | None = None,
+    allow_sync_folder: bool = False,
 ) -> Path:
     """Create the canonical vault tree, write ``matter.yaml``, and seed a canary.
 
-    Refuses if the target directory already exists and is non-empty.
+    Refuses if the target directory already exists and is non-empty, or if the location
+    fails `preflight_vault_location`.
     """
     # Lazy import breaks the vault<->privacy cycle (privacy imports vault helpers).
     from mootloop.privacy import seed_canary
 
     validate_id(matter.matter_id, kind="matter_id")
+    preflight_vault_location(vault_root, allow_sync_folder=allow_sync_folder)
     root = Path(vault_root)
     if root.exists() and any(root.iterdir()):
         raise VaultBoundaryError(f"refusing to create vault: {root} exists and is non-empty")
@@ -258,6 +310,20 @@ def create_vault(
     return root
 
 
+def _is_git_marker(dot_git: Path) -> bool:
+    """True when ``.git`` really marks a repo, mirroring git's own test.
+
+    A gitlink file (worktree/submodule) counts. A directory counts only when it
+    carries ``HEAD`` — an empty or partial ``.git`` directory is not a repo, and
+    git itself would not resolve one. Stray ``.git`` directories do appear in
+    shared parents like ``/tmp``; treating those as repos would wrongly forbid
+    every vault beneath them.
+    """
+    if dot_git.is_file():
+        return True
+    return (dot_git / "HEAD").exists()
+
+
 def enclosing_git_repo(path: Path | str) -> Path | None:
     """Return the git work-tree root enclosing ``path`` (or the nearest existing
     ancestor), or None. Used to keep vaults out of any repo."""
@@ -266,7 +332,7 @@ def enclosing_git_repo(path: Path | str) -> Path | None:
         cur = cur.parent
     cur = _real(cur)
     for ancestor in (cur, *cur.parents):
-        if (ancestor / ".git").exists():
+        if _is_git_marker(ancestor / ".git"):
             return ancestor
     return None
 
@@ -278,17 +344,16 @@ def init_vault(
     allow_sync_folder: bool = False,
     registry_path: Path | str | None = None,
 ) -> Path:
-    """Preflight (repo boundary + sync-folder) then create the vault."""
-    repo = enclosing_git_repo(vault_path)
-    if repo is not None:
-        assert_vault_outside_repo(vault_path, repo)
-    marker = detect_sync_folder(vault_path)
-    if marker and not allow_sync_folder:
-        raise VaultBoundaryError(
-            f"vault path is inside a background-sync folder ({marker}); active "
-            "vaults must not live in sync folders — pass allow_sync_folder to override"
-        )
-    return create_vault(vault_path, matter, registry_path=registry_path)
+    """Preflight (repo boundary + sync-folder) then create the vault.
+
+    The preflight now lives in `create_vault`, so this is a thin alias kept for the CLI
+    and the demo baker; both paths get the identical checks."""
+    return create_vault(
+        vault_path,
+        matter,
+        registry_path=registry_path,
+        allow_sync_folder=allow_sync_folder,
+    )
 
 
 # --- Run lock ---------------------------------------------------------------
@@ -334,31 +399,102 @@ class RunLock:
         self.pid = os.getpid()
         self._path = safe_vault_path(vault_root, "runs", LOCK_FILE)
         self._acquired = False
+        self._token: str | None = None
 
     # -- lifecycle --
     def acquire(self) -> RunLock:
+        """Take the lock, or raise `LockHeldError`.
+
+        The gate is an atomic exclusive create, NOT a read followed by a write. Two
+        processes that both read "no lock" before either wrote would both have believed
+        they held it — and this lock is the only thing serializing `record_turn`'s
+        load-fold-append cycle, `attest`, decision resolution, and the backup snapshot
+        that documents itself as never racing an active run. The `Queue` alongside it
+        already takes an `flock`; this did not.
+
+        The file is published by `os.link` from a fully-written temp file, so it is
+        never observable half-written — a loser's follow-up read always sees complete
+        JSON and can make a real takeover decision.
+        """
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        existing = self._read()
-        if existing is not None:
-            self._check_takeover(existing)
-        self._write(started_at=_now())
+        started = _now()
+        self._token = uuid.uuid4().hex
+        with self._serialized_update():
+            try:
+                self._create_exclusive(started_at=started)
+            except FileExistsError:
+                existing = self._read()
+                if existing is None:
+                    # The lock exists but says nothing readable. Fail closed rather than
+                    # steal it: an unreadable control is a blocker, not a green light.
+                    if not self.override:
+                        self._token = None
+                        raise LockHeldError(
+                            f"lock file {self._path} is unreadable or corrupt; pass "
+                            "override=True to take it over"
+                        ) from None
+                    logger.warning("overriding an unreadable lock at %s", self._path)
+                else:
+                    try:
+                        self._check_takeover(existing)
+                    except BaseException:
+                        self._token = None
+                        raise
+                self._write(started_at=started)
         self._acquired = True
         return self
 
-    def heartbeat(self) -> None:
-        if not self._acquired:
-            raise LockHeldError("cannot heartbeat a lock that is not held")
-        current = self._read()
-        started = current["started_at"] if current else _now().isoformat()
-        self._write(started_at=datetime.fromisoformat(started))
+    def heartbeat(self, *, best_effort: bool = False) -> bool:
+        """Refresh ``heartbeat_at`` so a held lock does not age into looking stale.
+
+        A long run holds this lock for hours. Nothing else moves ``heartbeat_at``,
+        so without periodic refreshes the lock crosses `heartbeat_threshold` and
+        `_check_takeover` hands the vault to a second process while the first is
+        still writing to it — the exact collision the lock exists to prevent.
+
+        ``best_effort`` is for that run loop: it returns ``False`` instead of
+        raising, because a transient failure to touch a lock file (a full disk, a
+        blipping mount) must never be what kills an otherwise healthy run mid-turn.
+        The next turn tries again; if the condition persists, the run degrades to
+        exactly the takeover-eligible state it had before this existed.
+        """
+        try:
+            if not self._acquired:
+                raise LockHeldError("cannot heartbeat a lock that is not held")
+            with self._serialized_update():
+                current = self._read()
+                if current is None or current.get("token") != self._token:
+                    raise LockHeldError("cannot heartbeat a lock owned by another run")
+                started = current["started_at"]
+                self._write(started_at=datetime.fromisoformat(started))
+        except (LockHeldError, OSError, KeyError, TypeError, ValueError):
+            if not best_effort:
+                raise
+            logger.warning(
+                "heartbeat failed for lock %s (run %s); it may age into takeover-eligible",
+                self._path,
+                self.run_id,
+                exc_info=True,
+            )
+            return False
+        return True
 
     def release(self) -> None:
         if not self._acquired:
             return
-        current = self._read()
-        if current and current.get("pid") == self.pid and current.get("hostname") == self.hostname:
-            self._path.unlink(missing_ok=True)
+        try:
+            with self._serialized_update():
+                current = self._read()
+                if current and current.get("token") == self._token:
+                    self._path.unlink(missing_ok=True)
+        except FileNotFoundError:
+            # Matter close intentionally removes the whole vault while holding its
+            # close lock. If the serialization directory is gone too, there is no
+            # lock inode left to release and no same-vault contender to fence.
+            if self._path.parent.exists():
+                raise
         self._acquired = False
+        self._token = None
 
     # -- internals --
     def _check_takeover(self, existing: dict[str, Any]) -> None:
@@ -400,16 +536,54 @@ class RunLock:
             return None
         return data if isinstance(data, dict) else None
 
+    def _payload(self, started_at: datetime) -> str:
+        return json.dumps(
+            {
+                "pid": self.pid,
+                "hostname": self.hostname,
+                "run_id": self.run_id,
+                "token": self._token,
+                "started_at": started_at.isoformat(),
+                "heartbeat_at": _now().isoformat(),
+            },
+            indent=2,
+        )
+
+    def _create_exclusive(self, *, started_at: datetime) -> None:
+        """Publish a complete lock file, or raise `FileExistsError` if one is there.
+
+        `os.link` is the atomic step: the destination either does not exist (and now
+        holds the finished bytes) or it does (and we lost). `O_CREAT|O_EXCL` alone would
+        expose a window where the file exists but is still empty, and a loser reading it
+        then would see "corrupt" and steal the lock it had just lost.
+        """
+        fd, tmp = tempfile.mkstemp(dir=str(self._path.parent), prefix=".lock-")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(self._payload(started_at))
+            os.link(tmp, self._path)
+        finally:
+            with contextlib.suppress(OSError):
+                os.unlink(tmp)
+
     def _write(self, *, started_at: datetime) -> None:
-        now = _now()
-        payload = {
-            "pid": self.pid,
-            "hostname": self.hostname,
-            "run_id": self.run_id,
-            "started_at": started_at.isoformat(),
-            "heartbeat_at": now.isoformat(),
-        }
-        self._path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        atomic_write_text(self._path, self._payload(started_at))
+
+    @contextlib.contextmanager
+    def _serialized_update(self) -> Iterator[None]:
+        """Serialize lock-file decisions while fencing each published owner.
+
+        The runs directory is the stable inode shared by all contenders, unlike the
+        lock file whose inode changes on every atomic write. Holding its advisory lock
+        closes the stale read/check/replace race without creating another vault file.
+        """
+        fd = os.open(self._path.parent, os.O_RDONLY)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            yield
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            os.close(fd)
 
     # -- context manager --
     def __enter__(self) -> RunLock:

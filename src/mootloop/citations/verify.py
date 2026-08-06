@@ -44,6 +44,10 @@ GATE_NAME = "citation"
 
 # MN Revisor territory; anything not case/curated/MN routes to the human research
 # queue (federal statute, regulation, other — the free stack cannot verify them).
+# Membership here is necessary but not sufficient: `mn_revisor.can_verify` still has to
+# recognize the shape. A MN rule body with no pinned Revisor index (only Civ. P. and
+# Gen. R. Prac. have one) belongs in the research queue, not fetched against the wrong
+# index where a 404 would be recorded as `invalid`.
 _MN_REVISOR = frozenset({AuthorityType.STATE_STATUTE, AuthorityType.COURT_RULE})
 
 
@@ -141,7 +145,7 @@ def verify_all(
             new_records.append(_curated_record(vault_root, citation, now))
         elif citation.authority_type == AuthorityType.CASE:
             cases_to_lookup.append(citation)
-        elif citation.authority_type in _MN_REVISOR:
+        elif citation.authority_type in _MN_REVISOR and mn_revisor.can_verify(citation):
             new_records.append(mn_revisor.verify_mn(citation, now=now, transport=transport))
         else:  # federal statute / regulation / other -> research queue
             request_id = _research_request_id(citation.normalized)

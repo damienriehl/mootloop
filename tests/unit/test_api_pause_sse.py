@@ -136,6 +136,30 @@ def test_internal_pause_requires_internal_secret(
     assert ok.json()["status"] == "paused"
 
 
+def test_internal_pause_and_resume_are_audited(
+    client: TestClient, registry: MatterRegistry
+) -> None:
+    """The driver has no verified email, but a run-state change is still something that
+    touched a matter. These two routes recorded nothing at all, so a driver-initiated
+    pause/resume left no trace in the hash-chained access audit."""
+    from mootloop.web import audit
+
+    matter_id = registry.list_matters()[0].matter_id
+    vault = registry.resolve(matter_id)
+    run_id = _started_running_run(vault)
+
+    client.post(
+        f"/internal/matters/{matter_id}/runs/{run_id}/pause", headers=_INTERNAL, json={}
+    )
+    client.post(f"/internal/matters/{matter_id}/runs/{run_id}/resume", headers=_INTERNAL)
+
+    entries = audit.audit_path(vault).read_text(encoding="utf-8").splitlines()
+    actions = [e for e in entries if '"actor":"internal:driver"' in e]
+    assert any('"action":"pause"' in e for e in actions), entries
+    assert any('"action":"resume"' in e for e in actions), entries
+    assert audit.verify_chain(vault) is True
+
+
 # --- queue/next -------------------------------------------------------------
 
 

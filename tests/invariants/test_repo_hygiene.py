@@ -25,13 +25,15 @@ DENYLIST_FIXTURE = ["ACME-SECRET-PARTY-NAME", "0000-CONFIDENTIAL-0000"]
 
 
 def _tracked_files() -> list[str]:
+    # ``-z``: without it ``core.quotePath`` C-quotes any non-ASCII path, and the quoted
+    # literal names no real file — so the scan silently skips it (see `privacy._git_paths`).
     out = subprocess.run(
-        ["git", "-C", str(REPO_ROOT), "ls-files"],
+        ["git", "-C", str(REPO_ROOT), "ls-files", "-z"],
         capture_output=True,
         text=True,
         check=True,
-    ).stdout.splitlines()
-    return [p for p in out if p]
+    ).stdout
+    return [p for p in out.split("\0") if p]
 
 
 def test_no_canary_token_in_repo() -> None:

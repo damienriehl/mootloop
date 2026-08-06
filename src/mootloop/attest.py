@@ -6,11 +6,18 @@ ledger head hash, append-only, in ``runs/<run-id>/attestations.jsonl``.
 ``check_attestation`` recomputes those hashes and, on a mismatch, appends an
 invalidation record (re-imposing DRAFT). Export reads attestation state; it never
 sets it — the gate ledger is the single export gate.
+
+The attested "master" hash covers the md-master **and** the matter chrome, because the
+served document is built from both. The md-master carries only the response bodies; the
+caption, case number, party names, our-side labels and the signing attorney's block all
+come from ``matter.yaml`` at export time. Hashing the deliverable alone would let an
+edit to ``matter.yaml`` change the case number or the signature line of a document that
+still reports a ``valid`` attestation — a defective filing under a live signature. The
+matter is therefore folded into ``master_sha256``; a change to either re-imposes DRAFT.
 """
 
 from __future__ import annotations
 
-import hashlib
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,10 +27,15 @@ from mootloop.decisions import DecisionStore
 from mootloop.errors import AttestationBlockedError, OrchestratorError
 from mootloop.journal import load_state
 from mootloop.models.attestations import Attestation, AttestationCheckStatus
+from mootloop.models.rubric import sha256_hex
 from mootloop.tasks import get_binding
-from mootloop.vault import RunLock, safe_vault_path
+from mootloop.vault import RunLock, load_matter, safe_vault_path
 
 ATTESTATIONS_JSONL = ("attestations.jsonl",)
+MASTER_HASH_SCOPE = "md-master+matter:v1"
+LEGACY_HASH_SCOPE_REASON = (
+    "legacy attestation hash scope is incompatible; re-attestation required"
+)
 
 
 # --- canonicalization + hashing ---------------------------------------------
@@ -38,10 +50,6 @@ def canonicalize(text: str) -> str:
     return "\n".join(lines).rstrip("\n") + "\n"
 
 
-def _sha256(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
-
-
 def master_deliverable_path(vault_root: Path | str, run_id: str) -> Path | None:
     """The run's md-master deliverable path, or None if the run/task is unknown."""
     state = load_state(vault_root, run_id)
@@ -53,12 +61,21 @@ def master_deliverable_path(vault_root: Path | str, run_id: str) -> Path | None:
     return safe_vault_path(vault_root, "deliverables", binding.config.deliverables[0])
 
 
+def matter_sha256(vault_root: Path | str) -> str:
+    """A canonical digest of ``matter.yaml`` — the chrome the served document renders
+    from (caption, case number, parties, our-side, signing attorney)."""
+    return sha256_hex(load_matter(vault_root).model_dump_json())
+
+
 def current_master_sha256(vault_root: Path | str, run_id: str) -> str | None:
-    """The canonicalized md-master hash, or None if the deliverable is not written."""
+    """The attested content hash — the canonicalized md-master bound to the matter
+    chrome — or None if the deliverable is not written (see the module docstring for
+    why the matter is part of it)."""
     path = master_deliverable_path(vault_root, run_id)
     if path is None or not path.is_file():
         return None
-    return _sha256(canonicalize(path.read_text(encoding="utf-8")))
+    canonical = canonicalize(path.read_text(encoding="utf-8"))
+    return sha256_hex(f"{canonical}\x1f{matter_sha256(vault_root)}")
 
 
 def current_ledger_head_sha256(vault_root: Path | str) -> str:
@@ -69,7 +86,7 @@ def current_ledger_head_sha256(vault_root: Path | str) -> str:
         lines = [ln for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
         if lines:
             head = lines[-1]
-    return _sha256(head)
+    return sha256_hex(head)
 
 
 # --- store ------------------------------------------------------------------
@@ -126,6 +143,7 @@ def attest(vault_root: Path | str, run_id: str, reviewer: str, now: str) -> Atte
         record = Attestation(
             attestation_id=f"att-{run_id}-{seq:04d}",
             run_id=run_id,
+            hash_scope=MASTER_HASH_SCOPE,
             master_sha256=master,
             ledger_head_sha256=current_ledger_head_sha256(vault_root),
             reviewer=reviewer,
@@ -153,9 +171,13 @@ def attestation_state(vault_root: Path | str, run_id: str) -> AttestationCheck:
         return AttestationCheck("missing")
     if not latest.valid:
         return AttestationCheck("invalidated", latest.reason)
+    if latest.hash_scope != MASTER_HASH_SCOPE:
+        return AttestationCheck("invalidated", LEGACY_HASH_SCOPE_REASON)
     master = current_master_sha256(vault_root, run_id)
     if master != latest.master_sha256:
-        return AttestationCheck("invalidated", "md-master changed after attestation")
+        return AttestationCheck(
+            "invalidated", "md-master or matter.yaml changed after attestation"
+        )
     if current_ledger_head_sha256(vault_root) != latest.ledger_head_sha256:
         return AttestationCheck("invalidated", "citation ledger changed after attestation")
     return AttestationCheck("valid")
@@ -175,6 +197,7 @@ def check_attestation(vault_root: Path | str, run_id: str, now: str) -> Attestat
                 Attestation(
                     attestation_id=f"att-{run_id}-{seq:04d}",
                     run_id=run_id,
+                    hash_scope=MASTER_HASH_SCOPE,
                     master_sha256=current_master_sha256(vault_root, run_id) or "",
                     ledger_head_sha256=current_ledger_head_sha256(vault_root),
                     reviewer="system",

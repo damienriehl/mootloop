@@ -3,6 +3,7 @@ marker mapping (plan D9/H8/Phase 5)."""
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -107,6 +108,54 @@ def test_content_edit_invalidates_and_blocks_export(tmp_path: Path) -> None:
 def test_check_attestation_missing_before_attest(tmp_path: Path) -> None:
     vault = _finished_and_resolved(tmp_path, "att-missing")
     assert attest.check_attestation(vault, "att-missing", NOW).status == "missing"
+
+
+def test_legacy_attestation_is_reported_as_incompatible_not_content_drift(
+    tmp_path: Path,
+) -> None:
+    vault = _finished_and_resolved(tmp_path, "att-legacy")
+    path = vault / "runs" / "att-legacy" / "attestations.jsonl"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "attestation_id": "att-att-legacy-0000",
+                "run_id": "att-legacy",
+                "master_sha256": "legacy-md-master-only-digest",
+                "ledger_head_sha256": attest.current_ledger_head_sha256(vault),
+                "reviewer": "Jane",
+                "attested_at": NOW,
+                "valid": True,
+                "reason": None,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    check = attest.check_attestation(vault, "att-legacy", LATER)
+
+    assert check.status == "invalidated"
+    assert check.reason == "legacy attestation hash scope is incompatible; re-attestation required"
+    assert "changed after attestation" not in check.reason
+    invalidation = attest.latest_attestation(vault, "att-legacy")
+    assert invalidation is not None
+    assert invalidation.valid is False
+    assert invalidation.hash_scope == attest.MASTER_HASH_SCOPE
+    assert invalidation.reason == check.reason
+
+
+def test_new_attestation_persists_explicit_hash_scope(tmp_path: Path) -> None:
+    vault = _finished_and_resolved(tmp_path, "att-scoped")
+
+    record = attest.attest(vault, "att-scoped", "Jane", NOW)
+
+    assert record.hash_scope == attest.MASTER_HASH_SCOPE
+    persisted = json.loads(
+        (vault / "runs" / "att-scoped" / "attestations.jsonl").read_text(encoding="utf-8")
+    )
+    assert persisted["hash_scope"] == attest.MASTER_HASH_SCOPE
+    assert attest.attestation_state(vault, "att-scoped").status == "valid"
 
 
 def test_gate_ledger_folds_decisions_and_attestation(tmp_path: Path) -> None:
