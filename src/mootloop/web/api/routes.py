@@ -272,6 +272,44 @@ def raise_cap(
     return _run_action(vault, run_id, "cap_raised")
 
 
+@router.post("/api/matters/{matter_id}/runs/{run_id}/reopen")
+def reopen_run(
+    matter_id: str,
+    run_id: str,
+    body: models.ReopenRunRequest,
+    principal: Principal,
+    vault: Vault,
+    queue: QueueDep,
+    _csrf: Csrf,
+    _audited: Annotated[None, Depends(_audit_dep("run_reopen"))],
+) -> models.RunActionResponse:
+    """Reopen a ``needs_attention`` run once the operator has fixed what blocked it
+    (mirrors ``mootloop run reopen``). Refuses — as a typed 4xx — while a counter-capped
+    turn is unresolved, unless ``grant_attempts`` restores its retry budget. The
+    verified Access email is the reopener recorded on the journal event."""
+    if not orchestrator.reopen_enqueue_pending(vault, run_id):
+        orchestrator.reopen_run(
+            vault,
+            run_id,
+            reason=body.reason,
+            grant_attempts=body.grant_attempts,
+            reopened_by=principal.email,
+        )
+    # Re-enqueue so the driver actually picks the reopened run back up — the same
+    # lesson the start-run route learned: a run nobody queues never executes.
+    queue.ensure_enqueued(
+        WorkItem.create(
+            lane="run",
+            matter_id=matter_id,
+            run_id=run_id,
+            kind="run_turn",
+            now=datetime.now(UTC),
+            item_id=f"reopen:{matter_id}:{run_id}",
+        )
+    )
+    return _run_action(vault, run_id, "run_reopened")
+
+
 # --- decision resolve (write; typed 409 on lock contention) -----------------
 
 

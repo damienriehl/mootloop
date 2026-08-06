@@ -124,6 +124,16 @@ def test_concurrent_enqueue_no_corruption(tmp_path: Path) -> None:
     assert len(set(ids)) == len(ids)  # no line was lost or duplicated
 
 
+def test_ensure_enqueued_is_idempotent_by_item_id(tmp_path: Path) -> None:
+    queue = Queue(tmp_path)
+    item = _item("run", "reopen-run")
+
+    assert queue.ensure_enqueued(item) == item
+    assert queue.ensure_enqueued(item) == item
+
+    assert [queued.item_id for queued in queue.snapshot()] == [item.item_id]
+
+
 def test_concurrent_claim_never_double_claims(tmp_path: Path) -> None:
     queue = Queue(tmp_path)
     for p in range(_PROCS):

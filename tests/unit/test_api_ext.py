@@ -11,6 +11,7 @@ run/gate/decision status envelopes (plan FD-8).
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -20,7 +21,7 @@ from typer.testing import CliRunner
 from mootloop import orchestrator
 from mootloop.cli import app as cli_app
 from mootloop.engine.queue import Queue
-from mootloop.errors import AccessAuthError
+from mootloop.errors import AccessAuthError, QueueError
 from mootloop.models.common import DocId
 from mootloop.models.matter import MatterConfig
 from mootloop.models.requests import RequestItem, RequestSet, RequestType
@@ -49,11 +50,16 @@ def registry(tmp_path: Path, matter: MatterConfig) -> MatterRegistry:
 
 
 @pytest.fixture
-def client(registry: MatterRegistry) -> TestClient:
+def queue(registry: MatterRegistry) -> Queue:
+    return Queue(registry.root)
+
+
+@pytest.fixture
+def client(registry: MatterRegistry, queue: Queue) -> TestClient:
     app = create_matter_api()
     app.dependency_overrides[get_verifier] = _StubVerifier
     app.dependency_overrides[get_registry] = lambda: registry
-    app.dependency_overrides[get_queue] = lambda: Queue(registry.root)
+    app.dependency_overrides[get_queue] = lambda: queue
     return TestClient(app)
 
 
@@ -111,6 +117,7 @@ def test_run_read_views_return_folded_views(
     assert body["kind"] == "run_status"
     assert body["run_id"] == run_id
     assert body["status"]  # a RunStatus Literal
+    assert body["attention_blockers"] == []
 
     gates = client.get(f"/api/matters/{matter.matter_id}/runs/{run_id}/gates", headers=_AUTH)
     assert gates.status_code == 200
@@ -229,6 +236,122 @@ def test_continue_wrapper_rejects_non_checkpoint_run(
     assert resp.status_code == 409
 
 
+def _halt_needs_attention(vault: Path, run_id: str) -> str:
+    """Derail the first schedulable turn until the counter cap halts the run."""
+    turn_id = orchestrator.plan_next(vault, run_id)[0].turn_id
+    for _ in range(3):
+        orchestrator.record_turn(vault, run_id, turn_id, "not valid json", None, _NOW)
+    assert orchestrator.status_summary(vault, run_id)["status"] == "needs_attention"
+    return turn_id
+
+
+def test_reopen_wrapper_refuses_while_blocked_then_reopens_with_a_grant(
+    client: TestClient, registry: MatterRegistry, matter: MatterConfig
+) -> None:
+    vault = registry.resolve(matter.matter_id)
+    run_id = _seed_running_run(vault)
+    _halt_needs_attention(vault, run_id)
+    headers = _csrf(client)
+    url = f"/api/matters/{matter.matter_id}/runs/{run_id}/reopen"
+
+    blocked = client.post(url, headers=headers, json={"reason": "persona body fixed"})
+    assert blocked.status_code == 409  # OrchestratorError -> typed 409
+    assert "unresolved blocker" in blocked.json()["detail"]
+
+    ok = client.post(
+        url, headers=headers, json={"reason": "persona body fixed", "grant_attempts": 2}
+    )
+    assert ok.status_code == 200
+    assert ok.json()["kind"] == "run_reopened"
+    assert ok.json()["status"] == "running"
+    # Reopening re-queues the run so the driver actually picks it back up.
+    queued = Queue(registry.root).claim("w-1", datetime.now(UTC), visibility_timeout_s=60.0)
+    assert queued is not None
+    assert queued.run_id == run_id
+
+
+def test_reopen_retry_repairs_queue_after_first_enqueue_failure(
+    client: TestClient,
+    registry: MatterRegistry,
+    matter: MatterConfig,
+    queue: Queue,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    vault = registry.resolve(matter.matter_id)
+    run_id = _seed_running_run(vault)
+    _halt_needs_attention(vault, run_id)
+    headers = _csrf(client)
+    url = f"/api/matters/{matter.matter_id}/runs/{run_id}/reopen"
+    original = queue.ensure_enqueued
+    calls = 0
+
+    def fail_once(item: object) -> object:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise QueueError("injected queue write failure")
+        return original(item)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(queue, "ensure_enqueued", fail_once)
+    first = client.post(
+        url, headers=headers, json={"reason": "persona body fixed", "grant_attempts": 2}
+    )
+    assert first.status_code == 409
+    assert orchestrator.load_state(vault, run_id).status == "running"
+    assert queue.snapshot() == []
+
+    retry = client.post(
+        url, headers=headers, json={"reason": "persona body fixed", "grant_attempts": 2}
+    )
+    assert retry.status_code == 200
+    queued = queue.claim("w-recovery", datetime.now(UTC), visibility_timeout_s=60.0)
+    assert queued is not None
+    assert queued.run_id == run_id
+
+
+def test_reopen_wrapper_requires_a_reason(
+    client: TestClient, registry: MatterRegistry, matter: MatterConfig
+) -> None:
+    vault = registry.resolve(matter.matter_id)
+    run_id = _seed_running_run(vault)
+    _halt_needs_attention(vault, run_id)
+    headers = _csrf(client)
+    resp = client.post(
+        f"/api/matters/{matter.matter_id}/runs/{run_id}/reopen",
+        headers=headers,
+        json={"reason": "  "},
+    )
+    assert resp.status_code == 422
+
+
+def test_reopen_wrapper_rejects_removed_force_field(
+    client: TestClient, registry: MatterRegistry, matter: MatterConfig
+) -> None:
+    vault = registry.resolve(matter.matter_id)
+    run_id = _seed_running_run(vault)
+    _halt_needs_attention(vault, run_id)
+    resp = client.post(
+        f"/api/matters/{matter.matter_id}/runs/{run_id}/reopen",
+        headers=_csrf(client),
+        json={"reason": "persona fixed", "grant_attempts": 2, "force": True},
+    )
+    assert resp.status_code == 422
+
+
+def test_reopen_wrapper_rejects_a_running_run(
+    client: TestClient, registry: MatterRegistry, matter: MatterConfig
+) -> None:
+    vault = registry.resolve(matter.matter_id)
+    run_id = _seed_running_run(vault)
+    headers = _csrf(client)
+    resp = client.post(
+        f"/api/matters/{matter.matter_id}/runs/{run_id}/reopen",
+        headers=headers,
+        json={"reason": "nothing to reopen"},
+    )
+    assert resp.status_code == 409
+
+
 # --- OpenAPI export CLI + discriminated-union structure ---------------------
 
 
@@ -247,6 +370,7 @@ def test_export_openapi_cli_writes_valid_json_with_new_paths(tmp_path: Path) -> 
     # POST wrappers present.
     assert "post" in paths["/api/matters/{matter_id}/runs"]
     assert "post" in paths["/api/matters/{matter_id}/runs/{run_id}/raise-cap"]
+    assert "post" in paths["/api/matters/{matter_id}/runs/{run_id}/reopen"]
 
 
 def test_openapi_components_show_discriminated_unions() -> None:
@@ -258,6 +382,8 @@ def test_openapi_components_show_discriminated_unions() -> None:
     run_status = schemas["RunStatusSummary"]["properties"]["status"]
     assert "running" in run_status["enum"] and "paused" in run_status["enum"]
     assert schemas["RunStatusSummary"]["properties"]["kind"]["const"] == "run_status"
+    blockers = schemas["RunStatusSummary"]["properties"]["attention_blockers"]
+    assert blockers["items"]["$ref"].endswith("/AttentionBlocker")
 
     # 2. gate status: turn_gates is a real discriminated union (oneOf + discriminator on
     #    ``status``) over the GatePass/GateFail/GatePending variants.

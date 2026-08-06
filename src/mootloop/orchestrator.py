@@ -46,6 +46,7 @@ from mootloop.models.events import (
     RunFinished,
     RunMode,
     RunPaused,
+    RunReopened,
     RunResumed,
     RunStarted,
     RunState,
@@ -59,6 +60,7 @@ from mootloop.models.requests import RequestItem, RequestSet, code_from_request_
 from mootloop.models.rubric import final_gate
 from mootloop.models.run import (
     OUTPUT_SCHEMAS,
+    AttentionBlocker,
     DiscardedTurn,
     DraftOutput,
     RubricScoreOutput,
@@ -500,13 +502,19 @@ def _maybe_emit_rubric_gate(
     append(vault_root, run_id, GateEvaluated(turn_id=spec.turn_id, result=result))
 
 
+def effective_max_attempts(state: RunState, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> int:
+    """The run's per-turn retry ceiling: the driver's ``max_attempts`` plus every extra
+    attempt granted by a ``RunReopened`` (``mootloop run reopen --grant-attempts``)."""
+    return max_attempts + state.attempts_granted
+
+
 def _discard(
     vault_root: Path | str, run_id: str, spec: TurnSpec, reason: str, max_attempts: int
 ) -> DiscardedTurn:
     state = load_state(vault_root, run_id)
     attempt = state.discarded.get(spec.turn_id, 0) + 1
     append(vault_root, run_id, TurnDiscarded(turn_id=spec.turn_id, reason=reason, attempt=attempt))
-    if attempt >= max_attempts:
+    if attempt >= effective_max_attempts(state, max_attempts):
         # Counter-capped: the run pauses, journal intact, never silently absorbed.
         append(vault_root, run_id, RunFinished(status="needs_attention"))
     return DiscardedTurn(turn_id=spec.turn_id, reason=reason, attempt=attempt)
@@ -741,6 +749,109 @@ def continue_run(vault_root: Path | str, run_id: str) -> None:
         append(vault_root, run_id, CheckpointCleared(boundary=boundary))
 
 
+# --- needs-attention reopen (the operator's un-block verb) ------------------
+
+
+def attention_blockers(
+    vault_root: Path | str,
+    run_id: str,
+    *,
+    max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+    grant_attempts: int = 0,
+) -> list[AttentionBlocker]:
+    """Everything still blocking a ``needs_attention`` run, folded from the journal.
+
+    A blocker is a turn that burned its whole retry budget without ever completing.
+    ``grant_attempts`` asks the *prospective* question ``reopen`` needs — "would this
+    grant clear the block?" — by raising the ceiling the check measures against.
+    """
+    state = load_state(vault_root, run_id)
+    ceiling = effective_max_attempts(state, max_attempts) + grant_attempts
+    return [
+        AttentionBlocker(
+            kind="counter_capped_turn",
+            ref=turn_id,
+            detail=(
+                f"{attempts} discarded attempt(s) against a ceiling of {ceiling}; "
+                "no completed turn recorded"
+            ),
+        )
+        for turn_id, attempts in sorted(state.discarded.items())
+        if attempts >= ceiling and turn_id not in state.completed_turns
+    ]
+
+
+def reopen_run(
+    vault_root: Path | str,
+    run_id: str,
+    *,
+    reason: str,
+    grant_attempts: int = 0,
+    reopened_by: str = "operator",
+    max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+) -> RunState:
+    """Reopen a ``needs_attention`` run to ``running`` (``mootloop run reopen``).
+
+    ``needs_attention`` is the one halt with no self-clearing signal: a counter-capped
+    turn or a driver auth/provider failure is fixed *outside* the run (a persona body,
+    a rotated key, a config change), so nothing in the journal ever flips it back. This
+    verb is that flip — explicit, logged, and refusing to paper over a live blocker.
+
+    Preconditions:
+      - the run is actually ``needs_attention`` (never a way to un-finish a run);
+      - ``reason`` is non-empty — it is the audit trail;
+      - every counter-capped turn is cleared, either because it since completed or
+        because ``grant_attempts`` restores its retry budget.
+    """
+    reason = reason.strip()
+    if not reason:
+        raise OrchestratorError("reopen requires a non-empty reason (it is the audit trail)")
+    if grant_attempts < 0:
+        raise OrchestratorError("grant_attempts must be >= 0")
+    with RunLock(vault_root, run_id):
+        state = load_state(vault_root, run_id)
+        if state.status != "needs_attention":
+            raise OrchestratorError(
+                f"run {run_id!r} is not blocked on attention (status={state.status!r})"
+            )
+        blockers = attention_blockers(
+            vault_root, run_id, max_attempts=max_attempts, grant_attempts=grant_attempts
+        )
+        if blockers:
+            listed = "; ".join(f"{b.ref} ({b.detail})" for b in blockers)
+            raise OrchestratorError(
+                f"run {run_id!r} still has {len(blockers)} unresolved blocker(s) "
+                f"caused by spent retry budget: {listed}. Grant retry budget with "
+                "--grant-attempts N "
+                "after fixing what derailed the turn."
+            )
+        append(
+            vault_root,
+            run_id,
+            RunReopened(
+                reason=reason,
+                grant_attempts=grant_attempts,
+                reopened_by=reopened_by,
+            ),
+        )
+    return load_state(vault_root, run_id)
+
+
+def reopen_enqueue_pending(vault_root: Path | str, run_id: str) -> bool:
+    """Whether the journal committed a reopen but no later run event exists yet.
+
+    This narrow predicate lets the hosted API replay only the queue half of its
+    journal-then-queue operation after a queue failure. It does not make the reopen
+    transition itself generally idempotent.
+    """
+    events = read_events(vault_root, run_id)
+    return bool(
+        events
+        and isinstance(events[-1], RunReopened)
+        and load_state(vault_root, run_id).status == "running"
+    )
+
+
 def _write_observed_status(
     vault_root: Path | str,
     run_id: str,
@@ -922,6 +1033,15 @@ def status_summary(vault_root: Path | str, run_id: str) -> dict[str, object]:
         "completed_turns": len(state.completed_turns),
         "discarded_turns": len(state.discarded),
         "open_decisions": [d.decision_id for d in open_decisions],
+        # What a `needs_attention` run must clear before `run reopen` will restart it
+        # (empty for every other status — and for a driver-halted run with no
+        # counter-capped turn, which reopens on the operator's reason alone).
+        "attention_blockers": [
+            b.model_dump(mode="json")
+            for b in (
+                attention_blockers(vault_root, run_id) if state.status == "needs_attention" else []
+            )
+        ],
         "total_tokens": total_tokens,
         "input_tokens": state.total_input_tokens,
         "cache_read_tokens": state.total_cache_read,

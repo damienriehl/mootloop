@@ -178,3 +178,19 @@ class DiscardedTurn(StrictModel):
     turn_id: str
     reason: str
     attempt: int
+
+
+class AttentionBlocker(StrictModel):
+    """One reason a ``needs_attention`` run may not simply be reopened — a derived
+    view (folded from the journal), never persisted.
+
+    ``kind`` is ``counter_capped_turn`` for a turn that burned its whole retry budget
+    and still has no completed record. A ``needs_attention`` run with *no* blockers was
+    halted by the driver (auth / repeated provider failure), which the journal cannot
+    prove fixed but which also leaves nothing in the run itself to clear — so it
+    reopens on the operator's logged reason alone.
+    """
+
+    kind: Literal["counter_capped_turn"]
+    ref: str
+    detail: str

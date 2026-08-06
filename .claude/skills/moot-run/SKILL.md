@@ -66,8 +66,14 @@ Repeat until `status` reports `finished`:
 
 ### 4b. `needs_attention`
 
-- Report which turn exhausted its attempts (from the journal) and stop — do not
-  force it.
+- `uv run mootloop run blockers "$VAULT" "$RUN" --json` → report which turn exhausted
+  its attempts (or, when the list is empty, that the driver halted the run on an
+  auth/provider failure) and stop. **Do not reopen it yourself** — what broke is
+  outside the run (a persona body, a key, a config), so a human fixes it first.
+- Once the operator confirms the fix, they reopen it:
+  `uv run mootloop run reopen "$VAULT" "$RUN" --reason "<what was fixed>" [--grant-attempts N]`
+  (a counter-capped turn needs the grant; `--force` overrides and is recorded as
+  forced). The run returns to `running` — resume the drive loop at step 2.
 
 ### 4c. `finished`
 

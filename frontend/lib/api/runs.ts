@@ -8,6 +8,7 @@ import { getClient } from "./client";
 import type {
   GateLedgerResponse,
   RaiseCapRequest,
+  ReopenRunRequest,
   RequestsResponse,
   RunActionResponse,
   RunStatusSummary,
@@ -115,6 +116,19 @@ export async function raiseCap(
 ): Promise<RunActionResponse> {
   return unwrap(
     await client.POST("/api/matters/{matter_id}/runs/{run_id}/raise-cap", {
+      params: { path: { matter_id: matterId, run_id: runId } },
+      body,
+    }),
+  );
+}
+
+export async function reopenRun(
+  { matterId, runId }: Ids,
+  body: ReopenRunRequest,
+  client: ApiClient = getClient(),
+): Promise<RunActionResponse> {
+  return unwrap(
+    await client.POST("/api/matters/{matter_id}/runs/{run_id}/reopen", {
       params: { path: { matter_id: matterId, run_id: runId } },
       body,
     }),

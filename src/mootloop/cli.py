@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import pwd
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
@@ -34,6 +36,7 @@ from mootloop.export import link as export_link
 from mootloop.export import service as export_service
 from mootloop.facts import FactStore, add_facts_from_file
 from mootloop.ingest import content_doc_id, ingest_folder
+from mootloop.journal import load_state
 from mootloop.llm import FakeLLMProvider
 from mootloop.models.matter import SCHEMA_VERSION, MatterConfig
 from mootloop.models.requests import RequestType
@@ -414,6 +417,89 @@ def run_resume(
     except MootloopError as exc:
         raise _fail(exc) from exc
     typer.echo(f"resumed {run_id}")
+
+
+@run_app.command("reopen")
+def run_reopen(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+    reason: Annotated[
+        str, typer.Option("--reason", help="Why the run may resume (logged to the journal)")
+    ],
+    grant_attempts: Annotated[
+        int,
+        typer.Option(
+            "--grant-attempts",
+            help="Extra retry attempts for counter-capped turns (clears that blocker)",
+        ),
+    ] = 0,
+) -> None:
+    """Reopen a `needs_attention` run once what blocked it is fixed (auth, a persona
+    body, a config change). Refuses while a counter-capped turn is unresolved unless
+    `--grant-attempts` restores its retry budget."""
+    matter = load_matter(vault_path)
+    registry = MatterRegistry()
+    try:
+        hosted_vault = registry.resolve(matter.matter_id)
+    except MootloopError:
+        hosted_vault = None
+    hosted = hosted_vault is not None and hosted_vault.resolve() == vault_path.resolve()
+    try:
+        if not (hosted and orchestrator.reopen_enqueue_pending(vault_path, run_id)):
+            state = orchestrator.reopen_run(
+                vault_path,
+                run_id,
+                reason=reason,
+                grant_attempts=grant_attempts,
+                reopened_by=pwd.getpwuid(os.geteuid()).pw_name,
+            )
+        else:
+            state = load_state(vault_path, run_id)
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    granted = f" (+{grant_attempts} attempt(s))" if grant_attempts else ""
+    queued = False
+    if hosted:
+        from mootloop.engine.queue import Queue, WorkItem
+
+        Queue(registry.root).ensure_enqueued(
+            WorkItem.create(
+                lane="run",
+                matter_id=matter.matter_id,
+                run_id=run_id,
+                kind="run_turn",
+                now=datetime.now(UTC),
+                item_id=f"reopen:{matter.matter_id}:{run_id}",
+            )
+        )
+        queued = True
+    next_step = (
+        "queued for the hosted driver"
+        if queued
+        else "standalone vault: resume explicitly with `run drive --fake`"
+    )
+    typer.echo(f"reopened {run_id}: {state.status}{granted} — {next_step}")
+
+
+@run_app.command("blockers")
+def run_blockers(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+    json_output: Annotated[bool, typer.Option("--json", help="Emit the blocker JSON")] = False,
+) -> None:
+    """List what a `needs_attention` run must clear before `run reopen` will restart it."""
+    try:
+        blockers = orchestrator.attention_blockers(vault_path, run_id)
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    if json_output:
+        typer.echo(json.dumps([b.model_dump(mode="json") for b in blockers]))
+        return
+    if not blockers:
+        typer.echo("No attention blockers.")
+        return
+    for blocker in blockers:
+        typer.secho(f"{blocker.kind}  {blocker.ref}  {blocker.detail}", fg=typer.colors.YELLOW)
 
 
 @run_app.command("gates")

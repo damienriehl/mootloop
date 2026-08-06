@@ -1,6 +1,32 @@
 {
   "components": {
     "schemas": {
+      "AttentionBlocker": {
+        "additionalProperties": false,
+        "description": "One reason a ``needs_attention`` run may not simply be reopened \u2014 a derived\nview (folded from the journal), never persisted.\n\n``kind`` is ``counter_capped_turn`` for a turn that burned its whole retry budget\nand still has no completed record. A ``needs_attention`` run with *no* blockers was\nhalted by the driver (auth / repeated provider failure), which the journal cannot\nprove fixed but which also leaves nothing in the run itself to clear \u2014 so it\nreopens on the operator's logged reason alone.",
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "kind": {
+            "const": "counter_capped_turn",
+            "title": "Kind",
+            "type": "string"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "ref",
+          "detail"
+        ],
+        "title": "AttentionBlocker",
+        "type": "object"
+      },
       "AttestResponse": {
         "additionalProperties": false,
         "description": "A recorded attestation. ``attestation.valid`` carries the state.",
@@ -708,6 +734,26 @@
         "title": "RaiseCapRequest",
         "type": "object"
       },
+      "ReopenRunRequest": {
+        "additionalProperties": false,
+        "description": "The body of a reopen call \u2014 the operator's logged ``reason`` (required), an\noptional grant of extra retry attempts to clear counter-capped turns.",
+        "properties": {
+          "grant_attempts": {
+            "default": 0,
+            "title": "Grant Attempts",
+            "type": "integer"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "ReopenRunRequest",
+        "type": "object"
+      },
       "RequestItem": {
         "additionalProperties": false,
         "description": "One served request (or a subpart of one) as a unit of work.\n\n``subpart`` is ``None`` for a top-level request and a single lowercase letter\nfor a compound subpart, whose ``text`` is the subpart clause; the parent item\nretains the full request text.",
@@ -850,14 +896,15 @@
       },
       "RunActionResponse": {
         "additionalProperties": false,
-        "description": "The result of a pause/resume/continue/raise-cap call, exposing the run's\nresulting `RunStatus` (the discriminated domain state).",
+        "description": "The result of a pause/resume/continue/raise-cap/reopen call, exposing the run's\nresulting `RunStatus` (the discriminated domain state).",
         "properties": {
           "kind": {
             "enum": [
               "run_paused",
               "run_resumed",
               "run_continued",
-              "cap_raised"
+              "cap_raised",
+              "run_reopened"
             ],
             "title": "Kind",
             "type": "string"
@@ -897,6 +944,13 @@
         "additionalProperties": false,
         "description": "Single-run status envelope for the cockpit (folded from the journal). Exposes\nthe `RunStatus` Literal; also returned by the start-run wrapper.",
         "properties": {
+          "attention_blockers": {
+            "items": {
+              "$ref": "#/components/schemas/AttentionBlocker"
+            },
+            "title": "Attention Blockers",
+            "type": "array"
+          },
           "completed_turns": {
             "default": 0,
             "title": "Completed Turns",
@@ -2052,6 +2106,65 @@
         "summary": "Raise Cap"
       }
     },
+    "/api/matters/{matter_id}/runs/{run_id}/reopen": {
+      "post": {
+        "description": "Reopen a ``needs_attention`` run once the operator has fixed what blocked it\n(mirrors ``mootloop run reopen``). Refuses \u2014 as a typed 4xx \u2014 while a counter-capped\nturn is unresolved, unless ``grant_attempts`` restores its retry budget. The\nverified Access email is the reopener recorded on the journal event.",
+        "operationId": "reopen_run_api_matters__matter_id__runs__run_id__reopen_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReopenRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunActionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reopen Run"
+      }
+    },
     "/api/matters/{matter_id}/runs/{run_id}/requests": {
       "get": {
         "operationId": "get_run_requests_api_matters__matter_id__runs__run_id__requests_get",
@@ -2283,6 +2396,29 @@
           }
         },
         "summary": "Create Freeform Task"
+      }
+    },
+    "/health": {
+      "get": {
+        "description": "Unauthenticated liveness probe \u2014 no Access/Internal guard, no matter data.\n\nA GET, so the write-only `RateLimitMiddleware` never throttles it; it carries only\nthe static app version so the container HEALTHCHECK and Coolify can probe readiness\nwithout a valid Cloudflare Access token.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Health Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health"
       }
     },
     "/internal/matters/{matter_id}/runs/{run_id}/pause": {
