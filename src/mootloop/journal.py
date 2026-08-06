@@ -28,6 +28,7 @@ corruption, not a torn write.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 from collections import OrderedDict
@@ -100,10 +101,6 @@ def write_turn_body(vault_root: Path | str, run_id: str, record: TurnRecord) -> 
 
 # --- read (torn-line tolerant, incremental) ---------------------------------
 
-# Bytes of the parsed prefix kept to prove the file still starts with what we parsed.
-# It sits at the prefix's END, where an append-only file's last write landed, so any
-# rewrite of the region we skip re-reading has to reproduce these bytes exactly.
-_ANCHOR_BYTES = 64
 # Journals held in the cache. A process drives one run at a time; a handful covers
 # export/audit paths that interleave runs without pinning many event lists in memory.
 _MAX_CACHED = 4
@@ -115,7 +112,7 @@ class _ParsedPrefix:
 
     offset: int  # bytes consumed: complete lines only, never a trailing partial one
     events: list[JournalEvent]
-    anchor: bytes  # the last <= _ANCHOR_BYTES bytes ending at `offset`
+    digest: bytes  # SHA-256 of every byte before `offset`
 
 
 _CACHE: OrderedDict[str, _ParsedPrefix] = OrderedDict()
@@ -137,17 +134,15 @@ def _prefix_intact(handle: BinaryIO, prefix: _ParsedPrefix) -> bool:
     """True when the file still begins with the bytes we parsed into ``prefix``.
 
     Checks the length (a shorter file means a truncated torn tail, or a rewrite) and
-    the anchor bytes at the prefix's end. Anything else and the caller reparses from
+    hashes the complete cached prefix. Anything else and the caller reparses from
     zero — the cache is an optimization that must never decide what the log says.
     """
     if prefix.offset == 0:
         return True
-    if not prefix.anchor:
-        return False
     if handle.seek(0, os.SEEK_END) < prefix.offset:
         return False
-    handle.seek(prefix.offset - len(prefix.anchor))
-    return handle.read(len(prefix.anchor)) == prefix.anchor
+    handle.seek(0)
+    return hashlib.sha256(handle.read(prefix.offset)).digest() == prefix.digest
 
 
 def read_events(vault_root: Path | str, run_id: str) -> list[JournalEvent]:
@@ -203,8 +198,10 @@ def read_events(vault_root: Path | str, run_id: str) -> list[JournalEvent]:
         consumed = pos
         cacheable = len(events)
 
-    tail = ((cached.anchor if cached is not None else b"") + chunk[:consumed])[-_ANCHOR_BYTES:]
-    _store(key, _ParsedPrefix(start + consumed, events[:cacheable], tail))
+    offset = start + consumed
+    with path.open("rb") as handle:
+        digest = hashlib.sha256(handle.read(offset)).digest()
+    _store(key, _ParsedPrefix(offset, events[:cacheable], digest))
     return events
 
 

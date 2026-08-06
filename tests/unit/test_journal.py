@@ -400,6 +400,28 @@ def test_cached_prefix_is_reverified_against_the_file(
     assert [type(e) for e in events] == [RunStarted, RunPaused, RunResumed]
 
 
+def test_cached_prefix_detects_same_length_rewrite_before_its_final_anchor(tmp_path: Path) -> None:
+    """A rewrite cannot hide outside the small tail previously used as an anchor."""
+    clear_cache()
+    append(tmp_path, RUN, _started())
+    append(tmp_path, RUN, RunPaused(reason="manual"))
+    append(tmp_path, RUN, TurnCompleted(record=_turn_record(f"{RUN}-t0000")))
+    primed = read_events(tmp_path, RUN)
+    assert isinstance(primed[1], RunPaused)
+    assert primed[1].reason == "manual"
+
+    path = journal_path(tmp_path, RUN)
+    original = path.read_bytes()
+    rewritten = original.replace(b'"reason":"manual"', b'"reason":"review"', 1)
+    assert len(rewritten) == len(original)
+    assert rewritten[-64:] == original[-64:]
+    path.write_bytes(rewritten)
+
+    refreshed = read_events(tmp_path, RUN)
+    assert isinstance(refreshed[1], RunPaused)
+    assert refreshed[1].reason == "review"
+
+
 def test_cache_survives_a_torn_tail_truncation(tmp_path: Path) -> None:
     """The torn-tail path must leave the cache consistent with the truncated file."""
     clear_cache()
