@@ -34,7 +34,6 @@ import os
 from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import BinaryIO
 
 from pydantic import TypeAdapter, ValidationError
 
@@ -130,7 +129,7 @@ def _store(key: str, prefix: _ParsedPrefix) -> None:
         _CACHE.popitem(last=False)
 
 
-def _prefix_intact(handle: BinaryIO, prefix: _ParsedPrefix) -> bool:
+def _prefix_intact(snapshot: bytes, prefix: _ParsedPrefix) -> bool:
     """True when the file still begins with the bytes we parsed into ``prefix``.
 
     Checks the length (a shorter file means a truncated torn tail, or a rewrite) and
@@ -139,10 +138,9 @@ def _prefix_intact(handle: BinaryIO, prefix: _ParsedPrefix) -> bool:
     """
     if prefix.offset == 0:
         return True
-    if handle.seek(0, os.SEEK_END) < prefix.offset:
+    if len(snapshot) < prefix.offset:
         return False
-    handle.seek(0)
-    return hashlib.sha256(handle.read(prefix.offset)).digest() == prefix.digest
+    return hashlib.sha256(snapshot[: prefix.offset]).digest() == prefix.digest
 
 
 def read_events(vault_root: Path | str, run_id: str) -> list[JournalEvent]:
@@ -159,13 +157,13 @@ def read_events(vault_root: Path | str, run_id: str) -> list[JournalEvent]:
         return []
 
     with path.open("rb") as handle:
-        cached = _CACHE.get(key)
-        if cached is not None and not _prefix_intact(handle, cached):
-            cached = None
-        start = cached.offset if cached is not None else 0
-        events: list[JournalEvent] = list(cached.events) if cached is not None else []
-        handle.seek(start)
-        chunk = handle.read()
+        snapshot = handle.read()
+    cached = _CACHE.get(key)
+    if cached is not None and not _prefix_intact(snapshot, cached):
+        cached = None
+    start = cached.offset if cached is not None else 0
+    events: list[JournalEvent] = list(cached.events) if cached is not None else []
+    chunk = snapshot[start:]
 
     # An empty chunk (nothing appended, or an empty file) falls through: the loop does
     # not run, and the store below re-seats the unchanged prefix and keeps it hot.
@@ -199,8 +197,10 @@ def read_events(vault_root: Path | str, run_id: str) -> list[JournalEvent]:
         cacheable = len(events)
 
     offset = start + consumed
-    with path.open("rb") as handle:
-        digest = hashlib.sha256(handle.read(offset)).digest()
+    # Hash the same immutable byte snapshot that supplied the parsed events. Reopening
+    # here lets a concurrent same-length rewrite pair old events with the new bytes'
+    # digest, making that stale pairing look valid on the next cached read.
+    digest = hashlib.sha256(snapshot[:offset]).digest()
     _store(key, _ParsedPrefix(offset, events[:cacheable], digest))
     return events
 

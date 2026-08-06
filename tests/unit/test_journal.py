@@ -422,6 +422,42 @@ def test_cached_prefix_detects_same_length_rewrite_before_its_final_anchor(tmp_p
     assert refreshed[1].reason == "review"
 
 
+def test_cache_digest_and_events_come_from_one_file_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A concurrent rewrite cannot pair old parsed events with the new bytes' digest."""
+    clear_cache()
+    append(tmp_path, RUN, _started())
+    append(tmp_path, RUN, RunPaused(reason="manual"))
+    path = journal_path(tmp_path, RUN)
+    original = path.read_bytes()
+    rewritten = original.replace(b'"reason":"manual"', b'"reason":"review"', 1)
+    assert len(rewritten) == len(original)
+
+    class _RewriteAfterSnapshotAdapter:
+        def __init__(self) -> None:
+            self.rewritten = False
+
+        def validate_json(self, data: bytes | str):  # type: ignore[no-untyped-def]
+            if not self.rewritten:
+                self.rewritten = True
+                path.write_bytes(rewritten)
+            return _EVENT_ADAPTER.validate_json(data)
+
+        def dump_json(self, obj: object) -> bytes:
+            return _EVENT_ADAPTER.dump_json(obj)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(journal, "_EVENT_ADAPTER", _RewriteAfterSnapshotAdapter())
+
+    first = read_events(tmp_path, RUN)
+    assert isinstance(first[1], RunPaused)
+    assert first[1].reason == "manual"  # the coherent snapshot read before the rewrite
+
+    refreshed = read_events(tmp_path, RUN)
+    assert isinstance(refreshed[1], RunPaused)
+    assert refreshed[1].reason == "review"
+
+
 def test_cache_survives_a_torn_tail_truncation(tmp_path: Path) -> None:
     """The torn-tail path must leave the cache consistent with the truncated file."""
     clear_cache()
