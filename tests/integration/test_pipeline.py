@@ -21,9 +21,11 @@ from mootloop.models.common import DocId
 from mootloop.models.matter import MatterConfig
 from mootloop.models.requests import RequestType
 from mootloop.orchestrator import (
+    attention_blockers,
     load_request_units,
     plan_next,
     record_turn,
+    reopen_run,
     run_with_provider,
     start_run,
 )
@@ -117,6 +119,33 @@ def test_kill_resume_never_reexecutes_completed_turns(tmp_path: Path) -> None:
 
     anchors = _response_anchors(vault / "deliverables" / "draft-discovery-responses.md")
     assert len(anchors) == len(load_request_units(vault))
+
+
+def test_counter_capped_run_reopens_and_finishes(tmp_path: Path) -> None:
+    """The recovery path end-to-end: a turn burns its retry budget, the run halts
+    ``needs_attention``, the operator reopens it with a grant (after fixing whatever
+    derailed the persona), and the same run drives to a complete deliverable."""
+    vault = _build_matter_vault(tmp_path)
+    units = load_request_units(vault)
+    run_id = start_run(vault, "discovery-responses", NOW, run_id="matter-0004")
+
+    turn_id = plan_next(vault, run_id)[0].turn_id
+    for _ in range(3):  # DEFAULT_MAX_ATTEMPTS
+        record_turn(vault, run_id, turn_id, "not valid json", None, NOW)
+    assert load_state(vault, run_id).status == "needs_attention"
+    assert plan_next(vault, run_id) == []  # halted: no work is scheduled
+
+    assert [b.ref for b in attention_blockers(vault, run_id)] == [turn_id]
+    state = reopen_run(vault, run_id, reason="persona output fixed", grant_attempts=2)
+    assert state.status == "running"
+
+    state = run_with_provider(vault, run_id, FakeLLMProvider(), NOW)
+    assert state.status == "needs_decisions"
+    resolve_all_decisions(vault, run_id, NOW)
+    assert load_state(vault, run_id).status == "finished"
+
+    anchors = _response_anchors(vault / "deliverables" / "draft-discovery-responses.md")
+    assert set(anchors) == {u.request_id for u in units}
 
 
 def test_turn_body_written_once(tmp_path: Path) -> None:

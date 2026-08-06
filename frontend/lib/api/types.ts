@@ -24,6 +24,7 @@ export type Attestation = Schemas["Attestation"];
 export type AttestResponse = Schemas["AttestResponse"];
 export type StartRunRequest = Schemas["StartRunRequest"];
 export type RaiseCapRequest = Schemas["RaiseCapRequest"];
+export type ReopenRunRequest = Schemas["ReopenRunRequest"];
 export type RequestItem = Schemas["RequestItem"];
 export type GatePass = Schemas["GatePass"];
 export type GateFail = Schemas["GateFail"];

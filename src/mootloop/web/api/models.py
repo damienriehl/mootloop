@@ -19,6 +19,7 @@ from mootloop.models.decisions import Decision, ResolutionAction
 from mootloop.models.events import RunMode, RunStatus
 from mootloop.models.gates import GateResult
 from mootloop.models.requests import RequestItem
+from mootloop.models.run import AttentionBlocker
 from mootloop.models.taskspec import TaskSpec
 
 SCHEMA_VERSION = "1.0"
@@ -73,6 +74,22 @@ class RaiseCapRequest(StrictModel):
         return self
 
 
+class ReopenRunRequest(StrictModel):
+    """The body of a reopen call — the operator's logged ``reason`` (required), an
+    optional grant of extra retry attempts to clear counter-capped turns."""
+
+    reason: str
+    grant_attempts: int = 0
+
+    @model_validator(mode="after")
+    def _non_empty_reason(self) -> ReopenRunRequest:
+        if not self.reason.strip():
+            raise ValueError("`reason` must be non-empty — it is the audit trail")
+        if self.grant_attempts < 0:
+            raise ValueError("`grant_attempts` must be >= 0")
+        return self
+
+
 # --- responses --------------------------------------------------------------
 
 
@@ -111,11 +128,11 @@ class AttestResponse(VersionedModel):
 
 
 class RunActionResponse(VersionedModel):
-    """The result of a pause/resume/continue/raise-cap call, exposing the run's
+    """The result of a pause/resume/continue/raise-cap/reopen call, exposing the run's
     resulting `RunStatus` (the discriminated domain state)."""
 
     schema_version: str = SCHEMA_VERSION
-    kind: Literal["run_paused", "run_resumed", "run_continued", "cap_raised"]
+    kind: Literal["run_paused", "run_resumed", "run_continued", "cap_raised", "run_reopened"]
     run_id: str
     status: RunStatus
 
@@ -136,6 +153,7 @@ class RunStatusSummary(VersionedModel):
     completed_turns: int = 0
     discarded_turns: int = 0
     open_decisions: list[str] = Field(default_factory=list)
+    attention_blockers: list[AttentionBlocker] = Field(default_factory=list)
 
 
 class GateLedgerResponse(VersionedModel):

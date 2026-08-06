@@ -482,10 +482,17 @@ class RunLock:
     def release(self) -> None:
         if not self._acquired:
             return
-        with self._serialized_update():
-            current = self._read()
-            if current and current.get("token") == self._token:
-                self._path.unlink(missing_ok=True)
+        try:
+            with self._serialized_update():
+                current = self._read()
+                if current and current.get("token") == self._token:
+                    self._path.unlink(missing_ok=True)
+        except FileNotFoundError:
+            # Matter close intentionally removes the whole vault while holding its
+            # close lock. If the serialization directory is gone too, there is no
+            # lock inode left to release and no same-vault contender to fence.
+            if self._path.parent.exists():
+                raise
         self._acquired = False
         self._token = None
 

@@ -10,6 +10,21 @@ The pipeline is task-agnostic; the first task adapter is **discovery responses**
 (interrogatories, requests for production, requests for admission) under the
 Minnesota / federal rules.
 
+## Who it's for
+
+- **Litigators** who want a first draft that has already survived an opposing-counsel
+  attack and a judge panel — and who keep the privilege, RFA, and attestation calls.
+- **Small firms and solos** carrying a discovery load without associate leverage.
+- **Legal-AI builders** looking at a worked example of rubric-gated multi-agent loops
+  with hard human gates, spend caps, and fabrication/citation guardrails.
+- **Anyone evaluating agentic legal work product** — every run leaves a journal,
+  ledger, decision log, and audit trail derived from facts, never LLM-asserted.
+
+Typical use cases: draft and harden a discovery response set; measure which objections
+survive a judge panel and restructure the weak ones; export court-formatted
+deliverables that stay DRAFT-watermarked until an attorney attests; run the whole thing
+under a hard budget cap with an auditable spend ledger.
+
 ## Status
 
 **Phase 6-7 — Panels, restructure & deliverable export.** The judge panel drives a
@@ -155,6 +170,11 @@ pipeline), this phase makes loops *terminate on quality* and *respect a budget*:
   estimate` prints a pre-run range + per-stage breakdown; `run status` shows live
   tokens + a notional `$`-equivalent; a `hard_cap_usd` triggers a **graceful
   checkpoint** — a gaps report + a `capped` run that `mootloop run raise-cap` reopens.
+- **Attention halts are reopenable** — a turn that burns its retry budget (or a driver
+  auth/provider failure) halts the run at `needs_attention`. `mootloop run blockers`
+  lists what is holding it; once the cause is fixed *outside* the run — a persona body,
+  a rotated key, a config change — `mootloop run reopen --reason "…"` transitions it
+  back to `running` on an audited journal event. No state is ever hand-edited.
 
 Earlier phases remain: **corpus ingestion** (`mootloop ingest`), the **discovery
 parser** (`mootloop requests parse`), and the append-only **fact repository**
@@ -176,6 +196,34 @@ uv run mootloop run status ~/matters/acme <run-id>
 uv run mootloop run raise-cap ~/matters/acme <run-id> --to 120
 uv run mootloop run drive ~/matters/acme <run-id> --fake
 ```
+
+### Reopen: unblocking a `needs_attention` run
+
+A run halts at `needs_attention` when a turn exhausts its retry budget (the counter
+cap) or the driver hits an auth / repeated provider failure. Both causes are fixed
+*outside* the run, so nothing in the journal ever clears them on its own — `run reopen`
+is that explicit, audited step (it replaces hand-editing run state, which is never
+supported).
+
+```bash
+# What is actually holding the run? (empty for a driver-halted run — nothing to clear)
+uv run mootloop run blockers ~/matters/acme <run-id>
+
+# Driver halt (auth/provider): the logged reason is the whole gate.
+uv run mootloop run reopen ~/matters/acme <run-id> --reason "rotated the provider key"
+
+# Counter-capped turn: restore its retry budget after fixing what derailed it.
+# (Without a sufficient grant, reopen REFUSES and names the blocking turn.)
+uv run mootloop run reopen ~/matters/acme <run-id> \
+    --reason "tightened the associate output contract" --grant-attempts 2
+```
+
+`--grant-attempts N` raises the run's per-turn retry ceiling by `N` for the rest of the
+run, so the reopened turn gets real budget instead of re-blocking on its next discard.
+`--reason` is always required. The transition is a `RunReopened` journal event, so the
+fold — not a mutated file — is still the single source of truth. The hosted tier
+exposes the same verb at `POST /api/matters/{matter_id}/runs/{run_id}/reopen`, which
+also re-enqueues the run so a driver picks it back up.
 
 ## Quickstart
 
@@ -290,7 +338,8 @@ MOOTLOOP_DOWNLOAD_SIGNING_KEY # download-link HMAC key (pre-seed on hosts with a
   never holding the `RunLock` across a model call, with heartbeats and stale-worker
   reclaim. A **seat limit pauses the run** (`RunPaused(reason="capacity")`) and releases
   the queue slot for a scheduled resume; an auth failure finishes `needs_attention` and
-  drops a notification — the work is never silently lost.
+  drops a notification — the work is never silently lost, and `run reopen` puts a fixed
+  run back to work.
 - **Pause/resume + write-ahead spend ledger** — `paused` is a first-class, non-terminal
   run status (`run pause`/`run resume`). Each turn writes a `TurnIntent` **before** the
   model call, reserving its max-plausible cost against the hard cap until the real
@@ -310,7 +359,26 @@ mootloop driver run-once --matters-root <dir> --worker-id <id> [--fake]
 mootloop driver serve    --matters-root <dir> --worker-id <id>   # supervised, drains on SIGTERM
 mootloop run pause  <vault> <run-id> [--reason capacity]
 mootloop run resume <vault> <run-id>
+mootloop run blockers <vault> <run-id>                     # what holds a needs_attention run
+mootloop run reopen   <vault> <run-id> --reason "…" [--grant-attempts N]
 mootloop backup <vault> --dest <dir>
+```
+
+## Matter cockpit (FE-2)
+
+The attorney-facing surface is a **Next.js 16 (App Router)** app in
+[`frontend/`](frontend/README.md) — the single Cloudflare-Access-verified origin in the
+FD-5 BFF topology. The browser talks only to same-origin `/api/*`, which proxies to the
+internal FastAPI matter API with the `X-Mootloop-Internal` shared secret; the browser
+never sees that secret and never reaches FastAPI directly. Two rooms: the **run cockpit**
+(instrument band, run controls, persona pipeline, gate ledger, live SSE iteration
+timeline) and the **decision inbox** (blocking vs. entered decision cards, attestation
+panel). Tailwind v4 courtroom-ledger tokens, class-based dark/light applied pre-paint.
+
+```bash
+cd frontend && npm install
+npm run dev        # http://localhost:8730
+npm run lint && npm run typecheck && npm test
 ```
 
 ## Guardrails
@@ -323,6 +391,7 @@ mootloop backup <vault> --dest <dir>
 
 ## Documentation
 
+- **Frontend cockpit:** [`frontend/README.md`](frontend/README.md)
 - **Live-matter quickstart:** [`docs/quickstart-live-matter.md`](docs/quickstart-live-matter.md)
   — the full local workflow (vault → ingest → run → decide → attest → export)
 - **Demo deployment:** [`docs/deploy.md`](docs/deploy.md)

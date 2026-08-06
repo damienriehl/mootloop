@@ -27,6 +27,7 @@ from typing import Any, Literal
 
 from pydantic import Field
 
+from mootloop.errors import QueueError
 from mootloop.models.common import StrictModel
 
 Lane = Literal["interactive", "run"]
@@ -139,6 +140,31 @@ class Queue:
         """Append a work item to the queue (under lock)."""
         with self._locked():
             items = self._read()
+            items.append(item)
+            self._write(items)
+        return item
+
+    def ensure_enqueued(self, item: WorkItem) -> WorkItem:
+        """Ensure exactly one live item with ``item.item_id`` exists.
+
+        Callers use a deterministic id for journal-then-queue transitions. Retrying
+        after a queue write failure is therefore safe: an existing equivalent item is
+        returned, while an id collision with different work fails closed.
+        """
+        with self._locked():
+            items = self._read()
+            for existing in items:
+                if existing.item_id != item.item_id:
+                    continue
+                if (
+                    existing.lane,
+                    existing.matter_id,
+                    existing.run_id,
+                    existing.kind,
+                    existing.payload,
+                ) != (item.lane, item.matter_id, item.run_id, item.kind, item.payload):
+                    raise QueueError(f"queue item id {item.item_id!r} has conflicting work")
+                return existing.model_copy(deep=True)
             items.append(item)
             self._write(items)
         return item
