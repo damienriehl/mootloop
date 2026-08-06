@@ -270,6 +270,7 @@ def record_turn(
     now: str,
     *,
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+    provider_call_id: str | None = None,
 ) -> TurnRecord | DiscardedTurn:
     """Validate -> degeneracy gate -> journal. Derailment => discard (never repair)."""
     binding = _binding_for(vault_root, run_id)
@@ -281,14 +282,33 @@ def record_turn(
             # provider and burned tokens even though the slot was already filled (a
             # lost lease, a re-drained queue item). Booking is suppressed only for an
             # exact replay of a result already on the ledger — see `_book_spend`.
-            _book_spend(vault_root, run_id, turn_id, usage, record.spec.model, now, dedupe=True)
+            _book_spend(
+                vault_root,
+                run_id,
+                turn_id,
+                usage,
+                record.spec.model,
+                now,
+                dedupe=True,
+                provider_call_id=provider_call_id,
+            )
             return record
         units = load_request_units(vault_root)
         facts = _load_facts(vault_root)
         specs = _plan(run_id, state, binding, units, facts, max_attempts, _tier_models(vault_root))
         spec = _find_spec_in(specs, turn_id)
         return _record_spec(
-            vault_root, run_id, spec, raw_text, usage, now, binding, units, state, max_attempts
+            vault_root,
+            run_id,
+            spec,
+            raw_text,
+            usage,
+            now,
+            binding,
+            units,
+            state,
+            max_attempts,
+            provider_call_id,
         )
 
 
@@ -301,6 +321,7 @@ def _book_spend(
     now: str,
     *,
     dedupe: bool = False,
+    provider_call_id: str | None = None,
 ) -> None:
     """Append the ``SpendRecorded`` for one provider call.
 
@@ -310,27 +331,41 @@ def _book_spend(
     still records what the provider reported.
 
     ``dedupe`` guards the one path that can be reached without a fresh provider call:
-    re-recording an already-completed turn. A byte-identical usage tuple already on
-    this turn's ledger is a replay of the same money, so it is skipped; anything else
-    is a distinct call that really was paid for.
+    re-recording an already-completed turn. New providers identify the invocation
+    directly. Legacy callers without an identity retain the historical usage-signature
+    fallback so old integrations and journals remain idempotent.
     """
     if usage is None:
         return
     if dedupe:
-        prior = (
-            (e.input_tokens, e.cache_read, e.cache_write, e.output_tokens, e.model)
+        prior = [
+            e
             for e in read_events(vault_root, run_id)
             if isinstance(e, SpendRecorded) and e.turn_id == turn_id
-        )
-        signature = (
-            usage.input_tokens,
-            usage.cache_read,
-            usage.cache_write,
-            usage.output_tokens,
-            usage.model,
-        )
-        if signature in prior:
-            return
+        ]
+        if provider_call_id is not None:
+            if any(e.provider_call_id == provider_call_id for e in prior):
+                return
+        else:
+            signature = (
+                usage.input_tokens,
+                usage.cache_read,
+                usage.cache_write,
+                usage.output_tokens,
+                usage.model,
+            )
+            if any(
+                (
+                    e.input_tokens,
+                    e.cache_read,
+                    e.cache_write,
+                    e.output_tokens,
+                    e.model,
+                )
+                == signature
+                for e in prior
+            ):
+                return
     append(
         vault_root,
         run_id,
@@ -342,6 +377,7 @@ def _book_spend(
             output_tokens=usage.output_tokens,
             model=usage.model,
             usd_equiv=budget.cost_of(usage, model or usage.model, _date_of(now)),
+            provider_call_id=provider_call_id,
         ),
     )
 
@@ -357,6 +393,7 @@ def _record_spec(
     units: list[RequestItem],
     state: RunState,
     max_attempts: int,
+    provider_call_id: str | None,
 ) -> TurnRecord | DiscardedTurn:
     model_cls = OUTPUT_SCHEMAS[spec.output_schema_name]
     try:
@@ -374,6 +411,7 @@ def _record_spec(
             usage=usage,
             now=now,
             detail=f"your previous output failed `{spec.output_schema_name}` validation — {detail}",
+            provider_call_id=provider_call_id,
         )
 
     gate = degeneracy.evaluate(output)  # type: ignore[arg-type]
@@ -390,6 +428,7 @@ def _record_spec(
             usage=usage,
             now=now,
             detail=f"your previous output was discarded by the degeneracy gate — {detail}",
+            provider_call_id=provider_call_id,
         )
 
     gate_results: list[GateResult] = [gate]
@@ -418,7 +457,15 @@ def _record_spec(
     # Attorney-gate decisions (plan P-28): every draft/bolster turn may imply gates.
     if isinstance(output, DraftOutput):
         decisions.derive_and_store(vault_root, run_id, spec, output, units)
-    _book_spend(vault_root, run_id, spec.turn_id, usage, spec.model, now)
+    _book_spend(
+        vault_root,
+        run_id,
+        spec.turn_id,
+        usage,
+        spec.model,
+        now,
+        provider_call_id=provider_call_id,
+    )
 
     # Final rubric gate: aggregate the decorrelated panel once the last seat lands.
     _maybe_emit_rubric_gate(vault_root, run_id, spec, binding, units)
@@ -596,12 +643,21 @@ def _discard(
     usage: TokenUsage | None = None,
     now: str,
     detail: str = "",
+    provider_call_id: str | None = None,
 ) -> DiscardedTurn:
     # A discarded turn is thrown away, but it was not free: the provider ran and
     # billed for it. Book it BEFORE the discard so the cap sees the money even on the
     # attempt that trips `max_attempts`, and so the turn's write-ahead `TurnIntent`
     # reservation is reconciled by a real settlement instead of lingering as pending.
-    _book_spend(vault_root, run_id, spec.turn_id, usage, spec.model, now)
+    _book_spend(
+        vault_root,
+        run_id,
+        spec.turn_id,
+        usage,
+        spec.model,
+        now,
+        provider_call_id=provider_call_id,
+    )
     state = load_state(vault_root, run_id)
     attempt = state.discarded.get(spec.turn_id, 0) + 1
     append(
@@ -992,6 +1048,7 @@ def run_with_provider(
                     units,
                     fresh,
                     max_attempts,
+                    result.provider_call_id,
                 )
     return load_state(vault_root, run_id)
 

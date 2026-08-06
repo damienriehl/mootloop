@@ -94,22 +94,21 @@ def test_replayed_completed_turn_books_new_spend_but_never_double_books(
     spec = plan_next(vault, run_id)[0]
     turn: RawTurnResult = provider.run_turn(spec, render_prompt(spec))
 
-    first = record_turn(vault, run_id, spec.turn_id, turn.text, USAGE, NOW)
+    first = record_turn(
+        vault, run_id, spec.turn_id, turn.text, USAGE, NOW, provider_call_id="call-1"
+    )
     assert load_state(vault, run_id).total_spend_usd == EXPECTED_USD
 
-    # Same turn, a second real provider call (different token counts) — new money.
-    second_usage = TokenUsage(
-        input_tokens=100_000,
-        cache_read=0,
-        cache_write=0,
-        output_tokens=20_000,
-        model=MODEL_OPUS,
+    # Same turn, a second real provider call with identical usage — new money.
+    again = record_turn(
+        vault, run_id, spec.turn_id, turn.text, USAGE, NOW, provider_call_id="call-2"
     )
-    again = record_turn(vault, run_id, spec.turn_id, turn.text, second_usage, NOW)
     assert again == first  # the stored record still wins
-    assert load_state(vault, run_id).total_spend_usd == EXPECTED_USD + 1.0
+    assert load_state(vault, run_id).total_spend_usd == EXPECTED_USD * 2
 
-    # Replaying an identical result books nothing further.
-    record_turn(vault, run_id, spec.turn_id, turn.text, second_usage, NOW)
-    assert load_state(vault, run_id).total_spend_usd == EXPECTED_USD + 1.0
+    # Replaying the exact same provider call books nothing further.
+    record_turn(
+        vault, run_id, spec.turn_id, turn.text, USAGE, NOW, provider_call_id="call-2"
+    )
+    assert load_state(vault, run_id).total_spend_usd == EXPECTED_USD * 2
     assert len(_spend_events(vault, run_id)) == 2

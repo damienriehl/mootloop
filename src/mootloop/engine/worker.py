@@ -284,7 +284,13 @@ class Worker:
                 return True
             # record_turn takes the RunLock itself — never held across the call above.
             orchestrator.record_turn(
-                vault, run_id, spec.turn_id, result.text, result.usage, now_iso
+                vault,
+                run_id,
+                spec.turn_id,
+                result.text,
+                result.usage,
+                now_iso,
+                provider_call_id=result.provider_call_id,
             )
             # WALL time, not the tick's frozen `now`: `Queue.heartbeat` writes
             # `visible_at = <the time passed> + timeout`, so heartbeating with the

@@ -85,6 +85,9 @@ class SpendRecorded(StrictModel):
     model: str
     usd_equiv: float
     billing_mode: Literal["subscription", "api"] = "subscription"
+    # Optional so journals written before provider-call identity was introduced still
+    # parse and fold unchanged.
+    provider_call_id: str | None = None
 
 
 class RunFinished(StrictModel):

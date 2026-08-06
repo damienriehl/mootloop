@@ -32,6 +32,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import uuid
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -533,7 +534,9 @@ class HeadlessClaudeProvider:
         if isinstance(session_id, str) and session_id:
             self._persist_session_id(key, session_id)
         usage = self._usage_from(payload)
-        return RawTurnResult(text=_unfence(text), usage=usage)
+        return RawTurnResult(
+            text=_unfence(text), usage=usage, provider_call_id=uuid.uuid4().hex
+        )
 
     @staticmethod
     def _usage_from(payload: dict[str, Any]) -> TokenUsage | None:
