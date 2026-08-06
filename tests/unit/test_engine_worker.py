@@ -9,6 +9,8 @@ lost). Consolidates the earlier smoke test.
 from __future__ import annotations
 
 import signal
+import threading
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -16,7 +18,7 @@ import yaml
 
 from mootloop.engine.queue import Queue, WorkItem
 from mootloop.engine.worker import Worker
-from mootloop.errors import SeatLimitError
+from mootloop.errors import SeatLimitError, TurnError
 from mootloop.journal import load_state, read_events
 from mootloop.llm import FakeLLMProvider, LLMProvider, RawTurnResult, TokenUsage
 from mootloop.models.common import DocId
@@ -220,6 +222,96 @@ def test_worker_stops_draining_when_it_loses_the_lease(tmp_path: Path) -> None:
     # wA bailed after its first turn instead of driving the whole run behind wB's back.
     assert not load_state(vault, run_id).is_terminal
     assert queue.snapshot()[0].claimed_by == "wB"
+
+
+class _BlockingProvider:
+    def __init__(self, started: threading.Event, release: threading.Event) -> None:
+        self.started = started
+        self.release = release
+        self._inner = FakeLLMProvider()
+
+    def run_turn(self, spec: TurnSpec, prompt: str) -> RawTurnResult:
+        self.started.set()
+        assert self.release.wait(timeout=2.0)
+        return self._inner.run_turn(spec, prompt)
+
+
+def test_provider_call_keeps_queue_lease_alive(tmp_path: Path) -> None:
+    root, run_id = _build_matters_root(tmp_path)
+    queue = Queue(root)
+    _enqueue_run_turn(queue, run_id, "wi-blocking")
+    started = threading.Event()
+    release = threading.Event()
+    provider = _BlockingProvider(started, release)
+    worker = Worker(
+        root,
+        "wA",
+        queue,
+        lambda v, r, b: provider,
+        visibility_timeout_s=0.15,
+    )
+
+    thread = threading.Thread(target=worker.run_once, args=(NOW,))
+    thread.start()
+    assert started.wait(timeout=1.0)
+    time.sleep(0.25)
+    assert queue.claim("wB", datetime.now(UTC), visibility_timeout_s=1.0) is None
+    release.set()
+    thread.join(timeout=2.0)
+    assert not thread.is_alive()
+
+
+class _PermissionDeniedProvider:
+    def run_turn(self, spec: TurnSpec, prompt: str) -> RawTurnResult:
+        raise TurnError(
+            "headless turn was denied filesystem access: permission settings refused Read"
+        )
+
+
+class _GenericTurnErrorProvider:
+    def run_turn(self, spec: TurnSpec, prompt: str) -> RawTurnResult:
+        raise TurnError("headless turn timed out after 300s")
+
+
+def test_permission_denial_is_immediately_operator_visible(tmp_path: Path) -> None:
+    root, run_id = _build_matters_root(tmp_path)
+    queue = Queue(root)
+    _enqueue_run_turn(queue, run_id, "wi-denied")
+    worker = Worker(
+        root,
+        "wA",
+        queue,
+        lambda v, r, b: _PermissionDeniedProvider(),
+    )
+
+    assert worker.run_once(NOW) is True
+    vault = MatterRegistry(root=root).resolve(MATTER_ID)
+    assert load_state(vault, run_id).status == "needs_attention"
+    assert queue.snapshot() == []
+    [notification] = list((root / ".queue" / "notifications").glob("*.json"))
+    assert '"reason": "permission_denied"' in notification.read_text(encoding="utf-8")
+    assert "permission settings refused Read" not in notification.read_text(encoding="utf-8")
+
+
+def test_generic_turn_error_still_retries_with_backoff(tmp_path: Path) -> None:
+    root, run_id = _build_matters_root(tmp_path)
+    queue = Queue(root)
+    _enqueue_run_turn(queue, run_id, "wi-retry")
+    worker = Worker(
+        root,
+        "wA",
+        queue,
+        lambda v, r, b: _GenericTurnErrorProvider(),
+        backoff_s=30.0,
+    )
+
+    assert worker.run_once(NOW) is True
+    vault = MatterRegistry(root=root).resolve(MATTER_ID)
+    assert load_state(vault, run_id).status == "running"
+    [pending] = queue.snapshot()
+    assert pending.claimed_by is None
+    assert pending.visible_at == (NOW + timedelta(seconds=30)).isoformat()
+    assert not (root / ".queue" / "notifications").exists()
 
 
 # --- a poison item must never kill the driver --------------------------------

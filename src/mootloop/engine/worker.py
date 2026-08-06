@@ -33,6 +33,7 @@ import os
 import re
 import signal
 import socket
+import threading
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -41,8 +42,9 @@ from mootloop import budget, orchestrator
 from mootloop.engine.queue import Queue, WorkItem
 from mootloop.errors import AuthError, SeatLimitError, TurnError
 from mootloop.journal import append
-from mootloop.llm import LLMProvider
+from mootloop.llm import LLMProvider, RawTurnResult
 from mootloop.models.events import RunFinished, TurnIntent
+from mootloop.models.run import TurnSpec
 from mootloop.vault import RunLock, validate_id
 
 logger = logging.getLogger("mootloop.engine.worker")
@@ -60,6 +62,11 @@ _DEFAULT_STALE_S = 900.0
 _DEFAULT_MAX_ATTEMPTS = 5
 
 _UNSAFE_STEM_RE = re.compile(r"[^A-Za-z0-9._-]")
+_PERMISSION_DENIAL_PREFIX = "headless turn was denied filesystem access:"
+
+
+class _LeaseLostError(Exception):
+    """Internal control flow: the queue item is no longer owned by this worker."""
 
 
 def default_now() -> datetime:
@@ -247,7 +254,15 @@ class Worker:
             )
             prompt = orchestrator.assemble_prompt(vault, run_id, spec.turn_id)
             try:
-                result = provider.run_turn(spec, prompt)
+                result = self._run_turn_with_lease(item, provider, spec, prompt)
+            except _LeaseLostError:
+                logger.warning(
+                    "worker %s: lost the lease on item %s during provider call; "
+                    "discarding its result",
+                    self.worker_id,
+                    item.item_id,
+                )
+                return True
             except SeatLimitError:
                 orchestrator.pause_run(vault, run_id, reason="capacity")
                 self.queue.release(
@@ -259,7 +274,12 @@ class Worker:
             except AuthError:
                 self._finish_needs_attention(vault, run_id, item, reason="auth", now=now)
                 return True
-            except TurnError:
+            except TurnError as exc:
+                if str(exc).startswith(_PERMISSION_DENIAL_PREFIX):
+                    self._finish_needs_attention(
+                        vault, run_id, item, reason="permission_denied", now=now
+                    )
+                    return True
                 self._on_turn_error(vault, run_id, item, now=now)
                 return True
             # record_turn takes the RunLock itself — never held across the call above.
@@ -285,6 +305,64 @@ class Worker:
                     item.item_id,
                 )
                 return True
+
+    def _run_turn_with_lease(
+        self,
+        item: WorkItem,
+        provider: LLMProvider,
+        spec: TurnSpec,
+        prompt: str,
+    ) -> RawTurnResult:
+        """Renew the file-queue lease while the blocking provider process runs.
+
+        The queue opens and locks its own files for every operation, so the helper
+        thread shares no database connection or mutable transaction with the worker.
+        A final ownership check closes the race at provider return; if ownership was
+        lost, the caller discards the paid result and performs no journal mutation.
+        """
+        stop = threading.Event()
+        lost = threading.Event()
+        interval = max(0.01, min(self.visibility_timeout_s / 3.0, 30.0))
+
+        def renew() -> None:
+            while not stop.wait(interval):
+                if not self.queue.heartbeat(
+                    item.item_id,
+                    self.worker_id,
+                    self.now_fn(),
+                    visibility_timeout_s=self.visibility_timeout_s,
+                ):
+                    lost.set()
+                    return
+
+        keeper = threading.Thread(
+            target=renew,
+            name=f"lease-{self.worker_id}-{item.item_id}",
+            daemon=True,
+        )
+        keeper.start()
+        result: RawTurnResult | None = None
+        error: BaseException | None = None
+        try:
+            result = provider.run_turn(spec, prompt)
+        except BaseException as exc:  # preserve provider exception after ownership check
+            error = exc
+        finally:
+            stop.set()
+            keeper.join()
+
+        still_owned = not lost.is_set() and self.queue.heartbeat(
+            item.item_id,
+            self.worker_id,
+            self.now_fn(),
+            visibility_timeout_s=self.visibility_timeout_s,
+        )
+        if not still_owned:
+            raise _LeaseLostError
+        if error is not None:
+            raise error
+        assert result is not None
+        return result
 
     # -- failure routing --
 
