@@ -1,5 +1,5 @@
 """The ``needs_attention`` reopen verb: blocker derivation, the gated transition
-(counter-capped and driver-halted), the attempt grant, and safe force semantics.
+(counter-capped and driver-halted), and the attempt grant.
 
 Everything here runs against a synthetic single-request vault built in ``tmp_path``
 (the same shape ``test_run_pause.py`` uses) — never a real matter.
@@ -159,30 +159,13 @@ def test_grant_reopens_and_restores_retry_budget(tmp_path: Path) -> None:
     assert load_state(vault, "reopen-0005").status == "needs_attention"
 
 
-def test_force_cannot_override_a_spent_retry_budget(tmp_path: Path) -> None:
-    vault, _ = _counter_capped_run(tmp_path, "reopen-0006")
-
-    with pytest.raises(OrchestratorError, match="retry budget"):
-        reopen_run(
-            vault,
-            "reopen-0006",
-            reason="driving the last turn by hand",
-            force=True,
-            reopened_by="ops",
-        )
-    assert load_state(vault, "reopen-0006").status == "needs_attention"
-    assert plan_next(vault, "reopen-0006") == []
-    assert [e for e in read_events(vault, "reopen-0006") if isinstance(e, RunReopened)] == []
-
-
-def test_force_on_a_clean_run_is_not_recorded_as_forced(tmp_path: Path) -> None:
-    """``forced`` means "overrode a live blocker", so it stays False when there was
-    nothing to override — the audit trail never over-claims."""
+def test_new_reopen_events_keep_legacy_forced_field_false(tmp_path: Path) -> None:
+    """The persisted compatibility field is never advertised or set by new calls."""
     vault = _build_vault(tmp_path)
     start_run(vault, "discovery-responses", NOW, run_id="reopen-0007")
     append(vault, "reopen-0007", RunFinished(status="needs_attention"))
 
-    reopen_run(vault, "reopen-0007", reason="auth restored", force=True)
+    reopen_run(vault, "reopen-0007", reason="auth restored")
     event = next(e for e in read_events(vault, "reopen-0007") if isinstance(e, RunReopened))
     assert event.forced is False
 
@@ -206,7 +189,7 @@ def test_reopen_rejects_a_run_that_is_not_needs_attention(tmp_path: Path, status
 def test_reopen_requires_a_reason(tmp_path: Path) -> None:
     vault, _ = _counter_capped_run(tmp_path, "reopen-0008")
     with pytest.raises(OrchestratorError, match="non-empty reason"):
-        reopen_run(vault, "reopen-0008", reason="   ", force=True)
+        reopen_run(vault, "reopen-0008", reason="   ")
     with pytest.raises(OrchestratorError, match="grant_attempts"):
         reopen_run(vault, "reopen-0008", reason="ok", grant_attempts=-1)
     assert load_state(vault, "reopen-0008").status == "needs_attention"

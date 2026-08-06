@@ -736,13 +736,8 @@
       },
       "ReopenRunRequest": {
         "additionalProperties": false,
-        "description": "The body of a reopen call \u2014 the operator's logged ``reason`` (required), an\noptional grant of extra retry attempts to clear counter-capped turns, and an\nexplicit ``force`` marker (which never overrides a spent retry budget).",
+        "description": "The body of a reopen call \u2014 the operator's logged ``reason`` (required), an\noptional grant of extra retry attempts to clear counter-capped turns.",
         "properties": {
-          "force": {
-            "default": false,
-            "title": "Force",
-            "type": "boolean"
-          },
           "grant_attempts": {
             "default": 0,
             "title": "Grant Attempts",
@@ -2113,7 +2108,7 @@
     },
     "/api/matters/{matter_id}/runs/{run_id}/reopen": {
       "post": {
-        "description": "Reopen a ``needs_attention`` run once the operator has fixed what blocked it\n(mirrors ``mootloop run reopen``). Refuses \u2014 as a typed 4xx \u2014 while a counter-capped\nturn is unresolved, unless ``grant_attempts`` restores its retry budget; ``force``\nnever bypasses a spent retry ceiling. The verified Access email is the reopener\nrecorded on the journal event.",
+        "description": "Reopen a ``needs_attention`` run once the operator has fixed what blocked it\n(mirrors ``mootloop run reopen``). Refuses \u2014 as a typed 4xx \u2014 while a counter-capped\nturn is unresolved, unless ``grant_attempts`` restores its retry budget. The\nverified Access email is the reopener recorded on the journal event.",
         "operationId": "reopen_run_api_matters__matter_id__runs__run_id__reopen_post",
         "parameters": [
           {

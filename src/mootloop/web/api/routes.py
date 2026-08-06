@@ -285,16 +285,14 @@ def reopen_run(
 ) -> models.RunActionResponse:
     """Reopen a ``needs_attention`` run once the operator has fixed what blocked it
     (mirrors ``mootloop run reopen``). Refuses — as a typed 4xx — while a counter-capped
-    turn is unresolved, unless ``grant_attempts`` restores its retry budget; ``force``
-    never bypasses a spent retry ceiling. The verified Access email is the reopener
-    recorded on the journal event."""
+    turn is unresolved, unless ``grant_attempts`` restores its retry budget. The
+    verified Access email is the reopener recorded on the journal event."""
     if not orchestrator.reopen_enqueue_pending(vault, run_id):
         orchestrator.reopen_run(
             vault,
             run_id,
             reason=body.reason,
             grant_attempts=body.grant_attempts,
-            force=body.force,
             reopened_by=principal.email,
         )
     # Re-enqueue so the driver actually picks the reopened run back up — the same

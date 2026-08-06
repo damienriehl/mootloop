@@ -149,9 +149,9 @@ class RunReopened(StrictModel):
     ``grant_attempts`` raises the run's retry ceiling by that many attempts, which is
     what clears a *counter-capped* block: the turn that exhausted its attempts gets a
     fresh budget instead of re-blocking on its next discard. ``reason`` is the
-    operator's (always required) justification, and ``forced`` records that the blocker
-    check was explicitly overridden — both exist so the journal alone explains why a
-    terminal run started running again."""
+    operator's (always required) justification. ``forced`` remains solely so journals
+    written by the short-lived pre-release schema can still be replayed; new reopen
+    calls never expose or set an override."""
 
     kind: Literal["run_reopened"] = "run_reopened"
     reason: str

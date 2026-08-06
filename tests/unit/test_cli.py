@@ -12,6 +12,7 @@ from typer.testing import CliRunner
 
 from mootloop.cli import app
 from mootloop.engine.queue import Queue
+from mootloop.errors import QueueError
 from mootloop.journal import read_events
 from mootloop.models.events import RunReopened
 
@@ -312,19 +313,48 @@ def test_run_reopen_enqueues_when_vault_is_in_hosted_matters_root(tmp_path: Path
     ]
 
 
-def test_run_reopen_force_cannot_bypass_retry_budget(tmp_path: Path) -> None:
-    vault = tmp_path / "vault"
+def test_run_reopen_retry_repairs_queue_after_first_enqueue_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    matters_root = tmp_path / "matters"
+    vault = matters_root / "northfield-widgets-v-granite-supply"
     _seed_requests(vault)
     run_id = _needs_attention_run(vault)
+    original = Queue.ensure_enqueued
+    calls = 0
 
-    result = runner.invoke(
-        app,
-        ["run", "reopen", str(vault), run_id, "--reason", "driving it by hand", "--force"],
-    )
-    assert result.exit_code == 1
-    assert "retry budget" in result.output
-    status = runner.invoke(app, ["run", "status", str(vault), run_id, "--json"])
-    assert json.loads(status.output)["status"] == "needs_attention"
+    def fail_once(self: Queue, item: object) -> object:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise QueueError("injected queue write failure")
+        return original(self, item)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(Queue, "ensure_enqueued", fail_once)
+    args = [
+        "run",
+        "reopen",
+        str(vault),
+        run_id,
+        "--reason",
+        "fixed the persona body",
+        "--grant-attempts",
+        "2",
+    ]
+    env = {**os.environ, "MOOTLOOP_MATTERS_ROOT": str(matters_root)}
+
+    first = runner.invoke(app, args, env=env)
+    assert first.exit_code == 1
+    assert Queue(matters_root).snapshot() == []
+
+    retry = runner.invoke(app, args, env=env)
+    assert retry.exit_code == 0, retry.output
+    queued = Queue(matters_root).snapshot()
+    assert [(item.matter_id, item.run_id) for item in queued] == [
+        ("northfield-widgets-v-granite-supply", run_id)
+    ]
+    reopened = [event for event in read_events(vault, run_id) if isinstance(event, RunReopened)]
+    assert len(reopened) == 1
 
 
 def test_run_reopen_uses_local_os_identity_and_has_no_by_option(
@@ -359,6 +389,7 @@ def test_run_reopen_uses_local_os_identity_and_has_no_by_option(
     help_result = runner.invoke(app, ["run", "reopen", "--help"])
     assert help_result.exit_code == 0
     assert "--by" not in help_result.output
+    assert "--force" not in help_result.output
 
 
 def test_cite_verify_text_routes_federal_to_research(tmp_path: Path) -> None:

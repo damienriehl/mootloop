@@ -133,7 +133,7 @@ uv run mootloop run reopen ~/Matters/<matter-id> <run-id> \
 ```
 
 `--grant-attempts N` restores retry budget to a counter-capped turn (reopen refuses
-without it, unless you pass `--force`). Everything is journaled — run state is never
+without it). Everything is journaled — run state is never
 edited by hand.
 
 ## 6. Resolve the attorney gates

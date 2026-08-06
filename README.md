@@ -220,9 +220,6 @@ uv run mootloop run reopen ~/matters/acme <run-id> \
 
 `--grant-attempts N` raises the run's per-turn retry ceiling by `N` for the rest of the
 run, so the reopened turn gets real budget instead of re-blocking on its next discard.
-`--force` never bypasses a spent retry budget (and therefore cannot strand a run as
-`running` with no schedulable turn); it remains an explicit audit marker for other
-operator-cleared attention halts.
 `--reason` is always required. The transition is a `RunReopened` journal event, so the
 fold — not a mutated file — is still the single source of truth. The hosted tier
 exposes the same verb at `POST /api/matters/{matter_id}/runs/{run_id}/reopen`, which
@@ -363,7 +360,7 @@ mootloop driver serve    --matters-root <dir> --worker-id <id>   # supervised, d
 mootloop run pause  <vault> <run-id> [--reason capacity]
 mootloop run resume <vault> <run-id>
 mootloop run blockers <vault> <run-id>                     # what holds a needs_attention run
-mootloop run reopen   <vault> <run-id> --reason "…" [--grant-attempts N] [--force]
+mootloop run reopen   <vault> <run-id> --reason "…" [--grant-attempts N]
 mootloop backup <vault> --dest <dir>
 ```
 

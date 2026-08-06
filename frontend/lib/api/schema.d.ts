@@ -280,9 +280,8 @@ export interface paths {
          * Reopen Run
          * @description Reopen a ``needs_attention`` run once the operator has fixed what blocked it
          *     (mirrors ``mootloop run reopen``). Refuses — as a typed 4xx — while a counter-capped
-         *     turn is unresolved, unless ``grant_attempts`` restores its retry budget; ``force``
-         *     never bypasses a spent retry ceiling. The verified Access email is the reopener
-         *     recorded on the journal event.
+         *     turn is unresolved, unless ``grant_attempts`` restores its retry budget. The
+         *     verified Access email is the reopener recorded on the journal event.
          */
         post: operations["reopen_run_api_matters__matter_id__runs__run_id__reopen_post"];
         delete?: never;
@@ -868,15 +867,9 @@ export interface components {
         /**
          * ReopenRunRequest
          * @description The body of a reopen call — the operator's logged ``reason`` (required), an
-         *     optional grant of extra retry attempts to clear counter-capped turns, and an
-         *     explicit ``force`` marker (which never overrides a spent retry budget).
+         *     optional grant of extra retry attempts to clear counter-capped turns.
          */
         ReopenRunRequest: {
-            /**
-             * Force
-             * @default false
-             */
-            force: boolean;
             /**
              * Grant Attempts
              * @default 0

@@ -36,6 +36,7 @@ from mootloop.export import link as export_link
 from mootloop.export import service as export_service
 from mootloop.facts import FactStore, add_facts_from_file
 from mootloop.ingest import content_doc_id, ingest_folder
+from mootloop.journal import load_state
 from mootloop.llm import FakeLLMProvider
 from mootloop.models.matter import SCHEMA_VERSION, MatterConfig
 from mootloop.models.requests import RequestType
@@ -432,37 +433,33 @@ def run_reopen(
             help="Extra retry attempts for counter-capped turns (clears that blocker)",
         ),
     ] = 0,
-    force: Annotated[
-        bool,
-        typer.Option(
-            "--force",
-            help="Record an explicit override (never bypasses a spent retry budget)",
-        ),
-    ] = False,
 ) -> None:
     """Reopen a `needs_attention` run once what blocked it is fixed (auth, a persona
     body, a config change). Refuses while a counter-capped turn is unresolved unless
-    `--grant-attempts` restores its retry budget; `--force` cannot bypass that cap."""
-    try:
-        state = orchestrator.reopen_run(
-            vault_path,
-            run_id,
-            reason=reason,
-            grant_attempts=grant_attempts,
-            force=force,
-            reopened_by=pwd.getpwuid(os.geteuid()).pw_name,
-        )
-    except MootloopError as exc:
-        raise _fail(exc) from exc
-    granted = f" (+{grant_attempts} attempt(s))" if grant_attempts else ""
-    queued = False
+    `--grant-attempts` restores its retry budget."""
     matter = load_matter(vault_path)
     registry = MatterRegistry()
     try:
         hosted_vault = registry.resolve(matter.matter_id)
     except MootloopError:
         hosted_vault = None
-    if hosted_vault is not None and hosted_vault.resolve() == vault_path.resolve():
+    hosted = hosted_vault is not None and hosted_vault.resolve() == vault_path.resolve()
+    try:
+        if not (hosted and orchestrator.reopen_enqueue_pending(vault_path, run_id)):
+            state = orchestrator.reopen_run(
+                vault_path,
+                run_id,
+                reason=reason,
+                grant_attempts=grant_attempts,
+                reopened_by=pwd.getpwuid(os.geteuid()).pw_name,
+            )
+        else:
+            state = load_state(vault_path, run_id)
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    granted = f" (+{grant_attempts} attempt(s))" if grant_attempts else ""
+    queued = False
+    if hosted:
         from mootloop.engine.queue import Queue, WorkItem
 
         Queue(registry.root).ensure_enqueued(

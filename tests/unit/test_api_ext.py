@@ -319,7 +319,21 @@ def test_reopen_wrapper_requires_a_reason(
     resp = client.post(
         f"/api/matters/{matter.matter_id}/runs/{run_id}/reopen",
         headers=headers,
-        json={"reason": "  ", "force": True},
+        json={"reason": "  "},
+    )
+    assert resp.status_code == 422
+
+
+def test_reopen_wrapper_rejects_removed_force_field(
+    client: TestClient, registry: MatterRegistry, matter: MatterConfig
+) -> None:
+    vault = registry.resolve(matter.matter_id)
+    run_id = _seed_running_run(vault)
+    _halt_needs_attention(vault, run_id)
+    resp = client.post(
+        f"/api/matters/{matter.matter_id}/runs/{run_id}/reopen",
+        headers=_csrf(client),
+        json={"reason": "persona fixed", "grant_attempts": 2, "force": True},
     )
     assert resp.status_code == 422
 

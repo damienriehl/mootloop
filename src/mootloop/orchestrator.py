@@ -787,7 +787,6 @@ def reopen_run(
     *,
     reason: str,
     grant_attempts: int = 0,
-    force: bool = False,
     reopened_by: str = "operator",
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
 ) -> RunState:
@@ -802,9 +801,7 @@ def reopen_run(
       - the run is actually ``needs_attention`` (never a way to un-finish a run);
       - ``reason`` is non-empty — it is the audit trail;
       - every counter-capped turn is cleared, either because it since completed or
-        because ``grant_attempts`` restores its retry budget. ``force=True`` is
-        reserved for non-budget blockers; it can never create an unschedulable
-        ``running`` run by overriding a spent retry ceiling.
+        because ``grant_attempts`` restores its retry budget.
     """
     reason = reason.strip()
     if not reason:
@@ -826,8 +823,7 @@ def reopen_run(
                 f"run {run_id!r} still has {len(blockers)} unresolved blocker(s) "
                 f"caused by spent retry budget: {listed}. Grant retry budget with "
                 "--grant-attempts N "
-                "after fixing what derailed the turn; --force cannot bypass a spent "
-                "retry budget."
+                "after fixing what derailed the turn."
             )
         append(
             vault_root,
@@ -835,7 +831,6 @@ def reopen_run(
             RunReopened(
                 reason=reason,
                 grant_attempts=grant_attempts,
-                forced=False,
                 reopened_by=reopened_by,
             ),
         )
