@@ -330,16 +330,32 @@ class Worker:
         lost = threading.Event()
         interval = max(0.01, min(self.visibility_timeout_s / 3.0, 30.0))
 
-        def renew() -> None:
-            while not stop.wait(interval):
-                if not self.queue.heartbeat(
+        def heartbeat() -> bool:
+            try:
+                return self.queue.heartbeat(
                     item.item_id,
                     self.worker_id,
                     self.now_fn(),
                     visibility_timeout_s=self.visibility_timeout_s,
-                ):
+                )
+            except Exception:
+                logger.exception(
+                    "worker %s: queue heartbeat failed for item %s; treating lease as lost",
+                    self.worker_id,
+                    item.item_id,
+                )
+                return False
+
+        def renew() -> None:
+            while not stop.wait(interval):
+                if not heartbeat():
                     lost.set()
                     return
+
+        # Fail closed before paying for provider work if the claim is already gone or
+        # the queue cannot prove ownership.
+        if not heartbeat():
+            raise _LeaseLostError
 
         keeper = threading.Thread(
             target=renew,
@@ -357,12 +373,7 @@ class Worker:
             stop.set()
             keeper.join()
 
-        still_owned = not lost.is_set() and self.queue.heartbeat(
-            item.item_id,
-            self.worker_id,
-            self.now_fn(),
-            visibility_timeout_s=self.visibility_timeout_s,
-        )
+        still_owned = not lost.is_set() and heartbeat()
         if not still_owned:
             raise _LeaseLostError
         if error is not None:

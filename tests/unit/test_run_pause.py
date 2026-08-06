@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from mootloop import vault as vault_module
-from mootloop.errors import OrchestratorError
+from mootloop.errors import LockHeldError, OrchestratorError
 from mootloop.journal import append, load_state, read_events
 from mootloop.llm import FakeLLMProvider, RawTurnResult
 from mootloop.models.common import DocId
@@ -219,3 +219,34 @@ def test_long_run_keeps_its_lock_heartbeat_fresh(
     assert len(provider.ages) >= 3  # long enough to outlive the window without refreshes
     # At no point was the live run's own lock old enough for another process to take.
     assert max(provider.ages) <= DEFAULT_HEARTBEAT_THRESHOLD
+
+
+class _TakeoverProvider:
+    """Replace the driver's lock while its blocking provider call is in flight."""
+
+    def __init__(self, vault: Path, run_id: str) -> None:
+        self._vault = vault
+        self._run_id = run_id
+        self._inner = FakeLLMProvider()
+        self.contender = vault_module.RunLock(
+            vault, f"{run_id}-contender", heartbeat_threshold=timedelta(0)
+        )
+
+    def run_turn(self, spec: TurnSpec, prompt: str) -> RawTurnResult:
+        self.contender.acquire()
+        return self._inner.run_turn(spec, prompt)
+
+
+def test_provider_result_is_not_recorded_after_run_lock_takeover(tmp_path: Path) -> None:
+    vault = _build_vault(tmp_path)
+    run_id = start_run(vault, "discovery-responses", NOW, run_id="pause-0008")
+    provider = _TakeoverProvider(vault, run_id)
+    events_before = read_events(vault, run_id)
+
+    try:
+        with pytest.raises(LockHeldError):
+            run_with_provider(vault, run_id, provider, NOW)  # type: ignore[arg-type]
+    finally:
+        provider.contender.release()
+
+    assert read_events(vault, run_id) == events_before

@@ -8,12 +8,14 @@ lost). Consolidates the earlier smoke test.
 
 from __future__ import annotations
 
+import logging
 import signal
 import threading
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pytest
 import yaml
 
 from mootloop.engine.queue import Queue, WorkItem
@@ -259,6 +261,47 @@ def test_provider_call_keeps_queue_lease_alive(tmp_path: Path) -> None:
     release.set()
     thread.join(timeout=2.0)
     assert not thread.is_alive()
+
+
+def test_provider_result_is_discarded_when_lease_heartbeat_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    root, run_id = _build_matters_root(tmp_path)
+    queue = Queue(root)
+    _enqueue_run_turn(queue, run_id, "wi-heartbeat-error")
+    started = threading.Event()
+    release = threading.Event()
+    provider = _BlockingProvider(started, release)
+    worker = Worker(
+        root,
+        "wA",
+        queue,
+        lambda v, r, b: provider,
+        visibility_timeout_s=0.15,
+    )
+    original_heartbeat = queue.heartbeat
+    calls = 0
+
+    def failing_heartbeat(*args: object, **kwargs: object) -> bool:
+        nonlocal calls
+        calls += 1
+        if calls >= 2:
+            raise OSError("simulated queue heartbeat failure")
+        return original_heartbeat(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(queue, "heartbeat", failing_heartbeat)
+    caplog.set_level(logging.WARNING, logger="mootloop.engine.worker")
+    thread = threading.Thread(target=worker.run_once, args=(NOW,))
+    thread.start()
+    assert started.wait(timeout=1.0)
+    time.sleep(0.1)
+    release.set()
+    thread.join(timeout=2.0)
+
+    assert not thread.is_alive()
+    vault = MatterRegistry(root=root).resolve(MATTER_ID)
+    assert load_state(vault, run_id).completed_turns == {}
+    assert "queue heartbeat failed" in caplog.text
 
 
 class _PermissionDeniedProvider:

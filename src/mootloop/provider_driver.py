@@ -7,21 +7,69 @@ optional driver part of the already-large state-machine module.
 
 from __future__ import annotations
 
+import logging
+import threading
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from mootloop import decisions
+from mootloop.errors import LockHeldError
 from mootloop.journal import load_state
 from mootloop.models.run import DraftOutput
 from mootloop.stages import first_incomplete_stage, render_prompt
 from mootloop.vault import RunLock, atomic_write_text, load_matter, safe_vault_path
 
 if TYPE_CHECKING:
-    from mootloop.llm import LLMProvider
+    from mootloop.llm import LLMProvider, RawTurnResult
     from mootloop.models.events import RunState
     from mootloop.models.requests import RequestItem
+    from mootloop.models.run import TurnSpec
     from mootloop.tasks import TaskBinding
 
+logger = logging.getLogger("mootloop.provider_driver")
+
+
+def _run_turn_with_lock_renewal(
+    lock: RunLock, provider: LLMProvider, spec: TurnSpec, prompt: str
+) -> RawTurnResult:
+    """Keep ``lock`` live across a blocking provider call and fence its result."""
+    stop = threading.Event()
+    lost = threading.Event()
+    interval = max(0.01, min(lock.heartbeat_threshold.total_seconds() / 3.0, 30.0))
+
+    if not lock.heartbeat(best_effort=True):
+        raise LockHeldError("run lock ownership was lost before provider call")
+
+    def renew() -> None:
+        while not stop.wait(interval):
+            if not lock.heartbeat(best_effort=True):
+                lost.set()
+                return
+
+    keeper = threading.Thread(
+        target=renew,
+        name=f"run-lock-{lock.run_id}",
+        daemon=True,
+    )
+    keeper.start()
+    result: RawTurnResult | None = None
+    error: BaseException | None = None
+    try:
+        result = provider.run_turn(spec, prompt)
+    except BaseException as exc:
+        error = exc
+    finally:
+        stop.set()
+        keeper.join()
+
+    still_owned = not lost.is_set() and lock.heartbeat(best_effort=True)
+    if not still_owned:
+        logger.warning("discarding provider result after run lock ownership was lost")
+        raise LockHeldError("run lock ownership was lost during provider call")
+    if error is not None:
+        raise error
+    assert result is not None
+    return result
 
 def run_with_provider(
     vault_root: Path | str,
@@ -61,9 +109,9 @@ def run_with_provider(
                 fresh = load_state(vault_root, run_id)
                 if fresh.finished or spec.turn_id in fresh.completed_turns:
                     continue
-                lock.heartbeat(best_effort=True)
-                result = provider.run_turn(spec, render_prompt(spec))
-                lock.heartbeat(best_effort=True)
+                result = _run_turn_with_lock_renewal(
+                    lock, provider, spec, render_prompt(spec)
+                )
                 orchestrator._record_spec(
                     vault_root,
                     run_id,
