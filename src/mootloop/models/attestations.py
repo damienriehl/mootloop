@@ -14,7 +14,7 @@ from typing import Literal
 
 from mootloop.models.common import VersionedModel
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
 
 AttestationCheckStatus = Literal["valid", "invalidated", "missing"]
 
@@ -23,6 +23,9 @@ class Attestation(VersionedModel):
     """One append-only attestation-manifest record (an attest or an invalidation)."""
 
     schema_version: str = SCHEMA_VERSION
+    # Absent on schema 1.0 records, whose master hash covered only md-master.
+    # Keep parsing those append-only records, but never treat their hash as current.
+    hash_scope: str | None = None
     attestation_id: str
     run_id: str
     master_sha256: str

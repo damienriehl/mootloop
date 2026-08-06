@@ -32,6 +32,10 @@ from mootloop.tasks import get_binding
 from mootloop.vault import RunLock, load_matter, safe_vault_path
 
 ATTESTATIONS_JSONL = ("attestations.jsonl",)
+MASTER_HASH_SCOPE = "md-master+matter:v1"
+LEGACY_HASH_SCOPE_REASON = (
+    "legacy attestation hash scope is incompatible; re-attestation required"
+)
 
 
 # --- canonicalization + hashing ---------------------------------------------
@@ -143,6 +147,7 @@ def attest(vault_root: Path | str, run_id: str, reviewer: str, now: str) -> Atte
         record = Attestation(
             attestation_id=f"att-{run_id}-{seq:04d}",
             run_id=run_id,
+            hash_scope=MASTER_HASH_SCOPE,
             master_sha256=master,
             ledger_head_sha256=current_ledger_head_sha256(vault_root),
             reviewer=reviewer,
@@ -170,6 +175,8 @@ def attestation_state(vault_root: Path | str, run_id: str) -> AttestationCheck:
         return AttestationCheck("missing")
     if not latest.valid:
         return AttestationCheck("invalidated", latest.reason)
+    if latest.hash_scope != MASTER_HASH_SCOPE:
+        return AttestationCheck("invalidated", LEGACY_HASH_SCOPE_REASON)
     master = current_master_sha256(vault_root, run_id)
     if master != latest.master_sha256:
         return AttestationCheck(
@@ -194,6 +201,7 @@ def check_attestation(vault_root: Path | str, run_id: str, now: str) -> Attestat
                 Attestation(
                     attestation_id=f"att-{run_id}-{seq:04d}",
                     run_id=run_id,
+                    hash_scope=MASTER_HASH_SCOPE,
                     master_sha256=current_master_sha256(vault_root, run_id) or "",
                     ledger_head_sha256=current_ledger_head_sha256(vault_root),
                     reviewer="system",
