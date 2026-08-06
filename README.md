@@ -213,14 +213,16 @@ uv run mootloop run blockers ~/matters/acme <run-id>
 uv run mootloop run reopen ~/matters/acme <run-id> --reason "rotated the provider key"
 
 # Counter-capped turn: restore its retry budget after fixing what derailed it.
-# (Without a grant — or --force — reopen REFUSES and names the blocking turn.)
+# (Without a sufficient grant, reopen REFUSES and names the blocking turn.)
 uv run mootloop run reopen ~/matters/acme <run-id> \
     --reason "tightened the associate output contract" --grant-attempts 2
 ```
 
 `--grant-attempts N` raises the run's per-turn retry ceiling by `N` for the rest of the
 run, so the reopened turn gets real budget instead of re-blocking on its next discard.
-`--force` reopens despite unresolved blockers and is recorded as forced on the event;
+`--force` never bypasses a spent retry budget (and therefore cannot strand a run as
+`running` with no schedulable turn); it remains an explicit audit marker for other
+operator-cleared attention halts.
 `--reason` is always required. The transition is a `RunReopened` journal event, so the
 fold — not a mutated file — is still the single source of truth. The hosted tier
 exposes the same verb at `POST /api/matters/{matter_id}/runs/{run_id}/reopen`, which

@@ -802,8 +802,9 @@ def reopen_run(
       - the run is actually ``needs_attention`` (never a way to un-finish a run);
       - ``reason`` is non-empty — it is the audit trail;
       - every counter-capped turn is cleared, either because it since completed or
-        because ``grant_attempts`` restores its retry budget. ``force=True`` overrides
-        the check and is recorded as such on the event.
+        because ``grant_attempts`` restores its retry budget. ``force=True`` is
+        reserved for non-budget blockers; it can never create an unschedulable
+        ``running`` run by overriding a spent retry ceiling.
     """
     reason = reason.strip()
     if not reason:
@@ -819,12 +820,14 @@ def reopen_run(
         blockers = attention_blockers(
             vault_root, run_id, max_attempts=max_attempts, grant_attempts=grant_attempts
         )
-        if blockers and not force:
+        if blockers:
             listed = "; ".join(f"{b.ref} ({b.detail})" for b in blockers)
             raise OrchestratorError(
-                f"run {run_id!r} still has {len(blockers)} unresolved blocker(s): {listed}. "
-                "Grant retry budget with --grant-attempts N (after fixing what derailed "
-                "the turn), or override with --force."
+                f"run {run_id!r} still has {len(blockers)} unresolved blocker(s) "
+                f"caused by spent retry budget: {listed}. Grant retry budget with "
+                "--grant-attempts N "
+                "after fixing what derailed the turn; --force cannot bypass a spent "
+                "retry budget."
             )
         append(
             vault_root,
@@ -832,11 +835,26 @@ def reopen_run(
             RunReopened(
                 reason=reason,
                 grant_attempts=grant_attempts,
-                forced=bool(blockers and force),
+                forced=False,
                 reopened_by=reopened_by,
             ),
         )
     return load_state(vault_root, run_id)
+
+
+def reopen_enqueue_pending(vault_root: Path | str, run_id: str) -> bool:
+    """Whether the journal committed a reopen but no later run event exists yet.
+
+    This narrow predicate lets the hosted API replay only the queue half of its
+    journal-then-queue operation after a queue failure. It does not make the reopen
+    transition itself generally idempotent.
+    """
+    events = read_events(vault_root, run_id)
+    return bool(
+        events
+        and isinstance(events[-1], RunReopened)
+        and load_state(vault_root, run_id).status == "running"
+    )
 
 
 def _write_observed_status(

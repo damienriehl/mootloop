@@ -1,5 +1,5 @@
 """The ``needs_attention`` reopen verb: blocker derivation, the gated transition
-(counter-capped and driver-halted), the attempt grant, and the forced override.
+(counter-capped and driver-halted), the attempt grant, and safe force semantics.
 
 Everything here runs against a synthetic single-request vault built in ``tmp_path``
 (the same shape ``test_run_pause.py`` uses) — never a real matter.
@@ -158,20 +158,20 @@ def test_grant_reopens_and_restores_retry_budget(tmp_path: Path) -> None:
     assert load_state(vault, "reopen-0005").status == "needs_attention"
 
 
-def test_force_overrides_unresolved_blockers_and_is_recorded(tmp_path: Path) -> None:
+def test_force_cannot_override_a_spent_retry_budget(tmp_path: Path) -> None:
     vault, _ = _counter_capped_run(tmp_path, "reopen-0006")
 
-    state = reopen_run(
-        vault, "reopen-0006", reason="driving the last turn by hand", force=True, reopened_by="ops"
-    )
-    assert state.status == "running"
-
-    reopened = [e for e in read_events(vault, "reopen-0006") if isinstance(e, RunReopened)]
-    assert len(reopened) == 1
-    assert reopened[0].forced is True
-    assert reopened[0].reason == "driving the last turn by hand"
-    assert reopened[0].reopened_by == "ops"
-    assert reopened[0].grant_attempts == 0
+    with pytest.raises(OrchestratorError, match="retry budget"):
+        reopen_run(
+            vault,
+            "reopen-0006",
+            reason="driving the last turn by hand",
+            force=True,
+            reopened_by="ops",
+        )
+    assert load_state(vault, "reopen-0006").status == "needs_attention"
+    assert plan_next(vault, "reopen-0006") == []
+    assert [e for e in read_events(vault, "reopen-0006") if isinstance(e, RunReopened)] == []
 
 
 def test_force_on_a_clean_run_is_not_recorded_as_forced(tmp_path: Path) -> None:

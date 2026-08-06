@@ -431,13 +431,17 @@ def run_reopen(
         ),
     ] = 0,
     force: Annotated[
-        bool, typer.Option("--force", help="Reopen despite unresolved blockers (recorded)")
+        bool,
+        typer.Option(
+            "--force",
+            help="Record an explicit override (never bypasses a spent retry budget)",
+        ),
     ] = False,
     by: Annotated[str, typer.Option("--by", help="Who is reopening the run")] = "operator",
 ) -> None:
     """Reopen a `needs_attention` run once what blocked it is fixed (auth, a persona
     body, a config change). Refuses while a counter-capped turn is unresolved unless
-    `--grant-attempts` restores its retry budget or `--force` overrides."""
+    `--grant-attempts` restores its retry budget; `--force` cannot bypass that cap."""
     try:
         state = orchestrator.reopen_run(
             vault_path,
@@ -450,10 +454,33 @@ def run_reopen(
     except MootloopError as exc:
         raise _fail(exc) from exc
     granted = f" (+{grant_attempts} attempt(s))" if grant_attempts else ""
-    typer.echo(
-        f"reopened {run_id}: {state.status}{granted} — resume with `run drive --fake` "
-        "(or let the driver pick it up)"
+    queued = False
+    matter = load_matter(vault_path)
+    registry = MatterRegistry()
+    try:
+        hosted_vault = registry.resolve(matter.matter_id)
+    except MootloopError:
+        hosted_vault = None
+    if hosted_vault is not None and hosted_vault.resolve() == vault_path.resolve():
+        from mootloop.engine.queue import Queue, WorkItem
+
+        Queue(registry.root).ensure_enqueued(
+            WorkItem.create(
+                lane="run",
+                matter_id=matter.matter_id,
+                run_id=run_id,
+                kind="run_turn",
+                now=datetime.now(UTC),
+                item_id=f"reopen:{matter.matter_id}:{run_id}",
+            )
+        )
+        queued = True
+    next_step = (
+        "queued for the hosted driver"
+        if queued
+        else "standalone vault: resume explicitly with `run drive --fake`"
     )
+    typer.echo(f"reopened {run_id}: {state.status}{granted} — {next_step}")
 
 
 @run_app.command("blockers")

@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
 from typer.testing import CliRunner
 
 from mootloop.cli import app
+from mootloop.engine.queue import Queue
 
 runner = CliRunner()
 
@@ -272,12 +274,42 @@ def test_run_reopen_refuses_then_reopens_with_a_grant(tmp_path: Path) -> None:
     )
     assert granted.exit_code == 0, granted.output
     assert "reopened" in granted.output
+    assert "standalone vault" in granted.output
 
     status = runner.invoke(app, ["run", "status", str(vault), run_id, "--json"])
     assert json.loads(status.output)["status"] == "running"
 
 
-def test_run_reopen_force_bypasses_blockers(tmp_path: Path) -> None:
+def test_run_reopen_enqueues_when_vault_is_in_hosted_matters_root(tmp_path: Path) -> None:
+    matters_root = tmp_path / "matters"
+    vault = matters_root / "northfield-widgets-v-granite-supply"
+    _seed_requests(vault)
+    run_id = _needs_attention_run(vault)
+
+    granted = runner.invoke(
+        app,
+        [
+            "run",
+            "reopen",
+            str(vault),
+            run_id,
+            "--reason",
+            "fixed the persona body",
+            "--grant-attempts",
+            "2",
+        ],
+        env={**os.environ, "MOOTLOOP_MATTERS_ROOT": str(matters_root)},
+    )
+
+    assert granted.exit_code == 0, granted.output
+    assert "queued for the hosted driver" in granted.output
+    queued = Queue(matters_root).snapshot()
+    assert [(item.matter_id, item.run_id) for item in queued] == [
+        ("northfield-widgets-v-granite-supply", run_id)
+    ]
+
+
+def test_run_reopen_force_cannot_bypass_retry_budget(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     _seed_requests(vault)
     run_id = _needs_attention_run(vault)
@@ -286,9 +318,10 @@ def test_run_reopen_force_bypasses_blockers(tmp_path: Path) -> None:
         app,
         ["run", "reopen", str(vault), run_id, "--reason", "driving it by hand", "--force"],
     )
-    assert result.exit_code == 0, result.output
+    assert result.exit_code == 1
+    assert "retry budget" in result.output
     status = runner.invoke(app, ["run", "status", str(vault), run_id, "--json"])
-    assert json.loads(status.output)["status"] == "running"
+    assert json.loads(status.output)["status"] == "needs_attention"
 
 
 def test_cite_verify_text_routes_federal_to_research(tmp_path: Path) -> None:

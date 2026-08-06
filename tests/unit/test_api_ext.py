@@ -21,7 +21,7 @@ from typer.testing import CliRunner
 from mootloop import orchestrator
 from mootloop.cli import app as cli_app
 from mootloop.engine.queue import Queue
-from mootloop.errors import AccessAuthError
+from mootloop.errors import AccessAuthError, QueueError
 from mootloop.models.common import DocId
 from mootloop.models.matter import MatterConfig
 from mootloop.models.requests import RequestItem, RequestSet, RequestType
@@ -50,11 +50,16 @@ def registry(tmp_path: Path, matter: MatterConfig) -> MatterRegistry:
 
 
 @pytest.fixture
-def client(registry: MatterRegistry) -> TestClient:
+def queue(registry: MatterRegistry) -> Queue:
+    return Queue(registry.root)
+
+
+@pytest.fixture
+def client(registry: MatterRegistry, queue: Queue) -> TestClient:
     app = create_matter_api()
     app.dependency_overrides[get_verifier] = _StubVerifier
     app.dependency_overrides[get_registry] = lambda: registry
-    app.dependency_overrides[get_queue] = lambda: Queue(registry.root)
+    app.dependency_overrides[get_queue] = lambda: queue
     return TestClient(app)
 
 
@@ -260,6 +265,45 @@ def test_reopen_wrapper_refuses_while_blocked_then_reopens_with_a_grant(
     assert ok.json()["status"] == "running"
     # Reopening re-queues the run so the driver actually picks it back up.
     queued = Queue(registry.root).claim("w-1", datetime.now(UTC), visibility_timeout_s=60.0)
+    assert queued is not None
+    assert queued.run_id == run_id
+
+
+def test_reopen_retry_repairs_queue_after_first_enqueue_failure(
+    client: TestClient,
+    registry: MatterRegistry,
+    matter: MatterConfig,
+    queue: Queue,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    vault = registry.resolve(matter.matter_id)
+    run_id = _seed_running_run(vault)
+    _halt_needs_attention(vault, run_id)
+    headers = _csrf(client)
+    url = f"/api/matters/{matter.matter_id}/runs/{run_id}/reopen"
+    original = queue.ensure_enqueued
+    calls = 0
+
+    def fail_once(item: object) -> object:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise QueueError("injected queue write failure")
+        return original(item)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(queue, "ensure_enqueued", fail_once)
+    first = client.post(
+        url, headers=headers, json={"reason": "persona body fixed", "grant_attempts": 2}
+    )
+    assert first.status_code == 409
+    assert orchestrator.load_state(vault, run_id).status == "running"
+    assert queue.snapshot() == []
+
+    retry = client.post(
+        url, headers=headers, json={"reason": "persona body fixed", "grant_attempts": 2}
+    )
+    assert retry.status_code == 200
+    queued = queue.claim("w-recovery", datetime.now(UTC), visibility_timeout_s=60.0)
     assert queued is not None
     assert queued.run_id == run_id
 

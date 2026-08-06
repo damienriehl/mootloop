@@ -76,7 +76,7 @@ class RaiseCapRequest(StrictModel):
 class ReopenRunRequest(StrictModel):
     """The body of a reopen call — the operator's logged ``reason`` (required), an
     optional grant of extra retry attempts to clear counter-capped turns, and an
-    explicit ``force`` override of the blocker check."""
+    explicit ``force`` marker (which never overrides a spent retry budget)."""
 
     reason: str
     grant_attempts: int = 0
