@@ -287,6 +287,22 @@ def test_run_lock_takes_over_stale_heartbeat(tmp_path: Path) -> None:
     lock.release()
 
 
+def test_stale_owner_cannot_heartbeat_after_takeover(tmp_path: Path) -> None:
+    """A replaced owner must not be able to overwrite its successor's lock."""
+    vault = tmp_path / "vault"
+    (vault / "runs").mkdir(parents=True)
+    old = RunLock(vault, "old", heartbeat_threshold=timedelta(0))
+    old.acquire()
+
+    new = RunLock(vault, "new", heartbeat_threshold=timedelta(0))
+    new.acquire()
+
+    with pytest.raises(LockHeldError):
+        old.heartbeat()
+    assert json.loads(new._path.read_text(encoding="utf-8"))["run_id"] == "new"
+    new.release()
+
+
 def test_run_lock_refuses_live_local_lock(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     (vault / "runs").mkdir(parents=True)
@@ -340,6 +356,25 @@ def _hammer_lock(vault: Path, barrier_dir: Path, idx: int) -> int:
         return 1  # correctly refused — this is the expected loser outcome
 
 
+def _race_stale_takeover(vault: Path, barrier: object, idx: int, results: object) -> None:
+    """Force two processes past the stale check at the same time."""
+    lock = RunLock(vault, f"contender-{idx}")
+    check = lock._check_takeover
+
+    def synchronized_check(existing: dict[str, object]) -> None:
+        check(existing)
+        time.sleep(0.1)
+
+    lock._check_takeover = synchronized_check  # type: ignore[method-assign]
+    try:
+        barrier.wait()  # type: ignore[attr-defined]
+        lock.acquire()
+    except LockHeldError:
+        results.put(False)  # type: ignore[attr-defined]
+    else:
+        results.put(True)  # type: ignore[attr-defined]
+
+
 def test_concurrent_acquire_never_lets_two_processes_in(tmp_path: Path) -> None:
     """`acquire` used to read, then write, with no atomic gate. Two processes that both
     read "free" before either wrote both believed they held the lock — and this lock is
@@ -355,6 +390,41 @@ def test_concurrent_acquire_never_lets_two_processes_in(tmp_path: Path) -> None:
 
     assert 2 not in codes, f"two processes were inside the critical section: {codes}"
     assert codes.count(0) >= 1, f"nobody acquired the lock: {codes}"
+
+
+def test_concurrent_stale_takeover_has_exactly_one_winner(tmp_path: Path) -> None:
+    """Two contenders observing one stale generation cannot both acquire it."""
+    vault = tmp_path / "vault"
+    lock_path = vault / "runs" / ".lock"
+    lock_path.parent.mkdir(parents=True)
+    lock_path.write_text(
+        json.dumps(
+            {
+                "pid": 999999,
+                "hostname": __import__("socket").gethostname(),
+                "run_id": "stale",
+                "started_at": "2020-01-01T00:00:00+00:00",
+                "heartbeat_at": "2020-01-01T00:00:00+00:00",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    ctx = multiprocessing.get_context("fork")
+    barrier = ctx.Barrier(2)
+    results = ctx.Queue()
+    processes = [
+        ctx.Process(target=_race_stale_takeover, args=(vault, barrier, idx, results))
+        for idx in range(2)
+    ]
+    for process in processes:
+        process.start()
+    for process in processes:
+        process.join(timeout=5)
+        assert process.exitcode == 0
+
+    winners = [results.get(timeout=1) for _ in processes]
+    assert winners.count(True) == 1
 
 
 def test_unreadable_lock_file_fails_closed(tmp_path: Path) -> None:

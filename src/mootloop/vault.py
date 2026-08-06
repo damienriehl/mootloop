@@ -9,6 +9,7 @@ structurally out of the repo tree.
 from __future__ import annotations
 
 import contextlib
+import fcntl
 import json
 import logging
 import os
@@ -16,6 +17,8 @@ import re
 import shutil
 import socket
 import tempfile
+import uuid
+from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import TracebackType
@@ -396,6 +399,7 @@ class RunLock:
         self.pid = os.getpid()
         self._path = safe_vault_path(vault_root, "runs", LOCK_FILE)
         self._acquired = False
+        self._token: str | None = None
 
     # -- lifecycle --
     def acquire(self) -> RunLock:
@@ -414,22 +418,29 @@ class RunLock:
         """
         self._path.parent.mkdir(parents=True, exist_ok=True)
         started = _now()
-        try:
-            self._create_exclusive(started_at=started)
-        except FileExistsError:
-            existing = self._read()
-            if existing is None:
-                # The lock exists but says nothing readable. Fail closed rather than
-                # steal it: an unreadable control is a blocker, not a green light.
-                if not self.override:
-                    raise LockHeldError(
-                        f"lock file {self._path} is unreadable or corrupt; pass "
-                        "override=True to take it over"
-                    ) from None
-                logger.warning("overriding an unreadable lock at %s", self._path)
-            else:
-                self._check_takeover(existing)
-            self._write(started_at=started)
+        self._token = uuid.uuid4().hex
+        with self._serialized_update():
+            try:
+                self._create_exclusive(started_at=started)
+            except FileExistsError:
+                existing = self._read()
+                if existing is None:
+                    # The lock exists but says nothing readable. Fail closed rather than
+                    # steal it: an unreadable control is a blocker, not a green light.
+                    if not self.override:
+                        self._token = None
+                        raise LockHeldError(
+                            f"lock file {self._path} is unreadable or corrupt; pass "
+                            "override=True to take it over"
+                        ) from None
+                    logger.warning("overriding an unreadable lock at %s", self._path)
+                else:
+                    try:
+                        self._check_takeover(existing)
+                    except BaseException:
+                        self._token = None
+                        raise
+                self._write(started_at=started)
         self._acquired = True
         return self
 
@@ -450,9 +461,12 @@ class RunLock:
         try:
             if not self._acquired:
                 raise LockHeldError("cannot heartbeat a lock that is not held")
-            current = self._read()
-            started = current["started_at"] if current else _now().isoformat()
-            self._write(started_at=datetime.fromisoformat(started))
+            with self._serialized_update():
+                current = self._read()
+                if current is None or current.get("token") != self._token:
+                    raise LockHeldError("cannot heartbeat a lock owned by another run")
+                started = current["started_at"]
+                self._write(started_at=datetime.fromisoformat(started))
         except (LockHeldError, OSError, KeyError, TypeError, ValueError):
             if not best_effort:
                 raise
@@ -468,10 +482,12 @@ class RunLock:
     def release(self) -> None:
         if not self._acquired:
             return
-        current = self._read()
-        if current and current.get("pid") == self.pid and current.get("hostname") == self.hostname:
-            self._path.unlink(missing_ok=True)
+        with self._serialized_update():
+            current = self._read()
+            if current and current.get("token") == self._token:
+                self._path.unlink(missing_ok=True)
         self._acquired = False
+        self._token = None
 
     # -- internals --
     def _check_takeover(self, existing: dict[str, Any]) -> None:
@@ -519,6 +535,7 @@ class RunLock:
                 "pid": self.pid,
                 "hostname": self.hostname,
                 "run_id": self.run_id,
+                "token": self._token,
                 "started_at": started_at.isoformat(),
                 "heartbeat_at": _now().isoformat(),
             },
@@ -544,6 +561,22 @@ class RunLock:
 
     def _write(self, *, started_at: datetime) -> None:
         atomic_write_text(self._path, self._payload(started_at))
+
+    @contextlib.contextmanager
+    def _serialized_update(self) -> Iterator[None]:
+        """Serialize lock-file decisions while fencing each published owner.
+
+        The runs directory is the stable inode shared by all contenders, unlike the
+        lock file whose inode changes on every atomic write. Holding its advisory lock
+        closes the stale read/check/replace race without creating another vault file.
+        """
+        fd = os.open(self._path.parent, os.O_RDONLY)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            yield
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            os.close(fd)
 
     # -- context manager --
     def __enter__(self) -> RunLock:
