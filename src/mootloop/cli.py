@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import pwd
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
@@ -437,7 +439,6 @@ def run_reopen(
             help="Record an explicit override (never bypasses a spent retry budget)",
         ),
     ] = False,
-    by: Annotated[str, typer.Option("--by", help="Who is reopening the run")] = "operator",
 ) -> None:
     """Reopen a `needs_attention` run once what blocked it is fixed (auth, a persona
     body, a config change). Refuses while a counter-capped turn is unresolved unless
@@ -449,7 +450,7 @@ def run_reopen(
             reason=reason,
             grant_attempts=grant_attempts,
             force=force,
-            reopened_by=by,
+            reopened_by=pwd.getpwuid(os.geteuid()).pw_name,
         )
     except MootloopError as exc:
         raise _fail(exc) from exc

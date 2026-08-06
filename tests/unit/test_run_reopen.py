@@ -10,11 +10,12 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from pydantic import TypeAdapter, ValidationError
 
 from mootloop.errors import OrchestratorError
 from mootloop.journal import append, load_state, read_events
 from mootloop.models.common import DocId
-from mootloop.models.events import RunFinished, RunReopened
+from mootloop.models.events import JournalEvent, RunFinished, RunReopened
 from mootloop.models.requests import RequestItem, RequestSet, RequestType
 from mootloop.models.run import DiscardedTurn
 from mootloop.orchestrator import (
@@ -224,3 +225,31 @@ def test_reopen_is_replayable_from_the_journal_alone(tmp_path: Path) -> None:
     assert replayed.status == "running"
     assert replayed.attempts_granted == 1
     assert not replayed.is_terminal
+
+
+@pytest.mark.parametrize(
+    ("reason", "grant_attempts"),
+    [("", 0), ("   ", 0), ("fixed", -1)],
+)
+def test_run_reopened_rejects_invalid_audit_fields(
+    reason: str, grant_attempts: int
+) -> None:
+    with pytest.raises(ValidationError):
+        RunReopened(reason=reason, grant_attempts=grant_attempts)
+
+
+def test_journal_parser_rejects_invalid_run_reopened_event() -> None:
+    adapter: TypeAdapter[JournalEvent] = TypeAdapter(JournalEvent)
+    with pytest.raises(ValidationError):
+        adapter.validate_python(
+            {
+                "kind": "run_reopened",
+                "reason": "   ",
+                "grant_attempts": -1,
+                "reopened_by": "operator",
+            }
+        )
+
+
+def test_run_reopened_strips_reason() -> None:
+    assert RunReopened(reason="  credentials rotated  ").reason == "credentials rotated"

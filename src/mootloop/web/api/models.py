@@ -19,6 +19,7 @@ from mootloop.models.decisions import Decision, ResolutionAction
 from mootloop.models.events import RunMode, RunStatus
 from mootloop.models.gates import GateResult
 from mootloop.models.requests import RequestItem
+from mootloop.models.run import AttentionBlocker
 from mootloop.models.taskspec import TaskSpec
 
 SCHEMA_VERSION = "1.0"
@@ -154,6 +155,7 @@ class RunStatusSummary(VersionedModel):
     completed_turns: int = 0
     discarded_turns: int = 0
     open_decisions: list[str] = Field(default_factory=list)
+    attention_blockers: list[AttentionBlocker] = Field(default_factory=list)
 
 
 class GateLedgerResponse(VersionedModel):

@@ -7,10 +7,13 @@ import os
 import subprocess
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from mootloop.cli import app
 from mootloop.engine.queue import Queue
+from mootloop.journal import read_events
+from mootloop.models.events import RunReopened
 
 runner = CliRunner()
 
@@ -322,6 +325,40 @@ def test_run_reopen_force_cannot_bypass_retry_budget(tmp_path: Path) -> None:
     assert "retry budget" in result.output
     status = runner.invoke(app, ["run", "status", str(vault), run_id, "--json"])
     assert json.loads(status.output)["status"] == "needs_attention"
+
+
+def test_run_reopen_uses_local_os_identity_and_has_no_by_option(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    vault = tmp_path / "vault"
+    _seed_requests(vault)
+    run_id = _needs_attention_run(vault)
+
+    class _LocalUser:
+        pw_name = "trusted-local-user"
+
+    monkeypatch.setattr("mootloop.cli.pwd.getpwuid", lambda _uid: _LocalUser())
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "reopen",
+            str(vault),
+            run_id,
+            "--reason",
+            "fixed the persona body",
+            "--grant-attempts",
+            "1",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    event = next(e for e in read_events(vault, run_id) if isinstance(e, RunReopened))
+    assert event.reopened_by == "trusted-local-user"
+
+    help_result = runner.invoke(app, ["run", "reopen", "--help"])
+    assert help_result.exit_code == 0
+    assert "--by" not in help_result.output
 
 
 def test_cite_verify_text_routes_federal_to_research(tmp_path: Path) -> None:

@@ -42,6 +42,11 @@ def run_status_summary(vault: Path, run_id: str) -> models.RunStatusSummary:
         completed_turns=len(state.completed_turns),
         discarded_turns=len(state.discarded),
         open_decisions=[d.decision_id for d in open_decisions],
+        attention_blockers=(
+            orchestrator.attention_blockers(vault, run_id)
+            if state.status == "needs_attention"
+            else []
+        ),
     )
 
 

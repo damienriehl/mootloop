@@ -1,6 +1,32 @@
 {
   "components": {
     "schemas": {
+      "AttentionBlocker": {
+        "additionalProperties": false,
+        "description": "One reason a ``needs_attention`` run may not simply be reopened \u2014 a derived\nview (folded from the journal), never persisted.\n\n``kind`` is ``counter_capped_turn`` for a turn that burned its whole retry budget\nand still has no completed record. A ``needs_attention`` run with *no* blockers was\nhalted by the driver (auth / repeated provider failure), which the journal cannot\nprove fixed but which also leaves nothing in the run itself to clear \u2014 so it\nreopens on the operator's logged reason alone.",
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "kind": {
+            "const": "counter_capped_turn",
+            "title": "Kind",
+            "type": "string"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "ref",
+          "detail"
+        ],
+        "title": "AttentionBlocker",
+        "type": "object"
+      },
       "AttestResponse": {
         "additionalProperties": false,
         "description": "A recorded attestation. ``attestation.valid`` carries the state.",
@@ -710,7 +736,7 @@
       },
       "ReopenRunRequest": {
         "additionalProperties": false,
-        "description": "The body of a reopen call \u2014 the operator's logged ``reason`` (required), an\noptional grant of extra retry attempts to clear counter-capped turns, and an\nexplicit ``force`` override of the blocker check.",
+        "description": "The body of a reopen call \u2014 the operator's logged ``reason`` (required), an\noptional grant of extra retry attempts to clear counter-capped turns, and an\nexplicit ``force`` marker (which never overrides a spent retry budget).",
         "properties": {
           "force": {
             "default": false,
@@ -923,6 +949,13 @@
         "additionalProperties": false,
         "description": "Single-run status envelope for the cockpit (folded from the journal). Exposes\nthe `RunStatus` Literal; also returned by the start-run wrapper.",
         "properties": {
+          "attention_blockers": {
+            "items": {
+              "$ref": "#/components/schemas/AttentionBlocker"
+            },
+            "title": "Attention Blockers",
+            "type": "array"
+          },
           "completed_turns": {
             "default": 0,
             "title": "Completed Turns",
@@ -2080,7 +2113,7 @@
     },
     "/api/matters/{matter_id}/runs/{run_id}/reopen": {
       "post": {
-        "description": "Reopen a ``needs_attention`` run once the operator has fixed what blocked it\n(mirrors ``mootloop run reopen``). Refuses \u2014 as a typed 4xx \u2014 while a counter-capped\nturn is unresolved, unless ``grant_attempts`` restores its retry budget or ``force``\noverrides. The verified Access email is the reopener recorded on the journal event.",
+        "description": "Reopen a ``needs_attention`` run once the operator has fixed what blocked it\n(mirrors ``mootloop run reopen``). Refuses \u2014 as a typed 4xx \u2014 while a counter-capped\nturn is unresolved, unless ``grant_attempts`` restores its retry budget; ``force``\nnever bypasses a spent retry ceiling. The verified Access email is the reopener\nrecorded on the journal event.",
         "operationId": "reopen_run_api_matters__matter_id__runs__run_id__reopen_post",
         "parameters": [
           {

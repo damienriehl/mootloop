@@ -280,8 +280,9 @@ export interface paths {
          * Reopen Run
          * @description Reopen a ``needs_attention`` run once the operator has fixed what blocked it
          *     (mirrors ``mootloop run reopen``). Refuses — as a typed 4xx — while a counter-capped
-         *     turn is unresolved, unless ``grant_attempts`` restores its retry budget or ``force``
-         *     overrides. The verified Access email is the reopener recorded on the journal event.
+         *     turn is unresolved, unless ``grant_attempts`` restores its retry budget; ``force``
+         *     never bypasses a spent retry ceiling. The verified Access email is the reopener
+         *     recorded on the journal event.
          */
         post: operations["reopen_run_api_matters__matter_id__runs__run_id__reopen_post"];
         delete?: never;
@@ -490,6 +491,28 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AttentionBlocker
+         * @description One reason a ``needs_attention`` run may not simply be reopened — a derived
+         *     view (folded from the journal), never persisted.
+         *
+         *     ``kind`` is ``counter_capped_turn`` for a turn that burned its whole retry budget
+         *     and still has no completed record. A ``needs_attention`` run with *no* blockers was
+         *     halted by the driver (auth / repeated provider failure), which the journal cannot
+         *     prove fixed but which also leaves nothing in the run itself to clear — so it
+         *     reopens on the operator's logged reason alone.
+         */
+        AttentionBlocker: {
+            /** Detail */
+            detail: string;
+            /**
+             * Kind
+             * @constant
+             */
+            kind: "counter_capped_turn";
+            /** Ref */
+            ref: string;
+        };
         /**
          * AttestResponse
          * @description A recorded attestation. ``attestation.valid`` carries the state.
@@ -846,7 +869,7 @@ export interface components {
          * ReopenRunRequest
          * @description The body of a reopen call — the operator's logged ``reason`` (required), an
          *     optional grant of extra retry attempts to clear counter-capped turns, and an
-         *     explicit ``force`` override of the blocker check.
+         *     explicit ``force`` marker (which never overrides a spent retry budget).
          */
         ReopenRunRequest: {
             /**
@@ -975,6 +998,8 @@ export interface components {
          *     the `RunStatus` Literal; also returned by the start-run wrapper.
          */
         RunStatusSummary: {
+            /** Attention Blockers */
+            attention_blockers?: components["schemas"]["AttentionBlocker"][];
             /**
              * Completed Turns
              * @default 0

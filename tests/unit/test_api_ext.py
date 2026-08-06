@@ -117,6 +117,7 @@ def test_run_read_views_return_folded_views(
     assert body["kind"] == "run_status"
     assert body["run_id"] == run_id
     assert body["status"]  # a RunStatus Literal
+    assert body["attention_blockers"] == []
 
     gates = client.get(f"/api/matters/{matter.matter_id}/runs/{run_id}/gates", headers=_AUTH)
     assert gates.status_code == 200
@@ -367,6 +368,8 @@ def test_openapi_components_show_discriminated_unions() -> None:
     run_status = schemas["RunStatusSummary"]["properties"]["status"]
     assert "running" in run_status["enum"] and "paused" in run_status["enum"]
     assert schemas["RunStatusSummary"]["properties"]["kind"]["const"] == "run_status"
+    blockers = schemas["RunStatusSummary"]["properties"]["attention_blockers"]
+    assert blockers["items"]["$ref"].endswith("/AttentionBlocker")
 
     # 2. gate status: turn_gates is a real discriminated union (oneOf + discriminator on
     #    ``status``) over the GatePass/GateFail/GatePending variants.

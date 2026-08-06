@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from mootloop.models.common import StrictModel
 from mootloop.models.gates import GateResult
@@ -155,9 +155,17 @@ class RunReopened(StrictModel):
 
     kind: Literal["run_reopened"] = "run_reopened"
     reason: str
-    grant_attempts: int = 0
+    grant_attempts: int = Field(default=0, ge=0)
     forced: bool = False
     reopened_by: str = "operator"
+
+    @field_validator("reason")
+    @classmethod
+    def _non_empty_reason(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("reason must be non-empty")
+        return stripped
 
 
 class TurnIntent(StrictModel):
