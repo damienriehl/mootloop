@@ -340,11 +340,11 @@ def _book_spend(
     if usage is None:
         return
     if dedupe:
-        prior = [
+        prior = (
             e
             for e in read_events(vault_root, run_id)
             if isinstance(e, SpendRecorded) and e.turn_id == turn_id
-        ]
+        )
         if provider_call_id is not None:
             if any(e.provider_call_id == provider_call_id for e in prior):
                 return

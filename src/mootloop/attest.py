@@ -18,7 +18,6 @@ matter is therefore folded into ``master_sha256``; a change to either re-imposes
 
 from __future__ import annotations
 
-import hashlib
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -28,6 +27,7 @@ from mootloop.decisions import DecisionStore
 from mootloop.errors import AttestationBlockedError, OrchestratorError
 from mootloop.journal import load_state
 from mootloop.models.attestations import Attestation, AttestationCheckStatus
+from mootloop.models.rubric import sha256_hex
 from mootloop.tasks import get_binding
 from mootloop.vault import RunLock, load_matter, safe_vault_path
 
@@ -50,10 +50,6 @@ def canonicalize(text: str) -> str:
     return "\n".join(lines).rstrip("\n") + "\n"
 
 
-def _sha256(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
-
-
 def master_deliverable_path(vault_root: Path | str, run_id: str) -> Path | None:
     """The run's md-master deliverable path, or None if the run/task is unknown."""
     state = load_state(vault_root, run_id)
@@ -68,7 +64,7 @@ def master_deliverable_path(vault_root: Path | str, run_id: str) -> Path | None:
 def matter_sha256(vault_root: Path | str) -> str:
     """A canonical digest of ``matter.yaml`` — the chrome the served document renders
     from (caption, case number, parties, our-side, signing attorney)."""
-    return _sha256(load_matter(vault_root).model_dump_json())
+    return sha256_hex(load_matter(vault_root).model_dump_json())
 
 
 def current_master_sha256(vault_root: Path | str, run_id: str) -> str | None:
@@ -79,7 +75,7 @@ def current_master_sha256(vault_root: Path | str, run_id: str) -> str | None:
     if path is None or not path.is_file():
         return None
     canonical = canonicalize(path.read_text(encoding="utf-8"))
-    return _sha256(f"{canonical}\x1f{matter_sha256(vault_root)}")
+    return sha256_hex(f"{canonical}\x1f{matter_sha256(vault_root)}")
 
 
 def current_ledger_head_sha256(vault_root: Path | str) -> str:
@@ -90,7 +86,7 @@ def current_ledger_head_sha256(vault_root: Path | str) -> str:
         lines = [ln for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
         if lines:
             head = lines[-1]
-    return _sha256(head)
+    return sha256_hex(head)
 
 
 # --- store ------------------------------------------------------------------
