@@ -35,7 +35,7 @@ from mootloop.journal import (
     read_events,
     write_turn_body,
 )
-from mootloop.llm import LLMProvider, RawTurnResult, TokenUsage
+from mootloop.llm import LLMProvider, TokenUsage
 from mootloop.models.budget import EstimateRange
 from mootloop.models.citations import Citation
 from mootloop.models.events import (
@@ -65,6 +65,8 @@ from mootloop.models.run import (
     TurnRecord,
     TurnSpec,
 )
+from mootloop.provider_driver import assemble as _assemble
+from mootloop.provider_driver import write_observed_status as _write_observed_status
 from mootloop.stages import (
     RUBRIC_GATE_STAGE,
     RubricGateStage,
@@ -900,97 +902,6 @@ def continue_run(vault_root: Path | str, run_id: str) -> None:
         append(vault_root, run_id, CheckpointCleared(boundary=boundary))
 
 
-def _write_observed_status(
-    vault_root: Path | str,
-    run_id: str,
-    binding: TaskBinding,
-    units: list[RequestItem],
-) -> None:
-    """Observed mode: overwrite ``runs/<run-id>/STATUS.md`` (a derived view)."""
-    state = load_state(vault_root, run_id)
-    if state.mode != "observed":
-        return
-    path = safe_vault_path(vault_root, "runs", run_id, "STATUS.md")
-    atomic_write_text(path, _render_status_md(vault_root, run_id, binding, units, state))
-
-
-def _render_status_md(
-    vault_root: Path | str,
-    run_id: str,
-    binding: TaskBinding,
-    units: list[RequestItem],
-    state: RunState,
-) -> str:
-    matter = load_matter(vault_root)
-    facts = _load_facts(vault_root)
-    lines: list[str] = [
-        f"# Run status — `{run_id}`",
-        "",
-        f"- Matter: `{matter.matter_id}`",
-        f"- Task: `{state.task}`  ·  Mode: `{state.mode}`  ·  Status: `{state.status}`",
-        f"- Spend so far: ${state.total_spend_usd:.4f} (notional)",
-        "",
-        "## Stage progress",
-        "",
-        "| request | stage |",
-        "| --- | --- |",
-    ]
-    for i in range(len(units)):
-        ctx = _context_for(run_id, state, binding, units, facts, i, DEFAULT_MAX_ATTEMPTS)
-        stage = first_incomplete_stage(ctx) or "complete"
-        lines.append(f"| `{units[i].request_id}` | {stage} |")
-    open_decisions = decisions.DecisionStore(vault_root, run_id).list_open()
-    lines += ["", "## Open decisions", ""]
-    if not open_decisions:
-        lines.append("_none_")
-    else:
-        for decision in open_decisions:
-            mode = decisions.gate_mode_for(matter, decision.kind)
-            lines.append(f"- `{decision.decision_id}` [{mode}] {decision.proposal.summary}")
-    lines += ["", f"STATE: {state_marker(state.status)}", ""]
-    return "\n".join(lines)
-
-
-def _assemble(
-    vault_root: Path | str,
-    run_id: str,
-    binding: TaskBinding,
-    units: list[RequestItem],
-    state: RunState,
-) -> Path:
-    """Write the deliverable: a markdown master with one fenced anchor per request."""
-    facts = _load_facts(vault_root)
-    lines: list[str] = [
-        f"# Discovery Responses — {binding.config.task}",
-        "",
-        f"Run: `{run_id}` · Requests: {len(units)} · Rubric: {binding.config.rubric_id}",
-        "",
-    ]
-    for i in range(len(units)):
-        request = units[i]
-        ctx = _context_for(run_id, state, binding, units, facts, i, DEFAULT_MAX_ATTEMPTS)
-        record = ctx.operative_draft()
-        draft = DraftOutput.model_validate(record.output) if record else None
-        lines.append(f"::: {{#resp-{request.request_id}}}")
-        lines.append(f"## {request.request_id}")
-        lines.append("")
-        lines.append(draft.response_text if draft else "_no response drafted_")
-        if draft and draft.objections:
-            lines.append("")
-            lines.append("**Objections**")
-            for objection in draft.objections:
-                lines.append(f"- {objection.basis} — {objection.text}")
-        lines.append("")
-        lines.append(":::")
-        lines.append("")
-    deliverable = binding.config.deliverables[0] if binding.config.deliverables else "draft.md"
-    path = safe_vault_path(vault_root, "deliverables", deliverable)
-    from mootloop.vault import atomic_write_text
-
-    atomic_write_text(path, "\n".join(lines))
-    return path
-
-
 # --- public: drive (fake/headless provider) ---------------------------------
 
 
@@ -1004,53 +915,16 @@ def run_with_provider(
     max_concurrency: int = 1,
 ) -> RunState:
     """Drive plan_next/record_turn to completion via ``provider`` (sync in v1)."""
-    binding = _binding_for(vault_root, run_id)
-    tier_models = _tier_models(vault_root)
-    # This is the one path that holds the run lock for the WHOLE run — hundreds of
-    # turns, hours of wall time — so it is the one path that has to keep the lock's
-    # heartbeat current. Nothing did, so any run outliving `heartbeat_threshold`
-    # (15 min) advertised itself as stale while it was actively appending to the
-    # journal, and the next process to open the vault would take the lock over: two
-    # writers in one matter vault, which is what this lock exists to prevent.
-    with RunLock(vault_root, run_id) as lock:
-        while True:
-            lock.heartbeat(best_effort=True)
-            state = load_state(vault_root, run_id)
-            if state.finished:
-                break
-            units = load_request_units(vault_root)
-            if _over_cap(vault_root, state):
-                _cap_transition(vault_root, run_id, binding, units)
-                break
-            facts = _load_facts(vault_root)
-            specs = _plan(run_id, state, binding, units, facts, max_attempts, tier_models)
-            if not specs:
-                _finalize(vault_root, run_id, binding, units, now)
-                _write_observed_status(vault_root, run_id, binding, units)
-                break
-            for spec in specs:
-                fresh = load_state(vault_root, run_id)
-                if fresh.finished or spec.turn_id in fresh.completed_turns:
-                    continue
-                # Both sides of the provider call: the call is the long part, and the
-                # refresh after it is what keeps the NEXT one inside the window.
-                lock.heartbeat(best_effort=True)
-                result: RawTurnResult = provider.run_turn(spec, render_prompt(spec))
-                lock.heartbeat(best_effort=True)
-                _record_spec(
-                    vault_root,
-                    run_id,
-                    spec,
-                    result.text,
-                    result.usage,
-                    now,
-                    binding,
-                    units,
-                    fresh,
-                    max_attempts,
-                    result.provider_call_id,
-                )
-    return load_state(vault_root, run_id)
+    from mootloop.provider_driver import run_with_provider as drive
+
+    return drive(
+        vault_root,
+        run_id,
+        provider,
+        now,
+        max_attempts=max_attempts,
+        max_concurrency=max_concurrency,
+    )
 
 
 # --- internals --------------------------------------------------------------
