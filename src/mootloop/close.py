@@ -28,7 +28,7 @@ from mootloop.models.attestations import Attestation
 from mootloop.models.audit import GENESIS_PREV_HASH, AccessAuditEntry
 from mootloop.models.citations import ResearchRequest, VerificationRecord
 from mootloop.models.common import MatterId, VersionedModel
-from mootloop.models.context import RunContextManifest
+from mootloop.models.context import CorpusSnapshot, RunContextManifest
 from mootloop.models.corpus import Manifest
 from mootloop.models.decisions import Decision
 from mootloop.models.facts import Fact
@@ -146,6 +146,12 @@ MATTER_SCOPED_STORES: tuple[MatterScopedStore, ...] = (
         glob="runs/*/context/manifest.json",
         description="Immutable per-run launch input snapshots.",
         model=RunContextManifest,
+    ),
+    MatterScopedStore(
+        name="run-corpus-snapshots",
+        glob="runs/*/context/corpus.json",
+        description="Immutable per-run normalized corpus snapshots.",
+        model=CorpusSnapshot,
     ),
     MatterScopedStore(
         name="run-attestations",

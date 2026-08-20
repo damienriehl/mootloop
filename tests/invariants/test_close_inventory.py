@@ -13,11 +13,13 @@ import pytest
 from mootloop.close import (
     EXEMPT_MODELS,
     MATTER_SCOPED_MODELS,
+    MATTER_SCOPED_STORES,
     concrete_versioned_models,
     is_registered,
     unregistered_models,
 )
 from mootloop.models.common import VersionedModel
+from mootloop.models.context import CorpusSnapshot, RunContextManifest
 
 pytestmark = pytest.mark.invariant
 
@@ -47,6 +49,13 @@ def test_enumeration_finds_known_models() -> None:
     # A representative matter-scoped model and the exempt registry view must both appear,
     # proving the walk imports lazily-loaded model modules.
     assert {"Fact", "AccessAuditEntry", "MatterSummary", "CloseRecord"} <= names
+
+
+def test_run_context_models_have_explicit_close_inventory_paths() -> None:
+    stores_by_model = {store.model: store.glob for store in MATTER_SCOPED_STORES}
+
+    assert stores_by_model[RunContextManifest] == "runs/*/context/manifest.json"
+    assert stores_by_model[CorpusSnapshot] == "runs/*/context/corpus.json"
 
 
 def test_gate_flags_an_unregistered_model() -> None:
