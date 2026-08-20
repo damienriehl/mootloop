@@ -217,7 +217,7 @@ permission to include unrelated dirty files.
 
 **Execution status (2026-08-20):** Option A was carried out through focused commits,
 PR #32, remote CI repair, and PR-feedback repair. The merge and every deployment remain
-withheld for a fresh inline authorization after the final PR head settles.
+withheld for a fresh inline authorization.
 
 ### D-14 — How literal should `source_matter_id` persistence be?
 

@@ -279,6 +279,6 @@ was read or changed. Those items remain on the Decision Sheet.
   drift checks, and the Next.js 16.2.10 production build passed. Next.js emitted its
   non-blocking middleware-to-proxy deprecation warning.
 - `git diff --check`: passed.
-- Focused commits are pushed in PR #32. Remote CI passed on code head `d64960c`; the
-  final documentation-only head still requires its own GitHub check cycle. PR merge,
-  deployment, hosted-vault access, and the synthetic/real-matter gates remain unperformed.
+- Focused commits are pushed in PR #32, with GitHub CI required on every published
+  head before merge authorization. PR merge, deployment, hosted-vault access, and the
+  synthetic/real-matter gates remain unperformed.

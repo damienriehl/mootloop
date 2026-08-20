@@ -282,9 +282,9 @@ flowchart TD
   migration policy, and D-09 off-vault anchor remain queued.
 - **U-02, U-04A/U-04B, and U-05 through U-17C remain queued** under their stated
   dependencies and decision gates. U-03 remains partial. **U-18 is partial:** focused
-  commits and PR #32 exist, remote CI passed on the last code head, and merge/deploy
-  remain pending a fresh D-13 authorization after the final PR head settles. No hosted
-  matter or deployment was accessed during this execution.
+  commits and PR #32 exist, remote CI is enforced on every published head, and
+  merge/deploy remain pending a fresh D-13 authorization. No hosted matter or
+  deployment was accessed during this execution.
 
 Verification at this checkpoint: backend ruff and strict mypy across 85 source files
 pass; 737 backend tests pass at 92% coverage; frontend ESLint, TypeScript, 9 Vitest
