@@ -41,7 +41,7 @@ missing older source plan.
 ## Current Validation Evidence
 
 - Backend verification: the final `make check` passed: ruff clean, mypy strict clean
-  across 85 source files, and 735 tests passed at 92% coverage.
+  across 85 source files, and 737 tests passed at 92% coverage.
 - Frontend verification: ESLint clean, TypeScript clean, 9 Vitest files / 37 tests
   passed, backend and generated-client OpenAPI drift checks pass, and the production
   build succeeds.
@@ -50,7 +50,7 @@ missing older source plan.
 - No GitHub issue was created or updated in the strict window.
 - At audit start, the current feature branch had no unique code commit relative to
   its already-merged result and its file tree matched `origin/main`. U-00 now adds the
-  documented uncommitted CI, invariant, and README corrections.
+  documented CI, invariant, and README corrections published in PR #32.
 
 Status vocabulary: `COMPLETE`, `PARTIAL`, `OPEN-AUTO`, `DECISION-GATED`, or
 `DEFERRED`.
