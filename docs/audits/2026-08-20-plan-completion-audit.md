@@ -227,8 +227,9 @@ ahead of context reproducibility, isolation, and a clean live run.
 Every discovered task now has one of four durable outcomes:
 
 1. `COMPLETE` with current evidence above.
-2. `OPEN-AUTO` as the residual U-01 work and U-02 through U-18 in the continuation
-   plan; U-00 is complete locally.
+2. `OPEN-AUTO` as the residual U-01 work and U-02 through U-17C in the continuation
+   plan; U-00 is complete and U-18 is partial pending the explicit merge/deploy
+   disposition.
 3. `DECISION-GATED` as D-01 through D-17 in the Decision Sheet (D-15 through D-17
    have safe defaults and do not block pre-validation work).
 4. `DEFERRED` but retained explicitly in the continuation plan rather than silently dropped.
@@ -246,9 +247,10 @@ record attorney approvals, consent to OAuth, spend uncapped funds, or deploy pro
 
 ## Autonomous Work Completed During This Audit
 
-- Closed U-00 locally: README truth, frontend CI, authoritative backend OpenAPI drift,
+- Closed U-00: README truth, frontend CI, authoritative backend OpenAPI drift,
   regenerated contracts, production-build verification, and a mutation-tested AST BFF
-  boundary.
+  boundary. The focused commits are published in PR #32, and remote backend, invariant,
+  and frontend CI passed on code head `d64960c` after one close-inventory repair.
 - Completed the first U-01 safety slice: exact byte-derived launch provenance;
   write-once manifest and separately hashed corpus snapshot; request/fact/policy/task/
   rubric/corpus replay; crash-recoverable launch; protected-decision and attestation
@@ -263,16 +265,20 @@ record attorney approvals, consent to OAuth, spend uncapped funds, or deploy pro
   races, manifest-only launch recovery, idempotent decision/journal reconciliation,
   launch-chrome attestation, trusted CLI actors, provider-boundary writes, hosted
   start retries, non-replayable UI controls, BFF semantic drift, and unknown-run 404s.
+- Resolved the PR review's P1 persona drift finding by snapshotting every authored
+  persona body with provenance and rendering prompts/provider calls from launch context.
 
 No hosted matter data, deployment, attorney approval, OAuth grant, or production state
 was read or changed. Those items remain on the Decision Sheet.
 
 ## Final Local Verification
 
-- `make check`: passed — ruff, strict mypy across 85 source files, and 735 pytest tests
+- `make check`: passed — ruff, strict mypy across 85 source files, and 737 pytest tests
   at 92% coverage (one existing Starlette deprecation warning).
 - Frontend: ESLint, TypeScript, 9 Vitest files / 37 tests, backend and client OpenAPI
   drift checks, and the Next.js 16.2.10 production build passed. Next.js emitted its
   non-blocking middleware-to-proxy deprecation warning.
 - `git diff --check`: passed.
-- The changes remain uncommitted and unpushed; remote CI therefore remains queued.
+- Focused commits are pushed in PR #32. Remote CI passed on code head `d64960c`; the
+  final documentation-only head still requires its own GitHub check cycle. PR merge,
+  deployment, hosted-vault access, and the synthetic/real-matter gates remain unperformed.

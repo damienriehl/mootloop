@@ -251,17 +251,18 @@ flowchart TD
 
 ## Execution Status — 2026-08-20
 
-- **U-00 COMPLETE locally.** README provider claims are corrected. CI now runs the
+- **U-00 COMPLETE.** README provider claims are corrected. CI now runs the
   backend-generated OpenAPI drift check plus frontend install, lint, typecheck, tests,
   generated-client drift, production build, and both lexical and TypeScript-AST BFF
-  boundary tests. Remote CI has not run because this work is not committed or pushed.
+  boundary tests. The work is published in PR #32; after the close-inventory repair,
+  its backend, invariant, and frontend jobs passed remotely on code head `d64960c`.
 - **U-01 PARTIAL; first safety slice complete.** New runs persist a write-once,
   versioned manifest plus a separately hashed corpus snapshot. It binds the TaskSpec,
-  adapter configuration and resolved behavior, locked rubric, request sets, folded
-  facts, matter policy, retry ceiling, tier models, corpus inventory/content, and
-  byte-derived provenance. Lifecycle, decisions, attestation, panels, demo/API views,
-  gates, and exports either replay that context or fail closed. Provider results rebind
-  context before protected writes; every lifecycle read verifies the corpus digest;
+  adapter configuration and resolved behavior, persona bodies, locked rubric, request
+  sets, folded facts, matter policy, retry ceiling, tier models, corpus inventory/content,
+  and byte-derived provenance. Lifecycle, decisions, attestation, panels, demo/API views,
+  gates, prompts, and exports either replay that context or fail closed. Provider results
+  rebind context before protected writes; every lifecycle read verifies the corpus digest;
   snapshot size/retained-storage ceilings are enforced; and historical pre-manifest
   runs remain readable as non-replayable status records. Launch is retryable after a
   journal or queue interruption using a client-stable run id and deterministic queue
@@ -279,18 +280,20 @@ flowchart TD
   exports replay launch requests/matter.
   The complete journal/decision/export commitment, coordinated-rewrite defense,
   migration policy, and D-09 off-vault anchor remain queued.
-- **U-02, U-04A/U-04B, and U-05 through U-18 remain queued** under their stated
-  dependencies and decision gates. U-03 remains partial. No hosted matter or
-  deployment was accessed during this execution.
+- **U-02, U-04A/U-04B, and U-05 through U-17C remain queued** under their stated
+  dependencies and decision gates. U-03 remains partial. **U-18 is partial:** focused
+  commits and PR #32 exist, remote CI passed on the last code head, and merge/deploy
+  remain pending a fresh D-13 authorization after the final PR head settles. No hosted
+  matter or deployment was accessed during this execution.
 
 Verification at this checkpoint: backend ruff and strict mypy across 85 source files
-pass; 735 backend tests pass at 92% coverage; frontend ESLint, TypeScript, 9 Vitest
+pass; 737 backend tests pass at 92% coverage; frontend ESLint, TypeScript, 9 Vitest
 files / 37 tests, OpenAPI generation/drift, and production build pass. The structured
-review completed nine local lenses. The external Claude pass could not run because
-sending repository code to an external model was not authorized; no egress workaround
-was attempted, and a local adversarial reviewer substituted. Eight confirmed P1/P2
-findings were repaired and regression-tested; remaining broader work is retained in
-the queue above.
+review completed nine local lenses plus the PR's Codex review. The external Claude
+pass could not run because sending repository code to an external model was not
+authorized; no egress workaround was attempted, and a local adversarial reviewer
+substituted. Eight local P1/P2 findings plus the PR review's persona-snapshot P1 were
+repaired and regression-tested; remaining broader work is retained in the queue above.
 
 The leaf-level closure map is
 `docs/audits/2026-08-20-plan-atomic-commitment-ledger.md`. Each `ce-work` handoff must
