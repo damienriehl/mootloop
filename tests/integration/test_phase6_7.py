@@ -287,9 +287,7 @@ def _attested_run(tmp_path: Path, run_id: str, *, signed: bool = True) -> Path:
 
 
 def test_matter_edit_after_attestation_refuses_clean_export(tmp_path: Path) -> None:
-    """The served document renders its caption, case number and signature block from
-    `matter.yaml`, not from the attested md-master. Hashing the deliverable alone let
-    an edit to the case number ship under a still-``valid`` attestation."""
+    """A live matter edit invalidates approval but cannot rebind the run's export."""
     run_id = "p67-matter-edit"
     vault = _attested_run(tmp_path, run_id)
     assert export_run(vault, run_id, NOW).is_draft is False
@@ -303,8 +301,8 @@ def test_matter_edit_after_attestation_refuses_clean_export(tmp_path: Path) -> N
     assert result.is_draft is True
     assert result.attestation_state == "invalidated"
     assert "attestation" in result.blockers
-    # The new case number really is in the document that would have been served.
-    assert "66-CV-26-9999" in result.master.read_text(encoding="utf-8")
+    # The run keeps exporting its launch snapshot; the edit requires a new/rebased run.
+    assert "66-CV-26-9999" not in result.master.read_text(encoding="utf-8")
 
 
 def test_signing_attorney_swap_after_attestation_refuses_clean_export(tmp_path: Path) -> None:

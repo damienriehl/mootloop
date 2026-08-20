@@ -41,6 +41,10 @@ class OrchestratorError(MootloopError):
     """An orchestrator precondition failed (unknown run, unschedulable turn, …)."""
 
 
+class RunNotFoundError(MootloopError):
+    """No journaled run exists with the requested id in the resolved matter vault."""
+
+
 class RubricLockError(MootloopError):
     """A LOCKED rubric's content no longer matches its recorded hash. Changing a
     locked rubric requires shipping a new version file — never editing in place."""

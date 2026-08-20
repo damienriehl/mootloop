@@ -13,8 +13,9 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from mootloop.context import load_run_context
 from mootloop.errors import DecisionError
-from mootloop.journal import append
+from mootloop.journal import append, read_events
 from mootloop.models.decisions import (
     GATE_NAME_FOR_KIND,
     STATUS_FOR_ACTION,
@@ -241,18 +242,16 @@ def resolve(
     """Record a resolution for an open decision (append-only), emit a
     ``DecisionRecorded`` journal event, and re-finalize the run (plan Phase 5).
 
-    Resolving an already-resolved decision is an error (no status regression). A
-    ``modify`` requires a chosen key; an ``approve`` defaults to the recommendation.
+    Retrying the exact same resolution repairs any interrupted journal/finalization
+    tail idempotently. A conflicting second resolution remains an error. A ``modify``
+    requires a chosen key; an ``approve`` defaults to the recommendation.
     """
     with RunLock(vault_root, run_id):
+        load_run_context(vault_root, run_id)
         store = DecisionStore(vault_root, run_id)
         decision = store.get(decision_id)
         if decision is None:
             raise DecisionError(f"unknown decision {decision_id!r} in run {run_id!r}")
-        if decision.status != "open":
-            raise DecisionError(
-                f"decision {decision_id!r} is already {decision.status}; decisions never regress"
-            )
         if action == "modify" and not chosen_key:
             raise DecisionError("a 'modify' resolution requires --choose <key>")
         recommended = decision.proposal.recommended
@@ -261,7 +260,7 @@ def resolve(
             raise DecisionError(
                 f"chosen key {chosen!r} is not an option for decision {decision_id!r}"
             )
-        resolution = DecisionResolution(
+        requested_resolution = DecisionResolution(
             action=action,
             chosen_key=chosen,
             note=note,
@@ -269,28 +268,78 @@ def resolve(
             source=source,
             decided_at=now,
         )
+        if decision.status != "open":
+            stored = decision.resolution
+            is_same_resolution = (
+                stored is not None
+                and stored.model_copy(update={"decided_at": now}) == requested_resolution
+            )
+            if not is_same_resolution:
+                raise DecisionError(
+                    f"decision {decision_id!r} is already {decision.status}; "
+                    "decisions never regress"
+                )
+            assert stored is not None
+            _record_resolution_event(vault_root, run_id, decision, stored)
+            from mootloop import orchestrator
+
+            orchestrator.finalize_if_ready(vault_root, run_id, stored.decided_at)
+            return decision
         resolved = decision.model_copy(
-            update={"status": STATUS_FOR_ACTION[action], "resolution": resolution}
+            update={"status": STATUS_FOR_ACTION[action], "resolution": requested_resolution}
         )
         store.append(resolved)
-        append(
-            vault_root,
-            run_id,
-            DecisionRecorded(
-                decision_id=decision_id,
-                decision_kind=decision.kind.value,
-                action=action,
-                status=resolved.status,
-                decided_by=decided_by,
-                source=source,
-                decided_at=now,
-            ),
-        )
+        _record_resolution_event(vault_root, run_id, resolved, requested_resolution)
         # A resolved hard-human gate may let the run finish (plan Phase 5).
         from mootloop import orchestrator
 
         orchestrator.finalize_if_ready(vault_root, run_id, now)
     return resolved
+
+
+def _record_resolution_event(
+    vault_root: Path | str,
+    run_id: str,
+    decision: Decision,
+    resolution: DecisionResolution,
+) -> None:
+    existing = [
+        event
+        for event in read_events(vault_root, run_id)
+        if isinstance(event, DecisionRecorded) and event.decision_id == decision.decision_id
+    ]
+    if existing:
+        event = existing[-1]
+        if (
+            event.action,
+            event.status,
+            event.decided_by,
+            event.source,
+            event.decided_at,
+        ) != (
+            resolution.action,
+            decision.status,
+            resolution.decided_by,
+            resolution.source,
+            resolution.decided_at,
+        ):
+            raise DecisionError(
+                f"decision {decision.decision_id!r} has a conflicting journal record"
+            )
+        return
+    append(
+        vault_root,
+        run_id,
+        DecisionRecorded(
+            decision_id=str(decision.decision_id),
+            decision_kind=decision.kind.value,
+            action=resolution.action,
+            status=decision.status,
+            decided_by=resolution.decided_by,
+            source=resolution.source,
+            decided_at=resolution.decided_at,
+        ),
+    )
 
 
 def derive_and_store(

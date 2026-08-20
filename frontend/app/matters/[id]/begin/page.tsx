@@ -46,6 +46,7 @@ export default function BeginTaskPage() {
       // Confirm is only offered for RUNNABLE slips, so `task` is a resolved adapter key
       // here; the fallback satisfies the required field and never fires in practice.
       startRun(matterId, {
+        run_id: `run-${res.task_spec.task_spec_id}`,
         task: res.task_spec.task ?? "discovery-responses",
         task_spec_id: res.task_spec.task_spec_id,
       }),

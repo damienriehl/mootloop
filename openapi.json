@@ -64,6 +64,17 @@
             "title": "Attested At",
             "type": "string"
           },
+          "hash_scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hash Scope"
+          },
           "ledger_head_sha256": {
             "title": "Ledger Head Sha256",
             "type": "string"
@@ -92,7 +103,7 @@
             "type": "string"
           },
           "schema_version": {
-            "default": "1.0",
+            "default": "1.1",
             "title": "Schema Version",
             "type": "string"
           },
@@ -956,6 +967,17 @@
             "title": "Completed Turns",
             "type": "integer"
           },
+          "context_blocker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Blocker"
+          },
           "current_stage": {
             "anyOf": [
               {
@@ -1005,6 +1027,10 @@
             "title": "Open Decisions",
             "type": "array"
           },
+          "replayable": {
+            "title": "Replayable",
+            "type": "boolean"
+          },
           "run_id": {
             "title": "Run Id",
             "type": "string"
@@ -1047,7 +1073,8 @@
         "required": [
           "run_id",
           "status",
-          "mode"
+          "mode",
+          "replayable"
         ],
         "title": "RunStatusSummary",
         "type": "object"
@@ -1194,6 +1221,10 @@
             ],
             "title": "Mode"
           },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
           "task": {
             "default": "discovery-responses",
             "title": "Task",
@@ -1211,6 +1242,9 @@
             "title": "Task Spec Id"
           }
         },
+        "required": [
+          "run_id"
+        ],
         "title": "StartRunRequest",
         "type": "object"
       },

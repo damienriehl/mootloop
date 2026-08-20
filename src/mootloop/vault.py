@@ -139,6 +139,45 @@ def atomic_write_text(path: Path, text: str, *, encoding: str = "utf-8") -> None
         raise
 
 
+def atomic_write_once_text(path: Path, text: str, *, encoding: str = "utf-8") -> None:
+    """Durably publish complete ``text`` only when ``path`` does not exist.
+
+    The same-directory temporary file is complete and fsync'd before ``os.link``
+    atomically claims the destination. A competing writer receives
+    ``FileExistsError`` and can inspect the winner's complete bytes.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".tmp-", suffix=path.suffix)
+    try:
+        with os.fdopen(fd, "w", encoding=encoding) as handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.link(tmp, path)
+        parent_fd = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(parent_fd)
+        finally:
+            os.close(parent_fd)
+    finally:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+
+
+def fsync_file_and_parent(path: Path) -> None:
+    """Reassert durability for an existing file and its directory entry."""
+    file_fd = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(file_fd)
+    finally:
+        os.close(file_fd)
+    parent_fd = os.open(path.parent, os.O_RDONLY)
+    try:
+        os.fsync(parent_fd)
+    finally:
+        os.close(parent_fd)
+
+
 def atomic_copy(src: Path, dst: Path) -> None:
     """Copy ``src`` onto ``dst`` atomically (same-dir temp + ``os.replace``).
 

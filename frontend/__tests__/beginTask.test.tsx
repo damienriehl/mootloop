@@ -154,6 +154,10 @@ describe("begin-task confirm flow", () => {
 
     // startRun POSTed the resolved slip's task_spec_id, then routed to that run's cockpit.
     await waitFor(() => expect(push).toHaveBeenCalledWith("/matters/m1/runs/discovery-responses-20260712"));
-    expect(startBody).toEqual({ task: "discovery-responses", task_spec_id: "taskspec-20260712-abc123" });
+    expect(startBody).toEqual({
+      run_id: "run-taskspec-20260712-abc123",
+      task: "discovery-responses",
+      task_spec_id: "taskspec-20260712-abc123",
+    });
   });
 });

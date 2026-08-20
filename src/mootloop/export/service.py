@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from mootloop import attest, gate_ledger
+from mootloop.context import load_run_context, load_run_corpus
 from mootloop.export import deliverables_dir, docx_render, residue
 from mootloop.export.audit import build_audit_log
 from mootloop.export.master import (
@@ -33,7 +34,6 @@ from mootloop.export.memo import build_strategy_memo
 from mootloop.export.privilege_log import build_privilege_log
 from mootloop.models.gates import GateResult
 from mootloop.resources import DEFAULT_REFERENCE_DOC, reference_doc_path
-from mootloop.vault import load_matter
 
 
 @dataclass
@@ -90,12 +90,16 @@ def export_run(
     """Build every deliverable and render per-set DOCX (draft or clean). The markdown
     deliverables are always produced; the DOCX watermark/clean decision is enforced
     here (plan D3 M12)."""
-    master = build_court_master(vault_root, run_id, now)
-    verification = build_verification_page(vault_root, run_id, now)
-    privilege = build_privilege_log(vault_root, run_id)
+    run_context = load_run_context(vault_root, run_id)
+    load_run_corpus(vault_root, run_context)
+    master = build_court_master(vault_root, run_id, now, run_context=run_context)
+    verification = build_verification_page(
+        vault_root, run_id, now, run_context=run_context
+    )
+    privilege = build_privilege_log(vault_root, run_id, run_context=run_context)
     memo = build_strategy_memo(vault_root, run_id, now)
     audit = build_audit_log(vault_root, run_id, now)
-    set_masters = build_set_masters(vault_root, run_id, now)
+    set_masters = build_set_masters(vault_root, run_id, now, run_context=run_context)
 
     ready, blockers = gate_ledger.export_ready(vault_root, run_id)
     attestation = attest.attestation_state(vault_root, run_id)
@@ -103,7 +107,7 @@ def export_run(
     # signature line — scaffolding, never a servable signature. Water the copy rather
     # than emit an unsigned filing (the residue scan is only the backstop, and it does
     # not run at all when pandoc is absent).
-    signed = load_matter(vault_root).attorney is not None
+    signed = run_context.manifest.matter_config.attorney is not None
     if not signed:
         blockers = [*blockers, "signature_block"]
     # Clean export requires a valid attestation AND a green gate ledger AND a signing

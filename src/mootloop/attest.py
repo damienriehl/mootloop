@@ -7,13 +7,10 @@ ledger head hash, append-only, in ``runs/<run-id>/attestations.jsonl``.
 invalidation record (re-imposing DRAFT). Export reads attestation state; it never
 sets it — the gate ledger is the single export gate.
 
-The attested "master" hash covers the md-master **and** the matter chrome, because the
-served document is built from both. The md-master carries only the response bodies; the
-caption, case number, party names, our-side labels and the signing attorney's block all
-come from ``matter.yaml`` at export time. Hashing the deliverable alone would let an
-edit to ``matter.yaml`` change the case number or the signature line of a document that
-still reports a ``valid`` attestation — a defective filing under a live signature. The
-matter is therefore folded into ``master_sha256``; a change to either re-imposes DRAFT.
+The attested "master" hash covers the md-master and the exact launch-snapshotted matter
+chrome that court export renders. A separate live-vs-launch comparison invalidates and
+blocks re-attestation after ``matter.yaml`` changes. A new run is required before the
+edit can be served.
 """
 
 from __future__ import annotations
@@ -23,12 +20,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from mootloop.citations.ledger import LEDGER_PATH
+from mootloop.context import load_run_context, load_run_corpus
 from mootloop.decisions import DecisionStore
 from mootloop.errors import AttestationBlockedError, OrchestratorError
 from mootloop.journal import load_state
 from mootloop.models.attestations import Attestation, AttestationCheckStatus
 from mootloop.models.rubric import sha256_hex
-from mootloop.tasks import get_binding
 from mootloop.vault import RunLock, load_matter, safe_vault_path
 
 ATTESTATIONS_JSONL = ("attestations.jsonl",)
@@ -52,19 +49,25 @@ def canonicalize(text: str) -> str:
 
 def master_deliverable_path(vault_root: Path | str, run_id: str) -> Path | None:
     """The run's md-master deliverable path, or None if the run/task is unknown."""
-    state = load_state(vault_root, run_id)
-    if state.task is None:
+    if load_state(vault_root, run_id).task is None:
         return None
-    binding = get_binding(state.task)
-    if not binding.config.deliverables:
+    context = load_run_context(vault_root, run_id)
+    if not context.binding.config.deliverables:
         return None
-    return safe_vault_path(vault_root, "deliverables", binding.config.deliverables[0])
+    return safe_vault_path(
+        vault_root, "deliverables", context.binding.config.deliverables[0]
+    )
 
 
-def matter_sha256(vault_root: Path | str) -> str:
-    """A canonical digest of ``matter.yaml`` — the chrome the served document renders
-    from (caption, case number, parties, our-side, signing attorney)."""
-    return sha256_hex(load_matter(vault_root).model_dump_json())
+def matter_sha256(vault_root: Path | str, run_id: str) -> str:
+    """Digest the launch-snapshotted matter chrome that export actually renders."""
+    context = load_run_context(vault_root, run_id)
+    return sha256_hex(context.manifest.matter_config.model_dump_json())
+
+
+def _live_matter_matches_launch(vault_root: Path | str, run_id: str) -> bool:
+    context = load_run_context(vault_root, run_id)
+    return load_matter(vault_root) == context.manifest.matter_config
 
 
 def current_master_sha256(vault_root: Path | str, run_id: str) -> str | None:
@@ -75,7 +78,7 @@ def current_master_sha256(vault_root: Path | str, run_id: str) -> str | None:
     if path is None or not path.is_file():
         return None
     canonical = canonicalize(path.read_text(encoding="utf-8"))
-    return sha256_hex(f"{canonical}\x1f{matter_sha256(vault_root)}")
+    return sha256_hex(f"{canonical}\x1f{matter_sha256(vault_root, run_id)}")
 
 
 def current_ledger_head_sha256(vault_root: Path | str) -> str:
@@ -128,6 +131,12 @@ def attest(vault_root: Path | str, run_id: str, reviewer: str, now: str) -> Atte
     """Record an attestation. Refuses while any attorney-gate decision is open or the
     md-master deliverable does not exist (plan D9/H8)."""
     with RunLock(vault_root, run_id):
+        context = load_run_context(vault_root, run_id)
+        load_run_corpus(vault_root, context)
+        if load_matter(vault_root) != context.manifest.matter_config:
+            raise AttestationBlockedError(
+                f"cannot attest run {run_id!r}: matter.yaml changed after launch; start a new run"
+            )
         open_decisions = DecisionStore(vault_root, run_id).list_open()
         if open_decisions:
             ids = ", ".join(d.decision_id for d in open_decisions)
@@ -173,6 +182,10 @@ def attestation_state(vault_root: Path | str, run_id: str) -> AttestationCheck:
         return AttestationCheck("invalidated", latest.reason)
     if latest.hash_scope != MASTER_HASH_SCOPE:
         return AttestationCheck("invalidated", LEGACY_HASH_SCOPE_REASON)
+    if not _live_matter_matches_launch(vault_root, run_id):
+        return AttestationCheck(
+            "invalidated", "matter.yaml changed after launch; start a new run"
+        )
     master = current_master_sha256(vault_root, run_id)
     if master != latest.master_sha256:
         return AttestationCheck(

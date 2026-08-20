@@ -261,6 +261,8 @@ def fold(events: list[JournalEvent]) -> RunState:
             state.matter_id = event.matter_id
             state.task = event.task
             state.rubric_version = event.rubric_version
+            state.context_manifest_sha256 = event.context_manifest_sha256
+            state.task_spec_id = event.task_spec_id
             state.mode = event.mode
         elif isinstance(event, StageStarted):
             state.current_stage = event.stage

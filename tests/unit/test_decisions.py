@@ -166,6 +166,77 @@ def test_resolve_happy_path_then_rejects_double_resolution(tmp_path: Path) -> No
         resolve(vault, run_id, decision.decision_id, "deny", None, "", "Atty", "human", NOW)
 
 
+def test_exact_resolution_retry_repairs_interrupted_journal_append(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import mootloop.decisions as decisions_module
+    from mootloop.models.events import DecisionRecorded
+
+    vault = _vault(tmp_path, RequestType.INTERROGATORY, 1, facts=False)
+    run_id = start_run(vault, "discovery-responses", NOW, run_id="dec-repair")
+    run_with_provider(vault, run_id, FakeLLMProvider(), NOW)
+    decision = DecisionStore(vault, run_id).list_open()[0]
+    real_append = decisions_module.append
+    calls = 0
+
+    def fail_once(vault_root: Path | str, target_run_id: str, event: object) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise OSError("injected journal failure")
+        real_append(vault_root, target_run_id, event)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(decisions_module, "append", fail_once)
+    with pytest.raises(OSError, match="injected journal failure"):
+        resolve(
+            vault, run_id, decision.decision_id, "approve", None, "ok", "Atty", "human", NOW
+        )
+
+    repaired = resolve(
+        vault, run_id, decision.decision_id, "approve", None, "ok", "Atty", "human", NOW
+    )
+    assert repaired.status == "approved"
+    recorded = [
+        event
+        for event in decisions_module.read_events(vault, run_id)
+        if isinstance(event, DecisionRecorded) and event.decision_id == decision.decision_id
+    ]
+    assert len(recorded) == 1
+
+
+def test_resolve_fails_closed_without_writing_when_manifest_is_tampered(
+    tmp_path: Path,
+) -> None:
+    from mootloop.errors import OrchestratorError
+
+    vault = _vault(tmp_path, RequestType.INTERROGATORY, 1, facts=False)
+    run_id = start_run(vault, "discovery-responses", NOW, run_id="dec-context-tamper")
+    run_with_provider(vault, run_id, FakeLLMProvider(), NOW)
+    decision = DecisionStore(vault, run_id).list_open()[0]
+    decisions_path = vault / "runs" / run_id / "decisions" / "decisions.jsonl"
+    journal_path = vault / "runs" / run_id / "journal.jsonl"
+    decisions_before = decisions_path.read_bytes()
+    journal_before = journal_path.read_bytes()
+    manifest = vault / "runs" / run_id / "context" / "manifest.json"
+    manifest.write_text("{}\n", encoding="utf-8")
+
+    with pytest.raises(OrchestratorError, match="context manifest.*(tampered|digest)"):
+        resolve(
+            vault,
+            run_id,
+            decision.decision_id,
+            "approve",
+            None,
+            "",
+            "Atty",
+            "human",
+            NOW,
+        )
+
+    assert decisions_path.read_bytes() == decisions_before
+    assert journal_path.read_bytes() == journal_before
+
+
 def test_resolving_last_hard_human_gate_finishes_the_run(tmp_path: Path) -> None:
     vault = _vault(tmp_path, RequestType.RFA, 1, facts=True)
     run_id = start_run(vault, "discovery-responses", NOW, run_id="dec-finish")

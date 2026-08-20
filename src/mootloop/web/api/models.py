@@ -49,6 +49,7 @@ class StartRunRequest(StrictModel):
     ``task_spec_id`` optionally binds the run to a resolved on-ramp TaskSpec (plan
     FE-2.5); it is recorded on the ``RunStarted`` journal event."""
 
+    run_id: str
     task: str = "discovery-responses"
     mode: RunMode | None = None
     task_spec_id: str | None = None
@@ -150,6 +151,8 @@ class RunStatusSummary(VersionedModel):
     task: str | None = None
     total_spend_usd: float = 0.0
     hard_cap_usd: float | None = None
+    replayable: bool
+    context_blocker: str | None = None
     completed_turns: int = 0
     discarded_turns: int = 0
     open_decisions: list[str] = Field(default_factory=list)

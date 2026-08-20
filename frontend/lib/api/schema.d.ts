@@ -539,6 +539,8 @@ export interface components {
             attestation_id: string;
             /** Attested At */
             attested_at: string;
+            /** Hash Scope */
+            hash_scope?: string | null;
             /** Ledger Head Sha256 */
             ledger_head_sha256: string;
             /** Master Sha256 */
@@ -551,7 +553,7 @@ export interface components {
             run_id: string;
             /**
              * Schema Version
-             * @default 1.0
+             * @default 1.1
              */
             schema_version: string;
             /**
@@ -998,6 +1000,8 @@ export interface components {
              * @default 0
              */
             completed_turns: number;
+            /** Context Blocker */
+            context_blocker?: string | null;
             /** Current Stage */
             current_stage?: string | null;
             /**
@@ -1020,6 +1024,8 @@ export interface components {
             mode: "autonomous" | "gated" | "observed";
             /** Open Decisions */
             open_decisions?: string[];
+            /** Replayable */
+            replayable: boolean;
             /** Run Id */
             run_id: string;
             /**
@@ -1111,6 +1117,8 @@ export interface components {
         StartRunRequest: {
             /** Mode */
             mode?: ("autonomous" | "gated" | "observed") | null;
+            /** Run Id */
+            run_id: string;
             /**
              * Task
              * @default discovery-responses

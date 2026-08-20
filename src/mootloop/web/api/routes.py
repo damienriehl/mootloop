@@ -236,17 +236,24 @@ def start_run(
     _audited: Annotated[None, Depends(_audit_dep("run_start"))],
 ) -> models.RunStatusSummary:
     run_id = orchestrator.start_run(
-        vault, body.task, _now_iso(), mode=body.mode, task_spec_id=body.task_spec_id
+        vault,
+        body.task,
+        _now_iso(),
+        run_id=body.run_id,
+        mode=body.mode,
+        task_spec_id=body.task_spec_id,
+        idempotent=True,
     )
     # Feed the driver queue so the worker actually picks the run up. Without this the
     # run is created but never executes (both FE-7 runs were enqueued operationally).
-    queue.enqueue(
+    queue.ensure_enqueued(
         WorkItem.create(
             lane="run",
             matter_id=matter_id,
             run_id=run_id,
             kind="run_turn",
             now=datetime.now(UTC),
+            item_id=f"run:{matter_id}:{run_id}",
         )
     )
     return readers.run_status_summary(vault, run_id)
@@ -282,7 +289,7 @@ def raise_cap(
     if body.to_usd is not None:
         to_usd = body.to_usd
     else:
-        current = readers.effective_cap(vault, load_state(vault, run_id))
+        current = readers.effective_cap(vault, run_id, load_state(vault, run_id))
         if current is None:
             raise OrchestratorError(
                 f"run {run_id!r} has no cap to increment; pass an absolute `to_usd`"

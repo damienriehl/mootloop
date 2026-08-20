@@ -111,18 +111,26 @@ def build_panel_report(vault_root: Path | str, run_id: str) -> PanelReport:
     Written to ``runs/<run-id>/scores/panels/report.json`` via ``safe_vault_path``.
     """
     from mootloop import orchestrator
+    from mootloop.context import load_run_context
     from mootloop.journal import load_state
     from mootloop.models.run import DraftOutput
 
-    binding = orchestrator._binding_for(vault_root, run_id)
+    run_context = load_run_context(vault_root, run_id)
+    binding = run_context.binding
     state = load_state(vault_root, run_id)
-    units = orchestrator.load_request_units(vault_root)
-    facts = orchestrator._load_facts(vault_root)
+    units = run_context.units
+    facts = run_context.facts
 
     results: list[PanelResult] = []
     for i in range(len(units)):
         ctx = orchestrator._context_for(
-            run_id, state, binding, units, facts, i, orchestrator.DEFAULT_MAX_ATTEMPTS
+            run_id,
+            state,
+            binding,
+            units,
+            facts,
+            i,
+            run_context.manifest.max_attempts,
         )
         draft_record = ctx.judged_draft()
         if draft_record is None:

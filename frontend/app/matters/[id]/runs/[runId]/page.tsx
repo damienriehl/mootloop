@@ -25,9 +25,11 @@ export default function CockpitPage() {
   const { data: gates } = useQuery({
     queryKey: runKeys.gates(),
     queryFn: () => getRunGates({ matterId, runId }),
+    enabled: run?.replayable === true,
   });
 
-  const stream = useRunStream({ matterId, runId });
+  const replayable = run?.replayable === true;
+  const stream = useRunStream({ matterId, runId, enabled: replayable });
   const live = stream.seq > 0;
 
   const status = live ? stream.status : (run?.status ?? "running");
@@ -54,21 +56,42 @@ export default function CockpitPage() {
           <h1 className="font-mono text-lg font-bold text-accent">{runId}</h1>
         </div>
         <div className="flex items-center gap-4">
-          <Link
-            href={`/matters/${matterId}/inbox`}
-            className="font-mono text-sm text-ink-soft hover:text-accent"
-          >
-            Decision inbox
-            {run && (run.open_decisions?.length ?? 0) > 0 ? ` (${run.open_decisions?.length})` : ""} →
-          </Link>
-          <Link
-            href={`/matters/${matterId}/runs/${runId}/export`}
-            className="font-mono text-sm text-ink-soft hover:text-accent"
-          >
-            Export &amp; release →
-          </Link>
+          {replayable ? (
+            <>
+              <Link
+                href={`/matters/${matterId}/inbox?run=${encodeURIComponent(runId)}`}
+                className="font-mono text-sm text-ink-soft hover:text-accent"
+              >
+                Decision inbox
+                {(run?.open_decisions?.length ?? 0) > 0
+                  ? ` (${run?.open_decisions?.length})`
+                  : ""} →
+              </Link>
+              <Link
+                href={`/matters/${matterId}/runs/${runId}/export`}
+                className="font-mono text-sm text-ink-soft hover:text-accent"
+              >
+                Export &amp; release →
+              </Link>
+            </>
+          ) : null}
         </div>
       </header>
+
+      {run?.replayable === false && (
+        <div role="alert" className="border border-fail bg-paper-raised p-4 text-fail">
+          <h2 className="font-mono text-sm font-bold uppercase tracking-[0.08em]">
+            Run context unavailable
+          </h2>
+          <p className="mt-2 font-mono text-sm">
+            {run.context_blocker ?? "This run cannot be safely replayed."}
+          </p>
+          <p className="mt-2 text-sm text-ink-soft">
+            Lifecycle, decision, attestation, and export actions are disabled. Restore the
+            committed context or start a new run.
+          </p>
+        </div>
+      )}
 
       <InstrumentBand
         status={status}
@@ -81,7 +104,7 @@ export default function CockpitPage() {
         stage={stage}
       />
 
-      <RunControls matterId={matterId} runId={runId} status={status} />
+      {replayable && <RunControls matterId={matterId} runId={runId} status={status} />}
 
       <div>
         <h2 className="mb-2 font-mono text-[0.62rem] uppercase tracking-[0.12em] text-ink-faint">
