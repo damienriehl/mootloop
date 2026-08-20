@@ -112,7 +112,10 @@ def run_with_provider(
                 if fresh.finished or spec.turn_id in fresh.completed_turns:
                     continue
                 result = _run_turn_with_lock_renewal(
-                    lock, provider, spec, render_prompt(spec)
+                    lock,
+                    provider,
+                    spec,
+                    render_prompt(spec, run_context.manifest.persona_bodies[spec.persona]),
                 )
                 # The provider is an untrusted blocking boundary. Rebind from disk
                 # immediately before the first protected write so a provider-side or

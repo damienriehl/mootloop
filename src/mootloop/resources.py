@@ -11,6 +11,7 @@ import re
 from pathlib import Path
 
 from mootloop.errors import ExportError
+from mootloop.models.run import PersonaName
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_DIR = REPO_ROOT / "config"
@@ -49,3 +50,12 @@ def rubric_path(rubric_id: str) -> Path:
 def persona_body(slug: str) -> str:
     """The task-agnostic excellence body for a persona (``personas/<slug>.md``)."""
     return (PERSONAS_DIR / f"{slug}.md").read_text(encoding="utf-8")
+
+
+def load_persona_bodies() -> dict[PersonaName, str]:
+    """Every currently-authored persona body, keyed by canonical persona name."""
+    return {
+        persona: persona_body(persona.body_slug)
+        for persona in PersonaName
+        if (PERSONAS_DIR / f"{persona.body_slug}.md").is_file()
+    }

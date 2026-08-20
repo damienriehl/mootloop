@@ -30,7 +30,7 @@ from mootloop.models.requests import RequestItem, RequestSet
 from mootloop.models.rubric import Rubric, sha256_hex
 from mootloop.models.task import TaskAdapterConfig
 from mootloop.models.taskspec import TaskSpec
-from mootloop.resources import rubric_path, task_config_path
+from mootloop.resources import load_persona_bodies, rubric_path, task_config_path
 from mootloop.tasks import TaskBinding
 from mootloop.taskspec import TaskSpecStore
 from mootloop.vault import atomic_write_once_text, fsync_file_and_parent, safe_vault_path
@@ -261,6 +261,7 @@ def build_run_context(
     adapter_raw = adapter_config_file.read_bytes()
     rubric_raw = rubric_file.read_bytes()
     rubric_lock_raw = rubric_lock_file.read_bytes() if rubric_lock_file.is_file() else b""
+    persona_bodies = load_persona_bodies()
     try:
         captured_matter = MatterConfig.model_validate(yaml.safe_load(matter_raw))
         captured_adapter = TaskAdapterConfig.model_validate(yaml.safe_load(adapter_raw))
@@ -283,6 +284,14 @@ def build_run_context(
         _source("rubric", f"rubrics/{rubric_file.name}", rubric_raw),
         _source("rubric_lock", f"rubrics/{rubric_lock_file.name}", rubric_lock_raw),
         _source("fact_repository", "facts/facts.jsonl", facts_raw),
+        *[
+            _source(
+                "persona_body",
+                f"personas/{persona.body_slug}.md",
+                body.encode("utf-8"),
+            )
+            for persona, body in persona_bodies.items()
+        ],
         *request_sources,
         *corpus_sources,
     ]
@@ -305,6 +314,7 @@ def build_run_context(
             draft_directive=binding.adapter.draft_directive(),
             judge_question=binding.adapter.judge_question(),
         ),
+        persona_bodies=persona_bodies,
         rubric=captured_rubric,
         request_sets=request_sets,
         facts=facts,

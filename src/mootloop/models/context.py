@@ -12,6 +12,7 @@ from mootloop.models.facts import Fact
 from mootloop.models.matter import MatterConfig
 from mootloop.models.requests import RequestSet
 from mootloop.models.rubric import Rubric
+from mootloop.models.run import PersonaName
 from mootloop.models.task import TaskAdapterConfig
 from mootloop.models.taskspec import TaskSpec
 
@@ -26,6 +27,7 @@ ContextSourceKind = Literal[
     "task_spec",
     "corpus_manifest",
     "corpus_content",
+    "persona_body",
 ]
 
 
@@ -71,6 +73,7 @@ class RunContextManifest(VersionedModel):
     task_spec: TaskSpec | None = None
     adapter_config: TaskAdapterConfig
     adapter_behavior: AdapterBehavior
+    persona_bodies: dict[PersonaName, str]
     rubric: Rubric
     request_sets: list[RequestSet] = Field(default_factory=list)
     facts: list[Fact] = Field(default_factory=list)

@@ -19,8 +19,10 @@ from mootloop.models.common import DocId, MatterId, TaskSpecId
 from mootloop.models.corpus import CorpusDoc, Manifest
 from mootloop.models.events import JournalEvent, RunStarted
 from mootloop.models.requests import RequestItem, RequestSet, RequestType
+from mootloop.models.run import PersonaName
 from mootloop.models.taskspec import TaskSpec
 from mootloop.orchestrator import (
+    assemble_prompt,
     plan_next,
     record_turn,
     resume_run,
@@ -332,6 +334,28 @@ def test_plan_replays_snapshotted_python_adapter_behavior(
     assert "MUTATED" not in replayed.prompt_context["directive"]
 
 
+def test_prompt_replays_launch_persona_body_after_deployment_change(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import mootloop.resources as resources
+
+    vault = _vault(tmp_path)
+    run_id = start_run(vault, TASK, NOW, run_id="ctx-persona")
+    spec = plan_next(vault, run_id)[0]
+    original = assemble_prompt(vault, run_id, spec.turn_id)
+    replacement_dir = tmp_path / "replacement-personas"
+    replacement_dir.mkdir()
+    (replacement_dir / f"{spec.persona.body_slug}.md").write_text(
+        "MUTATED DEPLOYMENT PERSONA BODY", encoding="utf-8"
+    )
+    monkeypatch.setattr(resources, "PERSONAS_DIR", replacement_dir)
+
+    replayed = assemble_prompt(vault, run_id, spec.turn_id)
+
+    assert replayed == original
+    assert "MUTATED DEPLOYMENT" not in replayed
+
+
 def test_fabrication_gate_replays_launch_corpus_after_content_changes(tmp_path: Path) -> None:
     vault = _vault(tmp_path)
     corpus_path = _add_corpus_doc(vault, "The agreed contract amount was $42,000.")
@@ -385,6 +409,7 @@ def test_provider_result_is_rejected_if_context_changes_during_call(tmp_path: Pa
 
 def test_manifest_source_digests_match_captured_bytes(tmp_path: Path) -> None:
     from mootloop.context import load_run_context, load_run_corpus
+    from mootloop.resources import PERSONAS_DIR
 
     vault = _vault(tmp_path)
     corpus_path = _add_corpus_doc(vault, "Exact launch corpus bytes.\n")
@@ -398,6 +423,11 @@ def test_manifest_source_digests_match_captured_bytes(tmp_path: Path) -> None:
     snapshot = load_run_corpus(vault, context).documents[0]
     assert snapshot.sha256 == expected
     assert hashlib.sha256(snapshot.text.encode("utf-8")).hexdigest() == expected
+    associate_raw = (PERSONAS_DIR / "associate.md").read_bytes()
+    assert context.manifest.persona_bodies[PersonaName.ASSOCIATE] == associate_raw.decode()
+    assert sources[("persona_body", "personas/associate.md")] == hashlib.sha256(
+        associate_raw
+    ).hexdigest()
 
 
 def test_lifecycle_fails_closed_when_corpus_snapshot_is_tampered(tmp_path: Path) -> None:

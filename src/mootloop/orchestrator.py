@@ -299,7 +299,9 @@ def assemble_prompt(
     max_attempts: int | None = None,
 ) -> str:
     """Render the full prompt for a currently-schedulable turn."""
-    return render_prompt(find_spec(vault_root, run_id, turn_id, max_attempts=max_attempts))
+    run_context = load_run_context(vault_root, run_id)
+    spec = find_spec(vault_root, run_id, turn_id, max_attempts=max_attempts)
+    return render_prompt(spec, run_context.manifest.persona_bodies[spec.persona])
 
 
 def record_turn_intent(vault_root: Path | str, run_id: str, event: TurnIntent) -> None:
