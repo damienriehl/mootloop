@@ -3,6 +3,8 @@ VersionedModel base every persisted model extends."""
 
 from __future__ import annotations
 
+import hashlib
+import json
 from typing import NewType
 
 from pydantic import BaseModel, ConfigDict
@@ -31,6 +33,17 @@ RubricId = NewType("RubricId", str)
 # data in the web-search lane" a build failure.
 MatterText = NewType("MatterText", str)
 PublicText = NewType("PublicText", str)
+
+
+def canonical_json_sha256(value: object) -> str:
+    """SHA-256 of deterministic UTF-8 JSON used by persisted commitments."""
+    raw = json.dumps(
+        value,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
 
 
 class StrictModel(BaseModel):

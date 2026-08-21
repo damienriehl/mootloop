@@ -9,7 +9,7 @@ from pydantic import ValidationError
 
 from mootloop.config import ConfigLayerInput, default_config_layer, resolve_run_config
 from mootloop.errors import ConfigResolutionError
-from mootloop.models.config import RunConfigOverlay
+from mootloop.models.config import ResolvedRunConfig, RunConfigOverlay
 from mootloop.resources import task_config_path
 from tests.conftest import make_matter
 
@@ -273,8 +273,8 @@ def test_source_digests_are_deterministic_and_content_sensitive() -> None:
         defaults=_defaults(), adapter=_adapter(), invocation_flags=changed
     )
 
-    def flags_digest(result: object) -> str:
-        sources = result.sources  # type: ignore[attr-defined]
+    def flags_digest(result: ResolvedRunConfig) -> str:
+        sources = result.sources
         return next(source.sha256 for source in sources if source.layer == "invocation_flags")
 
     assert flags_digest(left_result) == flags_digest(reordered_result)

@@ -7,8 +7,6 @@ replaying events, so a resume after a kill is exactly a re-fold (plan D10).
 
 from __future__ import annotations
 
-import hashlib
-import json
 from typing import Annotated, Any, Literal
 
 from pydantic import Field, field_validator, model_validator
@@ -21,6 +19,7 @@ from mootloop.models.common import (
     TaskSpecId,
     TaskSpecLockId,
     TurnId,
+    canonical_json_sha256,
 )
 from mootloop.models.gates import GateResult
 from mootloop.models.run import TurnRecord
@@ -48,8 +47,7 @@ RunMode = Literal["autonomous", "gated", "observed"]
 
 
 def _payload_sha256(payload: dict[str, Any]) -> str:
-    body = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-    return hashlib.sha256(body.encode("utf-8")).hexdigest()
+    return canonical_json_sha256(payload)
 
 
 class QueueIntent(StrictModel):
@@ -94,9 +92,7 @@ class QueueIntent(StrictModel):
         return self
 
 
-def validate_run_queue_intent(
-    intent: QueueIntent, *, matter_id: str, run_id: str
-) -> QueueIntent:
+def validate_run_queue_intent(intent: QueueIntent, *, matter_id: str, run_id: str) -> QueueIntent:
     """Revalidate mutable nested payload data and bind launch work to its run."""
     validated = QueueIntent.model_validate(intent.model_dump(mode="python"))
     expected_item_id = f"run:{matter_id}:{run_id}"

@@ -13,8 +13,6 @@ concept-resolution lands in FE-3.
 
 from __future__ import annotations
 
-import hashlib
-import json
 import re
 from typing import Literal
 
@@ -26,6 +24,7 @@ from mootloop.models.common import (
     TaskSpecId,
     TaskSpecLockId,
     VersionedModel,
+    canonical_json_sha256,
 )
 
 SCHEMA_VERSION = "1.0"
@@ -39,13 +38,7 @@ _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 def canonical_sha256(value: object) -> str:
     """SHA-256 of deterministic UTF-8 JSON used by TaskSpec lock records."""
-    raw = json.dumps(
-        value,
-        ensure_ascii=False,
-        separators=(",", ":"),
-        sort_keys=True,
-    ).encode("utf-8")
-    return hashlib.sha256(raw).hexdigest()
+    return canonical_json_sha256(value)
 
 
 def task_spec_sha256(spec: TaskSpec) -> str:

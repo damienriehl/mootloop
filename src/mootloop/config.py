@@ -49,9 +49,7 @@ class ConfigLayerInput:
             ) from exc
 
     @classmethod
-    def from_mapping(
-        cls, locator: str, content: Mapping[str, object]
-    ) -> ConfigLayerInput:
+    def from_mapping(cls, locator: str, content: Mapping[str, object]) -> ConfigLayerInput:
         canonical = json.dumps(
             content,
             ensure_ascii=False,
@@ -89,12 +87,12 @@ def _validation_path(error: Mapping[str, object]) -> str:
     return ".".join(str(part) for part in location) or "<root>"
 
 
-def _validate_model(
-    model_type: type[BaseModel],
+def _validate_model[ModelT: BaseModel](
+    model_type: type[ModelT],
     raw: Mapping[str, Any],
     source: ConfigLayerInput,
     layer: ConfigLayer,
-) -> BaseModel:
+) -> ModelT:
     try:
         return model_type.model_validate(raw)
     except ValidationError as exc:
@@ -202,7 +200,6 @@ def resolve_run_config(
 
     defaults_raw = _parse_mapping(defaults, "defaults")
     defaults_model = _validate_model(DefaultRunConfig, defaults_raw, defaults, "defaults")
-    assert isinstance(defaults_model, DefaultRunConfig)
     merged = _model_content(defaults_model, "schema_version")
     # Compatibility-only values from the legacy top-level MatterConfig live below
     # every authored layer. This preserves old matter behavior without allowing
@@ -212,7 +209,6 @@ def resolve_run_config(
 
     adapter_raw = _parse_mapping(adapter, "task_adapter")
     adapter_model = _validate_model(TaskAdapterConfig, adapter_raw, adapter, "task_adapter")
-    assert isinstance(adapter_model, TaskAdapterConfig)
     adapter_content = adapter_model.model_dump(
         exclude={"schema_version", "overridable"}, exclude_unset=True
     )
@@ -225,7 +221,6 @@ def resolve_run_config(
         firm_model = _validate_model(
             FirmPreferences, firm_raw, firm_preferences, "firm_preferences"
         )
-        assert isinstance(firm_model, FirmPreferences)
         firm_content = _overlay_content(firm_model.run_config)
         _enforce_structural_policy(merged, firm_content, allowed, "firm_preferences")
         merged = _deep_merge(merged, firm_content)
@@ -239,7 +234,6 @@ def resolve_run_config(
             continue
         raw = _parse_mapping(source, layer)
         overlay_model = _validate_model(RunConfigOverlay, raw, source, layer)
-        assert isinstance(overlay_model, RunConfigOverlay)
         content = _overlay_content(overlay_model)
         _enforce_structural_policy(merged, content, allowed, layer)
         merged = _deep_merge(merged, content)

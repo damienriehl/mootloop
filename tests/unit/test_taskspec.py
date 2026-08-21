@@ -16,6 +16,7 @@ from typer.testing import CliRunner
 
 from mootloop import taskspec as taskspec_svc
 from mootloop.cli import app
+from mootloop.models.events import RunStarted
 from mootloop.models.taskspec import TaskSpec
 from mootloop.taskspec import (
     TaskSpecStore,
@@ -168,9 +169,8 @@ def _build_single_request_vault(tmp_path: Path) -> Path:
     return vault
 
 
-def _run_started(vault: Path, run_id: str) -> object:
+def _run_started(vault: Path, run_id: str) -> RunStarted:
     from mootloop.journal import read_events
-    from mootloop.models.events import RunStarted
 
     started = [e for e in read_events(vault, run_id) if isinstance(e, RunStarted)]
     assert len(started) == 1

@@ -13,7 +13,7 @@ from typing import Any, TypeVar
 from pydantic import ValidationError
 
 from mootloop.errors import MigrationError
-from mootloop.models.common import VersionedModel
+from mootloop.models.common import VersionedModel, canonical_json_sha256
 from mootloop.models.context import RunContextManifest
 
 MigrationPayload = dict[str, Any]
@@ -99,9 +99,7 @@ class MigrationRegistry:
                 )
             result = step.migrate(deepcopy(working))
             if not isinstance(result, Mapping):
-                raise MigrationError(
-                    f"{model_name} migration from {version} must return a mapping"
-                )
+                raise MigrationError(f"{model_name} migration from {version} must return a mapping")
             working = deepcopy(dict(result))
             actual_target = working.get("schema_version")
             if actual_target != step.target_version:
@@ -133,16 +131,6 @@ class MigrationRegistry:
 DEFAULT_MIGRATIONS = MigrationRegistry()
 
 
-def _canonical_sha256(value: object) -> str:
-    raw = json.dumps(
-        value,
-        ensure_ascii=False,
-        separators=(",", ":"),
-        sort_keys=True,
-    ).encode("utf-8")
-    return hashlib.sha256(raw).hexdigest()
-
-
 def _legacy_context_source(
     payload: Mapping[str, Any],
     kind: str,
@@ -158,7 +146,7 @@ def _legacy_context_source(
                 digest = source.get("sha256")
                 if isinstance(locator, str) and isinstance(digest, str):
                     return locator, digest
-    return fallback_locator, _canonical_sha256(fallback_value)
+    return fallback_locator, canonical_json_sha256(fallback_value)
 
 
 def _migrate_run_context_1_0_to_1_1(payload: MigrationPayload) -> MigrationPayload:
@@ -234,7 +222,7 @@ def _migrate_run_context_1_0_to_1_1(payload: MigrationPayload) -> MigrationPaylo
             {
                 "layer": "invocation_flags",
                 "locator": "migration:v1.0:effective-run-fields",
-                "sha256": _canonical_sha256(effective_fields),
+                "sha256": canonical_json_sha256(effective_fields),
                 "present": True,
             },
         ],

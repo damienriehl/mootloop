@@ -10,6 +10,7 @@ repeat delivery, so consumers and ``Queue.ensure_enqueued`` must stay idempotent
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -19,6 +20,7 @@ from mootloop.engine.queue import Queue, WorkItem
 from mootloop.errors import MootloopError, OrchestratorError
 from mootloop.journal import append, read_events
 from mootloop.models.events import (
+    JournalEvent,
     QueueIntent,
     RunEnqueued,
     RunStarted,
@@ -30,8 +32,8 @@ from mootloop.vault import RunLock, safe_vault_path, validate_id
 logger = logging.getLogger("mootloop.engine.outbox")
 
 
-def _started_event(vault_root: Path | str, run_id: str) -> RunStarted:
-    started = [event for event in read_events(vault_root, run_id) if isinstance(event, RunStarted)]
+def _started_event(events: Sequence[JournalEvent], run_id: str) -> RunStarted:
+    started = [event for event in events if isinstance(event, RunStarted)]
     if len(started) != 1:
         raise OrchestratorError(
             f"run {run_id!r} must have exactly one RunStarted event; found {len(started)}"
@@ -39,12 +41,8 @@ def _started_event(vault_root: Path | str, run_id: str) -> RunStarted:
     return started[0]
 
 
-def _is_acknowledged(
-    vault_root: Path | str, run_id: str, intent: QueueIntent
-) -> bool:
-    acknowledgments = [
-        event for event in read_events(vault_root, run_id) if isinstance(event, RunEnqueued)
-    ]
+def _is_acknowledged(events: Sequence[JournalEvent], run_id: str, intent: QueueIntent) -> bool:
+    acknowledgments = [event for event in events if isinstance(event, RunEnqueued)]
     for event in acknowledgments:
         if (event.item_id, event.payload_sha256) != (
             intent.item_id,
@@ -78,7 +76,8 @@ def drain_run_outbox(vault_root: Path | str, queue: Queue, run_id: str) -> bool:
     """
     validate_id(run_id, kind="run_id")
     with RunLock(vault_root, run_id):
-        started = _started_event(vault_root, run_id)
+        events = read_events(vault_root, run_id)
+        started = _started_event(events, run_id)
         intent = started.queue_intent
         if intent is None:
             return False
@@ -90,7 +89,7 @@ def drain_run_outbox(vault_root: Path | str, queue: Queue, run_id: str) -> bool:
             )
         except (ValidationError, ValueError) as exc:
             raise OrchestratorError(f"run {run_id!r} has an invalid queue intent") from exc
-        if _is_acknowledged(vault_root, run_id, intent):
+        if _is_acknowledged(events, run_id, intent):
             return False
 
         # Validate the exact launch snapshot before materializing any queue work.

@@ -12,6 +12,7 @@ from mootloop.models.context import (
     AssembledContextItem,
     ContextContribution,
     ContextExclusion,
+    ContextExclusionReason,
     CorpusSnapshot,
     RunContextManifest,
 )
@@ -60,7 +61,7 @@ def select_launch_contributions(
                 f"duplicate context contribution id {contribution.contribution_id!r}"
             )
         seen.add(contribution.contribution_id)
-        reason: str | None = None
+        reason: ContextExclusionReason | None = None
         if contribution.source_matter_id != matter_id:
             reason = "wrong_matter"
         elif contribution.task_scope and task not in contribution.task_scope:
@@ -74,7 +75,7 @@ def select_launch_contributions(
                 ContextExclusion(
                     contribution_id=contribution.contribution_id,
                     kind=contribution.kind,
-                    reason=reason,  # type: ignore[arg-type]
+                    reason=reason,
                 )
             )
     excluded.sort(key=lambda item: item.contribution_id)
@@ -117,16 +118,12 @@ def _corpus_items(
             (start, min(start + MAX_CORPUS_PASSAGE_CHARS, len(captured.text)))
             for start in range(0, len(captured.text), MAX_CORPUS_PASSAGE_CHARS)
         ] or [(0, 0)]
-        ranked = sorted(
-            ranges,
-            key=lambda bounds: (
-                -sum(
-                    captured.text[bounds[0] : bounds[1]].casefold().count(term)
-                    for term in query_terms
-                ),
-                bounds[0],
-            ),
-        )[:MAX_CORPUS_PASSAGES_PER_DOC]
+
+        def score(bounds: tuple[int, int], captured_text: str = captured.text) -> tuple[int, int]:
+            passage = captured_text[bounds[0] : bounds[1]].casefold()
+            return -sum(passage.count(term) for term in query_terms), bounds[0]
+
+        ranked = sorted(ranges, key=score)[:MAX_CORPUS_PASSAGES_PER_DOC]
         for start, end in sorted(ranked):
             passage = captured.text[start:end]
             yield AssembledContextItem(
@@ -221,10 +218,11 @@ def items_for_turn(
     persona: PersonaName,
 ) -> tuple[AssembledContextItem, ...]:
     """Re-apply task/persona permissions at the final TurnSpec boundary."""
+    if persona not in _INTERNAL_CONTEXT_PERSONAS:
+        return ()
     return tuple(
         item
         for item in items
-        if persona in _INTERNAL_CONTEXT_PERSONAS
-        and (not item.task_scope or task in item.task_scope)
+        if (not item.task_scope or task in item.task_scope)
         and (not item.persona_scope or persona in item.persona_scope)
     )

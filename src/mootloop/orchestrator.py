@@ -245,12 +245,10 @@ def start_run(
     """
     resolved_id = run_id or f"{task}-{_compact_ts(now)}"
     with RunLock(vault_root, resolved_id):
-        if read_events(vault_root, resolved_id):
+        existing_events = read_events(vault_root, resolved_id)
+        if existing_events:
             if idempotent:
-                existing_events = read_events(vault_root, resolved_id)
-                started = [
-                    event for event in existing_events if isinstance(event, RunStarted)
-                ]
+                started = [event for event in existing_events if isinstance(event, RunStarted)]
                 context = load_run_context(vault_root, resolved_id)
                 matter = load_matter(vault_root)
                 try:
@@ -284,8 +282,7 @@ def start_run(
                     )
                     == task_spec_id
                     and context.manifest.resolved_config == proposed
-                    and context.manifest.context_contributions
-                    == list(accepted_contributions)
+                    and context.manifest.context_contributions == list(accepted_contributions)
                     and context.manifest.context_exclusions == list(context_exclusions)
                     and len(started) == 1
                     and _same_queue_intent(started[0].queue_intent, queue_intent)
@@ -972,10 +969,7 @@ def _write_gaps_report(
         for request_id, stage in unfinished:
             lines.append(f"- `{request_id}` — stopped at stage `{stage}`")
     lines.append("")
-    lines.append(
-        f"Raise the cap and resume: "
-        f"`mootloop run raise-cap <vault> {run_id} --to <usd>`."
-    )
+    lines.append(f"Raise the cap and resume: `mootloop run raise-cap <vault> {run_id} --to <usd>`.")
     path = safe_vault_path(vault_root, "deliverables", f"gaps-{run_id}.md")
     atomic_write_text(path, "\n".join(lines) + "\n")
     return path
@@ -1257,6 +1251,8 @@ def reopen_enqueue_pending(vault_root: Path | str, run_id: str) -> bool:
         and isinstance(events[-1], RunReopened)
         and load_state(vault_root, run_id).status == "running"
     )
+
+
 # --- public: drive (fake/headless provider) ---------------------------------
 
 
@@ -1337,9 +1333,7 @@ def status_summary(vault_root: Path | str, run_id: str) -> dict[str, object]:
         "spend_usd": round(state.total_spend_usd, 6),
         "spend_label": "notional (plan mode)",
         "hard_cap_usd": (
-            effective_cap(state, run_context)
-            if run_context is not None
-            else state.cap_raised_to
+            effective_cap(state, run_context) if run_context is not None else state.cap_raised_to
         ),
         "replayable": run_context is not None,
         "context_blocker": context_blocker,

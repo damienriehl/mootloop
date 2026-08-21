@@ -29,6 +29,7 @@ from pydantic import Field
 
 from mootloop.errors import QueueError
 from mootloop.models.common import StrictModel
+from mootloop.vault import fsync_file_and_parent
 
 Lane = Literal["interactive", "run"]
 
@@ -119,18 +120,6 @@ class Queue:
                 items.append(WorkItem.model_validate_json(line))
         return items
 
-    def _fsync_state_and_parent(self) -> None:
-        state_fd = os.open(self._state, os.O_RDONLY)
-        try:
-            os.fsync(state_fd)
-        finally:
-            os.close(state_fd)
-        parent_fd = os.open(self.root, os.O_RDONLY)
-        try:
-            os.fsync(parent_fd)
-        finally:
-            os.close(parent_fd)
-
     def _write(self, items: list[WorkItem]) -> None:
         self.root.mkdir(parents=True, exist_ok=True)
         body = "".join(item.model_dump_json() + "\n" for item in items)
@@ -183,7 +172,7 @@ class Queue:
                     raise QueueError(f"queue item id {item.item_id!r} has conflicting work")
                 # A prior writer can fail after replace but before its directory fsync.
                 # Retry must establish both barriers before the outbox acknowledges.
-                self._fsync_state_and_parent()
+                fsync_file_and_parent(self._state)
                 return existing.model_copy(deep=True)
             items.append(item)
             self._write(items)
@@ -234,9 +223,7 @@ class Queue:
             self._write(kept)
             return True
 
-    def release(
-        self, item_id: str, worker_id: str, *, visible_at: datetime | None = None
-    ) -> bool:
+    def release(self, item_id: str, worker_id: str, *, visible_at: datetime | None = None) -> bool:
         """Return an item this worker owns to the queue (slot released on pause).
 
         With ``visible_at`` it schedules a delayed resume (the item stays invisible

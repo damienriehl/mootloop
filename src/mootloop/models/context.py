@@ -41,6 +41,7 @@ ContextContributionKind = Literal["board", "learning", "context_note", "firm_pla
 ContextApprovalState = Literal["approved", "accepted", "pending", "rejected"]
 ContextPermission = Literal["matter_confidential", "privileged"]
 ContextTrust = Literal["untrusted_data"]
+ContextExclusionReason = Literal["not_approved", "wrong_matter", "wrong_task"]
 AssembledContextKind = Literal[
     "fact",
     "corpus_passage",
@@ -125,7 +126,7 @@ class ContextExclusion(StrictModel):
 
     contribution_id: str
     kind: ContextContributionKind
-    reason: Literal["not_approved", "wrong_matter", "wrong_task"]
+    reason: ContextExclusionReason
 
 
 class AssembledContextItem(StrictModel):
