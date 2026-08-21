@@ -8,18 +8,21 @@ import type { TaskSpec } from "@/lib/api/types";
  * spec id, created_at, FOLIO ref) are set in the MONO record voice; the attorney's
  * intent reads in the SERIF argument voice. When the intent did not resolve to a
  * runnable task (`task === null`), the slip states an HONEST unmapped posture — no fake
- * start button — pointing at FE-3 synthesis; a runnable slip offers "Start run".
+ * start button — pointing at FE-3 synthesis. Resolved tasks require an explicit human
+ * lock before the start action is available.
  */
 export function TaskSlipCard({
   spec,
-  runnable,
+  state,
+  onLock,
   onConfirm,
   onDiscard,
   pending,
   error,
 }: {
   spec: TaskSpec;
-  runnable: boolean;
+  state: "unmapped" | "approval-required" | "runnable";
+  onLock: () => void;
   onConfirm: () => void;
   onDiscard: () => void;
   pending: boolean;
@@ -40,10 +43,10 @@ export function TaskSlipCard({
             data-testid="slip-lane-state"
             className={cn(
               "rounded-[3px] border px-1.5 py-0.5 font-mono text-[0.6rem] uppercase tracking-[0.08em]",
-              runnable ? "border-pass text-pass" : "border-pending text-pending",
+              state === "runnable" ? "border-pass text-pass" : "border-pending text-pending",
             )}
           >
-            {runnable ? "runnable" : "unmapped"}
+            {state === "approval-required" ? "approval required" : state}
           </span>
         </div>
         {/* Intent — argument voice (serif). */}
@@ -71,7 +74,7 @@ export function TaskSlipCard({
       </dl>
 
       <footer className="border-t border-rule px-5 py-4">
-        {runnable ? (
+        {state === "runnable" ? (
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -90,6 +93,32 @@ export function TaskSlipCard({
             >
               Revise intent
             </button>
+          </div>
+        ) : state === "approval-required" ? (
+          <div data-testid="slip-awaiting-lock" className="grid gap-3">
+            <p className="text-sm text-ink-soft">
+              Confirm this task to lock the exact TaskSpec, adapter, rubric, and rubric
+              approval record before the run starts.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                data-testid="slip-lock"
+                onClick={onLock}
+                disabled={pending}
+                className="border border-accent bg-accent-soft px-4 py-2 font-mono text-sm font-bold text-accent transition-colors hover:bg-accent hover:text-paper disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {pending ? "Confirming…" : "Confirm and lock task"}
+              </button>
+              <button
+                type="button"
+                onClick={onDiscard}
+                disabled={pending}
+                className="border border-rule-strong px-4 py-2 font-mono text-sm text-ink-soft hover:border-accent hover:text-accent disabled:opacity-40"
+              >
+                Revise intent
+              </button>
+            </div>
           </div>
         ) : (
           <div data-testid="slip-unmapped" className="grid gap-3">

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -11,10 +12,14 @@ import pytest
 from typer.testing import CliRunner
 
 from mootloop.cli import app
+from mootloop.context import load_run_context
+from mootloop.context_sources import FIRM_PREFERENCES_ENV, ContextContributionStore
 from mootloop.engine.queue import Queue
 from mootloop.errors import QueueError
 from mootloop.journal import read_events
-from mootloop.models.events import RunReopened
+from mootloop.models.common import MatterId
+from mootloop.models.context import ContextContribution
+from mootloop.models.events import RunEnqueued, RunReopened, RunStarted
 
 runner = CliRunner()
 
@@ -217,6 +222,101 @@ def test_run_status_labels_spend_notional(tmp_path: Path) -> None:
     assert status.exit_code == 0, status.output
     assert "notional (plan mode)" in status.output
     assert '"spend_usd"' in status.output
+
+
+def test_run_start_hosted_vault_commits_and_drains_stable_outbox(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    matters_root = tmp_path / "matters"
+    vault = matters_root / "northfield-widgets-v-granite-supply"
+    _seed_requests(vault)
+    firm = tmp_path / "firm-preferences.yaml"
+    firm.write_text(
+        "schema_version: '1.0'\nrun_config:\n  max_attempts: 7\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv(FIRM_PREFERENCES_ENV, str(firm))
+    text = "Use the approved CLI chronology."
+    ContextContributionStore(vault).put(
+        ContextContribution(
+            contribution_id="board-cli-approved",
+            kind="board",
+            text=text,
+            sha256=hashlib.sha256(text.encode()).hexdigest(),
+            provenance_locator="board://approved/cli",
+            source_matter_id=MatterId("northfield-widgets-v-granite-supply"),
+            task_scope=("discovery-responses",),
+            permission="privileged",
+            approval_state="approved",
+        )
+    )
+    env = {**os.environ, "MOOTLOOP_MATTERS_ROOT": str(matters_root)}
+    args = ["run", "start", str(vault), "--run-id", "hosted-start"]
+
+    first = runner.invoke(app, args, env=env)
+    assert first.exit_code == 0, first.output
+    retry = runner.invoke(app, args, env=env)
+    assert retry.exit_code == 0, retry.output
+
+    queued = Queue(matters_root).snapshot()
+    assert [item.item_id for item in queued] == [
+        "run:northfield-widgets-v-granite-supply:hosted-start"
+    ]
+    events = read_events(vault, "hosted-start")
+    started = next(event for event in events if isinstance(event, RunStarted))
+    assert started.queue_intent is not None
+    assert len([event for event in events if isinstance(event, RunEnqueued)]) == 1
+    manifest = load_run_context(vault, "hosted-start").manifest
+    assert manifest.max_attempts == 7
+    assert [item.contribution_id for item in manifest.context_contributions] == [
+        "board-cli-approved"
+    ]
+
+
+def test_run_start_fails_closed_for_escaping_hosted_registry_path(tmp_path: Path) -> None:
+    matters_root = tmp_path / "matters"
+    matters_root.mkdir()
+    vault = tmp_path / "outside" / "northfield-widgets-v-granite-supply"
+    _seed_requests(vault)
+    (matters_root / vault.name).symlink_to(vault, target_is_directory=True)
+    env = {**os.environ, "MOOTLOOP_MATTERS_ROOT": str(matters_root)}
+
+    result = runner.invoke(
+        app,
+        ["run", "start", str(vault), "--run-id", "must-not-start"],
+        env=env,
+    )
+
+    assert result.exit_code != 0
+    assert "outside matters-root" in result.output
+    assert read_events(vault, "must-not-start") == []
+
+
+def test_run_start_fails_closed_for_hosted_path_config_identity_mismatch(
+    tmp_path: Path,
+) -> None:
+    matters_root = tmp_path / "matters"
+    vault = matters_root / "northfield-widgets-v-granite-supply"
+    _seed_requests(vault)
+    matter_path = vault / "matter.yaml"
+    matter_path.write_text(
+        matter_path.read_text(encoding="utf-8").replace(
+            "matter_id: northfield-widgets-v-granite-supply",
+            "matter_id: renamed-matter",
+        ),
+        encoding="utf-8",
+    )
+    env = {**os.environ, "MOOTLOOP_MATTERS_ROOT": str(matters_root)}
+
+    result = runner.invoke(
+        app,
+        ["run", "start", str(vault), "--run-id", "must-not-start"],
+        env=env,
+    )
+
+    assert result.exit_code != 0
+    assert "does not match matter identity" in result.output
+    assert read_events(vault, "must-not-start") == []
 
 
 def test_run_status_reports_non_replayable_context_without_failing(tmp_path: Path) -> None:

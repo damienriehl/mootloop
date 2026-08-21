@@ -44,6 +44,7 @@ const ORIGIN = "http://localhost:3000";
 
 /** The freeform mutation body the page POSTed (asserted for the resolved intent). */
 let freeformIntent: string | null = null;
+let lockedTaskSpecId: string | null = null;
 /** The start-run body the confirm click POSTed (asserted to carry the task_spec_id). */
 let startBody: { task?: string; task_spec_id?: string } | null = null;
 
@@ -74,7 +75,42 @@ const server = setupServer(
     const spec = resolved
       ? taskSpec({ intent_text: body.intent_text })
       : taskSpec({ intent_text: body.intent_text, task: null });
-    return HttpResponse.json({ schema_version: "1.0", kind: "task_spec", task_spec: spec, runnable: resolved });
+    return HttpResponse.json({
+      schema_version: "1.0",
+      kind: "task_spec",
+      task_spec: spec,
+      resolved,
+      locked: false,
+      runnable: false,
+    });
+  }),
+  http.post(`${ORIGIN}/api/matters/:m/tasks/:taskSpecId/lock`, ({ params }) => {
+    lockedTaskSpecId = String(params.taskSpecId);
+    return HttpResponse.json({
+      schema_version: "1.0",
+      kind: "task_spec_locked",
+      task_spec_lock: {
+        schema_version: "1.0",
+        task_spec_lock_id: `taskspeclock-${params.taskSpecId}-v1`,
+        lock_version: 1,
+        task_spec_id: params.taskSpecId,
+        matter_id: "m1",
+        task: "discovery-responses",
+        task_spec_sha256: "a".repeat(64),
+        adapter_locator: "config/tasks/discovery-responses.yaml",
+        adapter_sha256: "b".repeat(64),
+        rubric_id: "discovery-responses-v1.0",
+        rubric_locator: "rubrics/discovery-responses-v1.0.yaml",
+        rubric_sha256: "c".repeat(64),
+        rubric_lock_locator: "rubrics/discovery-responses-v1.0.sha256",
+        rubric_lock_sha256: "d".repeat(64),
+        rubric_recorded_sha256: "c".repeat(64),
+        locked_by: "attorney@example.com",
+        source: "human",
+        locked_at: "2026-07-12T00:00:01+00:00",
+        record_sha256: "e".repeat(64),
+      },
+    });
   }),
   http.post(`${ORIGIN}/api/matters/:m/runs`, async ({ request }) => {
     startBody = (await request.json()) as { task?: string; task_spec_id?: string };
@@ -101,6 +137,7 @@ afterEach(() => {
   resetCsrfToken();
   push.mockReset();
   freeformIntent = null;
+  lockedTaskSpecId = null;
   startBody = null;
   useBeginDraftStore.setState({ intents: {} }); // the omnibox draft is per-matter, module-global
 });
@@ -110,7 +147,7 @@ afterAll(() => {
 });
 
 describe("begin-task omnibox lane states", () => {
-  it("resolves a sentence to a RUNNABLE slip with a start button", async () => {
+  it("resolves a sentence to an approval-required slip", async () => {
     const user = userEvent.setup();
     renderWithClient(<BeginTaskPage />);
 
@@ -119,10 +156,10 @@ describe("begin-task omnibox lane states", () => {
 
     const slip = await screen.findByTestId("task-slip");
     expect(slip).toBeInTheDocument();
-    expect(screen.getByTestId("slip-lane-state")).toHaveTextContent(/runnable/i);
+    expect(screen.getByTestId("slip-lane-state")).toHaveTextContent(/approval required/i);
     expect(screen.getByTestId("slip-task")).toHaveTextContent("discovery-responses");
-    // Runnable slip offers Start run; there is no honest-block panel.
-    expect(screen.getByTestId("slip-start")).toBeInTheDocument();
+    expect(screen.getByTestId("slip-lock")).toBeInTheDocument();
+    expect(screen.queryByTestId("slip-start")).not.toBeInTheDocument();
     expect(screen.queryByTestId("slip-unmapped")).not.toBeInTheDocument();
     expect(freeformIntent).toBe("answer the discovery served on us");
   });
@@ -139,6 +176,7 @@ describe("begin-task omnibox lane states", () => {
     expect(screen.getByTestId("slip-task")).toHaveTextContent(/unmapped/i);
     // The honest block is shown; NO start button (no run can start from an unmapped slip).
     expect(screen.getByTestId("slip-unmapped")).toBeInTheDocument();
+    expect(screen.queryByTestId("slip-lock")).not.toBeInTheDocument();
     expect(screen.queryByTestId("slip-start")).not.toBeInTheDocument();
   });
 });
@@ -150,6 +188,10 @@ describe("begin-task confirm flow", () => {
 
     await user.type(screen.getByTestId("omnibox-input"), "answer the discovery served on us");
     await user.click(screen.getByTestId("omnibox-submit"));
+    await user.click(await screen.findByTestId("slip-lock"));
+    await waitFor(() =>
+      expect(lockedTaskSpecId).toBe("taskspec-20260712-abc123"),
+    );
     await user.click(await screen.findByTestId("slip-start"));
 
     // startRun POSTed the resolved slip's task_spec_id, then routed to that run's cockpit.

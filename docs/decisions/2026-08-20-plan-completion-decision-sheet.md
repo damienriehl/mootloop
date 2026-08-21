@@ -33,7 +33,7 @@ These rulings are settled implementation constraints for the continuation queue:
 | D-10 | A | Gate backlog expansion on the smallest clean workflow and observed attorney friction. |
 | D-11 | A | Authenticated Confirm is the human lock; append actor/time/task/rubric digests. |
 | D-12 | C, with canonical-source direction | Use `alea-institute/FOLIO` `main/FOLIO.owl` as source of truth and implement the proven startup/periodic freshness pattern. Active runs remain pinned. |
-| D-13 | A | Create focused commits and a PR, repair remote CI, and ask again before merge or deploy. |
+| D-13 | A, merge later authorized | Create focused commits and a PR, repair remote CI, and merge after green review; deploy remains separately gated. |
 | D-14 | A | Persist and validate `source_matter_id` on every matter-scoped model. |
 | D-15 | A | Context changes always require a new run. |
 | D-16 | A | Order expansion from friction observed in the clean compounding loop. |
@@ -215,8 +215,9 @@ must not be swept into a commit.
 **Never implied by this choice:** merge, production deploy, hosted-vault access, or
 permission to include unrelated dirty files.
 
-**Execution status (2026-08-20):** Option A was carried out through focused commits,
-PR #32, remote CI repair, and PR-feedback repair. The merge and every deployment remain
+**Execution status (updated 2026-08-21):** Option A was carried out through focused
+commits, PR #32, remote CI repair, and PR-feedback repair. The user subsequently
+authorized merge of PR #32 and the reviewed continuation work; every deployment remains
 withheld for a fresh inline authorization.
 
 ### D-14 — How literal should `source_matter_id` persistence be?

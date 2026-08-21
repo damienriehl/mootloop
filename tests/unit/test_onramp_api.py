@@ -77,7 +77,9 @@ def test_freeform_resolves_to_runnable_spec(
     assert resp.status_code == 200
     body = resp.json()
     assert body["kind"] == "task_spec"
-    assert body["runnable"] is True
+    assert body["resolved"] is True
+    assert body["locked"] is False
+    assert body["runnable"] is False
     assert body["task_spec"]["task"] == "discovery-responses"
     assert body["task_spec"]["source_lane"] == "freeform"
 
@@ -94,6 +96,8 @@ def test_freeform_unmapped_intent_is_recorded_not_runnable(
     assert resp.status_code == 200
     body = resp.json()
     assert body["runnable"] is False
+    assert body["resolved"] is False
+    assert body["locked"] is False
     assert body["task_spec"]["task"] is None
 
 

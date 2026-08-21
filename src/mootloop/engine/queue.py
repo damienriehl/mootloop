@@ -29,6 +29,7 @@ from pydantic import Field
 
 from mootloop.errors import QueueError
 from mootloop.models.common import StrictModel
+from mootloop.vault import fsync_file_and_parent
 
 Lane = Literal["interactive", "run"]
 
@@ -129,6 +130,11 @@ class Queue:
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(tmp, self._state)
+            parent_fd = os.open(self.root, os.O_RDONLY)
+            try:
+                os.fsync(parent_fd)
+            finally:
+                os.close(parent_fd)
         except BaseException:
             with contextlib.suppress(OSError):
                 os.unlink(tmp)
@@ -153,9 +159,11 @@ class Queue:
         """
         with self._locked():
             items = self._read()
-            for existing in items:
-                if existing.item_id != item.item_id:
-                    continue
+            matches = [existing for existing in items if existing.item_id == item.item_id]
+            if len(matches) > 1:
+                raise QueueError(f"queue item id {item.item_id!r} is duplicated")
+            if matches:
+                existing = matches[0]
                 if (
                     existing.lane,
                     existing.matter_id,
@@ -164,6 +172,9 @@ class Queue:
                     existing.payload,
                 ) != (item.lane, item.matter_id, item.run_id, item.kind, item.payload):
                     raise QueueError(f"queue item id {item.item_id!r} has conflicting work")
+                # A prior writer can fail after replace but before its directory fsync.
+                # Retry must establish both barriers before the outbox acknowledges.
+                fsync_file_and_parent(self._state)
                 return existing.model_copy(deep=True)
             items.append(item)
             self._write(items)
@@ -214,9 +225,7 @@ class Queue:
             self._write(kept)
             return True
 
-    def release(
-        self, item_id: str, worker_id: str, *, visible_at: datetime | None = None
-    ) -> bool:
+    def release(self, item_id: str, worker_id: str, *, visible_at: datetime | None = None) -> bool:
         """Return an item this worker owns to the queue (slot released on pause).
 
         With ``visible_at`` it schedules a delayed resume (the item stays invisible

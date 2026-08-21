@@ -18,6 +18,7 @@ CONFIG_DIR = REPO_ROOT / "config"
 PERSONAS_DIR = REPO_ROOT / "personas"
 RUBRICS_DIR = REPO_ROOT / "rubrics"
 COURTS_DIR = CONFIG_DIR / "courts"
+DEFAULTS_CONFIG = CONFIG_DIR / "defaults.yaml"
 
 DEFAULT_REFERENCE_DOC = "generic-mn-district"
 

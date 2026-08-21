@@ -44,6 +44,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from mootloop import budget, orchestrator
+from mootloop.engine.outbox import drain_pending_run_outboxes
 from mootloop.engine.queue import Queue, WorkItem
 from mootloop.errors import AuthError, SeatLimitError, TurnError
 from mootloop.llm import LLMProvider, RawTurnResult
@@ -64,6 +65,7 @@ _DEFAULT_RESUME_DELAY_S = 900.0
 _DEFAULT_BACKOFF_S = 30.0
 _DEFAULT_STALE_S = 900.0
 _DEFAULT_MAX_ATTEMPTS = 5
+_DEFAULT_OUTBOX_SCAN_INTERVAL_S = 30.0
 
 _UNSAFE_STEM_RE = re.compile(r"[^A-Za-z0-9._-]")
 _PERMISSION_DENIAL_PREFIX = "headless turn was denied filesystem access:"
@@ -93,6 +95,7 @@ class Worker:
         backoff_s: float = _DEFAULT_BACKOFF_S,
         stale_threshold_s: float = _DEFAULT_STALE_S,
         max_attempts: int = _DEFAULT_MAX_ATTEMPTS,
+        outbox_scan_interval_s: float = _DEFAULT_OUTBOX_SCAN_INTERVAL_S,
         now_fn: NowFn = default_now,
     ) -> None:
         self.now_fn = now_fn
@@ -106,7 +109,9 @@ class Worker:
         self.backoff_s = backoff_s
         self.stale_threshold_s = stale_threshold_s
         self.max_attempts = max_attempts
+        self.outbox_scan_interval_s = outbox_scan_interval_s
         self._reclaimed = False
+        self._last_outbox_scan_at: datetime | None = None
         self._stop_requested = False
         self._stop: Stop | None = None
 
@@ -166,6 +171,18 @@ class Worker:
             self._reclaim_stale(now)
             self._reclaimed = True
         self._staging_gc()
+        # Journaled launch work is the source of truth. Repair it before claiming so
+        # a worker restart advances runs whose API process died before queue delivery.
+        if (
+            self._last_outbox_scan_at is None
+            or (now - self._last_outbox_scan_at).total_seconds()
+            >= self.outbox_scan_interval_s
+        ):
+            self._last_outbox_scan_at = now
+            try:
+                drain_pending_run_outboxes(self.matters_root, self.queue)
+            except Exception:  # noqa: BLE001 — registry poison must not kill the worker
+                logger.exception("worker %s: run-start outbox scan failed", self.worker_id)
         item = self.queue.claim(
             self.worker_id, now, visibility_timeout_s=self.visibility_timeout_s
         )

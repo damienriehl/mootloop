@@ -1,0 +1,20 @@
+schema_version: "1.0"
+run_mode: autonomous
+max_attempts: 3
+budget:
+  tier: moderate
+loop_caps:
+  associate_partner: 2
+  oc: 1
+  bolster: 1
+  restructure: 1
+panels:
+  judges: 3
+  jury: false
+  rubric_judges: 3
+convergence:
+  score_delta_floor: 0.02
+  material_change_floor: 0.10
+  coverage_floor: 0.80
+rubric_threshold: 0.75
+restructure_threshold: 0.5

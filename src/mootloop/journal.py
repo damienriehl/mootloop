@@ -44,6 +44,7 @@ from mootloop.models.events import (
     DecisionRecorded,
     GateEvaluated,
     JournalEvent,
+    RunEnqueued,
     RunFinished,
     RunPaused,
     RunReopened,
@@ -79,11 +80,20 @@ def append(vault_root: Path | str, run_id: str, event: JournalEvent) -> None:
     """Serialize ``event`` and append it as one fsync'd line."""
     path = journal_path(vault_root, run_id)
     path.parent.mkdir(parents=True, exist_ok=True)
+    first_record = not path.exists()
     line = _EVENT_ADAPTER.dump_json(event).decode("utf-8") + "\n"
     with path.open("a", encoding="utf-8") as handle:
         handle.write(line)
         handle.flush()
         os.fsync(handle.fileno())
+    if first_record:
+        # The file fsync makes the record durable; the directory fsync makes the new
+        # journal name durable. Later appends do not change the directory entry.
+        parent_fd = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(parent_fd)
+        finally:
+            os.close(parent_fd)
 
 
 def write_turn_body(vault_root: Path | str, run_id: str, record: TurnRecord) -> Path:
@@ -307,7 +317,7 @@ def fold(events: list[JournalEvent]) -> RunState:
             state.attempts_granted += event.grant_attempts
             if state.status == "needs_attention":
                 state.status = "running"  # reopen an operator-cleared attention halt
-        elif isinstance(event, (GateEvaluated, DecisionRecorded)):
+        elif isinstance(event, (GateEvaluated, DecisionRecorded, RunEnqueued)):
             pass  # informational; authoritative copies ride on TurnRecord/decisions
     return state
 

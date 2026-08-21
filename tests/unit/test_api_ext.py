@@ -10,6 +10,7 @@ run/gate/decision status envelopes (plan FD-8).
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -20,11 +21,14 @@ from typer.testing import CliRunner
 
 from mootloop import orchestrator
 from mootloop.cli import app as cli_app
+from mootloop.context import load_run_context
+from mootloop.context_sources import FIRM_PREFERENCES_ENV, ContextContributionStore
 from mootloop.engine.queue import Queue
 from mootloop.errors import AccessAuthError, QueueError
-from mootloop.journal import append
-from mootloop.models.common import DocId
-from mootloop.models.events import RunStarted
+from mootloop.journal import append, read_events
+from mootloop.models.common import DocId, MatterId
+from mootloop.models.context import ContextContribution
+from mootloop.models.events import RunEnqueued, RunStarted
 from mootloop.models.matter import MatterConfig
 from mootloop.models.requests import RequestItem, RequestSet, RequestType
 from mootloop.registry import MatterRegistry
@@ -225,6 +229,80 @@ def test_start_run_wrapper_creates_a_run(
     # The started run is now discoverable in the run listing.
     listed = client.get(f"/api/matters/{matter.matter_id}/runs", headers=_AUTH)
     assert body["run_id"] in [r["run_id"] for r in listed.json()]
+    started_events = read_events(vault, body["run_id"])
+    started = next(event for event in started_events if isinstance(event, RunStarted))
+    assert started.queue_intent is not None
+    assert any(isinstance(event, RunEnqueued) for event in started_events)
+
+
+def test_api_start_rejects_tampered_vault_matter_before_journaling(
+    client: TestClient,
+    registry: MatterRegistry,
+    queue: Queue,
+    matter: MatterConfig,
+) -> None:
+    vault = registry.resolve(matter.matter_id)
+    matter_path = vault / "matter.yaml"
+    matter_path.write_text(
+        matter_path.read_text(encoding="utf-8").replace(
+            f"matter_id: {matter.matter_id}",
+            "matter_id: other-matter",
+        ),
+        encoding="utf-8",
+    )
+
+    response = client.post(
+        f"/api/matters/{matter.matter_id}/runs",
+        headers=_csrf(client),
+        json={"run_id": "tampered-matter", "task": "discovery-responses"},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"error": "invalid_matter_id"}
+    assert queue.snapshot() == []
+    assert not (vault / "runs" / "tampered-matter" / "journal.jsonl").exists()
+
+
+def test_api_start_loads_trusted_firm_and_context_sources(
+    client: TestClient,
+    registry: MatterRegistry,
+    matter: MatterConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    vault = registry.resolve(matter.matter_id)
+    firm = registry.root.parent / "firm-preferences.yaml"
+    firm.write_text(
+        "schema_version: '1.0'\nrun_config:\n  max_attempts: 7\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv(FIRM_PREFERENCES_ENV, str(firm))
+    text = "Use the attorney-approved chronology."
+    ContextContributionStore(vault).put(
+        ContextContribution(
+            contribution_id="board-api-approved",
+            kind="board",
+            text=text,
+            sha256=hashlib.sha256(text.encode()).hexdigest(),
+            provenance_locator="board://approved/api",
+            source_matter_id=MatterId(str(matter.matter_id)),
+            task_scope=("discovery-responses",),
+            permission="privileged",
+            approval_state="approved",
+        )
+    )
+
+    response = client.post(
+        f"/api/matters/{matter.matter_id}/runs",
+        headers=_csrf(client),
+        json={"run_id": "api-trusted-context", "task": "discovery-responses"},
+    )
+
+    assert response.status_code == 200, response.text
+    manifest = load_run_context(vault, "api-trusted-context").manifest
+    assert manifest.max_attempts == 7
+    assert [item.contribution_id for item in manifest.context_contributions] == [
+        "board-api-approved"
+    ]
 
 
 def test_start_run_requires_csrf(client: TestClient, matter: MatterConfig) -> None:
@@ -416,6 +494,7 @@ def test_export_openapi_cli_writes_valid_json_with_new_paths(tmp_path: Path) -> 
     assert "post" in paths["/api/matters/{matter_id}/runs"]
     assert "post" in paths["/api/matters/{matter_id}/runs/{run_id}/raise-cap"]
     assert "post" in paths["/api/matters/{matter_id}/runs/{run_id}/reopen"]
+    assert "post" in paths["/api/matters/{matter_id}/tasks/{task_spec_id}/lock"]
 
 
 def test_openapi_components_show_discriminated_unions() -> None:

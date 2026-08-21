@@ -22,11 +22,13 @@ from mootloop import attest as attest_svc
 from mootloop import decisions as decisions_svc
 from mootloop import orchestrator
 from mootloop import taskspec as taskspec_svc
+from mootloop.engine.launch import launch_run as launch_run_service
 from mootloop.engine.queue import Queue as WorkQueue
 from mootloop.engine.queue import WorkItem
 from mootloop.errors import OrchestratorError
 from mootloop.export import link as link_svc
 from mootloop.journal import load_state
+from mootloop.models.common import MatterId
 from mootloop.models.matters import MatterSummary
 from mootloop.registry import MatterRegistry
 from mootloop.vault import safe_vault_path
@@ -235,26 +237,15 @@ def start_run(
     _csrf: Csrf,
     _audited: Annotated[None, Depends(_audit_dep("run_start"))],
 ) -> models.RunStatusSummary:
-    run_id = orchestrator.start_run(
+    run_id = launch_run_service(
         vault,
         body.task,
         _now_iso(),
         run_id=body.run_id,
         mode=body.mode,
         task_spec_id=body.task_spec_id,
-        idempotent=True,
-    )
-    # Feed the driver queue so the worker actually picks the run up. Without this the
-    # run is created but never executes (both FE-7 runs were enqueued operationally).
-    queue.ensure_enqueued(
-        WorkItem.create(
-            lane="run",
-            matter_id=matter_id,
-            run_id=run_id,
-            kind="run_turn",
-            now=datetime.now(UTC),
-            item_id=f"run:{matter_id}:{run_id}",
-        )
+        queue=queue,
+        expected_matter_id=MatterId(matter_id),
     )
     return readers.run_status_summary(vault, run_id)
 
@@ -332,7 +323,7 @@ def reopen_run(
             run_id=run_id,
             kind="run_turn",
             now=datetime.now(UTC),
-            item_id=f"reopen:{matter_id}:{run_id}",
+            item_id=f"run:{matter_id}:{run_id}",
         )
     )
     return _run_action(vault, run_id, "run_reopened")
@@ -397,7 +388,32 @@ def create_freeform_task(
     """Resolve free-text intent to a TaskSpec (deterministic v1; unmapped -> ``task=None``,
     recorded but not runnable). Persists append-only at ``tasks/specs.jsonl`` (plan FE-2.5)."""
     spec = taskspec_svc.create_freeform(vault, matter_id, body.intent_text, _now_iso())
-    return models.TaskSpecResponse(task_spec=spec, runnable=spec.runnable)
+    return models.TaskSpecResponse(
+        task_spec=spec,
+        resolved=spec.resolved,
+        locked=False,
+        runnable=False,
+    )
+
+
+@router.post("/api/matters/{matter_id}/tasks/{task_spec_id}/lock")
+def lock_task(
+    matter_id: str,
+    task_spec_id: str,
+    principal: Principal,
+    vault: Vault,
+    _csrf: Csrf,
+    _audited: Annotated[None, Depends(_audit_dep("task_lock"))],
+) -> models.TaskSpecLockResponse:
+    """Record exact human approval; actor and source are server-derived."""
+    record = taskspec_svc.lock_task_spec(
+        vault,
+        matter_id,
+        task_spec_id,
+        principal.email,
+        _now_iso(),
+    )
+    return models.TaskSpecLockResponse(task_spec_lock=record)
 
 
 @router.get("/api/matters/{matter_id}/tasks")

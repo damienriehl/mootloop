@@ -372,19 +372,28 @@ def run_start(
     task_spec_id: Annotated[
         str | None, typer.Option("--task-spec-id", help="Approved TaskSpec id")
     ] = None,
+    run_id: Annotated[
+        str | None, typer.Option("--run-id", help="Stable run id (recommended for retries)")
+    ] = None,
 ) -> None:
     """Begin a run: write RunStarted, acquire the run lock, print the run id."""
+    launched_at = _now()
+    resolved_id = run_id or f"{task}-{''.join(ch for ch in launched_at if ch.isdigit())}"
     try:
-        run_id = orchestrator.start_run(
+        from mootloop.engine.launch import launch_run_from_path
+
+        started_id = launch_run_from_path(
             vault_path,
             task,
-            _now(),
+            launched_at,
+            run_id=resolved_id,
             mode=mode.value if mode else None,
             task_spec_id=task_spec_id,
+            idempotent=run_id is not None,
         )
     except MootloopError as exc:
         raise _fail(exc) from exc
-    typer.echo(run_id)
+    typer.echo(started_id)
 
 
 @run_app.command("continue")
@@ -477,7 +486,7 @@ def run_reopen(
                 run_id=run_id,
                 kind="run_turn",
                 now=datetime.now(UTC),
-                item_id=f"reopen:{matter.matter_id}:{run_id}",
+                item_id=f"run:{matter.matter_id}:{run_id}",
             )
         )
         queued = True
@@ -916,7 +925,10 @@ def tasks_freeform(
         typer.echo(spec.model_dump_json())
         return
     if spec.runnable:
-        typer.secho(f"{spec.task_spec_id}  -> {spec.task}", fg=typer.colors.GREEN)
+        typer.secho(
+            f"{spec.task_spec_id}  -> {spec.task} (RESOLVED; human lock required)",
+            fg=typer.colors.GREEN,
+        )
     else:
         typer.secho(
             f"{spec.task_spec_id}  -> UNMAPPED (cannot start a run yet)", fg=typer.colors.YELLOW
@@ -943,6 +955,36 @@ def tasks_list(
         target = spec.task if spec.runnable else "UNMAPPED"
         typer.echo(f"{spec.task_spec_id}  [{spec.source_lane}]  {target}")
         typer.echo(f"  {spec.intent_text}")
+
+
+@tasks_app.command("lock")
+def tasks_lock(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    task_spec_id: Annotated[str, typer.Argument(help="Resolved TaskSpec id")],
+    json_output: Annotated[
+        bool, typer.Option("--json", help="Emit the TaskSpecLock JSON")
+    ] = False,
+) -> None:
+    """Human-lock a resolved TaskSpec and its exact adapter/rubric sources."""
+    try:
+        matter = load_matter(vault_path)
+        actor = pwd.getpwuid(os.geteuid()).pw_name
+        record = taskspec_service.lock_task_spec(
+            vault_path,
+            str(matter.matter_id),
+            task_spec_id,
+            actor,
+            _now(),
+        )
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    if json_output:
+        typer.echo(record.model_dump_json())
+        return
+    typer.echo(
+        f"{record.task_spec_lock_id}  {record.task_spec_id}  "
+        f"LOCKED by {record.locked_by} (v{record.lock_version})"
+    )
 
 
 # --- web verbs (demo tier; the bake is the tier's only writer) ---------------

@@ -3,6 +3,8 @@ VersionedModel base every persisted model extends."""
 
 from __future__ import annotations
 
+import hashlib
+import json
 from typing import NewType
 
 from pydantic import BaseModel, ConfigDict
@@ -21,6 +23,9 @@ DocId = NewType("DocId", str)
 DecisionId = NewType("DecisionId", str)
 CitationId = NewType("CitationId", str)
 TaskSpecId = NewType("TaskSpecId", str)
+TaskSpecLockId = NewType("TaskSpecLockId", str)
+TurnId = NewType("TurnId", str)
+RubricId = NewType("RubricId", str)
 
 # --- Confidentiality-typed text --------------------------------------------
 # MatterText is confidential matter data; PublicText is publishable. The only
@@ -28,6 +33,17 @@ TaskSpecId = NewType("TaskSpecId", str)
 # data in the web-search lane" a build failure.
 MatterText = NewType("MatterText", str)
 PublicText = NewType("PublicText", str)
+
+
+def canonical_json_sha256(value: object) -> str:
+    """SHA-256 of deterministic UTF-8 JSON used by persisted commitments."""
+    raw = json.dumps(
+        value,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
 
 
 class StrictModel(BaseModel):

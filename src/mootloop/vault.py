@@ -49,6 +49,7 @@ VAULT_TREE: tuple[str, ...] = (
     "runs",
     "deliverables",
     "learnings",
+    "context/contributions",
     "research-requests",
 )
 

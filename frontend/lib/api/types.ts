@@ -33,6 +33,8 @@ export type GateResult = GatePass | GateFail | GatePending;
 
 // --- On-ramp (FE-2.5): the freeform lane produces a TaskSpec slip ---
 export type TaskSpec = Schemas["TaskSpec"];
+export type TaskSpecLock = Schemas["TaskSpecLock"];
+export type TaskSpecLockResponse = Schemas["TaskSpecLockResponse"];
 export type TaskSpecResponse = Schemas["TaskSpecResponse"];
 export type TaskSpecsResponse = Schemas["TaskSpecsResponse"];
 export type FreeformTaskRequest = Schemas["FreeformTaskRequest"];

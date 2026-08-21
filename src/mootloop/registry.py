@@ -12,6 +12,7 @@ discipline as `safe_vault_path`. Core stays synchronous.
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 
@@ -30,6 +31,8 @@ from mootloop.vault import (
 
 DEFAULT_MATTERS_ROOT = "/srv/mootloop-matters"
 MATTERS_ROOT_ENV = "MOOTLOOP_MATTERS_ROOT"
+
+logger = logging.getLogger("mootloop.registry")
 
 
 class MatterRegistry:
@@ -92,6 +95,23 @@ class MatterRegistry:
                 continue
             summaries.append(self._summarize(matter, child_real.name))
         return summaries
+
+    def recovery_vaults(self) -> list[tuple[MatterId, Path]]:
+        """Enumerate contained vault directories without loading mutable matter.yaml."""
+        root_real = _real(self.root)
+        if not root_real.is_dir():
+            return []
+        vaults: list[tuple[MatterId, Path]] = []
+        for child in sorted(root_real.iterdir()):
+            if not child.is_dir() or child.name.startswith("."):
+                continue
+            try:
+                child_real = self.resolve(child.name)
+            except (MatterNotFoundError, VaultBoundaryError):
+                logger.exception("skipping unsafe recovery vault %s", child)
+                continue
+            vaults.append((MatterId(child.name), child_real))
+        return vaults
 
     @staticmethod
     def _summarize(matter: MatterConfig, rel_path: str) -> MatterSummary:

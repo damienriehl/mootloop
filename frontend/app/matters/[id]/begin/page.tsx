@@ -3,7 +3,7 @@
 import { useRouter, useParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { createFreeformTask } from "@/lib/api/tasks";
+import { createFreeformTask, lockTaskSpec } from "@/lib/api/tasks";
 import { startRun } from "@/lib/api/runs";
 import { keys } from "@/lib/api/keys";
 import { useBeginDraftStore } from "@/lib/stores/beginDraft";
@@ -42,13 +42,11 @@ export default function BeginTaskPage() {
 
   // Confirm on a RUNNABLE slip → start the run with its task_spec_id → route to cockpit.
   const start = useMutation({
-    mutationFn: (res: TaskSpecResponse) =>
-      // Confirm is only offered for RUNNABLE slips, so `task` is a resolved adapter key
-      // here; the fallback satisfies the required field and never fires in practice.
+    mutationFn: ({ task, taskSpecId }: { task: string; taskSpecId: string }) =>
       startRun(matterId, {
-        run_id: `run-${res.task_spec.task_spec_id}`,
-        task: res.task_spec.task ?? "discovery-responses",
-        task_spec_id: res.task_spec.task_spec_id,
+        run_id: `run-${taskSpecId}`,
+        task,
+        task_spec_id: taskSpecId,
       }),
     onError: (err) => setStartError((err as Error).message),
     onSuccess: (run) => {
@@ -58,7 +56,25 @@ export default function BeginTaskPage() {
     },
   });
 
+  const lock = useMutation({
+    mutationFn: (res: TaskSpecResponse) =>
+      lockTaskSpec(matterId, res.task_spec.task_spec_id),
+    onError: (err) => setStartError((err as Error).message),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: keys.matter(matterId).tasks() });
+    },
+  });
+
   const slip = resolve.data;
+  const locked =
+    slip?.locked === true ||
+    lock.data?.task_spec_lock.task_spec_id === slip?.task_spec.task_spec_id;
+  const slipState =
+    !slip?.resolved || slip.task_spec.task === null
+      ? "unmapped"
+      : locked
+        ? "runnable"
+        : "approval-required";
   const trimmed = intent.trim();
 
   function onSubmit(e: React.FormEvent) {
@@ -70,6 +86,7 @@ export default function BeginTaskPage() {
 
   function revise() {
     resolve.reset();
+    lock.reset();
     setStartError(null);
   }
 
@@ -123,12 +140,23 @@ export default function BeginTaskPage() {
       {slip && (
         <TaskSlipCard
           spec={slip.task_spec}
-          runnable={slip.runnable}
-          pending={start.isPending}
+          state={slipState}
+          pending={lock.isPending || start.isPending}
           error={startError}
+          onLock={() => {
+            setStartError(null);
+            lock.mutate(slip);
+          }}
           onConfirm={() => {
             setStartError(null);
-            start.mutate(slip);
+            if (!locked || slip.task_spec.task === null) {
+              setStartError("This task must be resolved and locked before it can start.");
+              return;
+            }
+            start.mutate({
+              task: slip.task_spec.task,
+              taskSpecId: slip.task_spec.task_spec_id,
+            });
           }}
           onDiscard={revise}
         />

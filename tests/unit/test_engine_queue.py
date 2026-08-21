@@ -4,10 +4,14 @@ two-process concurrency gate (advisory-locked appends never corrupt or double-cl
 from __future__ import annotations
 
 import multiprocessing as mp
+import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pytest
+
 from mootloop.engine.queue import Queue, WorkItem
+from mootloop.errors import QueueError
 
 NOW = datetime(2026, 7, 12, tzinfo=UTC)
 
@@ -132,6 +136,44 @@ def test_ensure_enqueued_is_idempotent_by_item_id(tmp_path: Path) -> None:
     assert queue.ensure_enqueued(item) == item
 
     assert [queued.item_id for queued in queue.snapshot()] == [item.item_id]
+
+
+@pytest.mark.parametrize("conflicting", [False, True])
+def test_ensure_enqueued_rejects_duplicate_item_ids(
+    tmp_path: Path, conflicting: bool
+) -> None:
+    queue = Queue(tmp_path)
+    item = _item("run", "duplicate-run")
+    duplicate = item.model_copy(update={"run_id": "r2"}) if conflicting else item
+    queue.enqueue(item)
+    queue.enqueue(duplicate)
+
+    with pytest.raises(QueueError, match="duplicated"):
+        queue.ensure_enqueued(item)
+
+
+def test_atomic_queue_replace_fsyncs_file_then_parent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import mootloop.engine.queue as queue_module
+
+    operations: list[str] = []
+    original_fsync = os.fsync
+    original_replace = os.replace
+
+    def tracked_fsync(fd: int) -> None:
+        operations.append("fsync")
+        original_fsync(fd)
+
+    def tracked_replace(src: str, dst: str | Path) -> None:
+        operations.append("replace")
+        original_replace(src, dst)
+
+    monkeypatch.setattr(queue_module.os, "fsync", tracked_fsync)
+    monkeypatch.setattr(queue_module.os, "replace", tracked_replace)
+
+    Queue(tmp_path).enqueue(_item("run", "durable"))
+    assert operations == ["fsync", "replace", "fsync"]
 
 
 def test_concurrent_claim_never_double_claims(tmp_path: Path) -> None:

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from mootloop.engine.backup import backup_matter, restore_matter
 from mootloop.engine.claude_provider import HeadlessClaudeProvider
+from mootloop.engine.outbox import drain_pending_run_outboxes, drain_run_outbox
 from mootloop.engine.queue import Queue, WorkItem
 from mootloop.engine.worker import Worker
 
@@ -26,5 +27,7 @@ __all__ = [
     "WorkItem",
     "Worker",
     "backup_matter",
+    "drain_pending_run_outboxes",
+    "drain_run_outbox",
     "restore_matter",
 ]

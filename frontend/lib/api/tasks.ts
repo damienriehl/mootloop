@@ -8,7 +8,7 @@
  */
 import type { ApiClient } from "./client";
 import { getClient } from "./client";
-import type { TaskSpecResponse, TaskSpecsResponse } from "./types";
+import type { TaskSpecLockResponse, TaskSpecResponse, TaskSpecsResponse } from "./types";
 
 function unwrap<T>(result: { data?: T }): T {
   // The client middleware throws on any non-2xx, so reaching here means `data` exists.
@@ -29,8 +29,8 @@ export async function listTaskSpecs(
 
 /**
  * Submit a free-text intent to the freeform on-ramp. Returns the TaskSpec slip plus
- * `runnable` (false when the concept did not resolve to a runnable task adapter —
- * the spec is still recorded for the audit trail, but no run can start from it yet).
+ * separate `resolved`, `locked`, and `runnable` states. A newly-created spec is never
+ * runnable until a human locks its exact adapter and rubric sources.
  */
 export async function createFreeformTask(
   matterId: string,
@@ -41,6 +41,19 @@ export async function createFreeformTask(
     await client.POST("/api/matters/{matter_id}/tasks/freeform", {
       params: { path: { matter_id: matterId } },
       body: { intent_text: intentText },
+    }),
+  );
+}
+
+/** Human-lock the exact current TaskSpec, adapter, rubric, and rubric sidecar bytes. */
+export async function lockTaskSpec(
+  matterId: string,
+  taskSpecId: string,
+  client: ApiClient = getClient(),
+): Promise<TaskSpecLockResponse> {
+  return unwrap(
+    await client.POST("/api/matters/{matter_id}/tasks/{task_spec_id}/lock", {
+      params: { path: { matter_id: matterId, task_spec_id: taskSpecId } },
     }),
   );
 }

@@ -25,7 +25,7 @@ short label is less detailed.
 | ID | Atomic commitment | Disposition |
 |---|---|---|
 | D1-01 | Core orchestration behind `TurnExecutor`/`LLMProvider`; fake provider tests | COMPLETE |
-| D1-02 | YAML-plus-strategy TaskAdapter; new task avoids core changes | PARTIAL — U-01/U-12 |
+| D1-02 | YAML-plus-strategy TaskAdapter; new task avoids core changes | PARTIAL — immutable binding complete; synthesis U-12 |
 | D1-03 | Uniform Gate protocol with scope, dependencies, and one gate ledger | PARTIAL — U-05 |
 | D1-04 | Agent/persona/task-binding layering contract | PARTIAL — U-05/U-06 |
 | D1-05 | Local protocol seams and pinned provenance for copied components | PARTIAL — U-05 |
@@ -36,7 +36,7 @@ short label is less detailed.
 | D2-04 | Least-privilege persona/panel/cite-checker tool sets | PARTIAL — U-02/U-07 |
 | D2-05 | Persona-body contract and injected excellence standard | PARTIAL — U-06 |
 | D2-06 | Compact run-skill navigator over durable references | OPEN-AUTO — U-11A |
-| D3-C1 | Fence all untrusted text as data; content never drives tools/control flow | PARTIAL — U-01/U-02/U-04A/U-09 |
+| D3-C1 | Fence all untrusted text as data; content never drives tools/control flow | PARTIAL — run context complete; U-02/U-04A/U-09 |
 | D3-C2 | Fail-closed OSS scrub plus mandatory rendered human diff; no auto-commit | OPEN-AUTO — U-09 |
 | D3-C3 | ID/path/filename realpath-containment hardening | COMPLETE |
 | D3-C4 | Google permission read-back and recipient allowlist after export | DECISION-GATED — D-06/U-09 |
@@ -84,17 +84,17 @@ short label is less detailed.
 | D9-03 | Sync-folder/conflicted-copy guard and idle snapshot | COMPLETE |
 | D9-04 | Heartbeating stale-lock takeover protocol | PARTIAL — U-11A |
 | D9-05 | Attestation binds master, ledgers, export set, actor/time; edit invalidates | PARTIAL — U-03/D-09 |
-| D9-06 | Content-hash document IDs and whole-vault self-check | PARTIAL — U-01/U-04A/U-11A |
+| D9-06 | Content-hash document IDs and whole-vault self-check | PARTIAL — launch snapshots complete; U-04A/U-11A |
 | D9-07 | Append-only fact versions; response and attestation pin fact state | OPEN-AUTO — U-03/U-04A |
 | D9-08 | Firm profile as append-only reviewed event log | OPEN-AUTO — U-09 |
 | D9-09 | All derived/shared state append-only, content-addressed, timestamped | PARTIAL — enforced per unit |
-| D10-01 | Domain models own types; versions, migrations, strict extras | PARTIAL — migrations U-01 |
+| D10-01 | Domain models own types; versions, migrations, strict extras | COMPLETE for current persisted models |
 | D10-02 | Discriminated GateResult union and exhaustive export handling | COMPLETE |
 | D10-03 | LLM provider/fake-provider protocol | COMPLETE |
 | D10-04 | Frozen StageContext and write-once StageResult | PARTIAL — U-05 |
 | D10-05 | Sync core; async only at HTTP/fan-out edges | COMPLETE |
 | D10-06 | Pure journal fold | COMPLETE |
-| D10-07 | One five-layer frozen resolved configuration | OPEN-AUTO — U-01 |
+| D10-07 | One five-layer frozen resolved configuration | COMPLETE |
 | D10-08 | Inject copied-component score sources; no hardcoded deltas | PARTIAL — U-05 |
 | D10-09 | Deterministic/replayed/invariant/paid-oracle test tiers | PARTIAL — U-10 |
 | D10-10 | Thin Typer adapters and CLI package split as verbs grow | PARTIAL — U-05 |
@@ -103,15 +103,15 @@ short label is less detailed.
 | D11-01 | Every action/human gate has structured read/write primitive | PARTIAL — U-11A/U-11B |
 | D11-02 | Decide/attest/research/facts/manifest/validate CLI verb set | PARTIAL — U-11A |
 | D11-03 | Hard-human versus policy-delegable gate provenance | COMPLETE for current decisions; extensions U-11B |
-| D11-04 | Accepted learnings and attorney decisions read back into later prompts | OPEN-AUTO — U-01/U-09 |
+| D11-04 | Accepted learnings and attorney decisions read back into later prompts | PARTIAL — approved snapshot/readback seam complete; learning workflow/proof U-09/U-17C |
 | D11-05 | Matter `context.md` read at start and updated at end | OPEN-AUTO — U-11A |
 | D11-06 | JSON sidecars beside human turn/score artifacts | OPEN-AUTO — U-11A |
 | D11-07 | Emergent in-domain task proof and structured derailment completion signal | PARTIAL — U-10/U-12 |
 | D12-01 | Canonical source/derived-artifact vocabulary, trace tree, evidence-pack IDs | PARTIAL — U-11A |
-| D12-02 | Canonical IDs including response/passages/facts/citations/decisions/learnings | PARTIAL — U-01/U-05/U-09 |
-| D12-03 | Five-layer config precedence and structural override allowlist | OPEN-AUTO — U-01 |
+| D12-02 | Canonical IDs including response/passages/facts/citations/decisions/learnings | PARTIAL — manifest/run IDs complete; U-05/U-09 |
+| D12-03 | Five-layer config precedence and structural override allowlist | COMPLETE |
 | D12-04 | Gate execution-order column and canonical gate names | OPEN-AUTO — U-05 |
-| D13-01 | Pre-first-serve professional-responsibility spine | PARTIAL — U-01–U-04B/U-11A/U-17 |
+| D13-01 | Pre-first-serve professional-responsibility spine | PARTIAL — immutable context complete; U-02–U-04B/U-11A/U-17 |
 | D13-02 | Post-serve learning, breadth, strategy, oracle, and CLI work retained | OPEN/DEFERRED — U-06/U-09/U-10/U-11B and successor queue |
 | D13-03 | Google/annotated and other explicitly delayed lanes remain visible | DECISION/DEFERRED — D-06/U-03/U-09/successor queue |
 
@@ -133,11 +133,11 @@ short label is less detailed.
 | FD3-03 | Access audit chained, attestation-bound, fail-closed on downloads, stronger sink | PARTIAL — U-03/D-09 |
 | FD3-04 | Secret ntfy topic, content-free digest, separate Gmail/Drive credentials | OPEN/DECISION — U-15/D-06 |
 | FD4-01 | Auto-derived board edits are immediately visible and journaled | OPEN-AUTO — U-13 |
-| FD4-02 | Only attorney-approved/curated nodes enter prompts | OPEN-AUTO — U-01/U-13 |
+| FD4-02 | Only attorney-approved/curated nodes enter prompts | COMPLETE at injection boundary; board producer U-13 |
 | FD4-03 | Untrusted auto-findings remain `needs_review` until promotion | OPEN-AUTO — U-13/U-14 |
-| FD4-04 | Injected board text is fenced and provenance-tagged | OPEN-AUTO — U-01/U-13 |
+| FD4-04 | Injected board text is fenced and provenance-tagged | COMPLETE at injection boundary; board producer U-13 |
 | FD5-01 | Synthesis limited honestly to discovery-family pipeline shape | OPEN-AUTO — U-12; broad shape deferred |
-| FD5-02 | Generic synthesized adapter, vault-aware binding, hash/lineage sidecars | OPEN-AUTO — U-01/U-12 |
+| FD5-02 | Generic synthesized adapter, vault-aware binding, hash/lineage sidecars | PARTIAL — immutable vault binding complete; synthesis U-12 |
 | FD5-03 | First-class pause/resume status/events | COMPLETE |
 | FD5-04 | Priority queue, slot release, heartbeat/visibility reclaim | COMPLETE; recovery hardening U-11A |
 | FD5-05 | SSE read-only tail and stepwise driver loop | COMPLETE |
@@ -151,7 +151,7 @@ short label is less detailed.
 | FD6-06 | Isolated upload staging, atomic promotion, GC, and locked writers | OPEN-AUTO — U-14 |
 | FD7-01 | `matters list` parity row | COMPLETE |
 | FD7-02 | `tasks synthesize` parity row | OPEN-AUTO — U-12 |
-| FD7-03 | hard-human `tasks lock` with approver/rubric hash | DECISION/OPEN — D-11/U-01/U-12 |
+| FD7-03 | hard-human `tasks lock` with approver/rubric hash | COMPLETE |
 | FD7-04 | policy-delegable `tasks rubric edit` with provenance | OPEN-AUTO — U-12 |
 | FD7-05 | board add/edit/remove/show parity rows | OPEN-AUTO — U-13 |
 | FD7-06 | board curate parity row | OPEN-AUTO — U-13 |
@@ -192,7 +192,7 @@ short label is less detailed.
 | FD10-01 | First-live sequence FE-0 → FE-2.5 → protected seed/run | PARTIAL — clean proof U-17 |
 | FD10-02 | Post-live FE-3 → FE-6 sequence | OPEN-AUTO — U-12–U-15 under D-10 |
 | FD10-03 | Dropbox/OneDrive/Web Push/pipeline-shape/multiplayer stay deferred | DEFERRED — successor queue |
-| FD10-04 | TaskSpec fields land only as consumed | OPEN-AUTO — enforced U-01/U-12 |
+| FD10-04 | TaskSpec fields land only as consumed | COMPLETE for current TaskSpec; extensions enforced in U-12 |
 | FD10-05 | `edited_by` provenance retained | OPEN-AUTO — U-12/U-13 |
 
 ## Closure rule

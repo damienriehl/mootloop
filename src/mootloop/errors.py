@@ -37,6 +37,14 @@ class TaskConfigError(MootloopError):
     """A task-adapter config failed to load or validate. Message names each bad field."""
 
 
+class ConfigResolutionError(MootloopError):
+    """A run-configuration source or structural override failed closed."""
+
+
+class MigrationError(MootloopError):
+    """A persisted model could not be migrated deterministically to its current schema."""
+
+
 class OrchestratorError(MootloopError):
     """An orchestrator precondition failed (unknown run, unschedulable turn, …)."""
 

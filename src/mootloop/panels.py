@@ -130,7 +130,7 @@ def build_panel_report(vault_root: Path | str, run_id: str) -> PanelReport:
             units,
             facts,
             i,
-            run_context.manifest.max_attempts,
+            run_context.manifest.resolved_config.max_attempts,
         )
         draft_record = ctx.judged_draft()
         if draft_record is None:

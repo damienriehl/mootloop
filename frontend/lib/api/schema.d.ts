@@ -387,6 +387,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/matters/{matter_id}/tasks/{task_spec_id}/lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lock Task
+         * @description Record exact human approval; actor and source are server-derived.
+         */
+        post: operations["lock_task_api_matters__matter_id__tasks__task_spec_id__lock_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -1167,9 +1187,77 @@ export interface components {
             utbms?: string | null;
         };
         /**
+         * TaskSpecLock
+         * @description One append-only human approval of exact TaskSpec launch inputs.
+         */
+        TaskSpecLock: {
+            /** Adapter Locator */
+            adapter_locator: string;
+            /** Adapter Sha256 */
+            adapter_sha256: string;
+            /** Lock Version */
+            lock_version: number;
+            /** Locked At */
+            locked_at: string;
+            /** Locked By */
+            locked_by: string;
+            /** Matter Id */
+            matter_id: string;
+            /** Record Sha256 */
+            record_sha256: string;
+            /** Rubric Id */
+            rubric_id: string;
+            /** Rubric Locator */
+            rubric_locator: string;
+            /** Rubric Lock Locator */
+            rubric_lock_locator: string;
+            /** Rubric Lock Sha256 */
+            rubric_lock_sha256: string;
+            /** Rubric Recorded Sha256 */
+            rubric_recorded_sha256: string;
+            /** Rubric Sha256 */
+            rubric_sha256: string;
+            /**
+             * Schema Version
+             * @default 1.0
+             */
+            schema_version: string;
+            /**
+             * Source
+             * @default human
+             * @constant
+             */
+            source: "human";
+            /** Task */
+            task: string;
+            /** Task Spec Id */
+            task_spec_id: string;
+            /** Task Spec Lock Id */
+            task_spec_lock_id: string;
+            /** Task Spec Sha256 */
+            task_spec_sha256: string;
+        };
+        /**
+         * TaskSpecLockResponse
+         * @description The exact human approval now governing a TaskSpec launch.
+         */
+        TaskSpecLockResponse: {
+            /**
+             * Kind
+             * @default task_spec_locked
+             * @constant
+             */
+            kind: "task_spec_locked";
+            /**
+             * Schema Version
+             * @default 1.0
+             */
+            schema_version: string;
+            task_spec_lock: components["schemas"]["TaskSpecLock"];
+        };
+        /**
          * TaskSpecResponse
-         * @description A single TaskSpec produced (or looked up) by an on-ramp. ``runnable`` mirrors the
-         *     domain property: false when the intent did not resolve to a runnable task.
+         * @description A TaskSpec with distinct resolution, human-lock, and launch-ready states.
          */
         TaskSpecResponse: {
             /**
@@ -1178,6 +1266,10 @@ export interface components {
              * @constant
              */
             kind: "task_spec";
+            /** Locked */
+            locked: boolean;
+            /** Resolved */
+            resolved: boolean;
             /** Runnable */
             runnable: boolean;
             /**
@@ -1880,6 +1972,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskSpecResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lock_task_api_matters__matter_id__tasks__task_spec_id__lock_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matter_id: string;
+                task_spec_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskSpecLockResponse"];
                 };
             };
             /** @description Validation Error */

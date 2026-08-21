@@ -20,7 +20,7 @@ from mootloop.models.events import RunMode, RunStatus
 from mootloop.models.gates import GateResult
 from mootloop.models.requests import RequestItem
 from mootloop.models.run import AttentionBlocker
-from mootloop.models.taskspec import TaskSpec
+from mootloop.models.taskspec import TaskSpec, TaskSpecLock
 
 SCHEMA_VERSION = "1.0"
 
@@ -204,13 +204,22 @@ class LockContentionBody(StrictModel):
 
 
 class TaskSpecResponse(VersionedModel):
-    """A single TaskSpec produced (or looked up) by an on-ramp. ``runnable`` mirrors the
-    domain property: false when the intent did not resolve to a runnable task."""
+    """A TaskSpec with distinct resolution, human-lock, and launch-ready states."""
 
     schema_version: str = SCHEMA_VERSION
     kind: Literal["task_spec"] = "task_spec"
     task_spec: TaskSpec
+    resolved: bool
+    locked: bool
     runnable: bool
+
+
+class TaskSpecLockResponse(VersionedModel):
+    """The exact human approval now governing a TaskSpec launch."""
+
+    schema_version: str = SCHEMA_VERSION
+    kind: Literal["task_spec_locked"] = "task_spec_locked"
+    task_spec_lock: TaskSpecLock
 
 
 class TaskSpecsResponse(VersionedModel):

@@ -13,6 +13,7 @@ re-executed. Three drivers share this one path: FakeLLMProvider (tests), the
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import date, datetime
 from pathlib import Path
 
@@ -31,8 +32,10 @@ from mootloop.context import (
     config_digest,
     load_run_context,
     load_run_corpus,
+    resolve_launch_config,
     write_run_context,
 )
+from mootloop.context_assembly import assemble_context, select_launch_contributions
 from mootloop.errors import OrchestratorError
 from mootloop.gates import completeness, degeneracy, fabrication
 from mootloop.journal import (
@@ -44,11 +47,21 @@ from mootloop.journal import (
 from mootloop.llm import LLMProvider, TokenUsage
 from mootloop.models.budget import EstimateRange
 from mootloop.models.citations import Citation
+from mootloop.models.common import (
+    MatterId,
+    RubricId,
+    RunId,
+    TaskSpecId,
+    TaskSpecLockId,
+    TurnId,
+)
+from mootloop.models.context import AssembledContextItem, ContextContribution
 from mootloop.models.events import (
     CapRaised,
     CheckpointCleared,
     CheckpointReached,
     GateEvaluated,
+    QueueIntent,
     RunFinished,
     RunMode,
     RunPaused,
@@ -61,6 +74,7 @@ from mootloop.models.events import (
     TurnCompleted,
     TurnDiscarded,
     TurnIntent,
+    validate_run_queue_intent,
 )
 from mootloop.models.gates import GateResult
 from mootloop.models.requests import RequestItem, RequestSet, code_from_request_id
@@ -92,7 +106,7 @@ DEFAULT_MAX_ATTEMPTS = 3
 
 
 def _launch_max_attempts(run_context: RunContext, requested: int | None) -> int:
-    committed = run_context.manifest.max_attempts
+    committed = run_context.manifest.resolved_config.max_attempts
     if requested is not None and requested != committed:
         raise OrchestratorError(
             f"max_attempts is launch-bound at {committed}; requested {requested}"
@@ -133,6 +147,7 @@ def _context_for(
     req_index: int,
     max_attempts: int,
     tier_models: dict[str, str] | None = None,
+    assembled_context: tuple[AssembledContextItem, ...] = (),
 ) -> StageContext:
     return StageContext(
         run_id=run_id,
@@ -145,6 +160,7 @@ def _context_for(
         state=state,
         max_attempts=max_attempts,
         tier_models=tier_models or {},
+        assembled_context=assembled_context,
     )
 
 
@@ -156,12 +172,23 @@ def _plan(
     facts: list[dict[str, str]],
     max_attempts: int,
     tier_models: dict[str, str] | None = None,
+    assembled_context: tuple[AssembledContextItem, ...] = (),
 ) -> list[TurnSpec]:
     if state.status != "running":
         return []
     specs: list[TurnSpec] = []
     for i in range(len(units)):
-        ctx = _context_for(run_id, state, binding, units, facts, i, max_attempts, tier_models)
+        ctx = _context_for(
+            run_id,
+            state,
+            binding,
+            units,
+            facts,
+            i,
+            max_attempts,
+            tier_models,
+            assembled_context,
+        )
         specs.extend(plan_request(ctx))
     return specs
 
@@ -173,6 +200,29 @@ def _compact_ts(now: str) -> str:
     return "".join(ch for ch in now if ch.isdigit())
 
 
+def _same_queue_intent(existing: QueueIntent | None, proposed: QueueIntent | None) -> bool:
+    """Compare launch work identity while allowing an HTTP retry's later wall clock.
+
+    ``enqueued_at`` controls FIFO ordering but not what work the caller launched. The
+    first committed timestamp remains authoritative and is what recovery materializes.
+    """
+    if existing is None or proposed is None:
+        return existing is proposed
+    return (
+        existing.item_id,
+        existing.lane,
+        existing.kind,
+        existing.payload,
+        existing.payload_sha256,
+    ) == (
+        proposed.item_id,
+        proposed.lane,
+        proposed.kind,
+        proposed.payload,
+        proposed.payload_sha256,
+    )
+
+
 def start_run(
     vault_root: Path | str,
     task: str,
@@ -181,8 +231,11 @@ def start_run(
     run_id: str | None = None,
     mode: RunMode | None = None,
     task_spec_id: str | None = None,
-    max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+    max_attempts: int | None = None,
     idempotent: bool = False,
+    firm_preferences_path: Path | str | None = None,
+    context_contributions: Sequence[ContextContribution] = (),
+    queue_intent: QueueIntent | None = None,
 ) -> str:
     """Begin a run: write RunStarted under the run lock; finalize if there is no work.
 
@@ -192,9 +245,34 @@ def start_run(
     """
     resolved_id = run_id or f"{task}-{_compact_ts(now)}"
     with RunLock(vault_root, resolved_id):
-        if read_events(vault_root, resolved_id):
+        existing_events = read_events(vault_root, resolved_id)
+        if existing_events:
             if idempotent:
+                started = [event for event in existing_events if isinstance(event, RunStarted)]
                 context = load_run_context(vault_root, resolved_id)
+                matter = load_matter(vault_root)
+                try:
+                    if queue_intent is not None:
+                        queue_intent = validate_run_queue_intent(
+                            queue_intent,
+                            matter_id=matter.matter_id,
+                            run_id=resolved_id,
+                        )
+                except (ValidationError, ValueError) as exc:
+                    raise OrchestratorError("invalid hosted run queue intent") from exc
+                proposed = resolve_launch_config(
+                    vault_root,
+                    task,
+                    matter,
+                    mode=mode,
+                    max_attempts=max_attempts,
+                    firm_preferences_path=firm_preferences_path,
+                )
+                accepted_contributions, context_exclusions = select_launch_contributions(
+                    context_contributions,
+                    matter_id=MatterId(matter.matter_id),
+                    task=task,
+                )
                 same_launch = (
                     context.manifest.task == task
                     and (
@@ -203,8 +281,11 @@ def start_run(
                         else None
                     )
                     == task_spec_id
-                    and (mode is None or context.manifest.effective_mode == mode)
-                    and context.manifest.max_attempts == max_attempts
+                    and context.manifest.resolved_config == proposed
+                    and context.manifest.context_contributions == list(accepted_contributions)
+                    and context.manifest.context_exclusions == list(context_exclusions)
+                    and len(started) == 1
+                    and _same_queue_intent(started[0].queue_intent, queue_intent)
                 )
                 if same_launch:
                     return resolved_id
@@ -214,30 +295,51 @@ def start_run(
             raise OrchestratorError(f"run {resolved_id!r} has already started")
         binding = get_binding(task)
         matter = load_matter(vault_root)
-        resolved_mode: RunMode = mode or matter.run_mode
+        try:
+            if queue_intent is not None:
+                queue_intent = validate_run_queue_intent(
+                    queue_intent,
+                    matter_id=matter.matter_id,
+                    run_id=resolved_id,
+                )
+        except (ValidationError, ValueError) as exc:
+            raise OrchestratorError("invalid hosted run queue intent") from exc
         run_context = build_run_context(
             vault_root,
             resolved_id,
             task,
             binding,
             matter,
-            resolved_mode,
+            mode,
             max_attempts,
             task_spec_id,
+            firm_preferences_path,
+            context_contributions,
         )
+        resolved_config = run_context.manifest.resolved_config
+        task_spec_lock = run_context.manifest.task_spec_lock
         context_manifest_sha256 = write_run_context(vault_root, run_context)
         append(
             vault_root,
             resolved_id,
             RunStarted(
-                run_id=resolved_id,
-                matter_id=matter.matter_id,
+                run_id=RunId(resolved_id),
+                matter_id=MatterId(matter.matter_id),
                 task=task,
-                rubric_version=binding.config.rubric_id,
-                config_digest=config_digest(binding.config),
+                rubric_version=RubricId(resolved_config.rubric_id),
+                config_digest=config_digest(resolved_config),
                 context_manifest_sha256=context_manifest_sha256,
-                mode=resolved_mode,
-                task_spec_id=task_spec_id,
+                mode=resolved_config.run_mode,
+                task_spec_id=TaskSpecId(task_spec_id) if task_spec_id is not None else None,
+                task_spec_lock_id=(
+                    TaskSpecLockId(task_spec_lock.task_spec_lock_id)
+                    if task_spec_lock is not None
+                    else None
+                ),
+                task_spec_lock_sha256=(
+                    task_spec_lock.record_sha256 if task_spec_lock is not None else None
+                ),
+                queue_intent=queue_intent,
             ),
         )
         _finalize(vault_root, resolved_id, now, run_context)
@@ -275,6 +377,7 @@ def plan_next(
         run_context.facts,
         max_attempts,
         run_context.manifest.tier_models,
+        assemble_context(run_context.manifest, load_run_corpus(vault_root, run_context)),
     )
 
 
@@ -365,6 +468,10 @@ def record_turn(
             facts,
             max_attempts,
             run_context.manifest.tier_models,
+            assemble_context(
+                run_context.manifest,
+                load_run_corpus(vault_root, run_context),
+            ),
         )
         spec = _find_spec_in(specs, turn_id)
         return _record_spec(
@@ -441,7 +548,7 @@ def _book_spend(
         vault_root,
         run_id,
         SpendRecorded(
-            turn_id=turn_id,
+            turn_id=TurnId(turn_id),
             input_tokens=usage.input_tokens,
             cache_read=usage.cache_read,
             cache_write=usage.cache_write,
@@ -598,7 +705,7 @@ def _operative_citations(vault_root: Path | str, run_id: str) -> list[Citation]:
             units,
             facts,
             i,
-            run_context.manifest.max_attempts,
+            run_context.manifest.resolved_config.max_attempts,
         )
         record = ctx.operative_draft()
         if record is None:
@@ -631,7 +738,7 @@ def operative_draft_turn_ids(vault_root: Path | str, run_id: str) -> dict[str, s
             units,
             facts,
             i,
-            run_context.manifest.max_attempts,
+            run_context.manifest.resolved_config.max_attempts,
         )
         record = ctx.operative_draft()
         if record is not None:
@@ -658,7 +765,7 @@ def operative_drafts(
             units,
             facts,
             i,
-            run_context.manifest.max_attempts,
+            run_context.manifest.resolved_config.max_attempts,
         )
         record = ctx.operative_draft()
         out.append((units[i], DraftOutput.model_validate(record.output) if record else None))
@@ -688,7 +795,11 @@ def verify_run_citations(
     gate = verify.citation_gate(
         vault_root, citations, now=now, max_cache_age_days=max_cache_age_days
     )
-    append(vault_root, run_id, GateEvaluated(turn_id=f"{run_id}-citations", result=gate))
+    append(
+        vault_root,
+        run_id,
+        GateEvaluated(turn_id=TurnId(f"{run_id}-citations"), result=gate),
+    )
     return summary
 
 
@@ -730,7 +841,7 @@ def _maybe_emit_rubric_gate(
         units,
         run_context.facts,
         idx,
-        run_context.manifest.max_attempts,
+        run_context.manifest.resolved_config.max_attempts,
     )
     if not RubricGateStage().is_complete(ctx):
         return
@@ -793,7 +904,7 @@ def effective_cap(state: RunState, run_context: RunContext) -> float | None:
     """The cap now in force: a ``CapRaised`` override wins over launch context."""
     if state.cap_raised_to is not None:
         return state.cap_raised_to
-    return run_context.manifest.matter_config.budget.hard_cap_usd
+    return run_context.manifest.resolved_config.budget.hard_cap_usd
 
 
 def _over_cap(state: RunState, run_context: RunContext) -> bool:
@@ -844,7 +955,7 @@ def _write_gaps_report(
             units,
             facts,
             i,
-            run_context.manifest.max_attempts,
+            run_context.manifest.resolved_config.max_attempts,
         )
         if request_complete(ctx):
             continue
@@ -858,10 +969,7 @@ def _write_gaps_report(
         for request_id, stage in unfinished:
             lines.append(f"- `{request_id}` — stopped at stage `{stage}`")
     lines.append("")
-    lines.append(
-        f"Raise the cap and resume: "
-        f"`mootloop run raise-cap <vault> {run_id} --to <usd>`."
-    )
+    lines.append(f"Raise the cap and resume: `mootloop run raise-cap <vault> {run_id} --to <usd>`.")
     path = safe_vault_path(vault_root, "deliverables", f"gaps-{run_id}.md")
     atomic_write_text(path, "\n".join(lines) + "\n")
     return path
@@ -917,7 +1025,7 @@ def _finalize(
         units,
         state,
         run_context.facts,
-        run_context.manifest.max_attempts,
+        run_context.manifest.resolved_config.max_attempts,
     ):
         return
     # The md-master is a DRAFT until attestation; assemble it now so it exists for the
@@ -983,7 +1091,7 @@ def _maybe_checkpoint(
     binding = run_context.binding
     units = run_context.units
     facts = run_context.facts
-    max_attempts = run_context.manifest.max_attempts
+    max_attempts = run_context.manifest.resolved_config.max_attempts
     tier_models = run_context.manifest.tier_models
     specs = _plan(run_id, state, binding, units, facts, max_attempts, tier_models)
     if specs:
@@ -1143,6 +1251,8 @@ def reopen_enqueue_pending(vault_root: Path | str, run_id: str) -> bool:
         and isinstance(events[-1], RunReopened)
         and load_state(vault_root, run_id).status == "running"
     )
+
+
 # --- public: drive (fake/headless provider) ---------------------------------
 
 
@@ -1223,9 +1333,7 @@ def status_summary(vault_root: Path | str, run_id: str) -> dict[str, object]:
         "spend_usd": round(state.total_spend_usd, 6),
         "spend_label": "notional (plan mode)",
         "hard_cap_usd": (
-            effective_cap(state, run_context)
-            if run_context is not None
-            else state.cap_raised_to
+            effective_cap(state, run_context) if run_context is not None else state.cap_raised_to
         ),
         "replayable": run_context is not None,
         "context_blocker": context_blocker,

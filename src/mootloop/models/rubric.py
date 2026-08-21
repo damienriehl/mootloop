@@ -20,7 +20,7 @@ from typing import Literal
 import yaml
 
 from mootloop.errors import RubricLockError, TaskConfigError
-from mootloop.models.common import StrictModel
+from mootloop.models.common import RubricId, StrictModel
 from mootloop.models.gates import GateFail, GateFinding, GatePass, GateResult
 
 CriterionKind = Literal["present", "correct"]
@@ -43,7 +43,7 @@ class Criterion(StrictModel):
 class Rubric(StrictModel):
     """A parsed, LOCKED rubric file."""
 
-    rubric_id: str
+    rubric_id: RubricId
     version: str
     locked: bool
     criteria: list[Criterion]
