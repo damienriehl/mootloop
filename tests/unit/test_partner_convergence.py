@@ -60,6 +60,7 @@ def _critique_output(verdict: str) -> dict[str, Any]:
 def _ctx(
     round2_text: str,
     *,
+    strategy: str = "thin-full",
     score_source: Any = None,
     convergence_source: Any = None,
 ) -> StageContext:
@@ -68,7 +69,7 @@ def _ctx(
     config = binding.config.model_copy(update={"loop_caps": caps})
     pipeline = compile_pipeline(
         binding.config,
-        make_matter(),
+        make_matter().model_copy(update={"pipeline_strategy": strategy}),
         matter_sha256="0" * 64,
         adapter_sha256="1" * 64,
     ).model_copy(update={"effective_config": config})
@@ -147,6 +148,37 @@ def test_churning_loop_runs_to_the_next_round() -> None:
     assert len(specs) == 1
     assert specs[0].stage == "partner_loop"
     assert specs[0].persona == PersonaName.ASSOCIATE  # the round-3 redraft
+
+
+def test_deep_core_does_not_settle_on_round_two_convergence() -> None:
+    ctx = _ctx(_COMPLIANT, strategy="deep-core")
+
+    assert ctx.converged_at(2) is True
+    stage = PartnerLoopStage()
+    assert stage.is_complete(ctx) is False
+    specs = stage.plan(ctx)
+    assert len(specs) == 1
+    assert specs[0].persona == PersonaName.ASSOCIATE
+    assert specs[0].prompt_context["round"] == 3
+
+
+def test_deep_core_does_not_settle_on_round_two_approval() -> None:
+    ctx = _ctx(
+        "Wholly different verbiage bearing no resemblance to the first pass.",
+        strategy="deep-core",
+    )
+    critique_seq = ctx.layout.critique(2)
+    critique = ctx.record(critique_seq)
+    output = dict(critique.output)
+    output["verdict"] = "approve"
+    ctx.state.completed_turns[ctx.layout.turn_id(critique_seq)] = critique.model_copy(
+        update={"output": output}
+    )
+
+    assert ctx.converged_at(2) is False
+    stage = PartnerLoopStage()
+    assert stage.is_complete(ctx) is False
+    assert stage.plan(ctx)[0].prompt_context["round"] == 3
 
 
 def test_stage_injects_real_round_scores_and_convergence_source() -> None:

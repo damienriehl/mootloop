@@ -270,6 +270,11 @@ class StageContext:
     def judged_draft(self) -> TurnRecord | None:
         """The draft the judge panel ruled on (bolster if present, else latest) —
         excludes any later restructure draft (plan Phase 6)."""
+        if self.pipeline.strategy == "adversarial-first":
+            for r in range(self.config.loop_caps.associate_partner, 1, -1):
+                seq = self.layout.draft(r)
+                if self.done(seq):
+                    return self.record(seq)
         for k in range(self.config.loop_caps.bolster, 0, -1):
             seq = self.layout.bolster_slot(k)
             if self.done(seq):
@@ -394,6 +399,10 @@ class PartnerLoopStage:
 
     name = "partner_loop"
 
+    @staticmethod
+    def _minimum_rounds(ctx: StageContext) -> int:
+        return 3 if ctx.pipeline.strategy == "deep-core" else 1
+
     def _settled_round(self, ctx: StageContext) -> int | None:
         """The round at which the loop settled, or None if still in progress."""
         ap = ctx.config.loop_caps.associate_partner
@@ -405,7 +414,8 @@ class PartnerLoopStage:
                 return None
             verdict = ctx.record(ctx.layout.critique(r)).output["verdict"]
             converged = ctx.pipeline.rubric_judge_enabled and ctx.converged_at(r)
-            if verdict == "approve" or r == ap or converged:
+            may_settle = r >= self._minimum_rounds(ctx)
+            if r == ap or (may_settle and (verdict == "approve" or converged)):
                 return r
         return None
 
@@ -458,7 +468,8 @@ class PartnerLoopStage:
                 ]
             verdict = ctx.record(crit_seq).output["verdict"]
             converged = ctx.pipeline.rubric_judge_enabled and ctx.converged_at(r)
-            if verdict == "approve" or r == ap or converged:
+            may_settle = r >= self._minimum_rounds(ctx)
+            if r == ap or (may_settle and (verdict == "approve" or converged)):
                 return []  # settled — remaining redraft slots are skipped
         return []
 

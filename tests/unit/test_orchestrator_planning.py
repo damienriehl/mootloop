@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -132,6 +133,59 @@ def test_adversarial_first_uses_both_opponents_before_partner_review(tmp_path: P
     partner_spec = plan_next(vault, run_id)[0]
     assert partner_spec.persona == PersonaName.PARTNER
     assert partner_spec.prompt_context["draft"]["response_text"] == "Response to ROG-1."
+
+
+def test_adversarial_first_judges_the_post_partner_revision(tmp_path: Path) -> None:
+    matter = make_matter().model_copy(update={"pipeline_strategy": "adversarial-first"})
+    vault = _build_single_request_vault(tmp_path, matter)
+    run_id = start_run(vault, "discovery-responses", NOW, run_id="adversarial-revision")
+    revise = {
+        "verdict": "revise",
+        "critiques": ["narrow it"],
+        "instructions": ["add particularity"],
+        "self_assessment": "still weak",
+    }
+    def partner_review(spec: Any, prompt: str) -> dict[str, Any]:
+        del prompt
+        if spec.prompt_context["draft"]["response_text"] == "Post-partner corrected response.":
+            return {
+                "verdict": "approve",
+                "critiques": [],
+                "instructions": [],
+                "self_assessment": "approved",
+            }
+        return revise
+
+    def revised_draft(spec: Any, prompt: str) -> dict[str, Any]:
+        del prompt
+        return {
+            "response_text": "Post-partner corrected response.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": list(spec.prompt_context["fact_ids"])[:1],
+            "attorney_gate_items": [],
+            "self_assessment": "corrected",
+        }
+
+    provider = FakeLLMProvider(
+        script={
+            ("partner", "partner_loop"): partner_review,
+            ("associate", "partner_loop"): revised_draft,
+        }
+    )
+
+    for _ in range(12):
+        specs = plan_next(vault, run_id)
+        assert specs
+        if specs[0].persona == PersonaName.JUDGE:
+            judge_spec = specs[0]
+            break
+        _run_step(vault, run_id, provider)
+    else:
+        pytest.fail("adversarial-first never reached judge review")
+
+    assert judge_spec.persona == PersonaName.JUDGE
+    assert judge_spec.prompt_context["draft"]["response_text"] == "Post-partner corrected response."
 
 
 def test_bypassed_personas_delegate_or_remove_every_owned_stage(tmp_path: Path) -> None:
