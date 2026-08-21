@@ -50,6 +50,8 @@ def test_start_matter_worker_validates_then_uses_fixed_mount_source(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     root, vault = _hosted_matter(tmp_path)
+    engine_config_root = tmp_path / "engine-config"
+    engine_config_root.mkdir(mode=0o700)
     compose = tmp_path / "compose.yaml"
     compose.write_text("services: {}\n", encoding="utf-8")
     password = tmp_path / "proxy-password"
@@ -67,6 +69,7 @@ def test_start_matter_worker_validates_then_uses_fixed_mount_source(
         "2026-08-21-acme-test",
         compose_file=compose,
         proxy_password_file=password,
+        engine_config_root=engine_config_root,
         runner=runner,
     )
 
@@ -74,10 +77,49 @@ def test_start_matter_worker_validates_then_uses_fixed_mount_source(
     environment = kwargs["env"]
     assert isinstance(environment, dict)
     assert environment["MOOTLOOP_MATTER_SOURCE"] == str(vault.resolve())
+    assert environment["MOOTLOOP_ENGINE_CONFIG_SOURCE"] == str(
+        engine_config_root / "2026-08-21-acme-test"
+    )
     assert environment["MOOTLOOP_MATTER_ID"] == "2026-08-21-acme-test"
     assert environment["MOOTLOOP_EGRESS_PROXY_PASSWORD_FILE"] == str(password.resolve())
     assert command[-4:] == ["up", "-d", "driver", "egress-proxy"]
     assert kwargs["check"] is True and kwargs["text"] is True
+    assert (engine_config_root / "2026-08-21-acme-test").stat().st_mode & 0o077 == 0
+
+
+def test_start_matter_worker_reuses_durable_per_matter_engine_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, _vault = _hosted_matter(tmp_path)
+    compose = tmp_path / "compose.yaml"
+    compose.write_text("services: {}\n", encoding="utf-8")
+    password = tmp_path / "proxy-password"
+    password.write_text("shared-proxy-secret\n", encoding="utf-8")
+    password.chmod(0o600)
+    engine_config_root = tmp_path / "engine-config"
+    engine_config_root.mkdir(mode=0o700)
+    monkeypatch.setattr(driver.secrets, "load_secret", lambda key: "shared-proxy-secret")
+    sources: list[str] = []
+
+    def runner(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        environment = kwargs["env"]
+        assert isinstance(environment, dict)
+        sources.append(str(environment["MOOTLOOP_ENGINE_CONFIG_SOURCE"]))
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    for _ in range(2):
+        driver.start_matter_worker(
+            root,
+            "2026-08-21-acme-test",
+            compose_file=compose,
+            proxy_password_file=password,
+            engine_config_root=engine_config_root,
+            runner=runner,
+        )
+
+    expected = engine_config_root / "2026-08-21-acme-test"
+    assert sources == [str(expected), str(expected)]
+    assert expected.is_dir()
 
 
 def test_start_matter_worker_rejects_invalid_id_before_runner(
@@ -104,6 +146,7 @@ def test_start_matter_worker_rejects_invalid_id_before_runner(
             "../sibling",
             compose_file=compose,
             proxy_password_file=password,
+            engine_config_root=tmp_path / "engine-config",
             runner=runner,
         )
     assert called is False
@@ -127,4 +170,5 @@ def test_start_matter_worker_rejects_unsafe_or_mismatched_proxy_secret(
             "2026-08-21-acme-test",
             compose_file=compose,
             proxy_password_file=password,
+            engine_config_root=tmp_path / "engine-config",
         )

@@ -119,26 +119,30 @@ internal-secret + rate-limit + audit assertions). No vault touches the box until
 
 Core deployment does not activate the `matter-worker` profile. For an already-created
 matter, use the host launcher as the `mootloop` service user. It validates the ID, exact
-registry vault, matter identity, vault location, compose file, and proxy credential
-before deriving the bind source and project name:
+registry vault, matter identity, vault location, compose file, proxy credential, and
+private engine-state root before deriving the bind sources and project name:
 
 ```bash
 uv run mootloop driver start-matter-worker 2025-10-16-riehl-fence \
   --matters-root /srv/mootloop-matters \
+  --engine-config-root /srv/mootloop-engine-config \
   --proxy-password-file /home/mootloop/.mootloop/egress-proxy-password \
   --compose-file docker-compose.matter.yaml
 ```
 
 Do not invoke the profile with a hand-authored `MOOTLOOP_MATTER_SOURCE`: the launcher is
-the path-containment choke point. Creation must fail if the vault, compose file, or
-matching proxy secret is absent. Verify the driver has only four mounts: its one vault,
+the path-containment choke point. Creation must fail if the vault, compose file,
+matching proxy secret, or private engine-state root is absent. Verify the driver has
+only five mounts: its one vault, its private persistent engine-state directory,
 `.queue`, the read-only global canary registry, and the read-only secrets directory;
 verify its only network is `driver-egress`. The provider's Landlock allowlist exposes
 only immutable runtime files and the per-run Claude config tree; the matter vault,
 `.queue`, global canary registry, and complete secrets directory are inaccessible to
 the persona subprocess. Normal turns receive all matter context through fenced prompt
 DATA, not direct filesystem reads. The driver injects only the required credential and
-uses `/tmp/mootloop-engine-config` for Claude state.
+stores Claude state below `/srv/mootloop-engine-config/<matter-id>` so `--resume`
+survives container replacement. Treat that state as credential-bearing: mode `0700`,
+never back it up, and delete it only when the matter's resumable runs are retired.
 
 The driver waits for Squid's healthcheck before starting. Squid receives only the
 dedicated Compose secret and joins the outbound network; the driver remains on the

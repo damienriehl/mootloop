@@ -25,10 +25,22 @@ def test_driver_mounts_one_matter_and_reaches_network_only_through_proxy() -> No
             "source": "${MOOTLOOP_MATTER_SOURCE:?validated matter source required}",
             "target": "/srv/mootloop-worker/matter",
             "bind": {"create_host_path": False},
-        }
+        },
+        {
+            "type": "bind",
+            "source": "${MOOTLOOP_ENGINE_CONFIG_SOURCE:?validated engine config source required}",
+            "target": (
+                "/var/lib/mootloop-engine-config/"
+                "${MOOTLOOP_MATTER_ID:?bound matter required}"
+            ),
+            "bind": {"create_host_path": False},
+        },
     ]
     assert ".canaries.json:/srv/mootloop-worker/.canaries.json:ro" in mounts
     assert driver["environment"]["MOOTLOOP_RUNTIME_MODE"] == "hosted"
+    assert driver["environment"]["MOOTLOOP_ENGINE_CONFIG_DIR"] == (
+        "/var/lib/mootloop-engine-config"
+    )
     assert driver["networks"] == ["driver-egress"]
     assert set(proxy["networks"]) == {"driver-egress", "proxy-outbound"}
     assert driver["depends_on"]["egress-proxy"]["condition"] == "service_healthy"

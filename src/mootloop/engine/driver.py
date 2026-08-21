@@ -31,6 +31,46 @@ class DriverBinding:
     vault: Path | None
 
 
+def _prepare_engine_config_source(root: Path, matter_id: MatterId, matters_root: Path) -> Path:
+    """Create or validate one private, durable Claude-state directory per matter."""
+    if not root.is_absolute():
+        raise DriverError("engine config root must be an absolute path")
+    try:
+        root_mode = root.lstat().st_mode
+    except OSError as exc:
+        raise DriverError("engine config root is missing or unreadable") from exc
+    if not stat.S_ISDIR(root_mode) or stat.S_ISLNK(root_mode):
+        raise DriverError("engine config root must be a real directory")
+    root_real = root.resolve()
+    matters_real = matters_root.resolve()
+    if (
+        root_real == matters_real
+        or root_real in matters_real.parents
+        or matters_real in root_real.parents
+    ):
+        raise DriverError("engine config root must be outside the matters root")
+
+    source = root_real / str(matter_id)
+    try:
+        source.mkdir(mode=0o700)
+    except FileExistsError:
+        pass
+    except OSError as exc:
+        raise DriverError("matter engine config directory could not be created") from exc
+    try:
+        source_mode = source.lstat().st_mode
+    except OSError as exc:
+        raise DriverError("matter engine config directory is unreadable") from exc
+    if not stat.S_ISDIR(source_mode) or stat.S_ISLNK(source_mode):
+        raise DriverError("matter engine config path must be a real directory")
+    if source_mode & 0o077:
+        raise DriverError("matter engine config directory must not be group/world accessible")
+    source_real = source.resolve()
+    if source_real.parent != root_real:
+        raise DriverError("matter engine config directory escapes its root")
+    return source_real
+
+
 def resolve_driver_binding(
     matters_root: Path,
     mode: RuntimeMode,
@@ -105,11 +145,12 @@ def start_matter_worker(
     *,
     compose_file: Path,
     proxy_password_file: Path,
+    engine_config_root: Path,
     runner: ComposeRunner = subprocess.run,
 ) -> None:
     """Validate host inputs, then start one fixed-target Compose worker project."""
     binding = resolve_driver_binding(matters_root, RuntimeMode.HOSTED, matter_id)
-    if binding.vault is None:  # pragma: no cover - hosted binding proves this above
+    if binding.vault is None or binding.matter_id is None:  # pragma: no cover
         raise DriverError("hosted matter binding did not resolve a vault")
     try:
         password_mode = proxy_password_file.lstat().st_mode
@@ -131,11 +172,17 @@ def start_matter_worker(
     secrets.register_secret(proxy_password)
     if not compose_file.is_file():
         raise DriverError("matter-worker compose file is missing")
+    engine_config_source = _prepare_engine_config_source(
+        engine_config_root,
+        binding.matter_id,
+        matters_root,
+    )
     environment = os.environ.copy()
     environment.update(
         {
             "MOOTLOOP_MATTER_ID": str(binding.matter_id),
             "MOOTLOOP_MATTER_SOURCE": str(binding.vault),
+            "MOOTLOOP_ENGINE_CONFIG_SOURCE": str(engine_config_source),
             "MOOTLOOP_EGRESS_PROXY_PASSWORD_FILE": str(proxy_password_file.resolve()),
         }
     )

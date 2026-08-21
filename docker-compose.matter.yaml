@@ -76,7 +76,7 @@ services:
       MOOTLOOP_MATTER_ID: ${MOOTLOOP_MATTER_ID:-unbound}
       MOOTLOOP_RUNTIME_MODE: hosted
       MOOTLOOP_EGRESS_PROXY_URL: http://egress-proxy:3128
-      MOOTLOOP_ENGINE_CONFIG_DIR: /tmp/mootloop-engine-config
+      MOOTLOOP_ENGINE_CONFIG_DIR: /var/lib/mootloop-engine-config
       MOOTLOOP_CANARY_REGISTRY: /srv/mootloop-worker/.canaries.json
     volumes:
       # Control-plane queue metadata is shared; no sibling vault is mounted.
@@ -85,6 +85,11 @@ services:
       - type: bind
         source: ${MOOTLOOP_MATTER_SOURCE:?validated matter source required}
         target: /srv/mootloop-worker/matter
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${MOOTLOOP_ENGINE_CONFIG_SOURCE:?validated engine config source required}
+        target: /var/lib/mootloop-engine-config/${MOOTLOOP_MATTER_ID:?bound matter required}
         bind:
           create_host_path: false
       - /home/mootloop/.mootloop:/home/mootloop/.mootloop:ro

@@ -1189,6 +1189,10 @@ def driver_start_matter_worker(
         Path,
         typer.Option("--proxy-password-file", help="Dedicated proxy-password file"),
     ],
+    engine_config_root: Annotated[
+        Path,
+        typer.Option("--engine-config-root", help="Private durable Claude-state root"),
+    ] = Path("/srv/mootloop-engine-config"),
     compose_file: Annotated[
         Path,
         typer.Option("--compose-file", help="Matter-worker Compose file"),
@@ -1201,6 +1205,7 @@ def driver_start_matter_worker(
             matter_id,
             compose_file=compose_file,
             proxy_password_file=proxy_password_file,
+            engine_config_root=engine_config_root,
         )
     except MootloopError as exc:
         raise _fail(exc) from exc
