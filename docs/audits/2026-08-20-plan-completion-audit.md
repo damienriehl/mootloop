@@ -233,9 +233,10 @@ Every discovered task now has one of four durable outcomes:
 
 1. `COMPLETE` with current evidence above.
 2. `OPEN-AUTO` as the still-unfinished portions of U-02 through U-17C in the
-   continuation plan; U-00, U-01, U-03, U-04A, U-04B's local/reviewed slice, and
-   their U-18 publication dispositions are complete. Deployment remains a separate
-   gated operation rather than part of that publication closure.
+   continuation plan; U-00, U-01, U-02's local/reviewed slice, U-03, U-04A, U-04B's
+   local/reviewed slice, and their U-18 publication dispositions are complete.
+   Deployment remains a separate gated operation rather than part of that publication
+   closure.
 3. `DECISION-GATED` as D-01 through D-17 in the Decision Sheet (D-15 through D-17
    have safe defaults and do not block pre-validation work).
 4. `DEFERRED` but retained explicitly in the continuation plan rather than silently dropped.
