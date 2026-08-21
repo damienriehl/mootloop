@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from pathlib import Path
 
@@ -10,7 +11,7 @@ from fastapi.testclient import TestClient
 
 from mootloop import orchestrator
 from mootloop.engine.queue import Queue, WorkItem
-from mootloop.errors import AccessAuthError
+from mootloop.errors import AccessAuthError, OutboundPrivacyError
 from mootloop.models.common import DocId
 from mootloop.models.matter import MatterConfig
 from mootloop.models.requests import RequestItem, RequestSet, RequestType
@@ -93,6 +94,26 @@ def test_format_sse_frames_a_data_event() -> None:
     assert format_sse('{"a":1}') == 'data: {"a":1}\n\n'
 
 
+def test_format_sse_redaction_preserves_valid_json() -> None:
+    frame = format_sse('{"message":"authorization Bearer shaped-token"}')
+    payload = json.loads(frame.removeprefix("data: ").strip())
+    assert payload == {"message": "authorization ***REDACTED***"}
+
+
+def test_format_sse_blocks_registered_canary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registry = tmp_path / "canaries.json"
+    registry.write_text(
+        '{"canaries":{"MOOTLOOP-CANARY-sse":"matter"},"denylist":[]}',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("MOOTLOOP_CANARY_REGISTRY", str(registry))
+
+    with pytest.raises(OutboundPrivacyError, match="canary"):
+        format_sse('{"message":"MOOTLOOP-CANARY-sse"}')
+
+
 def test_iter_sse_lines_yields_events(registry: MatterRegistry, matter: MatterConfig) -> None:
     vault = registry.resolve(matter.matter_id)
     run_id = orchestrator.start_run(vault, "discovery-responses", _NOW)
@@ -148,9 +169,7 @@ def test_internal_pause_and_resume_are_audited(
     vault = registry.resolve(matter_id)
     run_id = _started_running_run(vault)
 
-    client.post(
-        f"/internal/matters/{matter_id}/runs/{run_id}/pause", headers=_INTERNAL, json={}
-    )
+    client.post(f"/internal/matters/{matter_id}/runs/{run_id}/pause", headers=_INTERNAL, json={})
     client.post(f"/internal/matters/{matter_id}/runs/{run_id}/resume", headers=_INTERNAL)
 
     entries = audit.audit_path(vault).read_text(encoding="utf-8").splitlines()

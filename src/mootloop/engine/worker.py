@@ -35,21 +35,23 @@ import contextlib
 import json
 import logging
 import os
-import re
 import signal
 import socket
 import threading
+import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from mootloop import budget, orchestrator
-from mootloop.engine.outbox import drain_pending_run_outboxes
+from mootloop.engine.outbox import drain_pending_run_outboxes, drain_pending_vault_outboxes
 from mootloop.engine.queue import Queue, WorkItem
-from mootloop.errors import AuthError, SeatLimitError, TurnError
+from mootloop.errors import AuthError, MootloopError, SeatLimitError, TurnError
 from mootloop.llm import LLMProvider, RawTurnResult
+from mootloop.models.common import MatterId
 from mootloop.models.events import TurnIntent
 from mootloop.models.run import TurnSpec
+from mootloop.privacy import serialize_outbound
 from mootloop.vault import validate_id
 
 logger = logging.getLogger("mootloop.engine.worker")
@@ -67,7 +69,6 @@ _DEFAULT_STALE_S = 900.0
 _DEFAULT_MAX_ATTEMPTS = 5
 _DEFAULT_OUTBOX_SCAN_INTERVAL_S = 30.0
 
-_UNSAFE_STEM_RE = re.compile(r"[^A-Za-z0-9._-]")
 _PERMISSION_DENIAL_PREFIX = "headless turn was denied filesystem access:"
 
 
@@ -97,6 +98,8 @@ class Worker:
         max_attempts: int = _DEFAULT_MAX_ATTEMPTS,
         outbox_scan_interval_s: float = _DEFAULT_OUTBOX_SCAN_INTERVAL_S,
         now_fn: NowFn = default_now,
+        bound_matter_id: MatterId | None = None,
+        bound_vault: Path | None = None,
     ) -> None:
         self.now_fn = now_fn
         self.matters_root = Path(matters_root)
@@ -114,6 +117,14 @@ class Worker:
         self._last_outbox_scan_at: datetime | None = None
         self._stop_requested = False
         self._stop: Stop | None = None
+        self.bound_matter_id = (
+            MatterId(validate_id(str(bound_matter_id), kind="matter_id"))
+            if bound_matter_id
+            else None
+        )
+        self.bound_vault = bound_vault
+        if (self.bound_matter_id is None) != (self.bound_vault is None):
+            raise TurnError("bound worker requires both matter identity and vault")
 
     # -- heartbeat + stale reclaim --
 
@@ -175,16 +186,25 @@ class Worker:
         # a worker restart advances runs whose API process died before queue delivery.
         if (
             self._last_outbox_scan_at is None
-            or (now - self._last_outbox_scan_at).total_seconds()
-            >= self.outbox_scan_interval_s
+            or (now - self._last_outbox_scan_at).total_seconds() >= self.outbox_scan_interval_s
         ):
             self._last_outbox_scan_at = now
             try:
-                drain_pending_run_outboxes(self.matters_root, self.queue)
+                if self.bound_vault is not None and self.bound_matter_id is not None:
+                    drain_pending_vault_outboxes(
+                        self.bound_vault,
+                        self.queue,
+                        self.bound_matter_id,
+                    )
+                else:
+                    drain_pending_run_outboxes(self.matters_root, self.queue)
             except Exception:  # noqa: BLE001 — registry poison must not kill the worker
                 logger.exception("worker %s: run-start outbox scan failed", self.worker_id)
         item = self.queue.claim(
-            self.worker_id, now, visibility_timeout_s=self.visibility_timeout_s
+            self.worker_id,
+            now,
+            visibility_timeout_s=self.visibility_timeout_s,
+            matter_id=self.bound_matter_id,
         )
         if item is None:
             return False
@@ -192,7 +212,9 @@ class Worker:
 
     def _resolve_vault(self, matter_id: str) -> Path:
         validate_id(matter_id, kind="matter_id")
-        return self.matters_root / matter_id
+        if self.bound_matter_id is not None and matter_id != self.bound_matter_id:
+            raise TurnError("bound worker refused a sibling matter")
+        return self.bound_vault or self.matters_root / matter_id
 
     def _process(self, item: WorkItem, now: datetime) -> bool:
         """Drain the item, and never let an unexpected failure escape the tick.
@@ -232,8 +254,7 @@ class Worker:
         with contextlib.suppress(Exception):
             vault = self._resolve_vault(item.matter_id)
             orchestrator.finish_needs_attention(vault, item.run_id)
-        with contextlib.suppress(OSError):
-            self._write_notification(item.matter_id, item.run_id, reason="poison_item", now=now)
+        self._write_notification_best_effort(reason="poison_item", now=now)
         self.queue.complete(item.item_id, self.worker_id)
 
     def _drain(self, item: WorkItem, now: datetime) -> bool:
@@ -407,7 +428,7 @@ class Worker:
         self, vault: Path, run_id: str, item: WorkItem, *, reason: str, now: datetime
     ) -> None:
         orchestrator.finish_needs_attention(vault, run_id)
-        self._write_notification(item.matter_id, run_id, reason=reason, now=now)
+        self._write_notification_best_effort(reason=reason, now=now)
         self.queue.complete(item.item_id, self.worker_id)
 
     def _on_turn_error(self, vault: Path, run_id: str, item: WorkItem, *, now: datetime) -> None:
@@ -420,22 +441,24 @@ class Worker:
             visible_at=now + timedelta(seconds=self.backoff_s),
         )
 
-    def _write_notification(
-        self, matter_id: str, run_id: str, *, reason: str, now: datetime
-    ) -> None:
+    def _write_notification(self, *, reason: str, now: datetime) -> None:
+        payload = {
+            "category": reason,
+            "severity": "error",
+            "ts": now.isoformat(),
+        }
+        serialized = serialize_outbound(payload)
         notif_dir = self.matters_root / ".queue" / "notifications"
         notif_dir.mkdir(parents=True, exist_ok=True)
         stamp = "".join(ch for ch in now.isoformat() if ch.isdigit())
-        # The run_id reaches a filename here. `_drain` validates it, but the poison
-        # handler runs precisely when that validation may have failed, so slugify.
-        path = notif_dir / f"{_UNSAFE_STEM_RE.sub('_', run_id)[:64]}-{stamp}.json"
-        payload = {
-            "run_id": run_id,
-            "matter_id": matter_id,
-            "reason": reason,
-            "ts": now.isoformat(),
-        }
-        path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+        path = notif_dir / f"event-{stamp}-{uuid.uuid4().hex}.json"
+        path.write_text(serialized + "\n", encoding="utf-8")
+
+    def _write_notification_best_effort(self, *, reason: str, now: datetime) -> None:
+        try:
+            self._write_notification(reason=reason, now=now)
+        except (MootloopError, OSError, TypeError, ValueError):
+            logger.exception("worker %s: operator notification was blocked", self.worker_id)
 
     # -- supervised loop --
 

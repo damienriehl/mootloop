@@ -67,6 +67,10 @@ class EgressError(MootloopError):
     allowlist, or a target that did not come from one of our own request builders."""
 
 
+class OutboundPrivacyError(MootloopError):
+    """An outbound payload contained a canary, denylisted value, or exact secret."""
+
+
 class CitationError(MootloopError):
     """A citation-verification precondition failed (unknown research request, missing
     fulfillment file, …). Verification *outcomes* are ledger states, not exceptions."""

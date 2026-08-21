@@ -13,6 +13,7 @@ import binascii
 import os
 import re
 import secrets as _secrets
+from collections.abc import Callable
 from pathlib import Path
 
 from mootloop.errors import BackupError
@@ -89,6 +90,28 @@ def load_secret(key: str, *, secrets_file: Path = SECRETS_FILE) -> str | None:
     return os.environ.get(key)
 
 
+def contains_exact_secret(text: str, *, secrets_file: Path = SECRETS_FILE) -> bool:
+    """Whether ``text`` contains a registered or secrets-file value verbatim.
+
+    This predicate deliberately returns only a boolean: callers can block a payload
+    without gaining an API that exposes the secret registry. Missing files mean there
+    are no file-backed literals; unreadable or malformed files still raise and make an
+    outbound boundary fail closed.
+    """
+    return exact_secret_matcher(secrets_file=secrets_file)(text)
+
+
+def exact_secret_matcher(*, secrets_file: Path = SECRETS_FILE) -> Callable[[str], bool]:
+    """Snapshot exact secret literals into a boolean-only matcher.
+
+    Outbound serializers call this once per payload, avoiding repeated secrets-file
+    reads without exposing the underlying values to callers.
+    """
+    candidates = {*_REGISTERED_SECRETS, *_read_secrets_file(secrets_file).values()}
+    literals = tuple(value for value in candidates if value)
+    return lambda text: any(value in text for value in literals)
+
+
 def load_or_create_signing_key(
     key: str = DOWNLOAD_SIGNING_KEY, *, secrets_file: Path = SECRETS_FILE
 ) -> str:
@@ -136,9 +159,7 @@ def _decode_backup_key(value: str) -> bytes:
     except (binascii.Error, ValueError) as exc:
         raise BackupError(f"{BACKUP_KEY} is not valid base64") from exc
     if len(raw) != _BACKUP_KEY_BYTES:
-        raise BackupError(
-            f"{BACKUP_KEY} must decode to {_BACKUP_KEY_BYTES} bytes, got {len(raw)}"
-        )
+        raise BackupError(f"{BACKUP_KEY} must decode to {_BACKUP_KEY_BYTES} bytes, got {len(raw)}")
     return raw
 
 

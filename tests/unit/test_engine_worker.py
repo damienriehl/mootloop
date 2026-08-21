@@ -48,9 +48,7 @@ def _seat_factory(vault_root: Path, run_dir: Path, billing_mode: str) -> LLMProv
     return _SeatProvider()  # type: ignore[return-value]
 
 
-def _build_matters_root(
-    tmp_path: Path, *, hard_cap_usd: float | None = None
-) -> tuple[Path, str]:
+def _build_matters_root(tmp_path: Path, *, hard_cap_usd: float | None = None) -> tuple[Path, str]:
     from mootloop.discovery_parser import save_requests
     from mootloop.facts import FactStore
     from mootloop.orchestrator import start_run
@@ -338,8 +336,29 @@ def test_permission_denial_is_immediately_operator_visible(tmp_path: Path) -> No
     assert load_state(vault, run_id).status == "needs_attention"
     assert queue.snapshot() == []
     [notification] = list((root / ".queue" / "notifications").glob("*.json"))
-    assert '"reason": "permission_denied"' in notification.read_text(encoding="utf-8")
-    assert "permission settings refused Read" not in notification.read_text(encoding="utf-8")
+    body = notification.read_text(encoding="utf-8")
+    assert '"category":"permission_denied"' in body
+    assert "permission settings refused Read" not in body
+    assert "matter_id" not in body and "run_id" not in body
+
+
+def test_blocked_notification_still_completes_terminal_queue_item(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, run_id = _build_matters_root(tmp_path)
+    registry = tmp_path / "malformed-canaries.json"
+    registry.write_text("{", encoding="utf-8")
+    monkeypatch.setenv("MOOTLOOP_RUNTIME_MODE", "hosted")
+    monkeypatch.setenv("MOOTLOOP_CANARY_REGISTRY", str(registry))
+    queue = Queue(root)
+    _enqueue_run_turn(queue, run_id, "wi-blocked-notification")
+    worker = Worker(root, "wA", queue, lambda v, r, b: _PermissionDeniedProvider())
+
+    assert worker.run_once(NOW) is True
+    vault = MatterRegistry(root=root).resolve(MATTER_ID)
+    assert load_state(vault, run_id).status == "needs_attention"
+    assert queue.snapshot() == []
+    assert not (root / ".queue" / "notifications").exists()
 
 
 def test_generic_turn_error_still_retries_with_backoff(tmp_path: Path) -> None:
