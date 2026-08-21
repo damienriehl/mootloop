@@ -163,15 +163,21 @@ def test_torn_final_line_recovered(tmp_path: Path) -> None:
 
 def test_write_turn_body_is_idempotent(tmp_path: Path) -> None:
     record = _turn_record(f"{RUN}-t0000")
-    path = write_turn_body(tmp_path, RUN, record)
-    assert path == turn_body_path(tmp_path, RUN, f"{RUN}-t0000")
+    persisted = write_turn_body(tmp_path, RUN, record)
+    path = turn_body_path(tmp_path, RUN, f"{RUN}-t0000")
+    assert persisted == record
     original = path.read_text(encoding="utf-8")
-    write_turn_body(tmp_path, RUN, record)
+    assert write_turn_body(tmp_path, RUN, record) == record
     assert path.read_text(encoding="utf-8") == original
 
-    # A different result for the same turn id must fail instead of silently leaving
-    # the sidecar and the journal with two competing versions.
-    mutated = record.model_copy(update={"completed_at": "2099-01-01T00:00:00+00:00"})
+    # A crash after sidecar publication can retry with a later wall clock; the
+    # original completion instant remains authoritative and the bytes stay untouched.
+    later = record.model_copy(update={"completed_at": "2099-01-01T00:00:00+00:00"})
+    assert write_turn_body(tmp_path, RUN, later) == record
+    assert path.read_text(encoding="utf-8") == original
+
+    # A substantively different result for the same turn id must still fail.
+    mutated = record.model_copy(update={"output": {"response_text": "different"}})
     with pytest.raises(JournalIntegrityError, match="conflicting write-once turn body"):
         write_turn_body(tmp_path, RUN, mutated)
     assert path.read_text(encoding="utf-8") == original

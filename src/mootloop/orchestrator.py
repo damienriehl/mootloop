@@ -627,7 +627,7 @@ def _record_spec(
         gate_results=gate_results,
         completed_at=now,
     )
-    write_turn_body(vault_root, run_id, record)
+    record = write_turn_body(vault_root, run_id, record)
     append(vault_root, run_id, TurnCompleted(record=record))
     # Attorney-gate decisions (plan P-28): every draft/bolster turn may imply gates.
     if isinstance(output, DraftOutput):

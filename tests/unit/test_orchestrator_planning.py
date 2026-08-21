@@ -4,9 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+from mootloop import orchestrator
 from mootloop.facts import FactStore
+from mootloop.journal import read_events, turn_body_path
 from mootloop.llm import FakeLLMProvider, RawTurnResult
 from mootloop.models.common import DocId
+from mootloop.models.events import JournalEvent, TurnCompleted
 from mootloop.models.requests import RequestItem, RequestSet, RequestType
 from mootloop.models.run import DiscardedTurn, PersonaName
 from mootloop.orchestrator import (
@@ -148,6 +153,42 @@ def test_completed_turn_record_is_idempotent(tmp_path: Path) -> None:
     # Re-recording the same turn returns the stored record, not a new one.
     again = record_turn(vault, run_id, spec.turn_id, result.text, result.usage, NOW)
     assert first == again
+
+
+def test_retry_recovers_sidecar_published_before_turn_completed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    vault = _build_single_request_vault(tmp_path)
+    run_id = start_run(vault, "discovery-responses", NOW, run_id="unit-crash-recovery")
+    provider = FakeLLMProvider()
+    spec = plan_next(vault, run_id)[0]
+    result = provider.run_turn(spec, assemble_prompt(vault, run_id, spec.turn_id))
+    real_append = orchestrator.append
+
+    def crash_before_completion(
+        vault_root: Path | str, target_run_id: str, event: JournalEvent
+    ) -> None:
+        if isinstance(event, TurnCompleted):
+            raise OSError("simulated crash before TurnCompleted")
+        real_append(vault_root, target_run_id, event)
+
+    monkeypatch.setattr(orchestrator, "append", crash_before_completion)
+    with pytest.raises(OSError, match="simulated crash"):
+        record_turn(vault, run_id, spec.turn_id, result.text, result.usage, NOW)
+
+    body = turn_body_path(vault, run_id, spec.turn_id)
+    assert body.is_file()
+    assert not any(isinstance(event, TurnCompleted) for event in read_events(vault, run_id))
+
+    monkeypatch.setattr(orchestrator, "append", real_append)
+    later = "2026-07-12T00:00:00+00:00"
+    recovered = record_turn(vault, run_id, spec.turn_id, result.text, result.usage, later)
+
+    assert recovered.completed_at == NOW
+    completed = [
+        event for event in read_events(vault, run_id) if isinstance(event, TurnCompleted)
+    ]
+    assert [event.record.completed_at for event in completed] == [NOW]
 
 
 def test_retry_spec_carries_discard_feedback(tmp_path: Path) -> None:
