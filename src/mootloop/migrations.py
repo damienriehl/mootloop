@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from collections.abc import Callable, Mapping
@@ -13,6 +14,7 @@ from pydantic import ValidationError
 
 from mootloop.errors import MigrationError
 from mootloop.models.common import VersionedModel
+from mootloop.models.context import RunContextManifest
 
 MigrationPayload = dict[str, Any]
 MigrationFunction = Callable[[MigrationPayload], object]
@@ -129,6 +131,126 @@ class MigrationRegistry:
 
 
 DEFAULT_MIGRATIONS = MigrationRegistry()
+
+
+def _canonical_sha256(value: object) -> str:
+    raw = json.dumps(
+        value,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _legacy_context_source(
+    payload: Mapping[str, Any],
+    kind: str,
+    *,
+    fallback_locator: str,
+    fallback_value: object,
+) -> tuple[str, str]:
+    sources = payload.get("sources")
+    if isinstance(sources, list):
+        for source in sources:
+            if isinstance(source, Mapping) and source.get("kind") == kind:
+                locator = source.get("locator")
+                digest = source.get("sha256")
+                if isinstance(locator, str) and isinstance(digest, str):
+                    return locator, digest
+    return fallback_locator, _canonical_sha256(fallback_value)
+
+
+def _migrate_run_context_1_0_to_1_1(payload: MigrationPayload) -> MigrationPayload:
+    """Reconstruct the v1.0 effective config solely from its captured launch fields."""
+    adapter = payload.get("adapter_config")
+    matter = payload.get("matter_config")
+    if not isinstance(adapter, Mapping) or not isinstance(matter, Mapping):
+        return {**payload, "schema_version": "1.1"}
+    budget = matter.get("budget")
+    if not isinstance(budget, Mapping):
+        budget = {}
+    adapter_locator, adapter_digest = _legacy_context_source(
+        payload,
+        "task_adapter",
+        fallback_locator="migration:v1.0:adapter-snapshot",
+        fallback_value=adapter,
+    )
+    matter_locator, matter_digest = _legacy_context_source(
+        payload,
+        "matter_config",
+        fallback_locator="migration:v1.0:matter-snapshot",
+        fallback_value=matter,
+    )
+    unavailable_digest = hashlib.sha256(b"").hexdigest()
+    effective_fields = {
+        "run_mode": payload.get("effective_mode"),
+        "max_attempts": payload.get("max_attempts"),
+    }
+    resolved_config = {
+        "schema_version": "1.0",
+        "task": adapter.get("task"),
+        "stages": adapter.get("stages"),
+        "loop_caps": adapter.get("loop_caps"),
+        "panels": adapter.get("panels"),
+        "convergence": adapter.get("convergence"),
+        "gates": adapter.get("gates"),
+        "rubric_id": adapter.get("rubric_id"),
+        "rubric_threshold": adapter.get("rubric_threshold"),
+        "restructure_threshold": adapter.get("restructure_threshold"),
+        "deliverables": adapter.get("deliverables"),
+        "run_mode": payload.get("effective_mode"),
+        "max_attempts": payload.get("max_attempts"),
+        "budget": {
+            "tier": budget.get("tier"),
+            "hard_cap_usd": budget.get("hard_cap_usd"),
+        },
+        "overridable_structural_paths": adapter.get("overridable", []),
+        "sources": [
+            {
+                "layer": "defaults",
+                "locator": "unavailable:migrated-v1.0-defaults",
+                "sha256": unavailable_digest,
+                "present": False,
+            },
+            {
+                "layer": "task_adapter",
+                "locator": adapter_locator,
+                "sha256": adapter_digest,
+                "present": True,
+            },
+            {
+                "layer": "firm_preferences",
+                "locator": "absent:firm_preferences",
+                "sha256": unavailable_digest,
+                "present": False,
+            },
+            {
+                "layer": "matter_overlay",
+                "locator": matter_locator,
+                "sha256": matter_digest,
+                "present": False,
+            },
+            {
+                "layer": "invocation_flags",
+                "locator": "migration:v1.0:effective-run-fields",
+                "sha256": _canonical_sha256(effective_fields),
+                "present": True,
+            },
+        ],
+    }
+    migrated = deepcopy(payload)
+    migrated["schema_version"] = "1.1"
+    migrated["resolved_config"] = resolved_config
+    return migrated
+
+
+DEFAULT_MIGRATIONS.register(
+    RunContextManifest,
+    "1.0",
+    "1.1",
+    _migrate_run_context_1_0_to_1_1,
+)
 
 
 def load_versioned_json[JsonModelT: VersionedModel](

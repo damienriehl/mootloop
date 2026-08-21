@@ -31,6 +31,7 @@ from mootloop.context import (
     config_digest,
     load_run_context,
     load_run_corpus,
+    resolve_launch_config,
     write_run_context,
 )
 from mootloop.errors import OrchestratorError
@@ -44,7 +45,7 @@ from mootloop.journal import (
 from mootloop.llm import LLMProvider, TokenUsage
 from mootloop.models.budget import EstimateRange
 from mootloop.models.citations import Citation
-from mootloop.models.common import MatterId, RunId, TaskSpecId, TurnId
+from mootloop.models.common import MatterId, RubricId, RunId, TaskSpecId, TurnId
 from mootloop.models.events import (
     CapRaised,
     CheckpointCleared,
@@ -93,7 +94,7 @@ DEFAULT_MAX_ATTEMPTS = 3
 
 
 def _launch_max_attempts(run_context: RunContext, requested: int | None) -> int:
-    committed = run_context.manifest.max_attempts
+    committed = run_context.manifest.resolved_config.max_attempts
     if requested is not None and requested != committed:
         raise OrchestratorError(
             f"max_attempts is launch-bound at {committed}; requested {requested}"
@@ -182,8 +183,9 @@ def start_run(
     run_id: str | None = None,
     mode: RunMode | None = None,
     task_spec_id: str | None = None,
-    max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+    max_attempts: int | None = None,
     idempotent: bool = False,
+    firm_preferences_path: Path | str | None = None,
 ) -> str:
     """Begin a run: write RunStarted under the run lock; finalize if there is no work.
 
@@ -196,6 +198,15 @@ def start_run(
         if read_events(vault_root, resolved_id):
             if idempotent:
                 context = load_run_context(vault_root, resolved_id)
+                matter = load_matter(vault_root)
+                proposed = resolve_launch_config(
+                    vault_root,
+                    task,
+                    matter,
+                    mode=mode,
+                    max_attempts=max_attempts,
+                    firm_preferences_path=firm_preferences_path,
+                )
                 same_launch = (
                     context.manifest.task == task
                     and (
@@ -204,8 +215,7 @@ def start_run(
                         else None
                     )
                     == task_spec_id
-                    and (mode is None or context.manifest.effective_mode == mode)
-                    and context.manifest.max_attempts == max_attempts
+                    and context.manifest.resolved_config == proposed
                 )
                 if same_launch:
                     return resolved_id
@@ -215,17 +225,18 @@ def start_run(
             raise OrchestratorError(f"run {resolved_id!r} has already started")
         binding = get_binding(task)
         matter = load_matter(vault_root)
-        resolved_mode: RunMode = mode or matter.run_mode
         run_context = build_run_context(
             vault_root,
             resolved_id,
             task,
             binding,
             matter,
-            resolved_mode,
+            mode,
             max_attempts,
             task_spec_id,
+            firm_preferences_path,
         )
+        resolved_config = run_context.manifest.resolved_config
         context_manifest_sha256 = write_run_context(vault_root, run_context)
         append(
             vault_root,
@@ -234,10 +245,10 @@ def start_run(
                 run_id=RunId(resolved_id),
                 matter_id=MatterId(matter.matter_id),
                 task=task,
-                rubric_version=binding.config.rubric_id,
-                config_digest=config_digest(binding.config),
+                rubric_version=RubricId(resolved_config.rubric_id),
+                config_digest=config_digest(resolved_config),
                 context_manifest_sha256=context_manifest_sha256,
-                mode=resolved_mode,
+                mode=resolved_config.run_mode,
                 task_spec_id=TaskSpecId(task_spec_id) if task_spec_id is not None else None,
             ),
         )
@@ -599,7 +610,7 @@ def _operative_citations(vault_root: Path | str, run_id: str) -> list[Citation]:
             units,
             facts,
             i,
-            run_context.manifest.max_attempts,
+            run_context.manifest.resolved_config.max_attempts,
         )
         record = ctx.operative_draft()
         if record is None:
@@ -632,7 +643,7 @@ def operative_draft_turn_ids(vault_root: Path | str, run_id: str) -> dict[str, s
             units,
             facts,
             i,
-            run_context.manifest.max_attempts,
+            run_context.manifest.resolved_config.max_attempts,
         )
         record = ctx.operative_draft()
         if record is not None:
@@ -659,7 +670,7 @@ def operative_drafts(
             units,
             facts,
             i,
-            run_context.manifest.max_attempts,
+            run_context.manifest.resolved_config.max_attempts,
         )
         record = ctx.operative_draft()
         out.append((units[i], DraftOutput.model_validate(record.output) if record else None))
@@ -735,7 +746,7 @@ def _maybe_emit_rubric_gate(
         units,
         run_context.facts,
         idx,
-        run_context.manifest.max_attempts,
+        run_context.manifest.resolved_config.max_attempts,
     )
     if not RubricGateStage().is_complete(ctx):
         return
@@ -798,7 +809,7 @@ def effective_cap(state: RunState, run_context: RunContext) -> float | None:
     """The cap now in force: a ``CapRaised`` override wins over launch context."""
     if state.cap_raised_to is not None:
         return state.cap_raised_to
-    return run_context.manifest.matter_config.budget.hard_cap_usd
+    return run_context.manifest.resolved_config.budget.hard_cap_usd
 
 
 def _over_cap(state: RunState, run_context: RunContext) -> bool:
@@ -849,7 +860,7 @@ def _write_gaps_report(
             units,
             facts,
             i,
-            run_context.manifest.max_attempts,
+            run_context.manifest.resolved_config.max_attempts,
         )
         if request_complete(ctx):
             continue
@@ -922,7 +933,7 @@ def _finalize(
         units,
         state,
         run_context.facts,
-        run_context.manifest.max_attempts,
+        run_context.manifest.resolved_config.max_attempts,
     ):
         return
     # The md-master is a DRAFT until attestation; assemble it now so it exists for the
@@ -988,7 +999,7 @@ def _maybe_checkpoint(
     binding = run_context.binding
     units = run_context.units
     facts = run_context.facts
-    max_attempts = run_context.manifest.max_attempts
+    max_attempts = run_context.manifest.resolved_config.max_attempts
     tier_models = run_context.manifest.tier_models
     specs = _plan(run_id, state, binding, units, facts, max_attempts, tier_models)
     if specs:

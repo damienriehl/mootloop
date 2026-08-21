@@ -28,6 +28,7 @@ from mootloop.models.attestations import Attestation
 from mootloop.models.audit import GENESIS_PREV_HASH, AccessAuditEntry
 from mootloop.models.citations import ResearchRequest, VerificationRecord
 from mootloop.models.common import MatterId, VersionedModel
+from mootloop.models.config import DefaultRunConfig, FirmPreferences, ResolvedRunConfig
 from mootloop.models.context import CorpusSnapshot, RunContextManifest
 from mootloop.models.corpus import Manifest
 from mootloop.models.decisions import Decision
@@ -201,6 +202,17 @@ MATTER_SCOPED_STORES: tuple[MatterScopedStore, ...] = (
 # Concrete `VersionedModel`s that are deliberately NOT matter-scoped-purgeable, each
 # with the reason the invariant records instead of demanding a store.
 EXEMPT_MODELS: dict[type[VersionedModel], str] = {
+    DefaultRunConfig: (
+        "Repo config loaded from config/defaults.yaml; ships with the code, not matter data."
+    ),
+    FirmPreferences: (
+        "Injected external firm config is forbidden inside an active matter vault; it is "
+        "not a matter-scoped close store."
+    ),
+    ResolvedRunConfig: (
+        "Nested inside each registered RunContextManifest, never persisted as a standalone "
+        "matter-vault store."
+    ),
     MatterSummary: (
         "Derived registry view built on the fly from matter.yaml; never persisted "
         "per-matter, so nothing to purge."

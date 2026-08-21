@@ -189,7 +189,7 @@ def _render_status_md(
             units,
             facts,
             index,
-            run_context.manifest.max_attempts,
+            run_context.manifest.resolved_config.max_attempts,
         )
         lines.append(f"| `{unit.request_id}` | {first_incomplete_stage(context) or 'complete'} |")
     open_decisions = decisions.DecisionStore(vault_root, run_id).list_open()
@@ -230,7 +230,7 @@ def assemble(
             units,
             facts,
             index,
-            run_context.manifest.max_attempts,
+            run_context.manifest.resolved_config.max_attempts,
         )
         record = context.operative_draft()
         draft = DraftOutput.model_validate(record.output) if record else None

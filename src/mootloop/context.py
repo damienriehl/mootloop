@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -10,11 +11,13 @@ import yaml
 from pydantic import ValidationError
 
 from mootloop import budget
+from mootloop.config import ConfigLayerInput, default_config_layer, resolve_run_config
 from mootloop.errors import MigrationError, OrchestratorError
 from mootloop.facts import FACTS_PATH
 from mootloop.facts import fold as fold_facts
 from mootloop.migrations import load_versioned_json
 from mootloop.models.common import MatterId, RunId
+from mootloop.models.config import BudgetOverlay, ResolvedRunConfig, RunConfigOverlay
 from mootloop.models.context import (
     SCHEMA_VERSION as RUN_CONTEXT_SCHEMA_VERSION,
 )
@@ -34,7 +37,7 @@ from mootloop.models.requests import RequestItem, RequestSet
 from mootloop.models.rubric import Rubric, sha256_hex
 from mootloop.models.task import TaskAdapterConfig
 from mootloop.models.taskspec import TaskSpec
-from mootloop.resources import load_persona_bodies, rubric_path, task_config_path
+from mootloop.resources import REPO_ROOT, load_persona_bodies, rubric_path, task_config_path
 from mootloop.tasks import TaskBinding
 from mootloop.taskspec import TaskSpecStore
 from mootloop.vault import atomic_write_once_text, fsync_file_and_parent, safe_vault_path
@@ -89,9 +92,114 @@ def _sha256_path(path: Path) -> str:
     return digest.hexdigest()
 
 
-def config_digest(config: TaskAdapterConfig) -> str:
-    """The compact digest historically recorded on ``RunStarted``."""
+def _canonical_model_bytes(model: ResolvedRunConfig) -> bytes:
+    return json.dumps(
+        model.model_dump(mode="json"),
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+
+
+def config_digest(config: ResolvedRunConfig) -> str:
+    """Compact deterministic digest of the complete effective launch config."""
+    return _sha256(_canonical_model_bytes(config))[:16]
+
+
+def _legacy_config_digest(config: TaskAdapterConfig) -> str:
+    """Digest written by v1.0 RunStarted events; retained only for migration replay."""
     return _sha256(config.model_dump_json().encode("utf-8"))[:16]
+
+
+def _is_within(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
+def _firm_preferences_layer(
+    vault_root: Path | str, path: Path | str | None
+) -> ConfigLayerInput | None:
+    if path is None:
+        return None
+    source = Path(path)
+    try:
+        real = source.resolve(strict=True)
+    except OSError as exc:
+        raise OrchestratorError(
+            f"firm preferences {source!s} could not be resolved: {exc}"
+        ) from exc
+    repo_real = REPO_ROOT.resolve()
+    vault_real = Path(vault_root).resolve()
+    if _is_within(real, repo_real):
+        raise OrchestratorError(
+            f"firm preferences {real!s} are inside the repo; inject an external path"
+        )
+    if _is_within(real, vault_real):
+        raise OrchestratorError(
+            f"firm preferences {real!s} are inside the active matter vault; "
+            "inject a separate firm-config path"
+        )
+    return ConfigLayerInput.from_path(real)
+
+
+def resolve_launch_config(
+    vault_root: Path | str,
+    task: str,
+    matter_config: MatterConfig,
+    *,
+    mode: RunMode | None,
+    max_attempts: int | None,
+    firm_preferences_path: Path | str | None,
+) -> ResolvedRunConfig:
+    """Resolve all launch layers without reading any run-history artifacts."""
+    legacy_fallback = RunConfigOverlay(
+        run_mode=matter_config.run_mode,
+        budget=BudgetOverlay(
+            tier=matter_config.budget.tier,
+            hard_cap_usd=matter_config.budget.hard_cap_usd,
+        ),
+    )
+    matter_overlay = (
+        ConfigLayerInput.from_mapping(
+            "matter.yaml#run_config",
+            matter_config.run_config.model_dump(exclude_unset=True),
+        )
+        if matter_config.run_config is not None
+        else None
+    )
+    matter_provenance = ConfigLayerInput.from_mapping(
+        "matter.yaml#runtime",
+        {
+            "legacy_fallback": legacy_fallback.model_dump(exclude_unset=True),
+            "run_config": (
+                matter_config.run_config.model_dump(exclude_unset=True)
+                if matter_config.run_config is not None
+                else {}
+            ),
+        },
+    )
+    invocation: dict[str, object] = {}
+    if mode is not None:
+        invocation["run_mode"] = mode
+    if max_attempts is not None:
+        invocation["max_attempts"] = max_attempts
+    invocation_flags = (
+        ConfigLayerInput.from_mapping("invocation:start_run", invocation)
+        if invocation
+        else None
+    )
+    return resolve_run_config(
+        defaults=default_config_layer(),
+        adapter=ConfigLayerInput.from_path(task_config_path(task)),
+        legacy_fallback=legacy_fallback,
+        firm_preferences=_firm_preferences_layer(vault_root, firm_preferences_path),
+        matter_overlay=matter_overlay,
+        matter_provenance=matter_provenance,
+        invocation_flags=invocation_flags,
+    )
 
 
 def _corpus_payload(snapshot: CorpusSnapshot) -> str:
@@ -246,9 +354,10 @@ def build_run_context(
     task: str,
     binding: TaskBinding,
     matter_config: MatterConfig,
-    mode: RunMode,
-    max_attempts: int,
+    mode: RunMode | None,
+    max_attempts: int | None,
     task_spec_id: str | None,
+    firm_preferences_path: Path | str | None = None,
 ) -> RunContext:
     task_spec = _validate_task_spec(
         vault_root, task_spec_id, task, str(matter_config.matter_id)
@@ -257,6 +366,14 @@ def build_run_context(
     facts, facts_raw = _load_facts(vault_root)
     corpus_manifest, corpus_texts, corpus_sources = _load_corpus(vault_root)
     corpus_snapshot = CorpusSnapshot(documents=corpus_texts)
+    resolved_config = resolve_launch_config(
+        vault_root,
+        task,
+        matter_config,
+        mode=mode,
+        max_attempts=max_attempts,
+        firm_preferences_path=firm_preferences_path,
+    )
     adapter_config_file = task_config_path(task)
     rubric_file = rubric_path(binding.config.rubric_id)
     matter_file = safe_vault_path(vault_root, "matter.yaml")
@@ -313,6 +430,7 @@ def build_run_context(
         task=task,
         task_spec=task_spec,
         adapter_config=captured_adapter,
+        resolved_config=resolved_config,
         adapter_behavior=AdapterBehavior(
             task=binding.adapter.task,
             draft_directive=binding.adapter.draft_directive(),
@@ -325,9 +443,9 @@ def build_run_context(
         corpus_manifest=corpus_manifest,
         corpus_snapshot_sha256=_sha256(_corpus_payload(corpus_snapshot).encode("utf-8")),
         matter_config=captured_matter,
-        effective_mode=mode,
-        max_attempts=max_attempts,
-        tier_models=budget.tier_models(captured_matter.budget.tier),
+        effective_mode=resolved_config.run_mode,
+        max_attempts=resolved_config.max_attempts,
+        tier_models=budget.tier_models(resolved_config.budget.tier),
         sources=sources,
     )
     return _materialize(manifest, corpus_snapshot)
@@ -343,8 +461,23 @@ def _materialize(
         _draft_directive=manifest.adapter_behavior.draft_directive,
         _judge_question=manifest.adapter_behavior.judge_question,
     )
+    effective_config = TaskAdapterConfig.model_validate(
+        {
+            "task": manifest.resolved_config.task,
+            "stages": manifest.resolved_config.stages,
+            "loop_caps": manifest.resolved_config.loop_caps.model_dump(),
+            "panels": manifest.resolved_config.panels.model_dump(),
+            "convergence": manifest.resolved_config.convergence.model_dump(),
+            "gates": manifest.resolved_config.gates,
+            "rubric_id": manifest.resolved_config.rubric_id,
+            "rubric_threshold": manifest.resolved_config.rubric_threshold,
+            "restructure_threshold": manifest.resolved_config.restructure_threshold,
+            "deliverables": manifest.resolved_config.deliverables,
+            "overridable": manifest.resolved_config.overridable_structural_paths,
+        }
+    )
     binding = TaskBinding(
-        config=manifest.adapter_config,
+        config=effective_config,
         adapter=adapter,
         rubric=manifest.rubric,
     )
@@ -481,15 +614,24 @@ def load_run_context(vault_root: Path | str, run_id: str) -> RunContext:
         raise OrchestratorError(
             f"run {run_id!r} context manifest failed validation: {exc}"
         ) from exc
+    raw_payload = json.loads(raw)
+    legacy_manifest = raw_payload.get("schema_version") == "1.0"
+    expected_config_digest = (
+        _legacy_config_digest(manifest.adapter_config)
+        if legacy_manifest
+        else config_digest(manifest.resolved_config)
+    )
     if (
         event.run_id != run_id
         or str(manifest.run_id) != run_id
         or str(manifest.matter_id) != event.matter_id
         or manifest.task != event.task
-        or manifest.adapter_config.rubric_id != event.rubric_version
+        or manifest.resolved_config.rubric_id != event.rubric_version
         or manifest.rubric.rubric_id != event.rubric_version
-        or config_digest(manifest.adapter_config) != event.config_digest
-        or manifest.effective_mode != event.mode
+        or expected_config_digest != event.config_digest
+        or manifest.resolved_config.run_mode != event.mode
+        or manifest.effective_mode != manifest.resolved_config.run_mode
+        or manifest.max_attempts != manifest.resolved_config.max_attempts
     ):
         raise OrchestratorError(
             f"run {run_id!r} context manifest identity does not match RunStarted"

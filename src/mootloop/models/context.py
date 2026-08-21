@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import Field
 
 from mootloop.models.common import DocId, MatterId, RunId, StrictModel, VersionedModel
+from mootloop.models.config import ResolvedRunConfig
 from mootloop.models.corpus import Manifest
 from mootloop.models.facts import Fact
 from mootloop.models.matter import MatterConfig
@@ -16,7 +17,8 @@ from mootloop.models.run import PersonaName
 from mootloop.models.task import TaskAdapterConfig
 from mootloop.models.taskspec import TaskSpec
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
+CORPUS_SNAPSHOT_SCHEMA_VERSION = "1.0"
 ContextSourceKind = Literal[
     "matter_config",
     "task_adapter",
@@ -59,7 +61,7 @@ class CorpusTextSnapshot(StrictModel):
 class CorpusSnapshot(VersionedModel):
     """Normalized corpus content stored beside, and hashed by, the manifest."""
 
-    schema_version: str = SCHEMA_VERSION
+    schema_version: str = CORPUS_SNAPSHOT_SCHEMA_VERSION
     documents: list[CorpusTextSnapshot] = Field(default_factory=list)
 
 
@@ -72,6 +74,7 @@ class RunContextManifest(VersionedModel):
     task: str
     task_spec: TaskSpec | None = None
     adapter_config: TaskAdapterConfig
+    resolved_config: ResolvedRunConfig
     adapter_behavior: AdapterBehavior
     persona_bodies: dict[PersonaName, str]
     rubric: Rubric

@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from pathlib import Path
 
 import pytest
 import yaml
 from fastapi import HTTPException
 
+from mootloop.context import config_digest, load_run_context
 from mootloop.discovery_parser import save_requests
 from mootloop.errors import OrchestratorError
 from mootloop.facts import FactStore
@@ -141,8 +143,6 @@ def test_start_rejects_invalid_task_spec_binding(
 
 
 def test_start_commits_versioned_manifest_and_task_spec(tmp_path: Path) -> None:
-    from mootloop.context import load_run_context
-
     vault = _vault(tmp_path)
     spec = create_freeform(vault, "acme-v-widgets", "answer the discovery", NOW)
     run_id = start_run(vault, TASK, NOW, run_id="ctx-start", task_spec_id=str(spec.task_spec_id))
@@ -150,10 +150,245 @@ def test_start_commits_versioned_manifest_and_task_spec(tmp_path: Path) -> None:
     started = next(event for event in read_events(vault, run_id) if isinstance(event, RunStarted))
     context = load_run_context(vault, run_id)
     assert started.context_manifest_sha256
-    assert context.manifest.schema_version == "1.0"
+    assert context.manifest.schema_version == "1.1"
     assert context.manifest.task_spec == spec
     assert context.manifest.adapter_behavior.draft_directive
     assert context.manifest.adapter_behavior.judge_question
+
+
+def test_start_resolves_five_layers_and_binds_effective_config_digest(
+    tmp_path: Path,
+) -> None:
+    vault = _vault(tmp_path)
+    matter = yaml.safe_load((vault / "matter.yaml").read_text(encoding="utf-8"))
+    matter["run_mode"] = "gated"
+    matter["budget"] = {"tier": "low", "hard_cap_usd": 9.0}
+    matter["run_config"] = {"loop_caps": {"associate_partner": 4}}
+    (vault / "matter.yaml").write_text(yaml.safe_dump(matter), encoding="utf-8")
+    firm = tmp_path / "firm-preferences.yaml"
+    firm.write_text(
+        "schema_version: '1.0'\nrun_config:\n  rubric_threshold: 0.66\n",
+        encoding="utf-8",
+    )
+
+    run_id = start_run(
+        vault,
+        TASK,
+        NOW,
+        run_id="ctx-five-layers",
+        mode="observed",
+        max_attempts=5,
+        firm_preferences_path=firm,
+    )
+
+    context = load_run_context(vault, run_id)
+    resolved = context.manifest.resolved_config
+    started = next(event for event in read_events(vault, run_id) if isinstance(event, RunStarted))
+    assert [source.layer for source in resolved.sources] == [
+        "defaults",
+        "task_adapter",
+        "firm_preferences",
+        "matter_overlay",
+        "invocation_flags",
+    ]
+    assert all(source.present for source in resolved.sources)
+    assert resolved.run_mode == "observed"
+    assert resolved.max_attempts == 5
+    assert resolved.loop_caps.associate_partner == 4
+    assert resolved.rubric_threshold == 0.66
+    assert resolved.budget.tier == "low"
+    assert resolved.budget.hard_cap_usd == 9.0
+    assert context.binding.config.loop_caps.associate_partner == 4
+    assert started.config_digest == config_digest(resolved)
+
+
+def test_legacy_matter_runtime_is_fallback_below_firm_and_explicit_overlay(
+    tmp_path: Path,
+) -> None:
+    vault = _vault(tmp_path)
+    matter = yaml.safe_load((vault / "matter.yaml").read_text(encoding="utf-8"))
+    matter["run_mode"] = "autonomous"
+    matter["budget"] = {"tier": "moderate", "hard_cap_usd": None}
+    matter["run_config"] = {"budget": {"hard_cap_usd": 7.0}}
+    (vault / "matter.yaml").write_text(yaml.safe_dump(matter), encoding="utf-8")
+    firm = tmp_path / "firm-preferences.yaml"
+    firm.write_text(
+        "schema_version: '1.0'\n"
+        "run_config:\n  run_mode: gated\n  max_attempts: 6\n"
+        "  budget:\n    tier: low\n    hard_cap_usd: 3.0\n",
+        encoding="utf-8",
+    )
+
+    run_id = start_run(
+        vault,
+        TASK,
+        NOW,
+        run_id="ctx-legacy-fallback",
+        firm_preferences_path=firm,
+    )
+
+    resolved = load_run_context(vault, run_id).manifest.resolved_config
+    assert resolved.run_mode == "gated"
+    assert resolved.max_attempts == 6
+    assert resolved.budget.tier == "low"
+    assert resolved.budget.hard_cap_usd == 7.0
+    invocation_source = next(
+        source for source in resolved.sources if source.layer == "invocation_flags"
+    )
+    matter_source = next(
+        source for source in resolved.sources if source.layer == "matter_overlay"
+    )
+    assert invocation_source.present is False
+    assert matter_source.present is True
+    assert matter_source.locator == "matter.yaml#runtime"
+
+
+def test_idempotent_run_reuse_compares_current_effective_config(tmp_path: Path) -> None:
+    vault = _vault(tmp_path)
+    firm = tmp_path / "firm-preferences.yaml"
+    firm.write_text(
+        "schema_version: '1.0'\nrun_config:\n  rubric_threshold: 0.66\n",
+        encoding="utf-8",
+    )
+    run_id = start_run(
+        vault,
+        TASK,
+        NOW,
+        run_id="ctx-idempotent-config",
+        firm_preferences_path=firm,
+        idempotent=True,
+    )
+    original = load_run_context(vault, run_id).manifest.resolved_config
+    firm.write_text(
+        "schema_version: '1.0'\nrun_config:\n  rubric_threshold: 0.67\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(OrchestratorError, match="different launch context"):
+        start_run(
+            vault,
+            TASK,
+            NOW,
+            run_id=run_id,
+            firm_preferences_path=firm,
+            idempotent=True,
+        )
+
+    assert load_run_context(vault, run_id).manifest.resolved_config == original
+    new_run = start_run(
+        vault,
+        TASK,
+        NOW,
+        run_id="ctx-idempotent-config-new",
+        firm_preferences_path=firm,
+    )
+    assert load_run_context(vault, new_run).manifest.resolved_config.rubric_threshold == 0.67
+
+
+def test_replay_ignores_all_live_config_mutations_and_new_run_uses_them(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import mootloop.config as config_module
+    import mootloop.context as context_module
+    import mootloop.tasks as tasks_module
+    from mootloop.resources import DEFAULTS_CONFIG, task_config_path
+
+    defaults = tmp_path / "defaults.yaml"
+    adapter = tmp_path / "discovery-responses.yaml"
+    shutil.copyfile(DEFAULTS_CONFIG, defaults)
+    shutil.copyfile(task_config_path(TASK), adapter)
+    defaults_raw = yaml.safe_load(defaults.read_text(encoding="utf-8"))
+    defaults_raw["convergence"]["coverage_floor"] = 0.71
+    defaults.write_text(yaml.safe_dump(defaults_raw), encoding="utf-8")
+    adapter_raw = yaml.safe_load(adapter.read_text(encoding="utf-8"))
+    adapter_raw["convergence"].pop("coverage_floor")
+    adapter.write_text(yaml.safe_dump(adapter_raw), encoding="utf-8")
+    monkeypatch.setattr(config_module, "DEFAULTS_CONFIG", defaults)
+    monkeypatch.setattr(context_module, "task_config_path", lambda _task: adapter)
+    monkeypatch.setattr(tasks_module, "task_config_path", lambda _task: adapter)
+
+    vault = _vault(tmp_path)
+    matter_raw = yaml.safe_load((vault / "matter.yaml").read_text(encoding="utf-8"))
+    matter_raw["run_config"] = {"restructure_threshold": 0.45}
+    (vault / "matter.yaml").write_text(yaml.safe_dump(matter_raw), encoding="utf-8")
+    firm = tmp_path / "firm-preferences.yaml"
+    firm.write_text(
+        "schema_version: '1.0'\nrun_config:\n  rubric_threshold: 0.66\n",
+        encoding="utf-8",
+    )
+    run_id = start_run(
+        vault,
+        TASK,
+        NOW,
+        run_id="ctx-all-config-sources",
+        mode="observed",
+        max_attempts=5,
+        firm_preferences_path=firm,
+        idempotent=True,
+    )
+    original = load_run_context(vault, run_id).manifest.resolved_config
+
+    defaults_raw["convergence"]["coverage_floor"] = 0.72
+    defaults.write_text(yaml.safe_dump(defaults_raw), encoding="utf-8")
+    adapter_raw["loop_caps"]["associate_partner"] = 3
+    adapter.write_text(yaml.safe_dump(adapter_raw), encoding="utf-8")
+    firm.write_text(
+        "schema_version: '1.0'\nrun_config:\n  rubric_threshold: 0.67\n",
+        encoding="utf-8",
+    )
+    matter_raw["run_config"] = {"restructure_threshold": 0.46}
+    (vault / "matter.yaml").write_text(yaml.safe_dump(matter_raw), encoding="utf-8")
+
+    assert load_run_context(vault, run_id).manifest.resolved_config == original
+    with pytest.raises(OrchestratorError, match="different launch context"):
+        start_run(
+            vault,
+            TASK,
+            NOW,
+            run_id=run_id,
+            mode="gated",
+            max_attempts=6,
+            firm_preferences_path=firm,
+            idempotent=True,
+        )
+    new_id = start_run(
+        vault,
+        TASK,
+        NOW,
+        run_id="ctx-all-config-sources-new",
+        mode="gated",
+        max_attempts=6,
+        firm_preferences_path=firm,
+    )
+    changed = load_run_context(vault, new_id).manifest.resolved_config
+    assert changed.convergence.coverage_floor == 0.72
+    assert changed.loop_caps.associate_partner == 3
+    assert changed.rubric_threshold == 0.67
+    assert changed.restructure_threshold == 0.46
+    assert changed.run_mode == "gated"
+    assert changed.max_attempts == 6
+
+
+@pytest.mark.parametrize("location", ["repo", "vault"])
+def test_start_rejects_firm_preferences_inside_protected_trees(
+    tmp_path: Path, location: str
+) -> None:
+    from mootloop.resources import REPO_ROOT
+
+    vault = _vault(tmp_path)
+    if location == "repo":
+        firm = REPO_ROOT / "config" / "defaults.yaml"
+    else:
+        firm = vault / "firm-preferences.yaml"
+        firm.write_text("schema_version: '1.0'\n", encoding="utf-8")
+    with pytest.raises(OrchestratorError, match="firm preferences.*(repo|vault)"):
+        start_run(
+            vault,
+            TASK,
+            NOW,
+            run_id=f"ctx-firm-boundary-{location}",
+            firm_preferences_path=firm,
+        )
 
 
 def test_start_recovers_identical_manifest_when_first_journal_append_failed(

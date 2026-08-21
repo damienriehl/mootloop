@@ -192,8 +192,10 @@ def resolve_run_config(
     *,
     defaults: ConfigLayerInput,
     adapter: ConfigLayerInput,
+    legacy_fallback: RunConfigOverlay | None = None,
     firm_preferences: ConfigLayerInput | None = None,
     matter_overlay: ConfigLayerInput | None = None,
+    matter_provenance: ConfigLayerInput | None = None,
     invocation_flags: ConfigLayerInput | None = None,
 ) -> ResolvedRunConfig:
     """Resolve defaults → adapter → firm → matter → flags into one frozen value."""
@@ -202,6 +204,11 @@ def resolve_run_config(
     defaults_model = _validate_model(DefaultRunConfig, defaults_raw, defaults, "defaults")
     assert isinstance(defaults_model, DefaultRunConfig)
     merged = _model_content(defaults_model, "schema_version")
+    # Compatibility-only values from the legacy top-level MatterConfig live below
+    # every authored layer. This preserves old matter behavior without allowing
+    # Pydantic-populated run_mode/budget defaults to shadow firm preferences.
+    if legacy_fallback is not None:
+        merged = _deep_merge(merged, _overlay_content(legacy_fallback))
 
     adapter_raw = _parse_mapping(adapter, "task_adapter")
     adapter_model = _validate_model(TaskAdapterConfig, adapter_raw, adapter, "task_adapter")
@@ -243,7 +250,7 @@ def resolve_run_config(
         _source("defaults", defaults),
         _source("task_adapter", adapter),
         _source("firm_preferences", firm_preferences),
-        _source("matter_overlay", matter_overlay),
+        _source("matter_overlay", matter_provenance or matter_overlay),
         _source("invocation_flags", invocation_flags),
     )
     try:

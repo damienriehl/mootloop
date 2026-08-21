@@ -13,6 +13,10 @@ import pytest
 from mootloop.errors import MigrationError, OrchestratorError
 from mootloop.migrations import MigrationRegistry, load_versioned_json
 from mootloop.models.common import VersionedModel
+from mootloop.models.events import RunStarted
+from mootloop.orchestrator import start_run
+from mootloop.vault import init_vault
+from tests.conftest import make_matter
 
 
 class ExampleRecord(VersionedModel):
@@ -185,3 +189,44 @@ def test_run_context_rejects_raw_digest_before_migration(
     with pytest.raises(OrchestratorError, match="manifest.*(tampered|digest)"):
         context_module.load_run_context(vault, "digest-order")
     assert called is False
+
+
+def test_run_context_v1_0_migrates_from_captured_fields_without_rewriting(
+    tmp_path: Path,
+) -> None:
+    from mootloop.context import load_run_context
+    from mootloop.journal import clear_cache, read_events
+
+    vault = tmp_path / "vault"
+    init_vault(vault, make_matter(), registry_path=tmp_path / "canaries.json")
+    run_id = start_run(vault, "discovery-responses", "2026-07-11T00:00:00+00:00")
+    context = load_run_context(vault, run_id)
+    manifest_path = vault / "runs" / run_id / "context" / "manifest.json"
+    payload = json.loads(manifest_path.read_bytes())
+    payload["schema_version"] = "1.0"
+    payload.pop("resolved_config")
+    legacy_raw = (json.dumps(payload, indent=2) + "\n").encode()
+    manifest_path.write_bytes(legacy_raw)
+
+    started = next(event for event in read_events(vault, run_id) if isinstance(event, RunStarted))
+    legacy_config_digest = hashlib.sha256(
+        context.manifest.adapter_config.model_dump_json().encode()
+    ).hexdigest()[:16]
+    journal_path = vault / "runs" / run_id / "journal.jsonl"
+    event_payload = started.model_dump(mode="json")
+    event_payload["config_digest"] = legacy_config_digest
+    event_payload["context_manifest_sha256"] = hashlib.sha256(legacy_raw).hexdigest()
+    journal_path.write_text(
+        json.dumps(event_payload, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+    clear_cache()
+
+    migrated = load_run_context(vault, run_id)
+
+    assert manifest_path.read_bytes() == legacy_raw
+    assert migrated.manifest.schema_version == "1.1"
+    assert migrated.manifest.resolved_config.task == "discovery-responses"
+    assert migrated.manifest.resolved_config.run_mode == started.mode
+    assert migrated.manifest.resolved_config.max_attempts == 3
+    assert migrated.binding.config == context.manifest.adapter_config
