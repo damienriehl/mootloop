@@ -227,9 +227,9 @@ ahead of context reproducibility, isolation, and a clean live run.
 Every discovered task now has one of four durable outcomes:
 
 1. `COMPLETE` with current evidence above.
-2. `OPEN-AUTO` as U-02 through U-17C in the continuation plan; U-00 and U-01 are
-   complete and U-18 is partial pending the explicit merge/deploy
-   disposition.
+2. `OPEN-AUTO` as U-02 through U-17C in the continuation plan; U-00, U-01, and
+   U-01's U-18 publication disposition are complete. Deployment remains a separate
+   gated operation rather than part of that publication closure.
 3. `DECISION-GATED` as D-01 through D-17 in the Decision Sheet (D-15 through D-17
    have safe defaults and do not block pre-validation work).
 4. `DEFERRED` but retained explicitly in the continuation plan rather than silently dropped.
@@ -239,7 +239,8 @@ Decision Sheet. Some operations remain intentionally gated even after their poli
 choice: D-03 A requires a fresh authorization before any real hosted-matter access;
 D-06 B does not self-grant Google OAuth consent; D-08 A is read-only; D-09 A requires
 approval of a named remote sink. D-13 A initially permitted only a PR/CI run; the user
-later authorized merge of PR #32 and the reviewed continuation work, but not deployment.
+later authorized merge of PR #32 and the reviewed continuation work. PR #33 merged as
+`74dec0a`; deployment remains unauthorized.
 The FOLIO source/update investigation required by D-05/D-12 is recorded in
 `docs/research/2026-08-20-folio-integration-route.md`.
 
@@ -282,6 +283,7 @@ was read or changed. Those items remain on the Decision Sheet.
   drift checks, and the Next.js 16.2.10 production build passed. Next.js emitted its
   non-blocking middleware-to-proxy deprecation warning.
 - `git diff --check`: passed.
-- PR #32 is merged. The reviewed U-01 continuation is locally complete and authorized
-  for publication/merge; its PR disposition is the remaining U-18 action. Deployment,
-  hosted-vault access, and the synthetic/real-matter gates remain unperformed.
+- PR #32 and PR #33 are merged. PR #33's backend, invariant, and frontend jobs passed
+  on head `acc1e51`; its one actionable review finding was fixed, replied to, and
+  resolved before merge. U-18 is complete for U-01. Deployment, hosted-vault access,
+  and the synthetic/real-matter gates remain unperformed.

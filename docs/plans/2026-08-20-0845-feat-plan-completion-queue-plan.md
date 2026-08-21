@@ -205,18 +205,20 @@ flowchart TD
 ## Current-State Findings That Govern Sequence
 
 - The completed demo plan stays closed.
-- FE-0 infrastructure and perimeter checkboxes are stale and complete, but its two
-  internal sandbox boundaries are not: egress wrapping is optional and all matters
-  share one mounted root/UID.
+- FE-0 infrastructure and perimeter checkboxes are complete. U-02 also closes the two
+  local sandbox gaps: hosted provider turns require the built-in Landlock wrapper,
+  each worker mounts only one matter, and provider traffic crosses an authenticated
+  destination-allowlisting proxy. Deployed hostile proof remains U-17A behind D-03.
 - The prior hosted run proved provider/queue/spend plumbing, but it stopped in
   `needs_attention`, loaded no verified client facts, and occurred during the blind
   persona-context window. It does not satisfy clean live validation.
-- At audit start, `RunStarted` did not bind the complete input snapshot. The first U-01
-  slice now binds TaskSpec, adapter/rubric, request/fact/policy, and corpus inputs; its
-  approved board/learning, canonical-config, migration, TaskSpec-lock, and outbox work
-  remains queued.
-- At audit start, GitHub CI ran backend only and lacked a BFF-thin invariant. U-00 now
-  adds both locally; remote evidence awaits the D-13 publication unit.
+- At audit start, `RunStarted` did not bind the complete input snapshot. U-01 now binds
+  TaskSpec, adapter/rubric, request/fact/policy, corpus, approved board/learning, and
+  persona inputs; canonical config, migrations, TaskSpec locks, context assembly, and
+  journaled launch outbox recovery are complete.
+- At audit start, GitHub CI ran backend only and lacked a BFF-thin invariant. U-00 is
+  complete locally and remotely: PR #32 proved backend, invariant, frontend, OpenAPI,
+  generated-client, production-build, and BFF-thin gates.
 - Current export is court-usable in its local DOCX lane, but edit-learning, Google
   round-trip, RFP production help, and answer-key regression remain absent.
 - FE-2 and thin FE-2.5 are shipped; FE-3 through FE-6 remain materially open.
@@ -271,6 +273,17 @@ flowchart TD
   journal a deterministic outbox intent atomically, and bounded recovery repairs queue
   delivery without resurrecting a terminal run. Content-addressed corpus deduplication
   remains a storage optimization, not an unmet U-01 safety contract.
+- **U-02 COMPLETE locally and in CI.** Hosted execution is bound to one exact matter
+  vault per worker; queue claim/recovery is matter-filtered; the hosted provider
+  requires the built-in Landlock wrapper; and the persona process cannot read its
+  matter vault, queue metadata, secrets, or canary registry. Its only network reaches
+  an authenticated Squid CONNECT proxy allowlisted to the model endpoint. Prompts,
+  SSE, and notifications share one fail-closed outbound privacy serializer. The trusted
+  launcher validates fixed bind sources, including a private persistent per-matter
+  Claude-state directory so resumed sessions survive worker replacement. The local
+  non-root image probe, Compose validation, review gates, and remote CI passed. U-17A's
+  deployed network/direct-egress/ACL/kill/cross-matter proof remains D-03-gated and is
+  not claimed by U-02.
 - **U-03 PARTIAL.** Decision resolution now repairs an interrupted matching journal
   append idempotently. Decision and attestation CLI actors come from the local OS
   principal. Attestation hashes the launch matter chrome actually rendered by export,
@@ -278,20 +291,24 @@ flowchart TD
   exports replay launch requests/matter.
   The complete journal/decision/export commitment, coordinated-rewrite defense,
   migration policy, and D-09 off-vault anchor remain queued.
-- **U-02, U-04A/U-04B, and U-05 through U-17C remain queued** under their stated
-  dependencies and decision gates. U-03 remains partial. **U-18 is active for U-01:**
-  PR #32 is merged and the user has authorized merge of the reviewed U-01 continuation;
-  its remote CI/merge disposition remains to be recorded. Deployment is still gated.
+- **U-04A/U-04B and U-05 through U-17C remain queued** under their stated dependencies
+  and decision gates. U-03 remains partial. **U-18 is COMPLETE for U-01 and U-02:**
+  PR #33 merged as `74dec0a` after backend, invariant, and frontend CI passed on code
+  head `acc1e51`; PR #35 merged as `b2ff6c7` after all six push/PR jobs passed on code
+  head `96da3c6`. Every actionable review finding on both PRs was fixed, replied to, and
+  resolved. Deployment is still gated.
   No hosted matter or deployment was accessed during this execution.
 
-Verification at this checkpoint: backend ruff and strict mypy across 85 source files
-pass; 737 backend tests pass at 92% coverage; frontend ESLint, TypeScript, 9 Vitest
-files / 37 tests, OpenAPI generation/drift, and production build pass. The structured
-review completed nine local lenses plus the PR's Codex review. The external Claude
-pass could not run because sending repository code to an external model was not
-authorized; no egress workaround was attempted, and a local adversarial reviewer
-substituted. Eight local P1/P2 findings plus the PR review's persona-snapshot P1 were
-repaired and regression-tested; remaining broader work is retained in the queue above.
+Verification at this checkpoint: backend ruff and strict mypy across 97 source files
+pass; 902 backend tests pass at 91% coverage; frontend ESLint, TypeScript, 9 Vitest
+files / 37 tests, OpenAPI generation/drift, and production build pass. U-01's structured
+review completed nine local lenses plus the PR's Codex review. Its external Claude pass
+could not run because sending repository code to an external model was not authorized;
+no egress workaround was attempted, and a local adversarial reviewer substituted. Eight
+local P1/P2 findings plus the PR review's persona-snapshot P1 were repaired and
+regression-tested. U-02's structured review repaired ten local findings, and its PR
+review's persistent-session P1 was also repaired and regression-tested. Remaining
+broader work is retained in the queue above.
 
 The leaf-level closure map is
 `docs/audits/2026-08-20-plan-atomic-commitment-ledger.md`. Each `ce-work` handoff must
