@@ -111,7 +111,7 @@ def config_digest(config: ResolvedRunConfig) -> str:
 
 def _legacy_config_digest(config: TaskAdapterConfig) -> str:
     """Digest written by v1.0 RunStarted events; retained only for migration replay."""
-    return _sha256(config.model_dump_json().encode("utf-8"))[:16]
+    return _sha256(config.model_dump_json(exclude={"overridable"}).encode("utf-8"))[:16]
 
 
 def _is_within(path: Path, root: Path) -> bool:

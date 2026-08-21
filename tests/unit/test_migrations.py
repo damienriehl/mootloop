@@ -206,12 +206,14 @@ def test_run_context_v1_0_migrates_from_captured_fields_without_rewriting(
     payload = json.loads(manifest_path.read_bytes())
     payload["schema_version"] = "1.0"
     payload.pop("resolved_config")
+    legacy_adapter = payload["adapter_config"]
+    legacy_adapter.pop("overridable")
     legacy_raw = (json.dumps(payload, indent=2) + "\n").encode()
     manifest_path.write_bytes(legacy_raw)
 
     started = next(event for event in read_events(vault, run_id) if isinstance(event, RunStarted))
     legacy_config_digest = hashlib.sha256(
-        context.manifest.adapter_config.model_dump_json().encode()
+        json.dumps(legacy_adapter, separators=(",", ":")).encode()
     ).hexdigest()[:16]
     journal_path = vault / "runs" / run_id / "journal.jsonl"
     event_payload = started.model_dump(mode="json")
