@@ -22,13 +22,13 @@ from mootloop import attest as attest_svc
 from mootloop import decisions as decisions_svc
 from mootloop import orchestrator
 from mootloop import taskspec as taskspec_svc
-from mootloop.engine.outbox import drain_run_outbox
+from mootloop.engine.launch import launch_run as launch_run_service
 from mootloop.engine.queue import Queue as WorkQueue
 from mootloop.engine.queue import WorkItem
 from mootloop.errors import OrchestratorError
 from mootloop.export import link as link_svc
 from mootloop.journal import load_state
-from mootloop.models.events import QueueIntent
+from mootloop.models.common import MatterId
 from mootloop.models.matters import MatterSummary
 from mootloop.registry import MatterRegistry
 from mootloop.vault import safe_vault_path
@@ -237,24 +237,16 @@ def start_run(
     _csrf: Csrf,
     _audited: Annotated[None, Depends(_audit_dep("run_start"))],
 ) -> models.RunStatusSummary:
-    launched_at = datetime.now(UTC)
-    queue_intent = QueueIntent.create(
-        item_id=f"run:{matter_id}:{body.run_id}",
-        lane="run",
-        kind="run_turn",
-        enqueued_at=launched_at.isoformat(),
-    )
-    run_id = orchestrator.start_run(
+    run_id = launch_run_service(
         vault,
         body.task,
-        launched_at.isoformat(),
+        _now_iso(),
         run_id=body.run_id,
         mode=body.mode,
         task_spec_id=body.task_spec_id,
-        idempotent=True,
-        queue_intent=queue_intent,
+        queue=queue,
+        expected_matter_id=MatterId(matter_id),
     )
-    drain_run_outbox(vault, queue, run_id)
     return readers.run_status_summary(vault, run_id)
 
 
@@ -331,7 +323,7 @@ def reopen_run(
             run_id=run_id,
             kind="run_turn",
             now=datetime.now(UTC),
-            item_id=f"reopen:{matter_id}:{run_id}",
+            item_id=f"run:{matter_id}:{run_id}",
         )
     )
     return _run_action(vault, run_id, "run_reopened")

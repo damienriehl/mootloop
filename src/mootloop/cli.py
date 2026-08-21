@@ -39,7 +39,6 @@ from mootloop.facts import FactStore, add_facts_from_file
 from mootloop.ingest import content_doc_id, ingest_folder
 from mootloop.journal import load_state
 from mootloop.llm import FakeLLMProvider
-from mootloop.models.events import QueueIntent
 from mootloop.models.matter import SCHEMA_VERSION, MatterConfig
 from mootloop.models.requests import RequestType
 from mootloop.models.run import DiscardedTurn
@@ -381,24 +380,9 @@ def run_start(
     launched_at = _now()
     resolved_id = run_id or f"{task}-{''.join(ch for ch in launched_at if ch.isdigit())}"
     try:
-        matter = load_matter(vault_path)
-        registry = MatterRegistry()
-        try:
-            hosted_vault = registry.resolve(matter.matter_id)
-        except MootloopError:
-            hosted_vault = None
-        hosted = hosted_vault is not None and hosted_vault.resolve() == vault_path.resolve()
-        queue_intent = (
-            QueueIntent.create(
-                item_id=f"run:{matter.matter_id}:{resolved_id}",
-                lane="run",
-                kind="run_turn",
-                enqueued_at=launched_at,
-            )
-            if hosted
-            else None
-        )
-        started_id = orchestrator.start_run(
+        from mootloop.engine.launch import launch_run_from_path
+
+        started_id = launch_run_from_path(
             vault_path,
             task,
             launched_at,
@@ -406,13 +390,7 @@ def run_start(
             mode=mode.value if mode else None,
             task_spec_id=task_spec_id,
             idempotent=run_id is not None,
-            queue_intent=queue_intent,
         )
-        if hosted:
-            from mootloop.engine.outbox import drain_run_outbox
-            from mootloop.engine.queue import Queue
-
-            drain_run_outbox(vault_path, Queue(registry.root), started_id)
     except MootloopError as exc:
         raise _fail(exc) from exc
     typer.echo(started_id)
@@ -508,7 +486,7 @@ def run_reopen(
                 run_id=run_id,
                 kind="run_turn",
                 now=datetime.now(UTC),
-                item_id=f"reopen:{matter.matter_id}:{run_id}",
+                item_id=f"run:{matter.matter_id}:{run_id}",
             )
         )
         queued = True

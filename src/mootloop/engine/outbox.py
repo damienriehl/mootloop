@@ -18,7 +18,8 @@ from pydantic import ValidationError
 from mootloop.context import load_run_context
 from mootloop.engine.queue import Queue, WorkItem
 from mootloop.errors import MootloopError, OrchestratorError
-from mootloop.journal import append, read_events
+from mootloop.journal import append, fold, read_events
+from mootloop.models.common import MatterId
 from mootloop.models.events import (
     JournalEvent,
     QueueIntent,
@@ -67,7 +68,13 @@ def _work_item(started: RunStarted, intent: QueueIntent) -> WorkItem:
     )
 
 
-def drain_run_outbox(vault_root: Path | str, queue: Queue, run_id: str) -> bool:
+def drain_run_outbox(
+    vault_root: Path | str,
+    queue: Queue,
+    run_id: str,
+    *,
+    expected_matter_id: MatterId | None = None,
+) -> bool:
     """Deliver one pending launch intent and durably acknowledge it.
 
     Returns ``True`` only when this call writes the acknowledgment. The per-matter
@@ -78,6 +85,11 @@ def drain_run_outbox(vault_root: Path | str, queue: Queue, run_id: str) -> bool:
     with RunLock(vault_root, run_id):
         events = read_events(vault_root, run_id)
         started = _started_event(events, run_id)
+        if expected_matter_id is not None and started.matter_id != expected_matter_id:
+            raise OrchestratorError(
+                f"run {run_id!r} belongs to matter {started.matter_id!r}, not "
+                f"recovery vault {expected_matter_id!r}"
+            )
         intent = started.queue_intent
         if intent is None:
             return False
@@ -89,13 +101,16 @@ def drain_run_outbox(vault_root: Path | str, queue: Queue, run_id: str) -> bool:
             )
         except (ValidationError, ValueError) as exc:
             raise OrchestratorError(f"run {run_id!r} has an invalid queue intent") from exc
-        if _is_acknowledged(events, run_id, intent):
+        acknowledged = _is_acknowledged(events, run_id, intent)
+        if acknowledged and fold(events).status != "running":
             return False
 
         # Validate the exact launch snapshot before materializing any queue work.
         # Live matter/config changes are intentionally irrelevant; tampering fails.
         load_run_context(vault_root, run_id)
         queue.ensure_enqueued(_work_item(started, intent))
+        if acknowledged:
+            return False
         append(
             vault_root,
             run_id,
@@ -112,8 +127,7 @@ def drain_pending_run_outboxes(matters_root: Path | str, queue: Queue) -> int:
     """
     registry = MatterRegistry(root=matters_root)
     delivered = 0
-    for summary in registry.list_matters():
-        vault = registry.resolve(summary.matter_id)
+    for matter_id, vault in registry.recovery_vaults():
         runs_dir = safe_vault_path(vault, "runs")
         if not runs_dir.is_dir():
             continue
@@ -121,13 +135,17 @@ def drain_pending_run_outboxes(matters_root: Path | str, queue: Queue) -> int:
             if not child.is_dir() or child.name.startswith("."):
                 continue
             try:
-                validate_id(child.name, kind="run_id")
-                if drain_run_outbox(vault, queue, child.name):
+                if drain_run_outbox(
+                    vault,
+                    queue,
+                    child.name,
+                    expected_matter_id=matter_id,
+                ):
                     delivered += 1
             except (MootloopError, OSError, ValidationError):
                 logger.exception(
                     "could not drain run-start outbox (matter=%s run=%s)",
-                    summary.matter_id,
+                    matter_id,
                     child.name,
                 )
     return delivered

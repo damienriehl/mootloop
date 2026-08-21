@@ -29,7 +29,11 @@ from mootloop.models.audit import GENESIS_PREV_HASH, AccessAuditEntry
 from mootloop.models.citations import ResearchRequest, VerificationRecord
 from mootloop.models.common import MatterId, VersionedModel
 from mootloop.models.config import DefaultRunConfig, FirmPreferences, ResolvedRunConfig
-from mootloop.models.context import CorpusSnapshot, RunContextManifest
+from mootloop.models.context import (
+    CorpusSnapshot,
+    RunContextManifest,
+    StoredContextContribution,
+)
 from mootloop.models.corpus import Manifest
 from mootloop.models.decisions import Decision
 from mootloop.models.facts import Fact
@@ -196,6 +200,12 @@ MATTER_SCOPED_STORES: tuple[MatterScopedStore, ...] = (
         glob="learnings/**/*",
         description="Per-matter learnings scratch.",
         model=None,
+    ),
+    MatterScopedStore(
+        name="context-contributions",
+        glob="context/contributions/*.json",
+        description="Write-once board, learning, note, and firm-playbook launch candidates.",
+        model=StoredContextContribution,
     ),
     MatterScopedStore(
         name="canary",

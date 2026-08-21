@@ -119,6 +119,13 @@ class ContextContribution(StrictModel):
         return self
 
 
+class StoredContextContribution(VersionedModel):
+    """Versioned top-level envelope for one write-once launch candidate source."""
+
+    schema_version: str = "1.0"
+    contribution: ContextContribution
+
+
 class ContextExclusion(StrictModel):
     """Text-free audit record proving why a candidate did not enter a run snapshot."""
 

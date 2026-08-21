@@ -67,6 +67,31 @@ def test_lock_is_append_only_and_exact_retry_is_idempotent(tmp_path: Path) -> No
     assert len(lines) == 1
 
 
+def test_lock_retry_reasserts_file_and_parent_durability(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    vault = _build_single_request_vault(tmp_path)
+    spec = create_freeform(vault, MATTER, "answer the discovery", NOW)
+    original = taskspec_svc.fsync_file_and_parent
+    calls = 0
+
+    def fail_once(path: Path) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise OSError("injected parent durability failure")
+        original(path)
+
+    monkeypatch.setattr(taskspec_svc, "fsync_file_and_parent", fail_once, raising=False)
+    with pytest.raises(OSError, match="durability"):
+        _lock(vault, str(spec.task_spec_id))
+
+    record = _lock(vault, str(spec.task_spec_id))
+    assert record.lock_version == 1
+    assert calls == 2
+    assert len((vault / "tasks" / "locks.jsonl").read_text().splitlines()) == 1
+
+
 def test_lock_rejects_unresolved_and_wrong_matter_specs(tmp_path: Path) -> None:
     vault = _build_single_request_vault(tmp_path)
     unresolved = create_freeform(vault, MATTER, "draft an appellate brief", NOW)
@@ -197,6 +222,37 @@ def test_rubric_and_sidecar_drift_require_relock(
     assert second.lock_version == 2
     assert second.rubric_sha256 != first.rubric_sha256
     assert second.rubric_lock_sha256 != first.rubric_lock_sha256
+
+
+def test_lock_rejects_exact_sidecar_change_during_capture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from mootloop.resources import rubric_path
+
+    vault = _build_single_request_vault(tmp_path)
+    spec = create_freeform(vault, MATTER, "answer the discovery", NOW)
+    source = rubric_path("discovery-responses-v1.0")
+    rubric = tmp_path / source.name
+    sidecar = rubric.with_suffix(".sha256")
+    rubric.write_bytes(source.read_bytes())
+    sidecar.write_bytes(source.with_suffix(".sha256").read_bytes())
+    monkeypatch.setattr(taskspec_svc, "rubric_path", lambda _rubric_id: rubric)
+    original_get_binding = taskspec_svc.get_binding
+    calls = 0
+
+    def mutate_on_confirmation(task: str):
+        nonlocal calls
+        calls += 1
+        binding = original_get_binding(task)
+        if calls == 2:
+            sidecar.write_bytes(sidecar.read_bytes() + b"\n")
+        return binding
+
+    monkeypatch.setattr(taskspec_svc, "get_binding", mutate_on_confirmation)
+
+    with pytest.raises(TaskSpecError, match="changed while approval was captured"):
+        _lock(vault, str(spec.task_spec_id))
+    assert not (vault / "tasks" / "locks.jsonl").exists()
 
 
 def test_tampered_lock_record_fails_closed(tmp_path: Path) -> None:

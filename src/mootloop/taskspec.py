@@ -31,7 +31,7 @@ from mootloop.models.taskspec import (
 )
 from mootloop.resources import rubric_path, task_config_path
 from mootloop.tasks import TaskBinding, get_binding, registered_tasks
-from mootloop.vault import load_matter, safe_vault_path
+from mootloop.vault import fsync_file_and_parent, load_matter, safe_vault_path
 
 SPECS_SUBPATH: tuple[str, ...] = ("tasks", "specs.jsonl")
 LOCKS_SUBPATH: tuple[str, ...] = ("tasks", "locks.jsonl")
@@ -160,8 +160,11 @@ class TaskSpecLockStore:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         with self._path.open("a", encoding="utf-8") as handle:
             handle.write(record.model_dump_json() + "\n")
-            handle.flush()
-            os.fsync(handle.fileno())
+        fsync_file_and_parent(self._path)
+
+    def reassert_durability(self) -> None:
+        if self._path.is_file():
+            fsync_file_and_parent(self._path)
 
 
 def _sha256(raw: bytes) -> str:
@@ -182,17 +185,25 @@ def _lock_material(
             "that is not locked"
         )
     try:
-        adapter_raw = adapter_file.read_bytes()
-        rubric_raw = rubric_file.read_bytes()
-        rubric_lock_raw = lock_file.read_bytes()
-        recorded = rubric_lock_raw.decode("utf-8").split()[0].strip()
+        first = (
+            adapter_file.read_bytes(),
+            rubric_file.read_bytes(),
+            lock_file.read_bytes(),
+        )
+        recorded = first[2].decode("utf-8").split()[0].strip()
+        confirmed = get_binding(task)
+        second = (
+            adapter_file.read_bytes(),
+            rubric_file.read_bytes(),
+            lock_file.read_bytes(),
+        )
     except (OSError, UnicodeError, IndexError) as exc:
         raise TaskSpecError(f"TaskSpec lock inputs could not be read: {exc}") from exc
+    if first != second or confirmed.config != binding.config or confirmed.rubric != binding.rubric:
+        raise TaskSpecError("TaskSpec lock inputs changed while approval was captured; retry")
+    adapter_raw, rubric_raw, rubric_lock_raw = second
     if recorded != _sha256(rubric_raw):
         raise TaskSpecError("locked rubric sidecar does not match the exact rubric YAML")
-    confirmed = get_binding(task)
-    if confirmed.config != binding.config or confirmed.rubric != binding.rubric:
-        raise TaskSpecError("TaskSpec lock inputs changed while approval was captured; retry")
     return (
         adapter_raw,
         rubric_raw,
@@ -237,41 +248,48 @@ def lock_task_spec(
     """
     if not locked_by.strip():
         raise TaskSpecError("TaskSpec lock requires an identified human actor")
-    matter = load_matter(vault_root)
-    if str(matter.matter_id) != matter_id:
-        raise TaskSpecError(
-            f"TaskSpec lock matter identity {matter_id!r} does not match vault matter "
-            f"{matter.matter_id!r}"
-        )
-    spec = TaskSpecStore(vault_root).get(task_spec_id)
-    if spec is None:
-        raise TaskSpecError(f"TaskSpec {task_spec_id!r} was not found")
-    if str(spec.matter_id) != matter_id:
-        raise TaskSpecError(
-            f"TaskSpec {task_spec_id!r} matter identity {spec.matter_id!r} does not "
-            f"match {matter_id!r}"
-        )
-    if spec.task is None:
-        raise TaskSpecError(f"TaskSpec {task_spec_id!r} is not resolved and cannot be locked")
-
-    (
-        adapter_raw,
-        rubric_raw,
-        lock_raw,
-        adapter_locator,
-        rubric_locator,
-        lock_locator,
-        binding,
-    ) = _lock_material(spec.task)
-    spec_digest = task_spec_sha256(spec)
-    adapter_digest = _sha256(adapter_raw)
-    rubric_digest = _sha256(rubric_raw)
-    lock_digest = _sha256(lock_raw)
     mutex = safe_vault_path(vault_root, *LOCK_MUTEX_SUBPATH)
     mutex.parent.mkdir(parents=True, exist_ok=True)
     with mutex.open("a", encoding="utf-8") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
         try:
+            matter = load_matter(vault_root)
+            if str(matter.matter_id) != matter_id:
+                raise TaskSpecError(
+                    f"TaskSpec lock matter identity {matter_id!r} does not match vault matter "
+                    f"{matter.matter_id!r}"
+                )
+            spec_store = TaskSpecStore(vault_root)
+            spec = spec_store.get(task_spec_id)
+            if spec is None:
+                raise TaskSpecError(f"TaskSpec {task_spec_id!r} was not found")
+            if str(spec.matter_id) != matter_id:
+                raise TaskSpecError(
+                    f"TaskSpec {task_spec_id!r} matter identity {spec.matter_id!r} does not "
+                    f"match {matter_id!r}"
+                )
+            if spec.task is None:
+                raise TaskSpecError(
+                    f"TaskSpec {task_spec_id!r} is not resolved and cannot be locked"
+                )
+            (
+                adapter_raw,
+                rubric_raw,
+                lock_raw,
+                adapter_locator,
+                rubric_locator,
+                lock_locator,
+                binding,
+            ) = _lock_material(spec.task)
+            confirmed_spec = spec_store.get(task_spec_id)
+            if confirmed_spec != spec:
+                raise TaskSpecError(
+                    "TaskSpec lock inputs changed while approval was captured; retry"
+                )
+            spec_digest = task_spec_sha256(spec)
+            adapter_digest = _sha256(adapter_raw)
+            rubric_digest = _sha256(rubric_raw)
+            lock_digest = _sha256(lock_raw)
             store = TaskSpecLockStore(vault_root)
             latest = store.latest(task_spec_id)
             if latest is not None and _same_approval(
@@ -282,6 +300,7 @@ def lock_task_spec(
                 rubric_lock_digest=lock_digest,
                 locked_by=locked_by,
             ):
+                store.reassert_durability()
                 return latest
             version = 1 if latest is None else latest.lock_version + 1
             payload: dict[str, object] = {

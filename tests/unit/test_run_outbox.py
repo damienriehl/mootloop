@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import multiprocessing as mp
 import os
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -16,7 +16,13 @@ from mootloop.engine.worker import Worker
 from mootloop.errors import LockHeldError, OrchestratorError, QueueError
 from mootloop.journal import append, clear_cache, fold, read_events
 from mootloop.llm import FakeLLMProvider, LLMProvider
-from mootloop.models.events import QueueIntent, RunEnqueued, RunStarted
+from mootloop.models.events import (
+    QueueIntent,
+    RunEnqueued,
+    RunFinished,
+    RunReopened,
+    RunStarted,
+)
 from mootloop.registry import MatterRegistry
 from tests.conftest import make_matter
 
@@ -251,6 +257,97 @@ def test_registry_scan_repairs_pending_outboxes(tmp_path: Path) -> None:
     assert [item.item_id for item in queue.snapshot()] == [f"run:{MATTER_ID}:{RUN_ID}"]
 
 
+def test_acknowledged_running_run_recreates_missing_queue_item(tmp_path: Path) -> None:
+    vault, queue = _vault(tmp_path)
+    _start(vault, _intent())
+    append(vault, RUN_ID, RunFinished(status="needs_attention"))
+    append(vault, RUN_ID, RunReopened(reason="operator repaired launch"))
+    assert drain_run_outbox(vault, queue, RUN_ID) is True
+    (queue.root / "queue.jsonl").unlink()
+
+    assert drain_run_outbox(vault, queue, RUN_ID) is False
+    assert [item.item_id for item in queue.snapshot()] == [f"run:{MATTER_ID}:{RUN_ID}"]
+    assert len(
+        [event for event in read_events(vault, RUN_ID) if isinstance(event, RunEnqueued)]
+    ) == 1
+
+
+def test_reopen_enqueue_and_recovery_converge_on_one_canonical_item(tmp_path: Path) -> None:
+    vault, queue = _vault(tmp_path)
+    _start(vault, _intent())
+    assert drain_run_outbox(vault, queue, RUN_ID) is True
+    (queue.root / "queue.jsonl").unlink()
+    append(vault, RUN_ID, RunFinished(status="needs_attention"))
+    append(vault, RUN_ID, RunReopened(reason="operator repaired launch"))
+    queue.ensure_enqueued(
+        WorkItem.create(
+            lane="run",
+            matter_id=MATTER_ID,
+            run_id=RUN_ID,
+            kind="run_turn",
+            now=NOW,
+            item_id=f"run:{MATTER_ID}:{RUN_ID}",
+        )
+    )
+
+    assert drain_pending_run_outboxes(tmp_path / "matters", queue) == 0
+    assert [item.item_id for item in queue.snapshot()] == [f"run:{MATTER_ID}:{RUN_ID}"]
+
+
+def test_acknowledged_nonrunning_run_does_not_recreate_queue_item(tmp_path: Path) -> None:
+    vault, queue = _vault(tmp_path)
+    _start(vault, _intent())
+    assert drain_run_outbox(vault, queue, RUN_ID) is True
+    append(vault, RUN_ID, RunFinished(status="finished"))
+    (queue.root / "queue.jsonl").unlink()
+
+    assert drain_run_outbox(vault, queue, RUN_ID) is False
+    assert queue.snapshot() == []
+
+
+def test_registry_scan_ignores_mutated_matter_config(tmp_path: Path) -> None:
+    vault, queue = _vault(tmp_path)
+    _start(vault, _intent())
+    (vault / "matter.yaml").write_text("not: [valid\n", encoding="utf-8")
+
+    assert drain_pending_run_outboxes(tmp_path / "matters", queue) == 1
+    assert [item.item_id for item in queue.snapshot()] == [f"run:{MATTER_ID}:{RUN_ID}"]
+
+
+def test_escaping_sibling_does_not_starve_healthy_outbox(tmp_path: Path) -> None:
+    vault, queue = _vault(tmp_path)
+    _start(vault, _intent())
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (tmp_path / "matters" / "poison-sibling").symlink_to(outside, target_is_directory=True)
+
+    assert drain_pending_run_outboxes(tmp_path / "matters", queue) == 1
+    assert [item.item_id for item in queue.snapshot()] == [f"run:{MATTER_ID}:{RUN_ID}"]
+
+
+def test_corrupt_run_does_not_starve_later_healthy_outbox(tmp_path: Path) -> None:
+    vault, queue = _vault(tmp_path)
+    for run_id in ("aaa-corrupt", "zzz-healthy"):
+        orchestrator.start_run(
+            vault,
+            "discovery-responses",
+            NOW.isoformat(),
+            run_id=run_id,
+            queue_intent=QueueIntent.create(
+                item_id=f"run:{MATTER_ID}:{run_id}",
+                lane="run",
+                kind="run_turn",
+                enqueued_at=NOW.isoformat(),
+            ),
+        )
+    (vault / "runs" / "aaa-corrupt" / "context" / "manifest.json").write_text(
+        "{}\n", encoding="utf-8"
+    )
+
+    assert drain_pending_run_outboxes(tmp_path / "matters", queue) == 1
+    assert [item.item_id for item in queue.snapshot()] == [f"run:{MATTER_ID}:zzz-healthy"]
+
+
 def test_worker_restart_repairs_before_claiming(tmp_path: Path) -> None:
     vault, queue = _vault(tmp_path)
     _start(vault, _intent())
@@ -262,6 +359,34 @@ def test_worker_restart_repairs_before_claiming(tmp_path: Path) -> None:
     assert worker.run_once(NOW) is True
     assert queue.snapshot() == []
     assert any(isinstance(event, RunEnqueued) for event in read_events(vault, RUN_ID))
+
+
+def test_worker_reconciles_outboxes_on_bounded_cadence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _vault(tmp_path)
+    calls = 0
+
+    def scan(_root: Path, _queue: Queue) -> int:
+        nonlocal calls
+        calls += 1
+        return 0
+
+    monkeypatch.setattr("mootloop.engine.worker.drain_pending_run_outboxes", scan)
+    worker = Worker(
+        tmp_path / "matters",
+        "cadence-worker",
+        Queue(tmp_path / "matters"),
+        lambda _vault, _run_dir, _billing: FakeLLMProvider(),
+        outbox_scan_interval_s=30.0,
+    )
+
+    assert worker.run_once(NOW) is False
+    assert worker.run_once(NOW + timedelta(seconds=1)) is False
+    assert worker.run_once(NOW + timedelta(seconds=29)) is False
+    assert calls == 1
+    assert worker.run_once(NOW + timedelta(seconds=30)) is False
+    assert calls == 2
 
 
 def test_run_enqueued_is_informational_to_fold() -> None:

@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from mootloop.engine.queue import Queue, WorkItem
+from mootloop.errors import QueueError
 
 NOW = datetime(2026, 7, 12, tzinfo=UTC)
 
@@ -135,6 +136,20 @@ def test_ensure_enqueued_is_idempotent_by_item_id(tmp_path: Path) -> None:
     assert queue.ensure_enqueued(item) == item
 
     assert [queued.item_id for queued in queue.snapshot()] == [item.item_id]
+
+
+@pytest.mark.parametrize("conflicting", [False, True])
+def test_ensure_enqueued_rejects_duplicate_item_ids(
+    tmp_path: Path, conflicting: bool
+) -> None:
+    queue = Queue(tmp_path)
+    item = _item("run", "duplicate-run")
+    duplicate = item.model_copy(update={"run_id": "r2"}) if conflicting else item
+    queue.enqueue(item)
+    queue.enqueue(duplicate)
+
+    with pytest.raises(QueueError, match="duplicated"):
+        queue.ensure_enqueued(item)
 
 
 def test_atomic_queue_replace_fsyncs_file_then_parent(

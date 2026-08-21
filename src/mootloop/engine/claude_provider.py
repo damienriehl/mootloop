@@ -8,7 +8,8 @@ Every escape hatch is closed by construction:
 - The subprocess sees a MINIMAL, explicitly-built environment (never ``os.environ``),
   carrying only the subscription OAuth token, a per-run config dir, and the
   auto-updater/telemetry kill switches.
-- ``--allowedTools`` is a READ-ONLY allowlist (no Bash / Write / Edit / web tools).
+- ``--allowedTools`` is empty for persona turns; approved inputs arrive through the
+  immutable prompt context instead of direct vault reads.
 - A per-run ``--settings`` file denies reads outside the vault realpath — by enumerating
   the vault's siblings at every ancestor level, NOT by a blanket ``Read(/**)``, which
   ``deny``-beats-``allow`` turns into a total filesystem blackout (see
@@ -45,8 +46,8 @@ from mootloop.llm import RawTurnResult, TokenUsage
 from mootloop.models.run import TurnSpec
 from mootloop.secrets import SECRETS_FILE, register_secret
 
-# Read-only file tools ONLY. No Bash, Write, Edit, WebFetch, WebSearch, or any
-# network/exec tool — a persona reads the vault and returns JSON, nothing more.
+# The approved context assembler supplies persona inputs in the prompt. These tools
+# remain only as an explicit diagnostic seam; normal persona turns receive none.
 READ_ONLY_TOOLS: tuple[str, ...] = ("Read", "Glob", "Grep", "LS")
 
 # Substring signatures (matched case-insensitively) that classify a failed turn.
@@ -318,13 +319,13 @@ class HeadlessClaudeProvider:
             child = parent
         return rules
 
-    def build_settings(self) -> dict[str, Any]:
-        """The per-run ``--settings`` dict: deny everything outside the vault and deny
-        the secrets file; allow only read-only tools scoped to the vault realpath."""
+    def build_settings(self, *, allow_vault_reads: bool = False) -> dict[str, Any]:
+        """Build fail-closed settings; normal persona turns have no filesystem reads."""
         vault = _abs(self._vault_real())
         secrets_path = _abs(self._secrets_real())
         secrets_dir = _abs(self._secrets_real().parent)
         config_dir = _abs(self._config_dir())
+        allowed_tools = self.build_allowed_tools(allow_vault_reads=allow_vault_reads)
         return {
             "permissions": {
                 "deny": [
@@ -335,6 +336,7 @@ class HeadlessClaudeProvider:
                     "Bash",
                     "WebFetch",
                     "WebSearch",
+                    *([] if allow_vault_reads else ["Read(//**)"]),
                     # The secrets file and its directory, named explicitly rather than
                     # left to the enumeration below.
                     f"Read({secrets_path})",
@@ -348,15 +350,19 @@ class HeadlessClaudeProvider:
                     f"Read({_abs(Path.home() / '.claude')}/**)",
                     "Read(//**/.credentials.json)",
                     # Everything else outside the vault.
-                    *self._outside_vault_read_deny(),
+                    *(self._outside_vault_read_deny() if allow_vault_reads else []),
                 ],
-                "allow": [f"{tool}({vault}/**)" for tool in READ_ONLY_TOOLS],
+                "allow": (
+                    [f"{tool}({vault}/**)" for tool in allowed_tools]
+                    if allow_vault_reads
+                    else []
+                ),
             }
         }
 
-    def build_allowed_tools(self) -> list[str]:
-        """The read-only ``--allowedTools`` list (no Bash / Write / Edit / web tools)."""
-        return list(READ_ONLY_TOOLS)
+    def build_allowed_tools(self, *, allow_vault_reads: bool = False) -> list[str]:
+        """Return no tools for persona turns; opt-in reads exist only for diagnostics."""
+        return list(READ_ONLY_TOOLS) if allow_vault_reads else []
 
     def build_env(self) -> dict[str, str]:
         """The subprocess environment, built EXPLICITLY from a minimal base.
@@ -402,10 +408,10 @@ class HeadlessClaudeProvider:
         prompt is fed on stdin instead (`run_turn`), which no other local process can
         read.
 
-        ``--output-format stream-json`` (with its required ``--verbose``) is what makes a
-        denied turn detectable: the terminal ``result`` event reports ``is_error: false``
-        even when every tool call was refused, and ``permission_denials`` is empty on some
-        refusals. Only the per-tool ``is_error`` in the stream is reliable.
+        ``--output-format stream-json`` (with its required ``--verbose``) makes any
+        attempted denied tool call detectable: the terminal ``result`` event can report
+        ``is_error: false`` even after a refusal, so only the per-tool stream result is
+        reliable.
 
         ``--model`` pins the tier's chosen model. Without it the CLI ran whatever it
         defaults to, which made the whole budget-tier map decorative: a ``low``-tier run

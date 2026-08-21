@@ -67,8 +67,16 @@ def _install_fake_claude(bin_dir: Path, body: str, monkeypatch: pytest.MonkeyPat
 # --- pure seams: allowlist --------------------------------------------------
 
 
-def test_allowed_tools_are_read_only(tmp_path: Path) -> None:
-    tools = _provider(tmp_path).build_allowed_tools()
+def test_persona_turns_receive_no_filesystem_tools(tmp_path: Path) -> None:
+    provider = _provider(tmp_path)
+    assert provider.build_allowed_tools() == []
+    permissions = provider.build_settings()["permissions"]
+    assert permissions["allow"] == []
+    assert "Read(//**)" in permissions["deny"]
+
+
+def test_diagnostic_read_tools_are_read_only(tmp_path: Path) -> None:
+    tools = _provider(tmp_path).build_allowed_tools(allow_vault_reads=True)
     assert set(tools) == {"Read", "Glob", "Grep", "LS"}
     for banned in ("Bash", "WebFetch", "WebSearch", "Write", "Edit"):
         assert banned not in tools
@@ -111,7 +119,7 @@ def test_env_fails_closed_without_token(tmp_path: Path) -> None:
 def test_settings_deny_outside_vault_and_secrets(tmp_path: Path) -> None:
     outsider = tmp_path / "outsider"
     outsider.mkdir()
-    settings = _provider(tmp_path).build_settings()
+    settings = _provider(tmp_path).build_settings(allow_vault_reads=True)
     deny = settings["permissions"]["deny"]
     assert f"Read(/{outsider})" in deny  # outside-vault restriction
     assert f"Read(/{outsider}/**)" in deny
@@ -148,7 +156,7 @@ def test_settings_never_blanket_deny_reads(tmp_path: Path) -> None:
     "File is in a directory that is denied by your permission settings"; delete the one
     string and the identical prompt returns the file's contents."""
     provider = _provider(tmp_path)
-    settings = provider.build_settings()
+    settings = provider.build_settings(allow_vault_reads=True)
     deny = settings["permissions"]["deny"]
     vault_real = Path(os.path.realpath(provider.vault_root))
 
@@ -175,7 +183,7 @@ def test_settings_deny_reaches_the_whole_ancestor_chain(tmp_path: Path) -> None:
         run_dir=nested / "runs" / "r1",
         oauth_token_loader=lambda: "sk-ant-oat-TESTTOKEN",
     )
-    deny = provider.build_settings()["permissions"]["deny"]
+    deny = provider.build_settings(allow_vault_reads=True)["permissions"]["deny"]
     assert f"Read(/{tmp_path / 'a' / 'cousin.txt'})" in deny  # one level up
     assert f"Read(/{tmp_path / 'aunt'}/**)" in deny  # two levels up
     assert "Read(//etc/**)" in deny  # all the way to the root
@@ -183,7 +191,7 @@ def test_settings_deny_reaches_the_whole_ancestor_chain(tmp_path: Path) -> None:
 
 def test_settings_allow_scoped_to_vault_realpath(tmp_path: Path) -> None:
     provider = _provider(tmp_path)
-    allow = provider.build_settings()["permissions"]["allow"]
+    allow = provider.build_settings(allow_vault_reads=True)["permissions"]["allow"]
     vault_real = str(Path(os.path.realpath(provider.vault_root)))
     assert allow == [f"{tool}(/{vault_real}/**)" for tool in ("Read", "Glob", "Grep", "LS")]
 
@@ -204,7 +212,7 @@ def test_argv_prepends_egress_wrapper_and_has_flags(tmp_path: Path) -> None:
     assert argv[argv.index("--output-format") + 1] == "stream-json"
     assert "--verbose" in argv
     tools = argv[argv.index("--allowedTools") + 1]
-    assert "Bash" not in tools
+    assert tools == ""
 
 
 def test_argv_appends_resume_when_session_present(tmp_path: Path) -> None:
@@ -477,7 +485,7 @@ def test_planted_injection_seams_and_token_redaction(
     # and the argv carries the --settings path pointing at those rules.
     settings = provider.build_settings()
     deny = settings["permissions"]["deny"]
-    assert any(rule == "Read(//etc/**)" for rule in deny)  # outside-vault denied
+    assert "Read(//**)" in deny  # every direct filesystem read is denied
     assert any(".mootloop/secrets.env" in rule for rule in deny)  # secrets denied
     settings_path = provider._write_settings()
     assert str(settings_path) in provider.build_argv(settings_path)

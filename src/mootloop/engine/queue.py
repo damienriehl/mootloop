@@ -159,9 +159,11 @@ class Queue:
         """
         with self._locked():
             items = self._read()
-            for existing in items:
-                if existing.item_id != item.item_id:
-                    continue
+            matches = [existing for existing in items if existing.item_id == item.item_id]
+            if len(matches) > 1:
+                raise QueueError(f"queue item id {item.item_id!r} is duplicated")
+            if matches:
+                existing = matches[0]
                 if (
                     existing.lane,
                     existing.matter_id,

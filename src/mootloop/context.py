@@ -25,7 +25,6 @@ from mootloop.models.context import (
 )
 from mootloop.models.context import (
     AdapterBehavior,
-    AssembledContextItem,
     ContextContribution,
     ContextSource,
     ContextSourceKind,
@@ -74,7 +73,6 @@ class RunContext:
     units: list[RequestItem]
     facts: list[dict[str, str]]
     corpus_snapshot: CorpusSnapshot | None = None
-    assembled_context: tuple[AssembledContextItem, ...] = ()
 
 
 def context_manifest_path(vault_root: Path | str, run_id: str) -> Path:
@@ -538,15 +536,14 @@ def _materialize(
         {"fact_id": str(fact.fact_id), "statement": fact.statement}
         for fact in manifest.facts
     ]
+    if corpus_snapshot is not None:
+        assemble_context(manifest, corpus_snapshot)
     return RunContext(
         manifest=manifest,
         binding=binding,
         units=units,
         facts=facts,
         corpus_snapshot=corpus_snapshot,
-        assembled_context=(
-            assemble_context(manifest, corpus_snapshot) if corpus_snapshot is not None else ()
-        ),
     )
 
 

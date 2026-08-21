@@ -18,8 +18,10 @@ from mootloop.context_assembly import (
     assemble_context,
     items_for_turn,
 )
+from mootloop.context_sources import FIRM_PREFERENCES_ENV, ContextContributionStore
 from mootloop.discovery_parser import save_requests
-from mootloop.errors import OrchestratorError
+from mootloop.engine.launch import launch_run
+from mootloop.errors import OrchestratorError, VaultBoundaryError
 from mootloop.facts import FactStore
 from mootloop.llm import FakeLLMProvider
 from mootloop.models.common import DocId, MatterId
@@ -189,6 +191,142 @@ def test_launch_snapshots_only_allowed_contributions_and_records_exclusions(
     assert "partner private tactic" not in prompt
     assert "other matter secret" not in prompt
     assert "secret pending" not in prompt
+
+
+def test_normal_launch_loads_external_firm_and_persisted_contributions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    vault = _vault(tmp_path)
+    firm = tmp_path / "firm-preferences.yaml"
+    firm.write_text(
+        "schema_version: '1.0'\nrun_config:\n  max_attempts: 7\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv(FIRM_PREFERENCES_ENV, str(firm))
+    store = ContextContributionStore(vault)
+    store.put(_contribution("board-approved-source", "Use the approved chronology."))
+    store.put(
+        _contribution(
+            "learning-not-accepted",
+            "Do not inject this learning.",
+            kind="learning",
+            approval_state="approved",
+        )
+    )
+
+    run_id = launch_run(vault, TASK, NOW, run_id="production-context", idempotent=False)
+    context = load_run_context(vault, run_id)
+
+    firm_source = next(
+        source
+        for source in context.manifest.resolved_config.sources
+        if source.layer == "firm_preferences"
+    )
+    assert firm_source.present is True
+    assert firm_source.locator == str(firm)
+    assert context.manifest.max_attempts == 7
+    assert [
+        item.contribution_id for item in context.manifest.context_contributions
+    ] == ["board-approved-source"]
+    assert context.manifest.context_exclusions[0].contribution_id == "learning-not-accepted"
+    assert "Do not inject this learning" not in context.manifest.model_dump_json()
+
+
+def test_context_contribution_store_is_write_once_and_identity_bound(tmp_path: Path) -> None:
+    vault = _vault(tmp_path)
+    store = ContextContributionStore(vault)
+    record = _contribution("board-write-once", "Exact approved source.")
+
+    path = store.put(record)
+    assert store.put(record) == path
+    path.write_text(
+        path.read_text(encoding="utf-8").replace("board-write-once", "board-other"),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(OrchestratorError, match="does not match record identity"):
+        store.list_all()
+
+
+def test_context_contribution_store_rejects_symlink_escape(tmp_path: Path) -> None:
+    vault = _vault(tmp_path)
+    store = ContextContributionStore(vault)
+    record = _contribution("board-outside", "External approved-looking text.")
+    outside = tmp_path / "outside.json"
+    outside.write_text(
+        store.put(record).read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    stored = vault / "context" / "contributions" / "board-outside.json"
+    stored.unlink()
+    stored.symlink_to(outside)
+
+    with pytest.raises(VaultBoundaryError, match="escapes vault"):
+        store.list_all()
+
+
+def test_context_contribution_store_rejects_symlink_swap_during_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import mootloop.context_sources as context_sources
+
+    vault = _vault(tmp_path)
+    store = ContextContributionStore(vault)
+    record = _contribution("board-swap", "Original approved text.")
+    stored = store.put(record)
+    outside = tmp_path / "outside.json"
+    outside.write_text(stored.read_text(encoding="utf-8"), encoding="utf-8")
+    original_safe_path = context_sources.safe_vault_path
+    swapped = False
+
+    def swap_after_check(vault_root: Path | str, *parts: str) -> Path:
+        nonlocal swapped
+        path = original_safe_path(vault_root, *parts)
+        if parts[-1:] == ("board-swap.json",) and not swapped:
+            swapped = True
+            stored.unlink()
+            stored.symlink_to(outside)
+        return path
+
+    monkeypatch.setattr(context_sources, "safe_vault_path", swap_after_check)
+
+    with pytest.raises(OrchestratorError, match="is invalid"):
+        store.list_all()
+
+
+def test_opposite_approval_sentinels_are_excluded(tmp_path: Path) -> None:
+    vault = _vault(tmp_path)
+    candidates = (
+        _contribution(
+            "learning-only-approved",
+            "Unaccepted learning.",
+            kind="learning",
+            approval_state="approved",
+        ),
+        _contribution(
+            "board-only-accepted",
+            "Unapproved board item.",
+            approval_state="accepted",
+        ),
+    )
+
+    run_id = start_run(
+        vault,
+        TASK,
+        NOW,
+        run_id="opposite-sentinels",
+        context_contributions=candidates,
+    )
+    context = load_run_context(vault, run_id)
+
+    assert context.manifest.context_contributions == []
+    assert {item.contribution_id: item.reason for item in context.manifest.context_exclusions} == {
+        "board-only-accepted": "not_approved",
+        "learning-only-approved": "not_approved",
+    }
+    serialized = context.manifest.model_dump_json()
+    assert "Unaccepted learning" not in serialized
+    assert "Unapproved board item" not in serialized
 
 
 def test_assembler_retains_fact_corpus_and_contribution_provenance(tmp_path: Path) -> None:
