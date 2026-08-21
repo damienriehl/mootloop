@@ -22,11 +22,13 @@ from mootloop import attest as attest_svc
 from mootloop import decisions as decisions_svc
 from mootloop import orchestrator
 from mootloop import taskspec as taskspec_svc
+from mootloop.engine.outbox import drain_run_outbox
 from mootloop.engine.queue import Queue as WorkQueue
 from mootloop.engine.queue import WorkItem
 from mootloop.errors import OrchestratorError
 from mootloop.export import link as link_svc
 from mootloop.journal import load_state
+from mootloop.models.events import QueueIntent
 from mootloop.models.matters import MatterSummary
 from mootloop.registry import MatterRegistry
 from mootloop.vault import safe_vault_path
@@ -235,27 +237,24 @@ def start_run(
     _csrf: Csrf,
     _audited: Annotated[None, Depends(_audit_dep("run_start"))],
 ) -> models.RunStatusSummary:
+    launched_at = datetime.now(UTC)
+    queue_intent = QueueIntent.create(
+        item_id=f"run:{matter_id}:{body.run_id}",
+        lane="run",
+        kind="run_turn",
+        enqueued_at=launched_at.isoformat(),
+    )
     run_id = orchestrator.start_run(
         vault,
         body.task,
-        _now_iso(),
+        launched_at.isoformat(),
         run_id=body.run_id,
         mode=body.mode,
         task_spec_id=body.task_spec_id,
         idempotent=True,
+        queue_intent=queue_intent,
     )
-    # Feed the driver queue so the worker actually picks the run up. Without this the
-    # run is created but never executes (both FE-7 runs were enqueued operationally).
-    queue.ensure_enqueued(
-        WorkItem.create(
-            lane="run",
-            matter_id=matter_id,
-            run_id=run_id,
-            kind="run_turn",
-            now=datetime.now(UTC),
-            item_id=f"run:{matter_id}:{run_id}",
-        )
-    )
+    drain_run_outbox(vault, queue, run_id)
     return readers.run_status_summary(vault, run_id)
 
 

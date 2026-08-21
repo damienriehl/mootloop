@@ -66,4 +66,5 @@ def test_id_newtypes_are_static_boundaries_with_string_wire_format() -> None:
         "mode": "autonomous",
         "task_spec_lock_id": None,
         "task_spec_lock_sha256": None,
+        "queue_intent": None,
     }

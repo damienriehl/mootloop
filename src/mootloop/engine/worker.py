@@ -44,6 +44,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from mootloop import budget, orchestrator
+from mootloop.engine.outbox import drain_pending_run_outboxes
 from mootloop.engine.queue import Queue, WorkItem
 from mootloop.errors import AuthError, SeatLimitError, TurnError
 from mootloop.llm import LLMProvider, RawTurnResult
@@ -166,6 +167,12 @@ class Worker:
             self._reclaim_stale(now)
             self._reclaimed = True
         self._staging_gc()
+        # Journaled launch work is the source of truth. Repair it before claiming so
+        # a worker restart advances runs whose API process died before queue delivery.
+        try:
+            drain_pending_run_outboxes(self.matters_root, self.queue)
+        except Exception:  # noqa: BLE001 — registry poison must not kill the worker
+            logger.exception("worker %s: run-start outbox scan failed", self.worker_id)
         item = self.queue.claim(
             self.worker_id, now, visibility_timeout_s=self.visibility_timeout_s
         )

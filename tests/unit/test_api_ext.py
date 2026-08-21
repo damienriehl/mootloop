@@ -22,9 +22,9 @@ from mootloop import orchestrator
 from mootloop.cli import app as cli_app
 from mootloop.engine.queue import Queue
 from mootloop.errors import AccessAuthError, QueueError
-from mootloop.journal import append
+from mootloop.journal import append, read_events
 from mootloop.models.common import DocId
-from mootloop.models.events import RunStarted
+from mootloop.models.events import RunEnqueued, RunStarted
 from mootloop.models.matter import MatterConfig
 from mootloop.models.requests import RequestItem, RequestSet, RequestType
 from mootloop.registry import MatterRegistry
@@ -225,6 +225,10 @@ def test_start_run_wrapper_creates_a_run(
     # The started run is now discoverable in the run listing.
     listed = client.get(f"/api/matters/{matter.matter_id}/runs", headers=_AUTH)
     assert body["run_id"] in [r["run_id"] for r in listed.json()]
+    started_events = read_events(vault, body["run_id"])
+    started = next(event for event in started_events if isinstance(event, RunStarted))
+    assert started.queue_intent is not None
+    assert any(isinstance(event, RunEnqueued) for event in started_events)
 
 
 def test_start_run_requires_csrf(client: TestClient, matter: MatterConfig) -> None:

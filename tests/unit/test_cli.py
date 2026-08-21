@@ -14,7 +14,7 @@ from mootloop.cli import app
 from mootloop.engine.queue import Queue
 from mootloop.errors import QueueError
 from mootloop.journal import read_events
-from mootloop.models.events import RunReopened
+from mootloop.models.events import RunEnqueued, RunReopened, RunStarted
 
 runner = CliRunner()
 
@@ -217,6 +217,28 @@ def test_run_status_labels_spend_notional(tmp_path: Path) -> None:
     assert status.exit_code == 0, status.output
     assert "notional (plan mode)" in status.output
     assert '"spend_usd"' in status.output
+
+
+def test_run_start_hosted_vault_commits_and_drains_stable_outbox(tmp_path: Path) -> None:
+    matters_root = tmp_path / "matters"
+    vault = matters_root / "northfield-widgets-v-granite-supply"
+    _seed_requests(vault)
+    env = {**os.environ, "MOOTLOOP_MATTERS_ROOT": str(matters_root)}
+    args = ["run", "start", str(vault), "--run-id", "hosted-start"]
+
+    first = runner.invoke(app, args, env=env)
+    assert first.exit_code == 0, first.output
+    retry = runner.invoke(app, args, env=env)
+    assert retry.exit_code == 0, retry.output
+
+    queued = Queue(matters_root).snapshot()
+    assert [item.item_id for item in queued] == [
+        "run:northfield-widgets-v-granite-supply:hosted-start"
+    ]
+    events = read_events(vault, "hosted-start")
+    started = next(event for event in events if isinstance(event, RunStarted))
+    assert started.queue_intent is not None
+    assert len([event for event in events if isinstance(event, RunEnqueued)]) == 1
 
 
 def test_run_status_reports_non_replayable_context_without_failing(tmp_path: Path) -> None:

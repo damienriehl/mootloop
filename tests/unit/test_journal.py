@@ -6,6 +6,7 @@ two-process append gate (concurrent ``append`` never tears a line)."""
 from __future__ import annotations
 
 import multiprocessing as mp
+import os
 from pathlib import Path
 
 import pytest
@@ -23,6 +24,7 @@ from mootloop.journal import (
     write_turn_body,
 )
 from mootloop.models.events import (
+    RunEnqueued,
     RunFinished,
     RunPaused,
     RunResumed,
@@ -74,6 +76,27 @@ def test_append_read_roundtrip(tmp_path: Path) -> None:
     assert len(events) == 3
     assert isinstance(events[0], RunStarted)
     assert isinstance(events[2], TurnCompleted)
+
+
+def test_first_journal_creation_fsyncs_parent_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[int] = []
+    original = os.fsync
+
+    def tracked(fd: int) -> None:
+        calls.append(fd)
+        original(fd)
+
+    monkeypatch.setattr(journal.os, "fsync", tracked)
+    append(tmp_path, RUN, _started())
+    assert len(calls) == 2  # journal bytes, then its parent directory entry
+    append(
+        tmp_path,
+        RUN,
+        RunEnqueued(item_id="run:acme-v-widgets:r1", payload_sha256="0" * 64),
+    )
+    assert len(calls) == 3  # established journal appends only fsync the file
 
 
 def test_fold_derives_state(tmp_path: Path) -> None:

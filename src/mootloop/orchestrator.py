@@ -61,6 +61,7 @@ from mootloop.models.events import (
     CheckpointCleared,
     CheckpointReached,
     GateEvaluated,
+    QueueIntent,
     RunFinished,
     RunMode,
     RunPaused,
@@ -73,6 +74,7 @@ from mootloop.models.events import (
     TurnCompleted,
     TurnDiscarded,
     TurnIntent,
+    validate_run_queue_intent,
 )
 from mootloop.models.gates import GateResult
 from mootloop.models.requests import RequestItem, RequestSet, code_from_request_id
@@ -198,6 +200,29 @@ def _compact_ts(now: str) -> str:
     return "".join(ch for ch in now if ch.isdigit())
 
 
+def _same_queue_intent(existing: QueueIntent | None, proposed: QueueIntent | None) -> bool:
+    """Compare launch work identity while allowing an HTTP retry's later wall clock.
+
+    ``enqueued_at`` controls FIFO ordering but not what work the caller launched. The
+    first committed timestamp remains authoritative and is what recovery materializes.
+    """
+    if existing is None or proposed is None:
+        return existing is proposed
+    return (
+        existing.item_id,
+        existing.lane,
+        existing.kind,
+        existing.payload,
+        existing.payload_sha256,
+    ) == (
+        proposed.item_id,
+        proposed.lane,
+        proposed.kind,
+        proposed.payload,
+        proposed.payload_sha256,
+    )
+
+
 def start_run(
     vault_root: Path | str,
     task: str,
@@ -210,6 +235,7 @@ def start_run(
     idempotent: bool = False,
     firm_preferences_path: Path | str | None = None,
     context_contributions: Sequence[ContextContribution] = (),
+    queue_intent: QueueIntent | None = None,
 ) -> str:
     """Begin a run: write RunStarted under the run lock; finalize if there is no work.
 
@@ -221,8 +247,21 @@ def start_run(
     with RunLock(vault_root, resolved_id):
         if read_events(vault_root, resolved_id):
             if idempotent:
+                existing_events = read_events(vault_root, resolved_id)
+                started = [
+                    event for event in existing_events if isinstance(event, RunStarted)
+                ]
                 context = load_run_context(vault_root, resolved_id)
                 matter = load_matter(vault_root)
+                try:
+                    if queue_intent is not None:
+                        queue_intent = validate_run_queue_intent(
+                            queue_intent,
+                            matter_id=matter.matter_id,
+                            run_id=resolved_id,
+                        )
+                except (ValidationError, ValueError) as exc:
+                    raise OrchestratorError("invalid hosted run queue intent") from exc
                 proposed = resolve_launch_config(
                     vault_root,
                     task,
@@ -248,6 +287,8 @@ def start_run(
                     and context.manifest.context_contributions
                     == list(accepted_contributions)
                     and context.manifest.context_exclusions == list(context_exclusions)
+                    and len(started) == 1
+                    and _same_queue_intent(started[0].queue_intent, queue_intent)
                 )
                 if same_launch:
                     return resolved_id
@@ -257,6 +298,15 @@ def start_run(
             raise OrchestratorError(f"run {resolved_id!r} has already started")
         binding = get_binding(task)
         matter = load_matter(vault_root)
+        try:
+            if queue_intent is not None:
+                queue_intent = validate_run_queue_intent(
+                    queue_intent,
+                    matter_id=matter.matter_id,
+                    run_id=resolved_id,
+                )
+        except (ValidationError, ValueError) as exc:
+            raise OrchestratorError("invalid hosted run queue intent") from exc
         run_context = build_run_context(
             vault_root,
             resolved_id,
@@ -292,6 +342,7 @@ def start_run(
                 task_spec_lock_sha256=(
                     task_spec_lock.record_sha256 if task_spec_lock is not None else None
                 ),
+                queue_intent=queue_intent,
             ),
         )
         _finalize(vault_root, resolved_id, now, run_context)

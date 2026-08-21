@@ -7,9 +7,11 @@ replaying events, so a resume after a kill is exactly a re-fold (plan D10).
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+import hashlib
+import json
+from typing import Annotated, Any, Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from mootloop.models.common import (
     MatterId,
@@ -45,6 +47,71 @@ RunStatus = Literal[
 RunMode = Literal["autonomous", "gated", "observed"]
 
 
+def _payload_sha256(payload: dict[str, Any]) -> str:
+    body = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()
+
+
+class QueueIntent(StrictModel):
+    """Immutable logical work committed atomically with ``RunStarted``.
+
+    The queue is a derived at-least-once delivery mechanism. Exact payload bytes and
+    their digest ride in the journal so recovery never consults mutable live sources
+    to decide what work the launch requested.
+    """
+
+    item_id: str
+    lane: Literal["interactive", "run"]
+    kind: str
+    enqueued_at: str
+    payload: dict[str, Any] = Field(default_factory=dict)
+    payload_sha256: str
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        item_id: str,
+        lane: Literal["interactive", "run"],
+        kind: str,
+        enqueued_at: str,
+        payload: dict[str, Any] | None = None,
+    ) -> QueueIntent:
+        exact_payload = payload or {}
+        return cls(
+            item_id=item_id,
+            lane=lane,
+            kind=kind,
+            enqueued_at=enqueued_at,
+            payload=exact_payload,
+            payload_sha256=_payload_sha256(exact_payload),
+        )
+
+    @model_validator(mode="after")
+    def _digest_matches_payload(self) -> QueueIntent:
+        if self.payload_sha256 != _payload_sha256(self.payload):
+            raise ValueError("payload_sha256 does not match queue intent payload")
+        return self
+
+
+def validate_run_queue_intent(
+    intent: QueueIntent, *, matter_id: str, run_id: str
+) -> QueueIntent:
+    """Revalidate mutable nested payload data and bind launch work to its run."""
+    validated = QueueIntent.model_validate(intent.model_dump(mode="python"))
+    expected_item_id = f"run:{matter_id}:{run_id}"
+    if (
+        validated.item_id != expected_item_id
+        or validated.lane != "run"
+        or validated.kind != "run_turn"
+        or validated.payload
+    ):
+        raise ValueError(
+            "run queue intent must target its enclosing matter/run as empty run_turn work"
+        )
+    return validated
+
+
 class RunStarted(StrictModel):
     kind: Literal["run_started"] = "run_started"
     run_id: RunId
@@ -63,6 +130,30 @@ class RunStarted(StrictModel):
     # journals and direct task starts that do not use the on-ramp.
     task_spec_lock_id: TaskSpecLockId | None = None
     task_spec_lock_sha256: str | None = None
+    # Optional for historical and explicitly local runs. Hosted starts commit this
+    # intent in the same fsync as RunStarted, closing the journal-to-queue crash gap.
+    queue_intent: QueueIntent | None = None
+
+    @model_validator(mode="after")
+    def _queue_intent_matches_run(self) -> RunStarted:
+        if self.queue_intent is not None:
+            validate_run_queue_intent(
+                self.queue_intent,
+                matter_id=self.matter_id,
+                run_id=self.run_id,
+            )
+        return self
+
+
+class RunEnqueued(StrictModel):
+    """Durable acknowledgment that the launch intent reached the queue.
+
+    This is informational and deliberately does not affect the folded run lifecycle.
+    """
+
+    kind: Literal["run_enqueued"] = "run_enqueued"
+    item_id: str
+    payload_sha256: str
 
 
 class StageStarted(StrictModel):
@@ -206,6 +297,7 @@ class TurnIntent(StrictModel):
 
 JournalEvent = Annotated[
     RunStarted
+    | RunEnqueued
     | StageStarted
     | TurnCompleted
     | TurnDiscarded
