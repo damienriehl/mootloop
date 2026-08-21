@@ -210,7 +210,8 @@ def resolve_run_config(
     adapter_raw = _parse_mapping(adapter, "task_adapter")
     adapter_model = _validate_model(TaskAdapterConfig, adapter_raw, adapter, "task_adapter")
     adapter_content = adapter_model.model_dump(
-        exclude={"schema_version", "overridable"}, exclude_unset=True
+        exclude={"schema_version", "overridable", "pipeline_strategies"},
+        exclude_unset=True,
     )
     # Layer two owns the task shape and may always replace defaults.
     merged = _deep_merge(merged, adapter_content)

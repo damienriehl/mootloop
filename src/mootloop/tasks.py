@@ -10,13 +10,16 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from mootloop.errors import TaskConfigError
 from mootloop.gates.runtime import DEFAULT_GATE_CATALOG
 from mootloop.models.rubric import Rubric, load_rubric
 from mootloop.models.task import TaskAdapterConfig, load_task_config
 from mootloop.resources import rubric_path, task_config_path
+
+if TYPE_CHECKING:
+    from mootloop.models.pipeline import ResolvedPipeline
 
 
 class TaskAdapter(Protocol):
@@ -58,12 +61,16 @@ class DiscoveryResponsesAdapter:
 
 @dataclass(frozen=True)
 class TaskBinding:
-    """A resolved task: its declarative config, its behavior adapter, and the LOCKED
-    rubric its config pins (loaded once, hash-checked at bind time)."""
+    """A resolved task and optional launch-committed pipeline.
+
+    The declarative config pins the LOCKED rubric; materialized run bindings replace
+    it with the exact effective graph and carry the matching pipeline commitment.
+    """
 
     config: TaskAdapterConfig
     adapter: TaskAdapter
     rubric: Rubric
+    pipeline: ResolvedPipeline | None = None
 
 
 # task name -> adapter factory. Add a task by registering here + shipping its YAML.

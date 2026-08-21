@@ -14,7 +14,7 @@ from pydantic import ValidationError
 from mootloop import budget
 from mootloop.config import ConfigLayerInput, default_config_layer, resolve_run_config
 from mootloop.context_assembly import assemble_context, select_launch_contributions
-from mootloop.errors import MigrationError, OrchestratorError, TaskSpecError
+from mootloop.errors import MigrationError, OrchestratorError, PipelineConfigError, TaskSpecError
 from mootloop.facts import FACTS_PATH
 from mootloop.facts import fold as fold_facts
 from mootloop.migrations import load_versioned_json
@@ -36,11 +36,13 @@ from mootloop.models.corpus import MANIFEST_PATH, Manifest
 from mootloop.models.events import RunMode, RunStarted
 from mootloop.models.facts import Fact
 from mootloop.models.matter import MatterConfig
+from mootloop.models.pipeline import ResolvedPipeline
 from mootloop.models.requests import RequestItem, RequestSet
 from mootloop.models.rubric import Rubric, sha256_hex
 from mootloop.models.task import TaskAdapterConfig
 from mootloop.models.taskspec import TaskSpec, TaskSpecLock
 from mootloop.persistence import sha256_file as _sha256_path
+from mootloop.pipeline import compile_pipeline
 from mootloop.resources import REPO_ROOT, load_persona_bodies, rubric_path, task_config_path
 from mootloop.tasks import TaskBinding
 from mootloop.taskspec import TaskSpecStore, require_current_lock
@@ -76,6 +78,31 @@ class RunContext:
     corpus_snapshot: CorpusSnapshot | None = None
 
 
+def resolve_launch_pipeline(
+    vault_root: Path | str,
+    binding: TaskBinding,
+    matter_config: MatterConfig,
+    resolved_config: ResolvedRunConfig,
+) -> ResolvedPipeline:
+    """Compile an exact graph from the two launch sources that own it."""
+    matter_raw = safe_vault_path(vault_root, "matter.yaml").read_bytes()
+    adapter_raw = task_config_path(binding.config.task).read_bytes()
+    try:
+        captured_matter = MatterConfig.model_validate(yaml.safe_load(matter_raw))
+        captured_adapter = TaskAdapterConfig.model_validate(yaml.safe_load(adapter_raw))
+    except (ValidationError, yaml.YAMLError) as exc:
+        raise OrchestratorError(f"pipeline source changed or is invalid: {exc}") from exc
+    if captured_matter != matter_config or captured_adapter != binding.config:
+        raise OrchestratorError("pipeline source changed while selection was resolved")
+    return compile_pipeline(
+        captured_adapter,
+        captured_matter,
+        matter_sha256=_sha256(matter_raw),
+        adapter_sha256=_sha256(adapter_raw),
+        resolved_config=resolved_config,
+    )
+
+
 def context_manifest_path(vault_root: Path | str, run_id: str) -> Path:
     return safe_vault_path(vault_root, "runs", run_id, *MANIFEST_SUBPATH)
 
@@ -104,7 +131,9 @@ def config_digest(config: ResolvedRunConfig) -> str:
 
 def _legacy_config_digest(config: TaskAdapterConfig) -> str:
     """Digest written by v1.0 RunStarted events; retained only for migration replay."""
-    return _sha256(config.model_dump_json(exclude={"overridable"}).encode("utf-8"))[:16]
+    return _sha256(
+        config.model_dump_json(exclude={"overridable", "pipeline_strategies"}).encode("utf-8")
+    )[:16]
 
 
 def _is_within(path: Path, root: Path) -> bool:
@@ -413,6 +442,13 @@ def build_run_context(
         or captured_rubric != binding.rubric
     ):
         raise OrchestratorError("launch context changed while the run snapshot was captured")
+    pipeline = compile_pipeline(
+        captured_adapter,
+        captured_matter,
+        matter_sha256=_sha256(matter_raw),
+        adapter_sha256=_sha256(adapter_raw),
+        resolved_config=resolved_config,
+    )
     if captured_rubric.locked:
         recorded = rubric_lock_raw.decode("utf-8").split()[0] if rubric_lock_raw else ""
         if recorded != sha256_hex(rubric_raw.decode("utf-8")):
@@ -479,6 +515,7 @@ def build_run_context(
         task_spec_lock=task_spec_lock,
         adapter_config=captured_adapter,
         resolved_config=resolved_config,
+        pipeline=pipeline,
         adapter_behavior=AdapterBehavior(
             task=binding.adapter.task,
             draft_directive=binding.adapter.draft_directive(),
@@ -511,25 +548,11 @@ def _materialize(
         _draft_directive=manifest.adapter_behavior.draft_directive,
         _judge_question=manifest.adapter_behavior.judge_question,
     )
-    effective_config = TaskAdapterConfig.model_validate(
-        {
-            "task": manifest.resolved_config.task,
-            "stages": manifest.resolved_config.stages,
-            "loop_caps": manifest.resolved_config.loop_caps.model_dump(),
-            "panels": manifest.resolved_config.panels.model_dump(),
-            "convergence": manifest.resolved_config.convergence.model_dump(),
-            "gates": manifest.resolved_config.gates,
-            "rubric_id": manifest.resolved_config.rubric_id,
-            "rubric_threshold": manifest.resolved_config.rubric_threshold,
-            "restructure_threshold": manifest.resolved_config.restructure_threshold,
-            "deliverables": manifest.resolved_config.deliverables,
-            "overridable": manifest.resolved_config.overridable_structural_paths,
-        }
-    )
     binding = TaskBinding(
-        config=effective_config,
+        config=manifest.pipeline.effective_config.model_copy(deep=True),
         adapter=adapter,
         rubric=manifest.rubric,
+        pipeline=manifest.pipeline,
     )
     units = [
         item
@@ -667,7 +690,31 @@ def load_run_context(vault_root: Path | str, run_id: str) -> RunContext:
             f"run {run_id!r} context manifest failed validation: {exc}"
         ) from exc
     raw_payload = json.loads(raw)
-    legacy_manifest = raw_payload.get("schema_version") == "1.0"
+    raw_schema_version = raw_payload.get("schema_version")
+    legacy_manifest = raw_schema_version == "1.0"
+    if raw_schema_version == RUN_CONTEXT_SCHEMA_VERSION:
+        matter_sources = [source for source in manifest.sources if source.kind == "matter_config"]
+        adapter_sources = [source for source in manifest.sources if source.kind == "task_adapter"]
+        if len(matter_sources) != 1 or len(adapter_sources) != 1:
+            raise OrchestratorError(
+                f"run {run_id!r} context manifest has ambiguous pipeline provenance"
+            )
+        try:
+            expected_pipeline = compile_pipeline(
+                manifest.adapter_config,
+                manifest.matter_config,
+                matter_sha256=matter_sources[0].sha256,
+                adapter_sha256=adapter_sources[0].sha256,
+                resolved_config=manifest.resolved_config,
+            )
+        except (PipelineConfigError, ValidationError) as exc:
+            raise OrchestratorError(
+                f"run {run_id!r} context manifest pipeline cannot be reproduced"
+            ) from exc
+        if manifest.pipeline != expected_pipeline:
+            raise OrchestratorError(
+                f"run {run_id!r} context manifest pipeline does not match captured inputs"
+            )
     expected_config_digest = (
         _legacy_config_digest(manifest.adapter_config)
         if legacy_manifest

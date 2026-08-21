@@ -153,7 +153,8 @@ def test_start_commits_versioned_manifest_and_task_spec(tmp_path: Path) -> None:
     started = next(event for event in read_events(vault, run_id) if isinstance(event, RunStarted))
     context = load_run_context(vault, run_id)
     assert started.context_manifest_sha256
-    assert context.manifest.schema_version == "1.3"
+    assert context.manifest.schema_version == "1.4"
+    assert context.manifest.pipeline.strategy == "thin-full"
     assert context.manifest.task_spec == spec
     assert context.manifest.task_spec_lock is not None
     assert context.manifest.adapter_behavior.draft_directive
@@ -287,6 +288,63 @@ def test_idempotent_run_reuse_compares_current_effective_config(tmp_path: Path) 
         firm_preferences_path=firm,
     )
     assert load_run_context(vault, new_run).manifest.resolved_config.rubric_threshold == 0.67
+
+
+def test_idempotent_run_reuse_compares_persona_and_strategy_selection(tmp_path: Path) -> None:
+    vault = _vault(tmp_path)
+    run_id = start_run(
+        vault,
+        TASK,
+        NOW,
+        run_id="ctx-idempotent-pipeline",
+        idempotent=True,
+    )
+    original = load_run_context(vault, run_id).manifest.pipeline
+    matter = yaml.safe_load((vault / "matter.yaml").read_text(encoding="utf-8"))
+    matter["pipeline_strategy"] = "adversarial-first"
+    matter["personas"] = {"oc_associate": False}
+    (vault / "matter.yaml").write_text(yaml.safe_dump(matter), encoding="utf-8")
+
+    with pytest.raises(OrchestratorError, match="different launch context"):
+        start_run(vault, TASK, NOW, run_id=run_id, idempotent=True)
+
+    assert load_run_context(vault, run_id).manifest.pipeline == original
+    next_id = start_run(vault, TASK, NOW, run_id="ctx-idempotent-pipeline-new")
+    selected = load_run_context(vault, next_id).manifest.pipeline
+    assert selected.strategy == "adversarial-first"
+    assert selected.oc_personas == (PersonaName.OC_PARTNER,)
+
+
+def test_pipeline_must_reproduce_from_captured_matter_and_adapter(tmp_path: Path) -> None:
+    vault = _vault(tmp_path)
+    run_id = start_run(vault, TASK, NOW, run_id="ctx-pipeline-derived")
+    manifest_path = _manifest_path(vault, run_id)
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    payload["pipeline"]["strategy"] = "adversarial-first"
+    payload["pipeline"]["effective_config"]["stages"] = [
+        "associate_draft",
+        "oc_attack",
+        "bolster",
+        "partner_loop",
+        "judge_panel",
+        "restructure",
+        "rubric_gate",
+        "assemble",
+    ]
+    manifest_raw = (json.dumps(payload, indent=2) + "\n").encode()
+    manifest_path.write_bytes(manifest_raw)
+
+    started = next(event for event in read_events(vault, run_id) if isinstance(event, RunStarted))
+    started_payload = started.model_dump(mode="json")
+    started_payload["context_manifest_sha256"] = hashlib.sha256(manifest_raw).hexdigest()
+    (vault / "runs" / run_id / "journal.jsonl").write_text(
+        json.dumps(started_payload, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+    clear_cache()
+
+    with pytest.raises(OrchestratorError, match="pipeline does not match captured inputs"):
+        load_run_context(vault, run_id)
 
 
 def test_replay_ignores_all_live_config_mutations_and_new_run_uses_them(

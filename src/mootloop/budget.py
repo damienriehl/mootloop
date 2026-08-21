@@ -213,19 +213,30 @@ def estimate_run(
     obj = assume.objections_per_request
 
     # (stage, role, min_calls_per_request, max_calls_per_request)
-    plan: list[tuple[str, str, int, int]] = [
-        ("associate_draft", "personas", 1, 1),
-        ("partner_loop:redraft", "personas", 0, ap - 1),
-        ("partner_loop:critique", "personas", 1, ap),
-        ("partner_loop:rubric", "rubric", 1, ap),
-        ("oc_attack", "personas", oc, oc),
-        ("bolster", "personas", bolster, bolster),
-        ("judge_panel", "judges", judges * obj, judges * obj),
-        # Costed restructure pass fires only when an objection is weak (plan Phase 6):
-        # 0 in the converge-early floor, up to the cap in the all-caps ceiling.
-        ("restructure", "personas", 0, config.loop_caps.restructure),
-        ("rubric_gate", "rubric", rubric_panel, rubric_panel),
-    ]
+    plan: list[tuple[str, str, int, int]] = []
+    for stage in config.stages:
+        if stage == "associate_draft":
+            plan.append((stage, "personas", 1, 1))
+        elif stage == "partner_loop":
+            plan.extend(
+                [
+                    ("partner_loop:redraft", "personas", 0, ap - 1),
+                    ("partner_loop:critique", "personas", 1, ap),
+                ]
+            )
+            if "rubric" in config.gates:
+                plan.append(("partner_loop:rubric", "rubric", 1, ap))
+        elif stage == "oc_attack":
+            plan.append((stage, "personas", oc, oc))
+        elif stage == "bolster":
+            plan.append((stage, "personas", bolster, bolster))
+        elif stage == "judge_panel":
+            plan.append((stage, "judges", judges * obj, judges * obj))
+        elif stage == "restructure":
+            # Costed restructure fires only when an objection is weak.
+            plan.append((stage, "personas", 0, config.loop_caps.restructure))
+        elif stage == "rubric_gate":
+            plan.append((stage, "rubric", rubric_panel, rubric_panel))
 
     breakdown: list[StageEstimate] = []
     min_total = 0.0

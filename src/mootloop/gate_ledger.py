@@ -124,7 +124,14 @@ class GateLedgerDoc:
 def build_ledger(vault_root: Path | str, run_id: str) -> GateLedgerDoc:
     """Assemble the gate-ledger document (pure; no writes)."""
     per_request, superseded, citation_status = _turn_gate_status(vault_root, run_id)
-    units = load_run_context(vault_root, run_id).units
+    run_context = load_run_context(vault_root, run_id)
+    units = run_context.units
+    configured_turn_gates = tuple(
+        gate for gate in TURN_GATES if gate in run_context.binding.config.gates
+    )
+    blocking_turn_gates = tuple(
+        gate for gate in BLOCKING_TURN_GATES if gate in configured_turn_gates
+    )
     open_decisions = DecisionStore(vault_root, run_id).list_open()
     open_by_request: dict[str, int] = {}
     request_less_open = 0
@@ -143,7 +150,7 @@ def build_ledger(vault_root: Path | str, run_id: str) -> GateLedgerDoc:
     for unit in units:
         rid = str(unit.request_id)
         recorded = per_request.get(rid, {})
-        row = {gate: recorded.get(gate, "pending") for gate in TURN_GATES}
+        row = {gate: recorded.get(gate, "pending") for gate in configured_turn_gates}
         row["citations"] = citation_status
         row["decisions"] = (
             "fail" if (open_by_request.get(rid, 0) or request_less_open) else "pass"
@@ -151,7 +158,13 @@ def build_ledger(vault_root: Path | str, run_id: str) -> GateLedgerDoc:
         row["attestation"] = attestation_status
         gates[rid] = row
 
-    ready, blockers = _export_ready(gates, decisions_status, attestation_status, citation_status)
+    ready, blockers = _export_ready(
+        gates,
+        decisions_status,
+        attestation_status,
+        citation_status,
+        blocking_turn_gates,
+    )
     return GateLedgerDoc(
         run_id=run_id,
         export_ready=ready,
@@ -171,6 +184,7 @@ def _export_ready(
     decisions_status: str,
     attestation_status: str,
     citation_status: str,
+    blocking_turn_gates: tuple[str, ...],
 ) -> tuple[bool, list[str]]:
     blockers: list[str] = []
     if decisions_status in _BLOCKING:
@@ -180,7 +194,7 @@ def _export_ready(
     if citation_status in _BLOCKING:
         blockers.append("citations")
     for row in gates.values():
-        for gate in BLOCKING_TURN_GATES:
+        for gate in blocking_turn_gates:
             if row.get(gate, "pending") in _BLOCKING and gate not in blockers:
                 blockers.append(gate)
     return (not blockers), blockers

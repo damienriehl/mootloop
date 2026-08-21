@@ -34,6 +34,7 @@ from mootloop.context import (
     load_run_context,
     load_run_corpus,
     resolve_launch_config,
+    resolve_launch_pipeline,
     write_run_context,
 )
 from mootloop.context_assembly import assemble_context, select_launch_contributions
@@ -151,6 +152,8 @@ def _context_for(
     tier_models: dict[str, str] | None = None,
     assembled_context: tuple[AssembledContextItem, ...] = (),
 ) -> StageContext:
+    if binding.pipeline is None:
+        raise OrchestratorError("run binding has no committed pipeline")
     return StageContext(
         run_id=run_id,
         req_index=req_index,
@@ -160,6 +163,7 @@ def _context_for(
         adapter=binding.adapter,
         rubric=binding.rubric,
         state=state,
+        pipeline=binding.pipeline,
         max_attempts=max_attempts,
         tier_models=tier_models or {},
         assembled_context=assembled_context,
@@ -270,6 +274,12 @@ def start_run(
                     max_attempts=max_attempts,
                     firm_preferences_path=firm_preferences_path,
                 )
+                proposed_pipeline = resolve_launch_pipeline(
+                    vault_root,
+                    get_binding(task),
+                    matter,
+                    proposed,
+                )
                 accepted_contributions, context_exclusions = select_launch_contributions(
                     context_contributions,
                     matter_id=MatterId(matter.matter_id),
@@ -284,6 +294,7 @@ def start_run(
                     )
                     == task_spec_id
                     and context.manifest.resolved_config == proposed
+                    and context.manifest.pipeline == proposed_pipeline
                     and context.manifest.context_contributions == list(accepted_contributions)
                     and context.manifest.context_exclusions == list(context_exclusions)
                     and len(started) == 1
@@ -1348,8 +1359,18 @@ def estimate_run_cost(
 ) -> EstimateRange:
     """A pre-run cost range + per-stage breakdown for a task at a tier (plan D5)."""
     binding = get_binding(task)
+    matter = load_matter(vault_root)
+    resolved_config = resolve_launch_config(
+        vault_root,
+        task,
+        matter,
+        mode=None,
+        max_attempts=None,
+        firm_preferences_path=None,
+    )
+    pipeline = resolve_launch_pipeline(vault_root, binding, matter, resolved_config)
     units = load_request_units(vault_root)
-    return budget.estimate_run(len(units), binding.config, tier, on)
+    return budget.estimate_run(len(units), pipeline.effective_config, tier, on)
 
 
 def matter_tier(vault_root: Path | str) -> str:

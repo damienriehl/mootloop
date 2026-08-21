@@ -1,14 +1,36 @@
 # MootLoop
 
-**Agentic law firm simulator.** Six personas — Associate, Partner, Opposing
-Counsel, Judge, Rubric-Judge, and Cite-Checker — draft, attack, and adjudicate
-legal work product through rubric-gated loops. A human attorney stays **on the
-loop**: privilege calls, RFA dispositions, and attestation are human-by-design
+**Agentic law firm simulator.** Six runnable personas — Associate, Partner,
+Opposing-Counsel Associate, Opposing-Counsel Partner, Judge, and Rubric Judge —
+draft, attack, and adjudicate legal work product through rubric-gated loops. A human
+attorney stays **on the loop**: privilege calls, RFA dispositions, and attestation are
+human-by-design
 gates, recorded as explicit primitives.
 
 The pipeline is task-agnostic; the first task adapter is **discovery responses**
 (interrogatories, requests for production, requests for admission) under the
 Minnesota / federal rules.
+
+Persona ownership and pipeline order are launch-bound in `matter.yaml`:
+
+```yaml
+pipeline_strategy: thin-full  # thin-full | deep-core | adversarial-first
+personas:
+  associate: true
+  partner: true
+  oc_associate: true
+  oc_partner: true
+  judge: true
+  rubric_judge: true
+```
+
+`thin-full` runs the complete low-cap graph; `deep-core` gives the
+Associate↔Partner core at least three rounds before external review;
+`adversarial-first` moves both opposing-counsel attacks and the bolster pass before
+partner review. A bypass either delegates its work to an enabled owner or removes the
+dependent stages and cost from the immutable run manifest. A run with no drafting
+owner fails before its journal is created. Jury and cite-checker actions are reserved
+for the separately tested panel/citation unit; they are not pretend toggles here.
 
 ## Who it's for
 

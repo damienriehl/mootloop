@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import date
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from mootloop.models.common import MATTER_ID_PATTERN, VersionedModel
-from mootloop.models.config import BudgetTier, RunConfigOverlay, RunMode
+from mootloop.models.config import BudgetTier, PipelineStrategy, RunConfigOverlay, RunMode
 
 SCHEMA_VERSION = "1.0"
 
@@ -52,10 +53,24 @@ class Deadline(_Model):
 class Personas(_Model):
     associate: bool = True
     partner: bool = True
-    opposing_counsel: bool = True
+    oc_associate: bool = True
+    oc_partner: bool = True
     judge: bool = True
     rubric_judge: bool = True
-    cite_checker: bool = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def _import_legacy_keys(cls, value: object) -> object:
+        """Translate retired selection keys without keeping them user-facing."""
+        if not isinstance(value, Mapping):
+            return value
+        imported = dict(value)
+        opposing = imported.pop("opposing_counsel", None)
+        if opposing is not None:
+            imported.setdefault("oc_associate", opposing)
+            imported.setdefault("oc_partner", opposing)
+        imported.pop("cite_checker", None)
+        return imported
 
 
 class Panels(_Model):
@@ -111,6 +126,7 @@ class MatterConfig(VersionedModel):
     our_side: Side
     deadlines: list[Deadline] = Field(default_factory=list)
     personas: Personas = Field(default_factory=Personas)
+    pipeline_strategy: PipelineStrategy = "thin-full"
     panels: Panels = Field(default_factory=Panels)
     gates: list[Gate] = Field(default_factory=_default_gates)
     # Run mode default (plan D12 precedence: defaults -> matter.yaml -> --mode flag).

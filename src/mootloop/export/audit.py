@@ -18,6 +18,7 @@ from mootloop import attest
 from mootloop.citations.extract import extract_citations
 from mootloop.citations.ledger import DEFAULT_MAX_CACHE_AGE_DAYS, VerificationLedger
 from mootloop.citations.verify import CITATOR_DISCLOSURE
+from mootloop.context import load_run_context
 from mootloop.decisions import DecisionStore
 from mootloop.export import deliverables_dir
 from mootloop.journal import load_state, read_events
@@ -71,6 +72,8 @@ def _decisions_by_request(vault_root: Path | str, run_id: str) -> dict[str, list
 def build_audit_log(vault_root: Path | str, run_id: str, now: str) -> Path:
     """Write ``deliverables/<run-id>/audit-log.json`` and return its path."""
     state = load_state(vault_root, run_id)
+    run_context = load_run_context(vault_root, run_id)
+    rubric_enabled = "rubric" in run_context.binding.config.gates
     ledger = VerificationLedger(vault_root).folded(
         now=datetime.fromisoformat(now), max_cache_age_days=DEFAULT_MAX_CACHE_AGE_DAYS
     )
@@ -120,7 +123,14 @@ def build_audit_log(vault_root: Path | str, run_id: str, now: str) -> Path:
                 "contributing_turns": contributing,
                 "citations": citations,
                 "decisions_applied": decisions_by_request.get(rid, []),
-                "rubric": rubric_scores.get(rid, {"status": "pending", "detail": ""}),
+                "rubric": rubric_scores.get(
+                    rid,
+                    (
+                        {"status": "pending", "detail": ""}
+                        if rubric_enabled
+                        else {"status": "bypassed", "detail": "rubric judge disabled at launch"}
+                    ),
+                ),
                 "attestation": attestation.status,
             }
         )

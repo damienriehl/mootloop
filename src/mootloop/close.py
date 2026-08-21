@@ -42,6 +42,7 @@ from mootloop.models.lifecycle import CloseRecord
 from mootloop.models.matter import MatterConfig
 from mootloop.models.matters import MatterSummary
 from mootloop.models.panels import PanelReport
+from mootloop.models.pipeline import ResolvedPipeline
 from mootloop.models.requests import RequestSet
 from mootloop.models.task import TaskAdapterConfig
 from mootloop.models.taskspec import TaskSpec, TaskSpecLock
@@ -240,6 +241,10 @@ EXEMPT_MODELS: dict[type[VersionedModel], str] = {
         "not a matter-scoped close store."
     ),
     ResolvedRunConfig: (
+        "Nested inside each registered RunContextManifest, never persisted as a standalone "
+        "matter-vault store."
+    ),
+    ResolvedPipeline: (
         "Nested inside each registered RunContextManifest, never persisted as a standalone "
         "matter-vault store."
     ),

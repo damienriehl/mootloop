@@ -29,8 +29,8 @@ def _minimal_dict() -> dict:
 
 def test_minimal_config_applies_defaults() -> None:
     cfg = MatterConfig.model_validate(_minimal_dict())
-    # All six personas default enabled.
-    assert cfg.personas.associate and cfg.personas.cite_checker
+    # All six currently runnable personas default enabled.
+    assert all(getattr(cfg.personas, name) for name in type(cfg.personas).model_fields)
     # Jury off by default.
     assert cfg.panels.jury_enabled is False
     # Default gate table present with correct modes.

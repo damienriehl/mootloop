@@ -13,13 +13,14 @@ from mootloop.models.config import ResolvedRunConfig
 from mootloop.models.corpus import Manifest
 from mootloop.models.facts import Fact
 from mootloop.models.matter import MatterConfig
+from mootloop.models.pipeline import ResolvedPipeline
 from mootloop.models.requests import RequestSet
 from mootloop.models.rubric import Rubric
 from mootloop.models.run import PersonaName
 from mootloop.models.task import TaskAdapterConfig
 from mootloop.models.taskspec import TaskSpec, TaskSpecLock
 
-SCHEMA_VERSION = "1.3"
+SCHEMA_VERSION = "1.4"
 CORPUS_SNAPSHOT_SCHEMA_VERSION = "1.0"
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _CONTRIBUTION_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._:-]{0,127}$")
@@ -178,6 +179,7 @@ class RunContextManifest(VersionedModel):
     task_spec_lock: TaskSpecLock | None = None
     adapter_config: TaskAdapterConfig
     resolved_config: ResolvedRunConfig
+    pipeline: ResolvedPipeline
     adapter_behavior: AdapterBehavior
     persona_bodies: dict[PersonaName, str]
     rubric: Rubric

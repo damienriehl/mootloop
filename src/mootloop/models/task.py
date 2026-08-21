@@ -1,10 +1,10 @@
 """`TaskAdapterConfig` — the declarative half of a task adapter (plan D1).
 
-The YAML declares pipeline shape (stages), per-request loop caps, panel counts, the
-gate list, the locked rubric id, and the deliverable set. The *behavior* half (how a
-Judge question is framed, etc.) is a registered Python class (see `mootloop.tasks`).
-The core orchestrator depends on this config + the adapter protocol — never on a
-task name literal.
+The YAML declares the default shape, selectable strategy graphs, per-request loop
+caps, panel counts, gates, locked rubric id, and deliverables. The *behavior* half
+(how a Judge question is framed, etc.) is a registered Python class (see
+`mootloop.tasks`). The core orchestrator depends on this config + the adapter protocol
+— never on a task name literal.
 """
 
 from __future__ import annotations
@@ -16,7 +16,11 @@ from pydantic import Field, ValidationError, field_validator
 
 from mootloop.errors import TaskConfigError
 from mootloop.models.common import RubricId, StrictModel, VersionedModel
-from mootloop.models.config import IMMUTABLE_IDENTITY_PATHS, STRUCTURAL_LEAF_PATHS
+from mootloop.models.config import (
+    IMMUTABLE_IDENTITY_PATHS,
+    STRUCTURAL_LEAF_PATHS,
+    PipelineStrategy,
+)
 
 SCHEMA_VERSION = "1.0"
 
@@ -52,6 +56,13 @@ class ConvergenceConfig(StrictModel):
     coverage_floor: float = Field(default=0.80, ge=0.0, le=1.0)
 
 
+class PipelineStrategyConfig(StrictModel):
+    """One adapter-authored deterministic graph and its core-loop depth."""
+
+    stages: tuple[str, ...] = Field(min_length=1)
+    associate_partner_cap: int = Field(ge=1)
+
+
 class TaskAdapterConfig(VersionedModel):
     """The declarative task adapter loaded from ``config/tasks/<task>.yaml``."""
 
@@ -68,7 +79,24 @@ class TaskAdapterConfig(VersionedModel):
     # restructure pass on its request (plan Phase 6).
     restructure_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
     deliverables: list[str] = Field(default_factory=list)
+    pipeline_strategies: dict[PipelineStrategy, PipelineStrategyConfig] = Field(
+        default_factory=dict
+    )
     overridable: tuple[str, ...] = ()
+
+    @field_validator("pipeline_strategies")
+    @classmethod
+    def _validate_pipeline_strategies(
+        cls,
+        strategies: dict[PipelineStrategy, PipelineStrategyConfig],
+    ) -> dict[PipelineStrategy, PipelineStrategyConfig]:
+        if not strategies:
+            return strategies
+        required = {"thin-full", "deep-core", "adversarial-first"}
+        if set(strategies) != required:
+            missing = ", ".join(sorted(required - set(strategies))) or "(none)"
+            raise ValueError(f"pipeline_strategies must define all strategies; missing: {missing}")
+        return strategies
 
     @field_validator("overridable")
     @classmethod

@@ -36,6 +36,7 @@ from mootloop.models.common import RunId, TurnId
 from mootloop.models.context import AssembledContextItem
 from mootloop.models.events import RunState
 from mootloop.models.panels import PanelResult
+from mootloop.models.pipeline import ResolvedPipeline
 from mootloop.models.requests import RequestItem, code_from_request_id
 from mootloop.models.rubric import Rubric
 from mootloop.models.run import (
@@ -145,6 +146,7 @@ class StageContext:
     adapter: TaskAdapter
     rubric: Rubric
     state: RunState
+    pipeline: ResolvedPipeline
     max_attempts: int = 3
     tier_models: Mapping[str, str] = field(default_factory=dict)
     assembled_context: tuple[AssembledContextItem, ...] = ()
@@ -157,6 +159,8 @@ class StageContext:
 
     def __post_init__(self) -> None:
         """Detach every nested stage input from its mutable caller-owned source."""
+        if self.config != self.pipeline.effective_config:
+            raise TaskConfigError("stage config does not match the committed pipeline")
         object.__setattr__(self, "request", self.request.model_copy(deep=True))
         object.__setattr__(
             self,
@@ -166,6 +170,7 @@ class StageContext:
         object.__setattr__(self, "config", self.config.model_copy(deep=True))
         object.__setattr__(self, "rubric", self.rubric.model_copy(deep=True))
         object.__setattr__(self, "state", self.state.model_copy(deep=True))
+        object.__setattr__(self, "pipeline", self.pipeline.model_copy(deep=True))
         object.__setattr__(self, "tier_models", MappingProxyType(dict(self.tier_models)))
         object.__setattr__(
             self,
@@ -253,9 +258,23 @@ class StageContext:
                 return self.record(seq)
         return None
 
+    def partner_draft(self, round_number: int) -> TurnRecord:
+        """The draft reviewed in a partner round, including adversarial-first bolster."""
+        if round_number == 1 and self.pipeline.strategy == "adversarial-first":
+            for k in range(self.config.loop_caps.bolster, 0, -1):
+                seq = self.layout.bolster_slot(k)
+                if self.done(seq):
+                    return self.record(seq)
+        return self.record(self.layout.draft(round_number))
+
     def judged_draft(self) -> TurnRecord | None:
         """The draft the judge panel ruled on (bolster if present, else latest) —
         excludes any later restructure draft (plan Phase 6)."""
+        if self.pipeline.strategy == "adversarial-first":
+            for r in range(self.config.loop_caps.associate_partner, 1, -1):
+                seq = self.layout.draft(r)
+                if self.done(seq):
+                    return self.record(seq)
         for k in range(self.config.loop_caps.bolster, 0, -1):
             seq = self.layout.bolster_slot(k)
             if self.done(seq):
@@ -291,7 +310,7 @@ class StageContext:
     def _round_history(self, upto_r: int) -> list[RoundState]:
         history: list[RoundState] = []
         for rr in range(1, upto_r + 1):
-            draft = DraftOutput.model_validate(self.record(self.layout.draft(rr)).output)
+            draft = DraftOutput.model_validate(self.partner_draft(rr).output)
             rubric_out = RubricScoreOutput.model_validate(
                 self.record(self.layout.rubric_loop(rr)).output
             )
@@ -366,7 +385,7 @@ class AssociateDraftStage:
         return [
             ctx._spec(
                 seq,
-                PersonaName.ASSOCIATE,
+                ctx.pipeline.drafting_persona,
                 self.name,
                 SCHEMA_DRAFT,
                 _draft_context(ctx, {"round": 1}),
@@ -380,18 +399,23 @@ class PartnerLoopStage:
 
     name = "partner_loop"
 
+    @staticmethod
+    def _minimum_rounds(ctx: StageContext) -> int:
+        return 3 if ctx.pipeline.strategy == "deep-core" else 1
+
     def _settled_round(self, ctx: StageContext) -> int | None:
         """The round at which the loop settled, or None if still in progress."""
         ap = ctx.config.loop_caps.associate_partner
         for r in range(1, ap + 1):
-            if not (
-                ctx.done(ctx.layout.draft(r))
-                and ctx.done(ctx.layout.critique(r))
-                and ctx.done(ctx.layout.rubric_loop(r))
-            ):
+            complete = ctx.done(ctx.layout.draft(r)) and ctx.done(ctx.layout.critique(r))
+            if ctx.pipeline.rubric_judge_enabled:
+                complete = complete and ctx.done(ctx.layout.rubric_loop(r))
+            if not complete:
                 return None
             verdict = ctx.record(ctx.layout.critique(r)).output["verdict"]
-            if verdict == "approve" or r == ap or ctx.converged_at(r):
+            converged = ctx.pipeline.rubric_judge_enabled and ctx.converged_at(r)
+            may_settle = r >= self._minimum_rounds(ctx)
+            if r == ap or (may_settle and (verdict == "approve" or converged)):
                 return r
         return None
 
@@ -409,7 +433,7 @@ class PartnerLoopStage:
                 return [
                     ctx._spec(
                         draft_seq,
-                        PersonaName.ASSOCIATE,
+                        ctx.pipeline.drafting_persona,
                         self.name,
                         SCHEMA_DRAFT,
                         _draft_context(
@@ -417,7 +441,7 @@ class PartnerLoopStage:
                             {
                                 "round": r,
                                 "partner_instructions": prior.output["instructions"],
-                                "previous_draft": ctx.record(ctx.layout.draft(r - 1)).output,
+                                "previous_draft": ctx.partner_draft(r - 1).output,
                             },
                         ),
                     )
@@ -429,21 +453,23 @@ class PartnerLoopStage:
                         PersonaName.PARTNER,
                         self.name,
                         SCHEMA_CRITIQUE,
-                        {"draft": ctx.record(draft_seq).output},
+                        {"draft": ctx.partner_draft(r).output},
                     )
                 ]
-            if not ctx.done(rubric_seq):
+            if ctx.pipeline.rubric_judge_enabled and not ctx.done(rubric_seq):
                 return [
                     ctx._spec(
                         rubric_seq,
                         PersonaName.RUBRIC_JUDGE,
                         self.name,
                         SCHEMA_RUBRIC,
-                        _rubric_context(ctx, ctx.record(draft_seq).output, {"round": r}),
+                        _rubric_context(ctx, ctx.partner_draft(r).output, {"round": r}),
                     )
                 ]
             verdict = ctx.record(crit_seq).output["verdict"]
-            if verdict == "approve" or r == ap or ctx.converged_at(r):
+            converged = ctx.pipeline.rubric_judge_enabled and ctx.converged_at(r)
+            may_settle = r >= self._minimum_rounds(ctx)
+            if r == ap or (may_settle and (verdict == "approve" or converged)):
                 return []  # settled — remaining redraft slots are skipped
         return []
 
@@ -463,10 +489,17 @@ class OCAttackStage:
                 return [
                     ctx._spec(
                         seq,
-                        PersonaName.OC_ASSOCIATE,
+                        ctx.pipeline.oc_personas[(k - 1) % len(ctx.pipeline.oc_personas)],
                         self.name,
                         SCHEMA_CRITIQUE,
-                        {"draft": draft.output if draft else None},
+                        {
+                            "draft": draft.output if draft else None,
+                            "prior_critiques": [
+                                ctx.record(ctx.layout.oc_slot(prior)).output
+                                for prior in range(1, k)
+                                if ctx.done(ctx.layout.oc_slot(prior))
+                            ],
+                        },
                     )
                 ]
         return []
@@ -492,7 +525,7 @@ class BolsterStage:
                 return [
                     ctx._spec(
                         seq,
-                        PersonaName.ASSOCIATE,
+                        ctx.pipeline.drafting_persona,
                         self.name,
                         SCHEMA_DRAFT,
                         _draft_context(
@@ -588,7 +621,7 @@ class RestructureStage:
                 return [
                     ctx._spec(
                         seq,
-                        PersonaName.ASSOCIATE,
+                        ctx.pipeline.drafting_persona,
                         self.name,
                         SCHEMA_DRAFT,
                         _draft_context(

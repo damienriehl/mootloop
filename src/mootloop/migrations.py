@@ -15,6 +15,8 @@ from pydantic import ValidationError
 from mootloop.errors import MigrationError
 from mootloop.models.common import VersionedModel, canonical_json_sha256
 from mootloop.models.context import RunContextManifest
+from mootloop.models.task import TaskAdapterConfig
+from mootloop.pipeline import legacy_fixed_pipeline
 
 MigrationPayload = dict[str, Any]
 MigrationFunction = Callable[[MigrationPayload], object]
@@ -271,6 +273,47 @@ DEFAULT_MIGRATIONS.register(
     "1.2",
     "1.3",
     _migrate_run_context_1_2_to_1_3,
+)
+
+
+def _migrate_run_context_1_3_to_1_4(payload: MigrationPayload) -> MigrationPayload:
+    """Capture the exact fixed graph historical runs actually executed."""
+    migrated = deepcopy(payload)
+    migrated["schema_version"] = "1.4"
+    adapter = migrated.get("adapter_config")
+    if not isinstance(adapter, Mapping):
+        return migrated
+    matter_locator, matter_digest = _legacy_context_source(
+        payload,
+        "matter_config",
+        fallback_locator="migration:v1.3:matter-snapshot",
+        fallback_value=payload.get("matter_config"),
+    )
+    adapter_locator, adapter_digest = _legacy_context_source(
+        payload,
+        "task_adapter",
+        fallback_locator="migration:v1.3:adapter-snapshot",
+        fallback_value=adapter,
+    )
+    try:
+        adapter_model = TaskAdapterConfig.model_validate(adapter)
+    except ValidationError:
+        return migrated
+    migrated["pipeline"] = legacy_fixed_pipeline(
+        adapter_model,
+        matter_locator=matter_locator,
+        matter_sha256=matter_digest,
+        adapter_locator=adapter_locator,
+        adapter_sha256=adapter_digest,
+    ).model_dump(mode="json")
+    return migrated
+
+
+DEFAULT_MIGRATIONS.register(
+    RunContextManifest,
+    "1.3",
+    "1.4",
+    _migrate_run_context_1_3_to_1_4,
 )
 
 

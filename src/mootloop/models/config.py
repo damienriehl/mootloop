@@ -12,6 +12,7 @@ SCHEMA_VERSION = "1.0"
 
 BudgetTier = Literal["no-budget", "moderate", "low"]
 RunMode = Literal["autonomous", "gated", "observed"]
+PipelineStrategy = Literal["thin-full", "deep-core", "adversarial-first"]
 
 ConfigLayer = Literal[
     "defaults",

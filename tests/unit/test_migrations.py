@@ -15,6 +15,7 @@ from mootloop.migrations import MigrationRegistry, load_versioned_json
 from mootloop.models.common import VersionedModel
 from mootloop.models.context import RunContextManifest
 from mootloop.models.events import RunStarted
+from mootloop.models.run import PersonaName
 from mootloop.orchestrator import start_run
 from mootloop.vault import init_vault
 from tests.conftest import make_matter
@@ -201,13 +202,14 @@ def test_run_context_v1_0_migrates_from_captured_fields_without_rewriting(
     vault = tmp_path / "vault"
     init_vault(vault, make_matter(), registry_path=tmp_path / "canaries.json")
     run_id = start_run(vault, "discovery-responses", "2026-07-11T00:00:00+00:00")
-    context = load_run_context(vault, run_id)
     manifest_path = vault / "runs" / run_id / "context" / "manifest.json"
     payload = json.loads(manifest_path.read_bytes())
     payload["schema_version"] = "1.0"
     payload.pop("resolved_config")
+    payload.pop("pipeline")
     legacy_adapter = payload["adapter_config"]
     legacy_adapter.pop("overridable")
+    legacy_adapter.pop("pipeline_strategies")
     legacy_raw = (json.dumps(payload, indent=2) + "\n").encode()
     manifest_path.write_bytes(legacy_raw)
 
@@ -228,14 +230,18 @@ def test_run_context_v1_0_migrates_from_captured_fields_without_rewriting(
     migrated = load_run_context(vault, run_id)
 
     assert manifest_path.read_bytes() == legacy_raw
-    assert migrated.manifest.schema_version == "1.3"
+    assert migrated.manifest.schema_version == "1.4"
     assert migrated.manifest.task_spec_lock is None
     assert migrated.manifest.context_contributions == []
     assert migrated.manifest.context_exclusions == []
     assert migrated.manifest.resolved_config.task == "discovery-responses"
     assert migrated.manifest.resolved_config.run_mode == started.mode
     assert migrated.manifest.resolved_config.max_attempts == 3
-    assert migrated.binding.config == context.manifest.adapter_config
+    assert migrated.manifest.pipeline.strategy == "thin-full"
+    assert migrated.manifest.pipeline.oc_personas == (PersonaName.OC_ASSOCIATE,)
+    assert migrated.binding.config == migrated.manifest.pipeline.effective_config
+    assert migrated.binding.config.loop_caps.oc == 1
+    assert migrated.binding.config.pipeline_strategies == {}
 
 
 def test_run_context_v1_1_adds_only_empty_context_capture_fields(tmp_path: Path) -> None:

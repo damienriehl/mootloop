@@ -49,6 +49,10 @@ class ConfigResolutionError(MootloopError):
     """A run-configuration source or structural override failed closed."""
 
 
+class PipelineConfigError(MootloopError):
+    """A persona selection or pipeline strategy cannot produce an owned stage graph."""
+
+
 class MigrationError(MootloopError):
     """A persisted model could not be migrated deterministically to its current schema."""
 
