@@ -310,20 +310,29 @@ flowchart TD
 - **U-04B is COMPLETE locally, remotely reviewed, and merged for the converter code
   and synthetic tests, with its deployed/protected evidence tail still gated by U-17A
   and fresh D-03 authorization.**
-  **U-05 through U-17C remain queued** under their stated dependencies and
-  decision gates. **U-18 is COMPLETE for U-01, U-02, U-03, U-04A, and U-04B:**
+- **U-05 COMPLETE locally, remotely reviewed, and merged.** The uniform gate catalog
+  validates canonical names, dependencies, cycles, and deterministic execution;
+  historical runs retain the previously implicit fabrication gate. Stage inputs are
+  detached from mutable callers, completed-turn sidecars are durable and write-once,
+  and a post-sidecar/pre-journal crash reuses the canonical persisted record without
+  accepting substantive drift. Copied convergence mechanics have injected score and
+  decision seams plus an exact upstream provenance pin. The Typer surface is split
+  into focused modules with exact command/help parity across all 63 command paths.
+  **U-06 through U-17C remain queued** under their stated dependencies and
+  decision gates. **U-18 is COMPLETE for U-01, U-02, U-03, U-04A, U-04B, and U-05:**
   PR #33 merged as `74dec0a` after backend, invariant, and frontend CI passed on code
   head `acc1e51`; PR #35 merged as `b2ff6c7` after all six push/PR jobs passed on code
   head `96da3c6`; PR #36 merged as `7e9f03e` after the final code head `4c5cd64`
   passed every required check; PR #38 merged as `2317e50` after all six final-head
   jobs passed on code head `425d99e`; PR #40 merged as `424fe6f` after all six
-  final-head jobs passed on code head `4f7927d`. Every actionable review finding on
-  all five PRs was fixed, regression-tested, replied to, and resolved. Deployment is
-  still gated.
+  final-head jobs passed on code head `4f7927d`; PR #42 merged as `4907761` after all
+  six final-head jobs passed on code head `d9f08e6`. Every actionable review finding
+  on all six PRs was fixed, regression-tested, replied to, and resolved. Deployment
+  is still gated.
   No hosted matter or deployment was accessed during this execution.
 
-Verification at this checkpoint: backend ruff and strict mypy across 101 source files
-pass; 970 backend tests pass at 91% coverage; frontend ESLint, TypeScript, 9 Vitest
+Verification at this checkpoint: backend ruff and strict mypy across 106 source files
+pass; 986 backend tests pass at 92% coverage; frontend ESLint, TypeScript, 9 Vitest
 files / 37 tests, OpenAPI generation/drift, and the production build pass. U-03's
 structured review covered correctness, security, adversarial behavior, tests,
 maintainability, reliability, project standards, API contracts, agent parity, and

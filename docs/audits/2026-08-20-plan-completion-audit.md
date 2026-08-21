@@ -8,6 +8,12 @@ uncommitted code change: the only pre-existing dirty file was the timer-managed
 `.claude/RESUME.md`. Both recent feature PRs are merged, and the backend and frontend
 validation suites are green.
 
+Execution update through 2026-08-21: U-01 through U-05 are now complete locally,
+remotely reviewed, and merged. U-05 landed in PR #42 as merge commit `4907761`; its
+final code head `d9f08e6` passed every required backend, invariant, and frontend job,
+and its sole actionable review finding was fixed, regression-tested, replied to, and
+resolved. U-06 is the next autonomous unit.
+
 The broader repository audit nevertheless found genuine unfinished work in the two
 legacy plans still marked `active`. This document is the completion ledger for every
 plan unit and acceptance criterion. Open autonomous work is routed to
@@ -124,7 +130,7 @@ delivery now share the same immutable commitment and recovery boundary.
 
 | ID | Reconciled status | Evidence or queue |
 |---|---|---|
-| D1 Architecture | PARTIAL | Provider/task/stage protocols, deterministic convergence, and the gate ledger exist. Uniform gate order/dependencies, copied-component seams/provenance, and remaining layering invariants are U-05. |
+| D1 Architecture | PARTIAL | Provider/task/stage protocols, deterministic convergence, uniform gate ordering/dependencies, the gate ledger, and copied-component seams/provenance exist. Persona/pipeline strategy completion is U-06 and synthesis remains U-12. |
 | D2 Packaging and skills | PARTIAL | Six personas and two local skills exist. Namespaced plugin packaging, complete side-effect invocation guards, compact navigators, and skill/CLI breadth are U-06/U-11A/U-11B. |
 | D3 Adversarial security | PARTIAL | Path/vault/privacy/redaction/type controls exist. Enforced egress and isolation are U-02; complete integrity is U-03; hostile reimport/learning and Google ACL controls are U-09/D-06. |
 | D4 Performance and scale | OPEN-AUTO | Flat-context proof, bounded fan-out, prompt caching, objection batching, cache metrics, and calibrated retry/concurrency are U-16. The process-wide CourtListener bucket already exists. |
@@ -133,9 +139,9 @@ delivery now share the same immutable commitment and recovery boundary.
 | D7 Discovery-practice gates | PARTIAL | Current discovery shapes, RFA decisions, rubric, privilege log, and structural export are implemented. Opinion-to-proposition support and remaining panel/legal-source work are U-07. |
 | D8 Export round trip | PARTIAL | DOCX rendering and attested local exports exist. Bookmark/revision reimport, defensive OOXML, CriticMarkup learning state, and optional Google suggestions/comments are U-09/D-06. |
 | D9 Lifecycle and integrity | PARTIAL | Cache staleness, close inventory, sync guard, locks, backups, and basic attestation exist. Full commitment, fact versions/state digest, close-policy enforcement, learning-event state, and stronger signed heads are U-03/U-09/U-11A and D-09/D-14. |
-| D10 Python foundations | PARTIAL | Domain models, strict schemas, migrations, five-layer frozen config, unions, protocols, sync-core boundaries, folds, and typed trust zones exist. Gate/CLI structure is U-05; learning package split is U-09. |
+| D10 Python foundations | PARTIAL | Domain models, strict schemas, migrations, five-layer frozen config, unions, protocols, sync-core boundaries, folds, typed trust zones, gate ordering, write-once turn results, copied-component seams, and the CLI split exist. The learning package split is U-09. |
 | D11 Agent-native parity | PARTIAL | Current run/decision/attestation/export and TaskSpec-lock primitives have CLI/API paths. Full learning actions, sidecars, `context.md`, emergent-task proof, and the complete capability matrix are U-09/U-11A/U-11B. |
-| D12 Vocabulary, IDs, config | PARTIAL | Five-layer resolution and structural override controls are complete, as are the IDs consumed by immutable run context. Remaining IDs and gate execution order are U-05/U-09. |
+| D12 Vocabulary, IDs, config | PARTIAL | Five-layer resolution, structural override controls, canonical gate names/order, and IDs consumed by current immutable run/gate context are complete. Learning-specific IDs remain U-09. |
 | D13 Sequencing | PARTIAL / DEFERRED | The pre-serve core mostly exists but clean validation is U-17. Edit-learning, strategies, oracle, CLI breadth, and benchmark are U-06/U-09/U-10/U-11A/U-11B; Google/non-discovery breadth remains D-06/deferred. |
 
 ## Plan 2 — Demo Server and Deployment
