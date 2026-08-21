@@ -43,7 +43,13 @@ from mootloop.models.task import TaskAdapterConfig
 from mootloop.models.taskspec import TaskSpec, TaskSpecLock
 from mootloop.persistence import sha256_file as _sha256_path
 from mootloop.pipeline import compile_pipeline
-from mootloop.resources import REPO_ROOT, load_persona_bodies, rubric_path, task_config_path
+from mootloop.resources import (
+    REPO_ROOT,
+    compose_persona_bodies,
+    load_persona_sources,
+    rubric_path,
+    task_config_path,
+)
 from mootloop.tasks import TaskBinding
 from mootloop.taskspec import TaskSpecStore, require_current_lock
 from mootloop.vault import atomic_write_once_text, fsync_file_and_parent, safe_vault_path
@@ -424,7 +430,8 @@ def build_run_context(
     adapter_raw = adapter_config_file.read_bytes()
     rubric_raw = rubric_file.read_bytes()
     rubric_lock_raw = rubric_lock_file.read_bytes() if rubric_lock_file.is_file() else b""
-    persona_bodies = load_persona_bodies()
+    persona_sources = load_persona_sources()
+    persona_bodies = compose_persona_bodies(persona_sources)
     accepted_contributions, context_exclusions = select_launch_contributions(
         context_contributions,
         matter_id=MatterId(matter_config.matter_id),
@@ -473,12 +480,8 @@ def build_run_context(
         _source("rubric_lock", f"rubrics/{rubric_lock_file.name}", rubric_lock_raw),
         _source("fact_repository", "facts/facts.jsonl", facts_raw),
         *[
-            _source(
-                "persona_body",
-                f"personas/{persona.body_slug}.md",
-                body.encode("utf-8"),
-            )
-            for persona, body in persona_bodies.items()
+            _source("persona_body", f"personas/{filename}", raw)
+            for filename, raw in persona_sources.items()
         ],
         *request_sources,
         *corpus_sources,

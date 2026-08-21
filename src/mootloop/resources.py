@@ -48,15 +48,26 @@ def rubric_path(rubric_id: str) -> Path:
     return RUBRICS_DIR / f"{rubric_id}.yaml"
 
 
-def persona_body(slug: str) -> str:
-    """The task-agnostic excellence body for a persona (``personas/<slug>.md``)."""
-    return (PERSONAS_DIR / f"{slug}.md").read_text(encoding="utf-8")
+def load_persona_sources() -> dict[str, bytes]:
+    """Exact shared-standard and persona bytes captured for a run."""
+    sources = {"_standard.md": (PERSONAS_DIR / "_standard.md").read_bytes()}
+    sources.update(
+        {
+            f"{persona.body_slug}.md": (PERSONAS_DIR / f"{persona.body_slug}.md").read_bytes()
+            for persona in PersonaName
+            if (PERSONAS_DIR / f"{persona.body_slug}.md").is_file()
+        }
+    )
+    return sources
 
 
-def load_persona_bodies() -> dict[PersonaName, str]:
-    """Every currently-authored persona body, keyed by canonical persona name."""
+def compose_persona_bodies(sources: dict[str, bytes]) -> dict[PersonaName, str]:
+    """Prepend the exact shared standard to every authored persona body."""
+    standard = sources["_standard.md"].decode("utf-8").rstrip()
     return {
-        persona: persona_body(persona.body_slug)
+        persona: standard
+        + "\n\n"
+        + sources[f"{persona.body_slug}.md"].decode("utf-8").lstrip()
         for persona in PersonaName
-        if (PERSONAS_DIR / f"{persona.body_slug}.md").is_file()
+        if f"{persona.body_slug}.md" in sources
     }

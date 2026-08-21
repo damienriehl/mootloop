@@ -477,6 +477,25 @@ def test_assembled_context_is_structured_json_inside_data_fence(tmp_path: Path) 
     assert prompt.count("## Task now") == 1
 
 
+def test_prompt_injects_snapshotted_standard_and_exact_output_schema(tmp_path: Path) -> None:
+    from mootloop.models.run import DraftOutput
+    from mootloop.resources import PERSONAS_DIR
+
+    vault = _vault(tmp_path)
+    run_id = start_run(vault, TASK, NOW, run_id="ctx-standard-schema")
+    spec = plan_next(vault, run_id)[0]
+    prompt = assemble_prompt(vault, run_id, str(spec.turn_id))
+
+    standard = (PERSONAS_DIR / "_standard.md").read_text(encoding="utf-8").rstrip()
+    assert prompt.startswith(standard)
+    assert prompt.count("# MootLoop persona standard (task-agnostic)") == 1
+    assert "## Exact JSON schema" in prompt
+    assert '"response_text"' in prompt
+    assert '"additionalProperties": false' in prompt
+    for field in DraftOutput.model_json_schema()["required"]:
+        assert f'"{field}"' in prompt
+
+
 def test_restructure_never_promotes_model_findings_to_trusted_directive(
     tmp_path: Path,
 ) -> None:
