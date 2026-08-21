@@ -87,7 +87,7 @@ Source: `docs/plans/2026-07-11-001-feat-mootloop-v1-agentic-litigation-pipeline-
 | V1-1b | Parse interrogatories/RFPs/RFAs into per-request items | COMPLETE | Parsers and unit/invariant coverage exist. |
 | V1-1c | Fact repository, provenance, and gap questions | COMPLETE locally / DECISION-GATED live | Models and services exist; the prior hosted run loaded zero client facts. Live fact supply and validation are D-02/D-03. |
 | V1-2a | Six personas, discovery adapter, defaults, thin full pipeline | COMPLETE | Persona/stage/orchestrator code and synthetic pipeline tests exist. |
-| V1-2b | Journaled crash resume, idempotent turns, derailment detection, non-degeneracy | PARTIAL, safety slice complete | Runs now replay a committed TaskSpec/config/rubric/request/fact/policy/corpus snapshot and fail closed on missing/tampered context. U-01 retains board/learning/config/migration/TaskSpec-lock/outbox work. |
+| V1-2b | Journaled crash resume, idempotent turns, derailment detection, non-degeneracy | COMPLETE for current pipeline | Runs replay an exact approved launch snapshot, fail closed on missing/tampered context, and repair journaled hosted launch delivery idempotently. |
 | V1-2c | Individually enable/bypass personas and select thin-full/deep-core/adversarial-first | OPEN-AUTO | Thin-full exists; full controls/strategies do not. U-06. |
 | V1-3 | Convergence, locked/versioned rubric, rubric judges, estimates/metering/hard cap | COMPLETE | Implemented and covered; the unchecked rubric/check-suite boxes are stale. |
 | V1-4 | Citation clients/cache, fabrication gate, and research-request queue | COMPLETE for current routes | Gate framework and current legal-source clients exist. OpenLaws consolidation remains intentionally deferred. |
@@ -112,8 +112,8 @@ documentation are mostly stale; `README.md` itself still understates hosted-prov
 wiring and is corrected in U-00. The combined export box is `PARTIAL`: DOCX,
 memo, privilege log, audit, attestation, watermark, and residue protection are done;
 GDoc and annotated-draft lanes remain deferred. Crash resume now fails closed against
-drift in the snapshotted launch sources; U-01 retains the context inputs and transaction
-boundaries itemized in its residual queue.
+drift in the snapshotted launch sources; approved context inputs and hosted launch
+delivery now share the same immutable commitment and recovery boundary.
 
 ### Exhaustive D1–D13 deepening disposition
 
@@ -128,9 +128,9 @@ boundaries itemized in its residual queue.
 | D7 Discovery-practice gates | PARTIAL | Current discovery shapes, RFA decisions, rubric, privilege log, and structural export are implemented. Opinion-to-proposition support and remaining panel/legal-source work are U-07. |
 | D8 Export round trip | PARTIAL | DOCX rendering and attested local exports exist. Bookmark/revision reimport, defensive OOXML, CriticMarkup learning state, and optional Google suggestions/comments are U-09/D-06. |
 | D9 Lifecycle and integrity | PARTIAL | Cache staleness, close inventory, sync guard, locks, backups, and basic attestation exist. Full commitment, fact versions/state digest, close-policy enforcement, learning-event state, and stronger signed heads are U-03/U-09/U-11A and D-09/D-14. |
-| D10 Python foundations | PARTIAL | Domain models, strict schemas, unions, protocols, sync-core boundaries, folds, and typed trust zones exist. Canonical migrations/config and remaining IDs are U-01; gate/CLI structure is U-05; learning package split is U-09. |
-| D11 Agent-native parity | PARTIAL | Current run/decision/attestation/export primitives have CLI/API paths. Context/readback, full learning actions, sidecars, `context.md`, emergent-task proof, and the complete capability matrix are U-01/U-09/U-11A/U-11B. |
-| D12 Vocabulary, IDs, config | PARTIAL | Core IDs and vocabulary exist. Five-layer resolution, structural override allowlist, remaining IDs, and gate execution order are U-01/U-05. |
+| D10 Python foundations | PARTIAL | Domain models, strict schemas, migrations, five-layer frozen config, unions, protocols, sync-core boundaries, folds, and typed trust zones exist. Gate/CLI structure is U-05; learning package split is U-09. |
+| D11 Agent-native parity | PARTIAL | Current run/decision/attestation/export and TaskSpec-lock primitives have CLI/API paths. Full learning actions, sidecars, `context.md`, emergent-task proof, and the complete capability matrix are U-09/U-11A/U-11B. |
+| D12 Vocabulary, IDs, config | PARTIAL | Five-layer resolution and structural override controls are complete, as are the IDs consumed by immutable run context. Remaining IDs and gate execution order are U-05/U-09. |
 | D13 Sequencing | PARTIAL / DEFERRED | The pre-serve core mostly exists but clean validation is U-17. Edit-learning, strategies, oracle, CLI breadth, and benchmark are U-06/U-09/U-10/U-11A/U-11B; Google/non-discovery breadth remains D-06/deferred. |
 
 ## Plan 2 — Demo Server and Deployment
@@ -192,11 +192,11 @@ Source: `docs/plans/2026-07-12-001-feat-hosted-frontend-folio-cockpit-plan.md`
 
 | ID | Reconciled status | Evidence or queue |
 |---|---|---|
-| FD-1 Sandbox/internal trust | PARTIAL | Read-only persona tool policy, driver auth, queue, and SSE seams exist; enforceable egress/per-matter isolation and planted-injection proof are U-02/U-17A. |
+| FD-1 Sandbox/internal trust | PARTIAL | Persona turns receive no filesystem tools; driver auth, queue, and SSE seams exist. Enforceable egress/per-matter isolation and planted-injection proof are U-02/U-17A. |
 | FD-2 Perimeter | PARTIAL | JWT algorithm/audience/email/JWKS behavior and recorded AOP perimeter are complete. Device-only Google consent and connector/backup credential handling remain D-06/U-14. |
 | FD-3 Non-portable controls | PARTIAL | Secret redaction and hash-chained access audit exist. Runtime outbound canary, stronger audit/attestation commitment, and content-free notifications are U-02/U-03/U-15. |
-| FD-4 Approve then inject | OPEN-AUTO | Approval-filtered manifest inputs/context assembly are residual U-01; durable board/changelog/review feed is U-13. |
-| FD-5 Architecture corrections | PARTIAL | Pause/queue/SSE/BFF and thin TaskSpec paths exist. Immutable synthesized bindings, full task lanes, drain/failover behavior, and pipeline-shape deferral are U-01/U-11A/U-11B/U-12/U-15. |
+| FD-4 Approve then inject | PARTIAL | Approval-filtered, provenance-tagged, DATA-fenced manifest injection is complete; durable board/changelog/review feed is U-13. |
+| FD-5 Architecture corrections | PARTIAL | Pause/queue/SSE/BFF, immutable launch bindings, and thin TaskSpec paths exist. Full task lanes, drain/failover behavior, and pipeline-shape deferral are U-11A/U-11B/U-12/U-15. |
 | FD-6 Data lifecycle | PARTIAL | Consistent backup, spend intent, close inventory, and queue locking exist. Full integrity/recovery/close policy, board mutation, hardened upload, and watcher reconciliation are U-03/U-11A/U-13/U-14. |
 | FD-7 Capability parity | PARTIAL | Current matter/run/decision/attestation/export rows exist. The checked capability matrix and remaining task/board/suggestion/failover/connector/notification verbs are U-11A/U-11B through U-15. |
 | FD-8 TypeScript contract | COMPLETE for FE-2 | Generated OpenAPI types, drift checks, typed modules, zod SSE, session-expiry handling, query keys, protected mutation semantics, and thin-BFF tests exist. New surfaces must extend the same contract in U-12–U-15. |
@@ -227,8 +227,8 @@ ahead of context reproducibility, isolation, and a clean live run.
 Every discovered task now has one of four durable outcomes:
 
 1. `COMPLETE` with current evidence above.
-2. `OPEN-AUTO` as the residual U-01 work and U-02 through U-17C in the continuation
-   plan; U-00 is complete and U-18 is partial pending the explicit merge/deploy
+2. `OPEN-AUTO` as U-02 through U-17C in the continuation plan; U-00 and U-01 are
+   complete and U-18 is partial pending the explicit merge/deploy
    disposition.
 3. `DECISION-GATED` as D-01 through D-17 in the Decision Sheet (D-15 through D-17
    have safe defaults and do not block pre-validation work).
@@ -238,7 +238,8 @@ On 2026-08-20 the user answered D-01 through D-17. The rulings are recorded in t
 Decision Sheet. Some operations remain intentionally gated even after their policy
 choice: D-03 A requires a fresh authorization before any real hosted-matter access;
 D-06 B does not self-grant Google OAuth consent; D-08 A is read-only; D-09 A requires
-approval of a named remote sink; and D-13 A permits a PR/CI run but not merge or deploy.
+approval of a named remote sink. D-13 A initially permitted only a PR/CI run; the user
+later authorized merge of PR #32 and the reviewed continuation work, but not deployment.
 The FOLIO source/update investigation required by D-05/D-12 is recorded in
 `docs/research/2026-08-20-folio-integration-route.md`.
 
@@ -249,15 +250,17 @@ record attorney approvals, consent to OAuth, spend uncapped funds, or deploy pro
 
 - Closed U-00: README truth, frontend CI, authoritative backend OpenAPI drift,
   regenerated contracts, production-build verification, and a mutation-tested AST BFF
-  boundary. The focused commits are published in PR #32, and remote backend, invariant,
-  and frontend CI passed on code head `d64960c` after one close-inventory repair.
-- Completed the first U-01 safety slice: exact byte-derived launch provenance;
+  boundary. PR #32 merged after remote backend, invariant, and frontend CI passed on
+  code head `d64960c` and one close-inventory repair.
+- Completed U-01: exact byte-derived launch provenance;
   write-once manifest and separately hashed corpus snapshot; request/fact/policy/task/
   rubric/corpus replay; crash-recoverable launch; protected-decision and attestation
   checks; snapshot-backed gates, status views, panels, and court exports. Every
   lifecycle read now verifies the corpus digest, provider-return writes rebind context,
   corpus snapshots have launch/retained-size ceilings, and hosted starts use a stable
-  run id plus deterministic queue repair.
+  run id plus a journaled, idempotently drained queue intent. Five-layer frozen config,
+  in-memory migrations, canonical manifest IDs, exact human TaskSpec locks, and bounded
+  permission-filtered context assembly close the formerly listed U-01 residuals.
 - Preserved historical journals as readable status records with an explicit
   `replayable=false` blocker while continuing to reject resume, decisions,
   attestation, and export without a committed context.
@@ -271,14 +274,14 @@ record attorney approvals, consent to OAuth, spend uncapped funds, or deploy pro
 No hosted matter data, deployment, attorney approval, OAuth grant, or production state
 was read or changed. Those items remain on the Decision Sheet.
 
-## Final Local Verification
+## Final Local Verification — 2026-08-21
 
-- `make check`: passed — ruff, strict mypy across 85 source files, and 737 pytest tests
+- `make check`: passed — ruff, strict mypy across 92 source files, and 848 pytest tests
   at 92% coverage (one existing Starlette deprecation warning).
 - Frontend: ESLint, TypeScript, 9 Vitest files / 37 tests, backend and client OpenAPI
   drift checks, and the Next.js 16.2.10 production build passed. Next.js emitted its
   non-blocking middleware-to-proxy deprecation warning.
 - `git diff --check`: passed.
-- Focused commits are pushed in PR #32, with GitHub CI required on every published
-  head before merge authorization. PR merge, deployment, hosted-vault access, and the
-  synthetic/real-matter gates remain unperformed.
+- PR #32 is merged. The reviewed U-01 continuation is locally complete and authorized
+  for publication/merge; its PR disposition is the remaining U-18 action. Deployment,
+  hosted-vault access, and the synthetic/real-matter gates remain unperformed.

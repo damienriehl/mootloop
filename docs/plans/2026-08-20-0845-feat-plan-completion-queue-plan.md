@@ -24,8 +24,8 @@ consent, spend authorization, and production changes behind explicit human decis
 The repository has two legacy plans marked active, stale checkboxes that understate
 completed work, broad post-first-serve features that were never implemented, and a
 partial hosted run that cannot count as clean legal validation. At audit start, resumed
-runs also reloaded mutable context; the completed U-01 safety slice now snapshots the
-listed launch sources, while U-01 retains the residual context and transaction work.
+runs also reloaded mutable context; completed U-01 now freezes the approved launch
+inputs, assembles bounded context, and recovers interrupted hosted launch delivery.
 
 ### Primary Users
 
@@ -249,14 +249,14 @@ flowchart TD
 | U-17C | Beneficial learning readback proof | U-09, U-17B | D-02, D-03 |
 | U-18 | Publish reviewed work and record remote CI/merge disposition | completed local units | D-13 |
 
-## Execution Status — 2026-08-20
+## Execution Status — updated 2026-08-21
 
 - **U-00 COMPLETE.** README provider claims are corrected. CI now runs the
   backend-generated OpenAPI drift check plus frontend install, lint, typecheck, tests,
   generated-client drift, production build, and both lexical and TypeScript-AST BFF
-  boundary tests. The work is published in PR #32; after the close-inventory repair,
-  its backend, invariant, and frontend jobs passed remotely on code head `d64960c`.
-- **U-01 PARTIAL; first safety slice complete.** New runs persist a write-once,
+  boundary tests. PR #32 merged after its backend, invariant, and frontend jobs passed
+  remotely on code head `d64960c`.
+- **U-01 COMPLETE.** New runs persist a write-once,
   versioned manifest plus a separately hashed corpus snapshot. It binds the TaskSpec,
   adapter configuration and resolved behavior, persona bodies, locked rubric, request
   sets, folded facts, matter policy, retry ceiling, tier models, corpus inventory/content,
@@ -264,15 +264,13 @@ flowchart TD
   gates, prompts, and exports either replay that context or fail closed. Provider results
   rebind context before protected writes; every lifecycle read verifies the corpus digest;
   snapshot size/retained-storage ceilings are enforced; and historical pre-manifest
-  runs remain readable as non-replayable status records. Launch is retryable after a
-  journal or queue interruption using a client-stable run id and deterministic queue
-  item.
-- **U-01 still queued:** five-source configuration/structural allowlist, migration
-  registry and remaining canonical IDs, append-only human TaskSpec lock provenance,
-  approved board and accepted-learning inputs, the bounded permission-filtered/fenced
-  context assembler, and a durable autonomous outbox marker/drainer beyond the current
-  retry-safe start+enqueue repair. Content-addressed corpus deduplication also remains
-  queued beyond the enforced size ceilings.
+  runs remain readable as non-replayable status records. Five-layer resolved config,
+  in-memory schema migrations, manifest-bound canonical IDs, exact append-only human
+  TaskSpec locks, approval-filtered board/learning/context contributions, and the
+  permission-filtered DATA-fenced context assembler are implemented. Hosted launches
+  journal a deterministic outbox intent atomically, and bounded recovery repairs queue
+  delivery without resurrecting a terminal run. Content-addressed corpus deduplication
+  remains a storage optimization, not an unmet U-01 safety contract.
 - **U-03 PARTIAL.** Decision resolution now repairs an interrupted matching journal
   append idempotently. Decision and attestation CLI actors come from the local OS
   principal. Attestation hashes the launch matter chrome actually rendered by export,
@@ -281,10 +279,10 @@ flowchart TD
   The complete journal/decision/export commitment, coordinated-rewrite defense,
   migration policy, and D-09 off-vault anchor remain queued.
 - **U-02, U-04A/U-04B, and U-05 through U-17C remain queued** under their stated
-  dependencies and decision gates. U-03 remains partial. **U-18 is partial:** focused
-  commits and PR #32 exist, remote CI is enforced on every published head, and
-  merge/deploy remain pending a fresh D-13 authorization. No hosted matter or
-  deployment was accessed during this execution.
+  dependencies and decision gates. U-03 remains partial. **U-18 is active for U-01:**
+  PR #32 is merged and the user has authorized merge of the reviewed U-01 continuation;
+  its remote CI/merge disposition remains to be recorded. Deployment is still gated.
+  No hosted matter or deployment was accessed during this execution.
 
 Verification at this checkpoint: backend ruff and strict mypy across 85 source files
 pass; 737 backend tests pass at 92% coverage; frontend ESLint, TypeScript, 9 Vitest
