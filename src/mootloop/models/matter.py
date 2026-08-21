@@ -8,15 +8,14 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from mootloop.models.common import MATTER_ID_PATTERN, VersionedModel
+from mootloop.models.config import BudgetTier, RunConfigOverlay, RunMode
 
 SCHEMA_VERSION = "1.0"
 
 Forum = Literal["state", "federal"]
 PartyRole = Literal["plaintiff", "defendant", "third-party"]
 Side = Literal["plaintiff", "defendant"]
-BudgetTier = Literal["no-budget", "moderate", "low"]
 GateMode = Literal["hard-human", "policy-delegable"]
-RunMode = Literal["autonomous", "gated", "observed"]
 
 MatterIdStr = Annotated[str, Field(pattern=MATTER_ID_PATTERN)]
 
@@ -119,3 +118,6 @@ class MatterConfig(VersionedModel):
     budget: Budget = Field(default_factory=Budget)
     attorney: Attorney | None = None
     retention: Retention
+    # Runtime choices stay in a dedicated overlay; caption/parties/deadlines remain
+    # case metadata and are never merged into run behavior.
+    run_config: RunConfigOverlay | None = None

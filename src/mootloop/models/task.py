@@ -12,10 +12,11 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
-from pydantic import Field, ValidationError
+from pydantic import Field, ValidationError, field_validator
 
 from mootloop.errors import TaskConfigError
 from mootloop.models.common import StrictModel, VersionedModel
+from mootloop.models.config import IMMUTABLE_IDENTITY_PATHS, STRUCTURAL_LEAF_PATHS
 
 SCHEMA_VERSION = "1.0"
 
@@ -67,6 +68,25 @@ class TaskAdapterConfig(VersionedModel):
     # restructure pass on its request (plan Phase 6).
     restructure_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
     deliverables: list[str] = Field(default_factory=list)
+    overridable: tuple[str, ...] = ()
+
+    @field_validator("overridable")
+    @classmethod
+    def _validate_overridable(cls, paths: tuple[str, ...]) -> tuple[str, ...]:
+        seen: set[str] = set()
+        for path in paths:
+            if path in seen:
+                raise ValueError(f"duplicate structural override allowlist path {path!r}")
+            seen.add(path)
+            if path in IMMUTABLE_IDENTITY_PATHS:
+                raise ValueError(f"immutable identity path {path!r} cannot be allowlisted")
+            if "*" in path:
+                raise ValueError(f"wildcard structural override path {path!r} is not allowed")
+            if path not in STRUCTURAL_LEAF_PATHS:
+                raise ValueError(
+                    f"structural override path {path!r} is not an exact known leaf path"
+                )
+        return paths
 
 
 def load_task_config(path: Path | str) -> TaskAdapterConfig:
