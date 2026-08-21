@@ -325,4 +325,17 @@ def run_proposition_checks(
             turn_id=TurnId(f"{run_id}-citation-propositions-{digest}"), result=gate
         ),
     )
+    combined_gate = orchestrator.citation_export_gate(
+        vault_root,
+        run_id,
+        now,
+    )
+    append(
+        vault_root,
+        run_id,
+        GateEvaluated(
+            turn_id=TurnId(f"{run_id}-citations"),
+            result=combined_gate,
+        ),
+    )
     return prepared

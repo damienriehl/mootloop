@@ -273,7 +273,10 @@ def test_next_launch_snapshots_only_matching_calibrated_profile_for_judge_data(
     base = make_matter()
     matter = base.model_copy(
         update={
-            "caption": base.caption.model_copy(update={"judge_name": "Judge Ada Example"})
+            "caption": base.caption.model_copy(
+                update={"judge_name": "  Judge   Ada   Example  "}
+            ),
+            "jurisdiction": base.jurisdiction.model_copy(update={"state": "  MN  "}),
         }
     )
     vault = tmp_path / "vault"

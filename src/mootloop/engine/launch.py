@@ -12,7 +12,11 @@ from mootloop.context_sources import (
 from mootloop.engine.outbox import drain_run_outbox
 from mootloop.engine.queue import Queue
 from mootloop.errors import MatterNotFoundError, VaultBoundaryError
-from mootloop.judge_profiles import JudgeProfileStore, profile_context_contribution
+from mootloop.judge_profiles import (
+    JudgeProfileStore,
+    profile_context_contribution,
+    profile_matches_matter,
+)
 from mootloop.models.common import MatterId
 from mootloop.models.events import QueueIntent, RunMode
 from mootloop.models.matter import MatterConfig
@@ -50,9 +54,7 @@ def _commit_launch(
     if (
         judge_profile is not None
         and judge_profile.calibration.calibrated
-        and judge_profile.judge_name == matter.caption.judge_name
-        and judge_profile.court_name == matter.caption.court_name
-        and judge_profile.jurisdiction_state == matter.jurisdiction.state
+        and profile_matches_matter(judge_profile, matter)
     ):
         contributions.append(
             profile_context_contribution(judge_profile, MatterId(matter.matter_id))

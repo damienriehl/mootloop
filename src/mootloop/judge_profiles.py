@@ -372,6 +372,17 @@ def profile_context_contribution(
     )
 
 
+def profile_matches_matter(profile: JudgeProfile, matter: MatterConfig) -> bool:
+    """Match a stored profile using the same canonical identity used at build time."""
+    judge_name = matter.caption.judge_name
+    return bool(
+        judge_name
+        and profile.judge_name == _normalized_name(judge_name)
+        and profile.court_name == matter.caption.court_name
+        and profile.jurisdiction_state == matter.jurisdiction.state.strip()
+    )
+
+
 def build_assigned_judge_profile(
     vault_root: Path | str,
     matter: MatterConfig,

@@ -12,6 +12,7 @@ from typing import Any
 import httpx
 import yaml
 
+from mootloop import gate_ledger
 from mootloop.citations.check_runner import run_proposition_checks
 from mootloop.citations.extract import extract_citations
 from mootloop.citations.ledger import ResearchQueue
@@ -252,6 +253,7 @@ def test_real_but_irrelevant_case_fails_proposition_gate_with_journaled_checks(
 
     assert prepared.bundles
     assert citation_export_gate(vault, run_id, NOW).status == "fail"
+    assert "citations" in gate_ledger.build_ledger(vault, run_id).blockers
     assert [request.url.path for request in calls] == [
         "/api/rest/v4/clusters/1/",
         "/api/rest/v4/opinions/11/",
@@ -263,6 +265,12 @@ def test_real_but_irrelevant_case_fails_proposition_gate_with_journaled_checks(
         if isinstance(event, GateEvaluated) and event.result.gate == "citation_propositions"
     )
     assert proposition_gate.status == "fail"
+    combined_gate = next(
+        event.result
+        for event in reversed(events)
+        if isinstance(event, GateEvaluated) and event.result.gate == "citation"
+    )
+    assert combined_gate.status == "fail"
     assert any(
         event.record.spec.persona == PersonaName.CITE_CHECKER
         for event in events
