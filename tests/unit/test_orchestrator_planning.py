@@ -2,35 +2,42 @@
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 import pytest
 
 from mootloop import orchestrator
+from mootloop.errors import PipelineConfigError
 from mootloop.facts import FactStore
+from mootloop.gate_ledger import build_ledger
 from mootloop.journal import read_events, turn_body_path
 from mootloop.llm import FakeLLMProvider, RawTurnResult
 from mootloop.models.common import DocId
 from mootloop.models.events import JournalEvent, TurnCompleted
+from mootloop.models.matter import MatterConfig, Personas
 from mootloop.models.requests import RequestItem, RequestSet, RequestType
 from mootloop.models.run import DiscardedTurn, PersonaName
 from mootloop.orchestrator import (
     assemble_prompt,
+    estimate_run_cost,
     plan_next,
     record_turn,
     start_run,
     status_summary,
 )
+from tests.conftest import make_matter
 
 NOW = "2026-07-11T00:00:00+00:00"
 
 
-def _build_single_request_vault(tmp_path: Path) -> Path:
+def _build_single_request_vault(
+    tmp_path: Path,
+    matter: MatterConfig | None = None,
+) -> Path:
     from mootloop.vault import init_vault
-    from tests.conftest import make_matter
-
     vault = tmp_path / "vault"
-    init_vault(vault, make_matter(), registry_path=tmp_path / "canaries.json")
+    init_vault(vault, matter or make_matter(), registry_path=tmp_path / "canaries.json")
     request_set = RequestSet(
         request_type=RequestType.INTERROGATORY,
         set_number=1,
@@ -76,6 +83,7 @@ def test_stage_order_single_request(tmp_path: Path) -> None:
     assert _run_step(vault, run_id, provider) == [PersonaName.PARTNER.value]
     assert _run_step(vault, run_id, provider) == [PersonaName.RUBRIC_JUDGE.value]
     assert _run_step(vault, run_id, provider) == [PersonaName.OC_ASSOCIATE.value]
+    assert _run_step(vault, run_id, provider) == [PersonaName.OC_PARTNER.value]
     assert _run_step(vault, run_id, provider) == [PersonaName.ASSOCIATE.value]  # bolster
     assert _run_step(vault, run_id, provider) == [PersonaName.JUDGE.value] * 3
     assert _run_step(vault, run_id, provider) == [PersonaName.RUBRIC_JUDGE.value] * 3
@@ -109,6 +117,69 @@ def test_partner_loop_respects_cap(tmp_path: Path) -> None:
     assert partner_loop_associate == 3
     assert personas.count(PersonaName.PARTNER.value) == 2
     assert status_summary(vault, run_id)["status"] == "finished"
+
+
+def test_adversarial_first_uses_both_opponents_before_partner_review(tmp_path: Path) -> None:
+    matter = make_matter().model_copy(update={"pipeline_strategy": "adversarial-first"})
+    vault = _build_single_request_vault(tmp_path, matter)
+    run_id = start_run(vault, "discovery-responses", NOW, run_id="adversarial-first")
+    provider = FakeLLMProvider()
+
+    assert _run_step(vault, run_id, provider) == [PersonaName.ASSOCIATE.value]
+    assert _run_step(vault, run_id, provider) == [PersonaName.OC_ASSOCIATE.value]
+    assert _run_step(vault, run_id, provider) == [PersonaName.OC_PARTNER.value]
+    assert _run_step(vault, run_id, provider) == [PersonaName.ASSOCIATE.value]
+    partner_spec = plan_next(vault, run_id)[0]
+    assert partner_spec.persona == PersonaName.PARTNER
+    assert partner_spec.prompt_context["draft"]["response_text"] == "Response to ROG-1."
+
+
+def test_bypassed_personas_delegate_or_remove_every_owned_stage(tmp_path: Path) -> None:
+    personas = Personas(
+        associate=False,
+        partner=True,
+        oc_associate=False,
+        oc_partner=True,
+        judge=False,
+        rubric_judge=False,
+    )
+    matter = make_matter().model_copy(update={"personas": personas})
+    vault = _build_single_request_vault(tmp_path, matter)
+    run_id = start_run(vault, "discovery-responses", NOW, run_id="persona-bypass")
+    provider = FakeLLMProvider()
+
+    seen: list[str] = []
+    for _ in range(10):
+        batch = _run_step(vault, run_id, provider)
+        if not batch:
+            break
+        seen.extend(batch)
+
+    assert seen == ["partner", "partner", "oc_partner", "partner"]
+    assert status_summary(vault, run_id)["status"] == "finished"
+    ledger = build_ledger(vault, run_id)
+    assert "rubric" not in ledger.gates["ROG-1"]
+    assert "rubric" not in ledger.blockers
+    estimate = estimate_run_cost(vault, "discovery-responses", "moderate", date(2026, 8, 21))
+    assert [row.stage for row in estimate.breakdown] == [
+        "associate_draft",
+        "partner_loop:redraft",
+        "partner_loop:critique",
+        "oc_attack",
+        "bolster",
+    ]
+
+
+def test_impossible_pipeline_fails_before_journal_creation(tmp_path: Path) -> None:
+    matter = make_matter().model_copy(
+        update={"personas": Personas(associate=False, partner=False)}
+    )
+    vault = _build_single_request_vault(tmp_path, matter)
+
+    with pytest.raises(PipelineConfigError, match="drafting owner"):
+        start_run(vault, "discovery-responses", NOW, run_id="no-drafter")
+
+    assert not (vault / "runs" / "no-drafter" / "journal.jsonl").exists()
 
 
 def test_derailment_discards_and_respawns_same_turn(tmp_path: Path) -> None:

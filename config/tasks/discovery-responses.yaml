@@ -52,3 +52,40 @@ restructure_threshold: 0.5
 
 deliverables:
   - draft-discovery-responses.md
+
+# User-selectable graphs. The adapter owns exact ordering; the core only filters
+# stages whose persona owner is deliberately bypassed.
+pipeline_strategies:
+  thin-full:
+    stages:
+      - associate_draft
+      - partner_loop
+      - oc_attack
+      - bolster
+      - judge_panel
+      - restructure
+      - rubric_gate
+      - assemble
+    associate_partner_cap: 2
+  deep-core:
+    stages:
+      - associate_draft
+      - partner_loop
+      - oc_attack
+      - bolster
+      - judge_panel
+      - restructure
+      - rubric_gate
+      - assemble
+    associate_partner_cap: 3
+  adversarial-first:
+    stages:
+      - associate_draft
+      - oc_attack
+      - bolster
+      - partner_loop
+      - judge_panel
+      - restructure
+      - rubric_gate
+      - assemble
+    associate_partner_cap: 2

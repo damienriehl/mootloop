@@ -166,7 +166,7 @@ def test_launch_snapshots_only_allowed_contributions_and_records_exclusions(
     )
     context = load_run_context(vault, run_id)
 
-    assert context.manifest.schema_version == "1.3"
+    assert context.manifest.schema_version == "1.4"
     assert [item.contribution_id for item in context.manifest.context_contributions] == [
         "board-approved",
         "board-partner-only",

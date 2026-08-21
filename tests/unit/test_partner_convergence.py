@@ -23,8 +23,10 @@ from mootloop.models.run import (
     TurnSpec,
 )
 from mootloop.models.task import ConvergenceConfig
+from mootloop.pipeline import compile_pipeline
 from mootloop.stages import PartnerLoopStage, SlotLayout, StageContext
 from mootloop.tasks import get_binding
+from tests.conftest import make_matter
 
 _COMPLIANT = (
     "Interrogatory No. 1 is restated. Responding party identifies Jane Roe and "
@@ -64,6 +66,12 @@ def _ctx(
     binding = get_binding("discovery-responses")
     caps = binding.config.loop_caps.model_copy(update={"associate_partner": 3})
     config = binding.config.model_copy(update={"loop_caps": caps})
+    pipeline = compile_pipeline(
+        binding.config,
+        make_matter(),
+        matter_sha256="0" * 64,
+        adapter_sha256="1" * 64,
+    ).model_copy(update={"effective_config": config})
     request = RequestItem(
         request_id="ROG-1",  # type: ignore[arg-type]
         set_number=1,
@@ -115,6 +123,7 @@ def _ctx(
         adapter=binding.adapter,
         rubric=binding.rubric,
         state=state,
+        pipeline=pipeline,
         **kwargs,
     )
 
