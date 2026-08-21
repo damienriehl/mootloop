@@ -77,6 +77,21 @@ def _finished_and_resolved(
     return vault
 
 
+def _enable_clean_docx_renderer(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("mootloop.export.docx_render.pandoc_available", lambda: True)
+
+    def render(source: Path, output: Path, reference: Path, *, draft: bool) -> None:
+        del source, reference, draft
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(b"clean-docx")
+
+    monkeypatch.setattr("mootloop.export.docx_render.render_docx", render)
+    monkeypatch.setattr(
+        "mootloop.export.residue.scan_docx",
+        lambda path: GatePass(gate="residue"),
+    )
+
+
 def test_state_marker_mapping() -> None:
     assert orchestrator.state_marker("running") == "working"
     assert orchestrator.state_marker("needs_decisions") == "ask-pending"
@@ -327,7 +342,10 @@ def test_access_audit_may_append_but_attested_prefix_may_not_change(tmp_path: Pa
     assert "access audit" in (check.reason or "")
 
 
-def test_clean_export_is_sealed_and_single_byte_mutation_invalidates(tmp_path: Path) -> None:
+def test_clean_export_is_sealed_and_single_byte_mutation_invalidates(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable_clean_docx_renderer(monkeypatch)
     vault = _finished_and_resolved(tmp_path, "att-export-set")
     attest.attest(vault, "att-export-set", "Jane", NOW)
 
@@ -375,7 +393,10 @@ def test_clean_export_requires_persisted_seal(tmp_path: Path) -> None:
     assert check.reason == "clean export has no export seal"
 
 
-def test_review_integrity_status_reports_exact_records_without_writes(tmp_path: Path) -> None:
+def test_review_integrity_status_reports_exact_records_without_writes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable_clean_docx_renderer(monkeypatch)
     vault = _finished_and_resolved(tmp_path, "att-status")
     record = attest.attest(vault, "att-status", "Jane", NOW)
     attestation_path = vault / "runs" / "att-status" / "attestations.jsonl"
@@ -395,7 +416,10 @@ def test_review_integrity_status_reports_exact_records_without_writes(tmp_path: 
     assert post_export.latest_export_seal == attest.latest_export_seal(vault, "att-status")
 
 
-def test_reexport_preserves_attested_master_and_replaces_current_seal(tmp_path: Path) -> None:
+def test_reexport_preserves_attested_master_and_replaces_current_seal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable_clean_docx_renderer(monkeypatch)
     vault = _finished_and_resolved(tmp_path, "att-reexport")
     attest.attest(vault, "att-reexport", "Jane", NOW)
     first = export_run(vault, "att-reexport", NOW)
@@ -419,6 +443,7 @@ def test_reexport_preserves_attested_master_and_replaces_current_seal(tmp_path: 
 def test_relative_vault_path_can_be_sealed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    _enable_clean_docx_renderer(monkeypatch)
     vault = _finished_and_resolved(tmp_path, "att-relative")
     attest.attest(vault, "att-relative", "Jane", NOW)
     monkeypatch.chdir(tmp_path)
@@ -429,7 +454,10 @@ def test_relative_vault_path_can_be_sealed(
     assert attest.sealed_export_state(Path(vault.name), "att-relative").status == "valid"
 
 
-def test_reexport_repairs_torn_export_seal_tail(tmp_path: Path) -> None:
+def test_reexport_repairs_torn_export_seal_tail(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable_clean_docx_renderer(monkeypatch)
     vault = _finished_and_resolved(tmp_path, "att-torn-seal")
     attest.attest(vault, "att-torn-seal", "Jane", NOW)
     export_run(vault, "att-torn-seal", NOW)
@@ -484,18 +512,7 @@ def test_skipped_docx_renderer_does_not_seal_or_block_later_render(
     assert skipped.docx_skipped_reason == "pandoc not installed"
     assert attest.latest_export_seal(vault, "att-render-later") is None
 
-    monkeypatch.setattr("mootloop.export.docx_render.pandoc_available", lambda: True)
-
-    def render(source: Path, output: Path, reference: Path, *, draft: bool) -> None:
-        del source, reference, draft
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_bytes(b"clean-docx")
-
-    monkeypatch.setattr("mootloop.export.docx_render.render_docx", render)
-    monkeypatch.setattr(
-        "mootloop.export.residue.scan_docx",
-        lambda path: GatePass(gate="residue"),
-    )
+    _enable_clean_docx_renderer(monkeypatch)
 
     rendered = export_run(vault, "att-render-later", LATER)
     assert rendered.docx
