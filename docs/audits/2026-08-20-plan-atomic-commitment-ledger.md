@@ -158,7 +158,7 @@ short label is less detailed.
 | FD7-07 | board revert parity row | OPEN-AUTO — U-13 |
 | FD7-08 | board changelog-list parity row | OPEN-AUTO — U-13 |
 | FD7-09 | notification feed-list parity row | OPEN-AUTO — U-15 |
-| FD7-10 | suggestions list/accept/dismiss with logged dismissal | OPEN-AUTO — U-08/U-14 |
+| FD7-10 | suggestions list/accept/dismiss with logged dismissal | COMPLETE for RFP production review — U-08; watched-source suggestions remain U-14 |
 | FD7-11 | hard-human/policy-bounded run failover authorization | OPEN-AUTO — U-15 |
 | FD7-12 | needs-triage reuses manifest privilege/role mutation | COMPLETE for local ingest — U-14 reuses this primitive for watched uploads |
 | FD7-13 | export-link writes access audit | COMPLETE |
