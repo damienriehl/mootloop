@@ -297,7 +297,7 @@ flowchart TD
   queued: U-09 supplies the anchored annotated-draft artifact before it can join the
   seal, and D-09 still needs a concrete immutable remote signed-head provider before
   coordinated host-writer resistance can be claimed.
-- **U-04A COMPLETE locally.** Mixed-format ingest now emits deterministic protected
+- **U-04A COMPLETE locally and in CI.** Mixed-format ingest now emits deterministic protected
   actions for OCR, password, corrupt, unsupported, unreadable, oversized, role, and
   privilege work. Original files are captured through stable no-follow descriptors;
   manifest mutations and append-only fact review transitions are process-safe and
@@ -305,15 +305,16 @@ flowchart TD
   immutable run context. Pending revisions preserve the reviewed predecessor until
   acceptance, provenance acceptance verifies an exact quote in a reviewed document,
   and deterministic interviews surface review, support, repair, and uncovered-document
-  gaps. Empty or wholly unreviewed ingests fail before run creation. Publication and
-  remote CI evidence remain this unit's U-18 tail.
+  gaps. Empty or wholly unreviewed ingests fail before run creation. Legacy manifests
+  also retain a conservative remedy for every non-runnable terminal state.
 - **U-04B and U-05 through U-17C remain queued** under their stated dependencies and
-  decision gates. **U-18 is COMPLETE for U-01, U-02, and U-03:**
+  decision gates. **U-18 is COMPLETE for U-01, U-02, U-03, and U-04A:**
   PR #33 merged as `74dec0a` after backend, invariant, and frontend CI passed on code
   head `acc1e51`; PR #35 merged as `b2ff6c7` after all six push/PR jobs passed on code
   head `96da3c6`; PR #36 merged as `7e9f03e` after the final code head `4c5cd64`
-  passed every required check. Every actionable review finding on all three PRs was
-  fixed, regression-tested, replied to, and resolved. Deployment is still gated.
+  passed every required check; PR #38 merged as `2317e50` after all six final-head
+  jobs passed on code head `425d99e`. Every actionable review finding on all four PRs
+  was fixed, regression-tested, replied to, and resolved. Deployment is still gated.
   No hosted matter or deployment was accessed during this execution.
 
 Verification at this checkpoint: backend ruff and strict mypy across 98 source files
