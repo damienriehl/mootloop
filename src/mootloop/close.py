@@ -145,7 +145,8 @@ MATTER_SCOPED_STORES: tuple[MatterScopedStore, ...] = (
     MatterScopedStore(
         name="run-context-manifests",
         glob="runs/*/context/manifest.json",
-        description="Immutable per-run launch input snapshots.",
+        description="Immutable per-run launch input snapshots, including approved context "
+        "contributions and text-free exclusion audit records.",
         model=RunContextManifest,
     ),
     MatterScopedStore(

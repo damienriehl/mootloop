@@ -13,7 +13,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from mootloop import decisions
-from mootloop.context import RunContext, load_run_context
+from mootloop.context import RunContext, load_run_context, load_run_corpus
+from mootloop.context_assembly import assemble_context
 from mootloop.errors import LockHeldError
 from mootloop.journal import load_state
 from mootloop.models.run import DraftOutput
@@ -101,7 +102,17 @@ def run_with_provider(
                 break
             facts = run_context.facts
             specs = orchestrator._plan(
-                run_id, state, binding, units, facts, max_attempts, tier_models
+                run_id,
+                state,
+                binding,
+                units,
+                facts,
+                max_attempts,
+                tier_models,
+                assemble_context(
+                    run_context.manifest,
+                    load_run_corpus(vault_root, run_context),
+                ),
             )
             if not specs:
                 orchestrator._finalize(vault_root, run_id, now, run_context)

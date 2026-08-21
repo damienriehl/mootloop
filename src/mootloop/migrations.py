@@ -253,6 +253,23 @@ DEFAULT_MIGRATIONS.register(
 )
 
 
+def _migrate_run_context_1_1_to_1_2(payload: MigrationPayload) -> MigrationPayload:
+    """Represent newly supported contribution inputs as absent on historical runs."""
+    migrated = deepcopy(payload)
+    migrated["schema_version"] = "1.2"
+    migrated["context_contributions"] = []
+    migrated["context_exclusions"] = []
+    return migrated
+
+
+DEFAULT_MIGRATIONS.register(
+    RunContextManifest,
+    "1.1",
+    "1.2",
+    _migrate_run_context_1_1_to_1_2,
+)
+
+
 def load_versioned_json[JsonModelT: VersionedModel](
     raw: bytes,
     model_type: type[JsonModelT],

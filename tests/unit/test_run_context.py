@@ -150,7 +150,7 @@ def test_start_commits_versioned_manifest_and_task_spec(tmp_path: Path) -> None:
     started = next(event for event in read_events(vault, run_id) if isinstance(event, RunStarted))
     context = load_run_context(vault, run_id)
     assert started.context_manifest_sha256
-    assert context.manifest.schema_version == "1.1"
+    assert context.manifest.schema_version == "1.2"
     assert context.manifest.task_spec == spec
     assert context.manifest.adapter_behavior.draft_directive
     assert context.manifest.adapter_behavior.judge_question
@@ -516,9 +516,11 @@ def test_plan_replays_snapshotted_requests_and_facts_after_sources_change(
 
     spec = plan_next(vault, run_id)[0]
     assert spec.prompt_context["request_text"] == "Identify every person with contract knowledge."
-    facts = spec.prompt_context["facts"]
-    assert isinstance(facts, list)
-    assert [fact["statement"] for fact in facts] == ["The original fact."]
+    approved_context = spec.prompt_context["approved_context"]
+    assert isinstance(approved_context, list)
+    facts = [item for item in approved_context if item["kind"] == "fact"]
+    assert [fact["text"] for fact in facts] == ["The original fact."]
+    assert all(fact["provenance_locator"] for fact in facts)
 
 
 def test_manifest_preserves_semantic_request_set_order(tmp_path: Path) -> None:

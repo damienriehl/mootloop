@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
+import re
 from typing import Literal
 
-from pydantic import Field
+from pydantic import ConfigDict, Field, model_validator
 
 from mootloop.models.common import DocId, MatterId, RunId, StrictModel, VersionedModel
 from mootloop.models.config import ResolvedRunConfig
@@ -17,8 +19,10 @@ from mootloop.models.run import PersonaName
 from mootloop.models.task import TaskAdapterConfig
 from mootloop.models.taskspec import TaskSpec
 
-SCHEMA_VERSION = "1.1"
+SCHEMA_VERSION = "1.2"
 CORPUS_SNAPSHOT_SCHEMA_VERSION = "1.0"
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+_CONTRIBUTION_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._:-]{0,127}$")
 ContextSourceKind = Literal[
     "matter_config",
     "task_adapter",
@@ -30,6 +34,19 @@ ContextSourceKind = Literal[
     "corpus_manifest",
     "corpus_content",
     "persona_body",
+    "context_contribution",
+]
+ContextContributionKind = Literal["board", "learning", "context_note", "firm_playbook"]
+ContextApprovalState = Literal["approved", "accepted", "pending", "rejected"]
+ContextPermission = Literal["matter_confidential", "privileged"]
+ContextTrust = Literal["untrusted_data"]
+AssembledContextKind = Literal[
+    "fact",
+    "corpus_passage",
+    "board",
+    "learning",
+    "context_note",
+    "firm_playbook",
 ]
 
 
@@ -65,6 +82,82 @@ class CorpusSnapshot(VersionedModel):
     documents: list[CorpusTextSnapshot] = Field(default_factory=list)
 
 
+class ContextContribution(StrictModel):
+    """One candidate launch contribution; never trusted as prompt instructions."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    contribution_id: str
+    kind: ContextContributionKind
+    text: str = Field(min_length=1)
+    sha256: str
+    provenance_locator: str = Field(min_length=1, max_length=1024)
+    source_matter_id: MatterId
+    task_scope: tuple[str, ...] = ()
+    persona_scope: tuple[PersonaName, ...] = ()
+    trust: ContextTrust = "untrusted_data"
+    permission: ContextPermission
+    approval_state: ContextApprovalState
+
+    @model_validator(mode="after")
+    def validate_identity_and_digest(self) -> ContextContribution:
+        if not _CONTRIBUTION_ID_RE.fullmatch(self.contribution_id):
+            raise ValueError("contribution_id must be a stable lowercase identifier")
+        if not _SHA256_RE.fullmatch(self.sha256):
+            raise ValueError("sha256 must be exactly 64 lowercase hexadecimal characters")
+        expected = hashlib.sha256(self.text.encode("utf-8")).hexdigest()
+        if self.sha256 != expected:
+            raise ValueError("sha256 does not match the exact UTF-8 contribution text")
+        if any(char in self.provenance_locator for char in "\r\n\x00"):
+            raise ValueError("provenance_locator may not contain control-line characters")
+        if len(set(self.task_scope)) != len(self.task_scope):
+            raise ValueError("task_scope may not contain duplicates")
+        if len(set(self.persona_scope)) != len(self.persona_scope):
+            raise ValueError("persona_scope may not contain duplicates")
+        return self
+
+
+class ContextExclusion(StrictModel):
+    """Text-free audit record proving why a candidate did not enter a run snapshot."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    contribution_id: str
+    kind: ContextContributionKind
+    reason: Literal["not_approved", "wrong_matter", "wrong_task"]
+
+
+class AssembledContextItem(StrictModel):
+    """One bounded prompt-data item with enough metadata to audit its authority."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    context_id: str
+    kind: AssembledContextKind
+    text: str
+    sha256: str
+    provenance_locator: str
+    source_matter_id: MatterId
+    task_scope: tuple[str, ...] = ()
+    persona_scope: tuple[PersonaName, ...] = ()
+    trust: ContextTrust = "untrusted_data"
+    permission: ContextPermission
+
+    @model_validator(mode="after")
+    def validate_content(self) -> AssembledContextItem:
+        if not self.context_id or any(char in self.context_id for char in "\r\n\x00"):
+            raise ValueError("context_id must be a non-empty single-line identifier")
+        if not _SHA256_RE.fullmatch(self.sha256):
+            raise ValueError("sha256 must be exactly 64 lowercase hexadecimal characters")
+        if self.sha256 != hashlib.sha256(self.text.encode("utf-8")).hexdigest():
+            raise ValueError("sha256 does not match the exact UTF-8 context text")
+        if not self.provenance_locator or any(
+            char in self.provenance_locator for char in "\r\n\x00"
+        ):
+            raise ValueError("provenance_locator must be a non-empty single-line locator")
+        return self
+
+
 class RunContextManifest(VersionedModel):
     """The complete set of currently-supported inputs approved at run launch."""
 
@@ -82,6 +175,8 @@ class RunContextManifest(VersionedModel):
     facts: list[Fact] = Field(default_factory=list)
     corpus_manifest: Manifest = Field(default_factory=Manifest)
     corpus_snapshot_sha256: str
+    context_contributions: list[ContextContribution] = Field(default_factory=list)
+    context_exclusions: list[ContextExclusion] = Field(default_factory=list)
     matter_config: MatterConfig
     effective_mode: Literal["autonomous", "gated", "observed"]
     max_attempts: int = Field(ge=1)

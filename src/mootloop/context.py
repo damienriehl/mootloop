@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from pydantic import ValidationError
 
 from mootloop import budget
 from mootloop.config import ConfigLayerInput, default_config_layer, resolve_run_config
+from mootloop.context_assembly import assemble_context, select_launch_contributions
 from mootloop.errors import MigrationError, OrchestratorError
 from mootloop.facts import FACTS_PATH
 from mootloop.facts import fold as fold_facts
@@ -23,6 +25,8 @@ from mootloop.models.context import (
 )
 from mootloop.models.context import (
     AdapterBehavior,
+    AssembledContextItem,
+    ContextContribution,
     ContextSource,
     ContextSourceKind,
     CorpusSnapshot,
@@ -70,6 +74,7 @@ class RunContext:
     units: list[RequestItem]
     facts: list[dict[str, str]]
     corpus_snapshot: CorpusSnapshot | None = None
+    assembled_context: tuple[AssembledContextItem, ...] = ()
 
 
 def context_manifest_path(vault_root: Path | str, run_id: str) -> Path:
@@ -358,6 +363,7 @@ def build_run_context(
     max_attempts: int | None,
     task_spec_id: str | None,
     firm_preferences_path: Path | str | None = None,
+    context_contributions: Sequence[ContextContribution] = (),
 ) -> RunContext:
     task_spec = _validate_task_spec(
         vault_root, task_spec_id, task, str(matter_config.matter_id)
@@ -383,6 +389,11 @@ def build_run_context(
     rubric_raw = rubric_file.read_bytes()
     rubric_lock_raw = rubric_lock_file.read_bytes() if rubric_lock_file.is_file() else b""
     persona_bodies = load_persona_bodies()
+    accepted_contributions, context_exclusions = select_launch_contributions(
+        context_contributions,
+        matter_id=MatterId(matter_config.matter_id),
+        task=task,
+    )
     try:
         captured_matter = MatterConfig.model_validate(yaml.safe_load(matter_raw))
         captured_adapter = TaskAdapterConfig.model_validate(yaml.safe_load(adapter_raw))
@@ -415,6 +426,14 @@ def build_run_context(
         ],
         *request_sources,
         *corpus_sources,
+        *[
+            ContextSource(
+                kind="context_contribution",
+                locator=contribution.provenance_locator,
+                sha256=contribution.sha256,
+            )
+            for contribution in accepted_contributions
+        ],
     ]
     if task_spec is not None:
         sources.append(
@@ -442,6 +461,8 @@ def build_run_context(
         facts=facts,
         corpus_manifest=corpus_manifest,
         corpus_snapshot_sha256=_sha256(_corpus_payload(corpus_snapshot).encode("utf-8")),
+        context_contributions=list(accepted_contributions),
+        context_exclusions=list(context_exclusions),
         matter_config=captured_matter,
         effective_mode=resolved_config.run_mode,
         max_attempts=resolved_config.max_attempts,
@@ -498,6 +519,9 @@ def _materialize(
         units=units,
         facts=facts,
         corpus_snapshot=corpus_snapshot,
+        assembled_context=(
+            assemble_context(manifest, corpus_snapshot) if corpus_snapshot is not None else ()
+        ),
     )
 
 

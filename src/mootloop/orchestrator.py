@@ -13,6 +13,7 @@ re-executed. Three drivers share this one path: FakeLLMProvider (tests), the
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import date, datetime
 from pathlib import Path
 
@@ -34,6 +35,7 @@ from mootloop.context import (
     resolve_launch_config,
     write_run_context,
 )
+from mootloop.context_assembly import assemble_context, select_launch_contributions
 from mootloop.errors import OrchestratorError
 from mootloop.gates import completeness, degeneracy, fabrication
 from mootloop.journal import (
@@ -46,6 +48,7 @@ from mootloop.llm import LLMProvider, TokenUsage
 from mootloop.models.budget import EstimateRange
 from mootloop.models.citations import Citation
 from mootloop.models.common import MatterId, RubricId, RunId, TaskSpecId, TurnId
+from mootloop.models.context import AssembledContextItem, ContextContribution
 from mootloop.models.events import (
     CapRaised,
     CheckpointCleared,
@@ -135,6 +138,7 @@ def _context_for(
     req_index: int,
     max_attempts: int,
     tier_models: dict[str, str] | None = None,
+    assembled_context: tuple[AssembledContextItem, ...] = (),
 ) -> StageContext:
     return StageContext(
         run_id=run_id,
@@ -147,6 +151,7 @@ def _context_for(
         state=state,
         max_attempts=max_attempts,
         tier_models=tier_models or {},
+        assembled_context=assembled_context,
     )
 
 
@@ -158,12 +163,23 @@ def _plan(
     facts: list[dict[str, str]],
     max_attempts: int,
     tier_models: dict[str, str] | None = None,
+    assembled_context: tuple[AssembledContextItem, ...] = (),
 ) -> list[TurnSpec]:
     if state.status != "running":
         return []
     specs: list[TurnSpec] = []
     for i in range(len(units)):
-        ctx = _context_for(run_id, state, binding, units, facts, i, max_attempts, tier_models)
+        ctx = _context_for(
+            run_id,
+            state,
+            binding,
+            units,
+            facts,
+            i,
+            max_attempts,
+            tier_models,
+            assembled_context,
+        )
         specs.extend(plan_request(ctx))
     return specs
 
@@ -186,6 +202,7 @@ def start_run(
     max_attempts: int | None = None,
     idempotent: bool = False,
     firm_preferences_path: Path | str | None = None,
+    context_contributions: Sequence[ContextContribution] = (),
 ) -> str:
     """Begin a run: write RunStarted under the run lock; finalize if there is no work.
 
@@ -207,6 +224,11 @@ def start_run(
                     max_attempts=max_attempts,
                     firm_preferences_path=firm_preferences_path,
                 )
+                accepted_contributions, context_exclusions = select_launch_contributions(
+                    context_contributions,
+                    matter_id=MatterId(matter.matter_id),
+                    task=task,
+                )
                 same_launch = (
                     context.manifest.task == task
                     and (
@@ -216,6 +238,9 @@ def start_run(
                     )
                     == task_spec_id
                     and context.manifest.resolved_config == proposed
+                    and context.manifest.context_contributions
+                    == list(accepted_contributions)
+                    and context.manifest.context_exclusions == list(context_exclusions)
                 )
                 if same_launch:
                     return resolved_id
@@ -235,6 +260,7 @@ def start_run(
             max_attempts,
             task_spec_id,
             firm_preferences_path,
+            context_contributions,
         )
         resolved_config = run_context.manifest.resolved_config
         context_manifest_sha256 = write_run_context(vault_root, run_context)
@@ -287,6 +313,7 @@ def plan_next(
         run_context.facts,
         max_attempts,
         run_context.manifest.tier_models,
+        assemble_context(run_context.manifest, load_run_corpus(vault_root, run_context)),
     )
 
 
@@ -377,6 +404,10 @@ def record_turn(
             facts,
             max_attempts,
             run_context.manifest.tier_models,
+            assemble_context(
+                run_context.manifest,
+                load_run_corpus(vault_root, run_context),
+            ),
         )
         spec = _find_spec_in(specs, turn_id)
         return _record_spec(

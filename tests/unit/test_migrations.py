@@ -13,6 +13,7 @@ import pytest
 from mootloop.errors import MigrationError, OrchestratorError
 from mootloop.migrations import MigrationRegistry, load_versioned_json
 from mootloop.models.common import VersionedModel
+from mootloop.models.context import RunContextManifest
 from mootloop.models.events import RunStarted
 from mootloop.orchestrator import start_run
 from mootloop.vault import init_vault
@@ -225,8 +226,34 @@ def test_run_context_v1_0_migrates_from_captured_fields_without_rewriting(
     migrated = load_run_context(vault, run_id)
 
     assert manifest_path.read_bytes() == legacy_raw
-    assert migrated.manifest.schema_version == "1.1"
+    assert migrated.manifest.schema_version == "1.2"
+    assert migrated.manifest.context_contributions == []
+    assert migrated.manifest.context_exclusions == []
     assert migrated.manifest.resolved_config.task == "discovery-responses"
     assert migrated.manifest.resolved_config.run_mode == started.mode
     assert migrated.manifest.resolved_config.max_attempts == 3
     assert migrated.binding.config == context.manifest.adapter_config
+
+
+def test_run_context_v1_1_adds_only_empty_context_capture_fields(tmp_path: Path) -> None:
+    vault = tmp_path / "vault-v11"
+    init_vault(vault, make_matter(), registry_path=tmp_path / "canaries-v11.json")
+    run_id = start_run(vault, "discovery-responses", "2026-07-11T00:00:00+00:00")
+    manifest_path = vault / "runs" / run_id / "context" / "manifest.json"
+    payload = json.loads(manifest_path.read_bytes())
+    payload["schema_version"] = "1.1"
+    payload.pop("context_contributions")
+    payload.pop("context_exclusions")
+    raw = json.dumps(payload, separators=(",", ":")).encode()
+    untouched = bytes(raw)
+
+    migrated = load_versioned_json(
+        raw,
+        RunContextManifest,
+        current_version="1.2",
+    )
+
+    assert raw == untouched
+    assert migrated.schema_version == "1.2"
+    assert migrated.context_contributions == []
+    assert migrated.context_exclusions == []
