@@ -10,6 +10,7 @@ from mootloop.models.common import (
     RubricId,
     RunId,
     TaskSpecId,
+    TaskSpecLockId,
     TurnId,
 )
 from mootloop.models.context import CorpusTextSnapshot
@@ -32,6 +33,7 @@ def test_persisted_models_expose_canonical_id_annotations() -> None:
     assert RunStarted.model_fields["matter_id"].annotation is MatterId
     assert RunStarted.model_fields["rubric_version"].annotation is RubricId
     assert RunStarted.model_fields["task_spec_id"].annotation == TaskSpecId | None
+    assert RunStarted.model_fields["task_spec_lock_id"].annotation == TaskSpecLockId | None
 
     assert TurnSpec.model_fields["turn_id"].annotation is TurnId
     assert TurnSpec.model_fields["run_id"].annotation is RunId
@@ -62,4 +64,6 @@ def test_id_newtypes_are_static_boundaries_with_string_wire_format() -> None:
         **historical,
         "context_manifest_sha256": None,
         "mode": "autonomous",
+        "task_spec_lock_id": None,
+        "task_spec_lock_sha256": None,
     }

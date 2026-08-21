@@ -17,9 +17,9 @@ from mootloop.models.requests import RequestSet
 from mootloop.models.rubric import Rubric
 from mootloop.models.run import PersonaName
 from mootloop.models.task import TaskAdapterConfig
-from mootloop.models.taskspec import TaskSpec
+from mootloop.models.taskspec import TaskSpec, TaskSpecLock
 
-SCHEMA_VERSION = "1.2"
+SCHEMA_VERSION = "1.3"
 CORPUS_SNAPSHOT_SCHEMA_VERSION = "1.0"
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _CONTRIBUTION_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._:-]{0,127}$")
@@ -31,6 +31,7 @@ ContextSourceKind = Literal[
     "fact_repository",
     "request_set",
     "task_spec",
+    "task_spec_lock",
     "corpus_manifest",
     "corpus_content",
     "persona_body",
@@ -166,6 +167,7 @@ class RunContextManifest(VersionedModel):
     matter_id: MatterId
     task: str
     task_spec: TaskSpec | None = None
+    task_spec_lock: TaskSpecLock | None = None
     adapter_config: TaskAdapterConfig
     resolved_config: ResolvedRunConfig
     adapter_behavior: AdapterBehavior
@@ -182,3 +184,18 @@ class RunContextManifest(VersionedModel):
     max_attempts: int = Field(ge=1)
     tier_models: dict[str, str]
     sources: list[ContextSource]
+
+    @model_validator(mode="after")
+    def validate_task_spec_lock_identity(self) -> RunContextManifest:
+        if self.task_spec_lock is None:
+            return self
+        if self.task_spec is None:
+            raise ValueError("task_spec_lock requires a captured task_spec")
+        lock = self.task_spec_lock
+        if (
+            lock.task_spec_id != self.task_spec.task_spec_id
+            or lock.matter_id != self.matter_id
+            or lock.task != self.task
+        ):
+            raise ValueError("task_spec_lock identity does not match the run manifest")
+        return self

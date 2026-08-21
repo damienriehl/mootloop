@@ -226,7 +226,8 @@ def test_run_context_v1_0_migrates_from_captured_fields_without_rewriting(
     migrated = load_run_context(vault, run_id)
 
     assert manifest_path.read_bytes() == legacy_raw
-    assert migrated.manifest.schema_version == "1.2"
+    assert migrated.manifest.schema_version == "1.3"
+    assert migrated.manifest.task_spec_lock is None
     assert migrated.manifest.context_contributions == []
     assert migrated.manifest.context_exclusions == []
     assert migrated.manifest.resolved_config.task == "discovery-responses"

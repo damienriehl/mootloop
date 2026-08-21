@@ -270,6 +270,22 @@ DEFAULT_MIGRATIONS.register(
 )
 
 
+def _migrate_run_context_1_2_to_1_3(payload: MigrationPayload) -> MigrationPayload:
+    """Historical launches predate human TaskSpec locks; never synthesize approval."""
+    migrated = deepcopy(payload)
+    migrated["schema_version"] = "1.3"
+    migrated["task_spec_lock"] = None
+    return migrated
+
+
+DEFAULT_MIGRATIONS.register(
+    RunContextManifest,
+    "1.2",
+    "1.3",
+    _migrate_run_context_1_2_to_1_3,
+)
+
+
 def load_versioned_json[JsonModelT: VersionedModel](
     raw: bytes,
     model_type: type[JsonModelT],

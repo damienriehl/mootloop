@@ -397,7 +397,32 @@ def create_freeform_task(
     """Resolve free-text intent to a TaskSpec (deterministic v1; unmapped -> ``task=None``,
     recorded but not runnable). Persists append-only at ``tasks/specs.jsonl`` (plan FE-2.5)."""
     spec = taskspec_svc.create_freeform(vault, matter_id, body.intent_text, _now_iso())
-    return models.TaskSpecResponse(task_spec=spec, runnable=spec.runnable)
+    return models.TaskSpecResponse(
+        task_spec=spec,
+        resolved=spec.resolved,
+        locked=False,
+        runnable=False,
+    )
+
+
+@router.post("/api/matters/{matter_id}/tasks/{task_spec_id}/lock")
+def lock_task(
+    matter_id: str,
+    task_spec_id: str,
+    principal: Principal,
+    vault: Vault,
+    _csrf: Csrf,
+    _audited: Annotated[None, Depends(_audit_dep("task_lock"))],
+) -> models.TaskSpecLockResponse:
+    """Record exact human approval; actor and source are server-derived."""
+    record = taskspec_svc.lock_task_spec(
+        vault,
+        matter_id,
+        task_spec_id,
+        principal.email,
+        _now_iso(),
+    )
+    return models.TaskSpecLockResponse(task_spec_lock=record)
 
 
 @router.get("/api/matters/{matter_id}/tasks")

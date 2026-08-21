@@ -14,7 +14,7 @@ from pydantic import ValidationError
 from mootloop import budget
 from mootloop.config import ConfigLayerInput, default_config_layer, resolve_run_config
 from mootloop.context_assembly import assemble_context, select_launch_contributions
-from mootloop.errors import MigrationError, OrchestratorError
+from mootloop.errors import MigrationError, OrchestratorError, TaskSpecError
 from mootloop.facts import FACTS_PATH
 from mootloop.facts import fold as fold_facts
 from mootloop.migrations import load_versioned_json
@@ -40,10 +40,10 @@ from mootloop.models.matter import MatterConfig
 from mootloop.models.requests import RequestItem, RequestSet
 from mootloop.models.rubric import Rubric, sha256_hex
 from mootloop.models.task import TaskAdapterConfig
-from mootloop.models.taskspec import TaskSpec
+from mootloop.models.taskspec import TaskSpec, TaskSpecLock
 from mootloop.resources import REPO_ROOT, load_persona_bodies, rubric_path, task_config_path
 from mootloop.tasks import TaskBinding
-from mootloop.taskspec import TaskSpecStore
+from mootloop.taskspec import TaskSpecStore, require_current_lock
 from mootloop.vault import atomic_write_once_text, fsync_file_and_parent, safe_vault_path
 
 MANIFEST_SUBPATH = ("context", "manifest.json")
@@ -337,7 +337,10 @@ def _validate_task_spec(
 ) -> TaskSpec | None:
     if task_spec_id is None:
         return None
-    spec = TaskSpecStore(vault_root).get(task_spec_id)
+    try:
+        spec = TaskSpecStore(vault_root).get(task_spec_id)
+    except TaskSpecError as exc:
+        raise OrchestratorError(str(exc)) from exc
     if spec is None:
         raise OrchestratorError(f"TaskSpec {task_spec_id!r} was not found; cannot start run")
     if str(spec.matter_id) != matter_id:
@@ -410,6 +413,19 @@ def build_run_context(
         recorded = rubric_lock_raw.decode("utf-8").split()[0] if rubric_lock_raw else ""
         if recorded != sha256_hex(rubric_raw.decode("utf-8")):
             raise OrchestratorError("rubric lock changed while the run snapshot was captured")
+    task_spec_lock: TaskSpecLock | None = None
+    if task_spec is not None:
+        try:
+            task_spec_lock = require_current_lock(
+                vault_root,
+                str(matter_config.matter_id),
+                task_spec,
+                adapter_raw=adapter_raw,
+                rubric_raw=rubric_raw,
+                rubric_lock_raw=rubric_lock_raw,
+            )
+        except TaskSpecError as exc:
+            raise OrchestratorError(str(exc)) from exc
     sources = [
         _source("matter_config", "matter.yaml", matter_raw),
         _source("task_adapter", f"config/tasks/{adapter_config_file.name}", adapter_raw),
@@ -443,11 +459,20 @@ def build_run_context(
                 sha256=_sha256(task_spec.model_dump_json().encode("utf-8")),
             )
         )
+        assert task_spec_lock is not None
+        sources.append(
+            ContextSource(
+                kind="task_spec_lock",
+                locator=f"tasks/locks.jsonl#{task_spec_lock.task_spec_lock_id}",
+                sha256=task_spec_lock.record_sha256,
+            )
+        )
     manifest = RunContextManifest(
         run_id=RunId(run_id),
         matter_id=MatterId(matter_config.matter_id),
         task=task,
         task_spec=task_spec,
+        task_spec_lock=task_spec_lock,
         adapter_config=captured_adapter,
         resolved_config=resolved_config,
         adapter_behavior=AdapterBehavior(
@@ -666,6 +691,28 @@ def load_run_context(vault_root: Path | str, run_id: str) -> RunContext:
     if manifest_task_spec_id != event.task_spec_id:
         raise OrchestratorError(
             f"run {run_id!r} context manifest TaskSpec does not match RunStarted"
+        )
+    manifest_lock_id = (
+        manifest.task_spec_lock.task_spec_lock_id
+        if manifest.task_spec_lock is not None
+        else None
+    )
+    manifest_lock_sha256 = (
+        manifest.task_spec_lock.record_sha256
+        if manifest.task_spec_lock is not None
+        else None
+    )
+    current_lock_contract = raw_payload.get("schema_version") == RUN_CONTEXT_SCHEMA_VERSION
+    if (
+        manifest_lock_id != event.task_spec_lock_id
+        or manifest_lock_sha256 != event.task_spec_lock_sha256
+        or (
+            current_lock_contract
+            and (manifest.task_spec is None) != (manifest.task_spec_lock is None)
+        )
+    ):
+        raise OrchestratorError(
+            f"run {run_id!r} context manifest TaskSpec lock does not match RunStarted"
         )
     corpus_path = corpus_snapshot_path(vault_root, run_id)
     try:

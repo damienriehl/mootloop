@@ -1345,15 +1345,155 @@
         "title": "TaskSpec",
         "type": "object"
       },
+      "TaskSpecLock": {
+        "additionalProperties": false,
+        "description": "One append-only human approval of exact TaskSpec launch inputs.",
+        "properties": {
+          "adapter_locator": {
+            "title": "Adapter Locator",
+            "type": "string"
+          },
+          "adapter_sha256": {
+            "title": "Adapter Sha256",
+            "type": "string"
+          },
+          "lock_version": {
+            "minimum": 1.0,
+            "title": "Lock Version",
+            "type": "integer"
+          },
+          "locked_at": {
+            "title": "Locked At",
+            "type": "string"
+          },
+          "locked_by": {
+            "title": "Locked By",
+            "type": "string"
+          },
+          "matter_id": {
+            "title": "Matter Id",
+            "type": "string"
+          },
+          "record_sha256": {
+            "title": "Record Sha256",
+            "type": "string"
+          },
+          "rubric_id": {
+            "title": "Rubric Id",
+            "type": "string"
+          },
+          "rubric_locator": {
+            "title": "Rubric Locator",
+            "type": "string"
+          },
+          "rubric_lock_locator": {
+            "title": "Rubric Lock Locator",
+            "type": "string"
+          },
+          "rubric_lock_sha256": {
+            "title": "Rubric Lock Sha256",
+            "type": "string"
+          },
+          "rubric_recorded_sha256": {
+            "title": "Rubric Recorded Sha256",
+            "type": "string"
+          },
+          "rubric_sha256": {
+            "title": "Rubric Sha256",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "source": {
+            "const": "human",
+            "default": "human",
+            "title": "Source",
+            "type": "string"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          },
+          "task_spec_id": {
+            "title": "Task Spec Id",
+            "type": "string"
+          },
+          "task_spec_lock_id": {
+            "title": "Task Spec Lock Id",
+            "type": "string"
+          },
+          "task_spec_sha256": {
+            "title": "Task Spec Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_spec_lock_id",
+          "lock_version",
+          "task_spec_id",
+          "matter_id",
+          "task",
+          "task_spec_sha256",
+          "adapter_locator",
+          "adapter_sha256",
+          "rubric_id",
+          "rubric_locator",
+          "rubric_sha256",
+          "rubric_lock_locator",
+          "rubric_lock_sha256",
+          "rubric_recorded_sha256",
+          "locked_by",
+          "locked_at",
+          "record_sha256"
+        ],
+        "title": "TaskSpecLock",
+        "type": "object"
+      },
+      "TaskSpecLockResponse": {
+        "additionalProperties": false,
+        "description": "The exact human approval now governing a TaskSpec launch.",
+        "properties": {
+          "kind": {
+            "const": "task_spec_locked",
+            "default": "task_spec_locked",
+            "title": "Kind",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "task_spec_lock": {
+            "$ref": "#/components/schemas/TaskSpecLock"
+          }
+        },
+        "required": [
+          "task_spec_lock"
+        ],
+        "title": "TaskSpecLockResponse",
+        "type": "object"
+      },
       "TaskSpecResponse": {
         "additionalProperties": false,
-        "description": "A single TaskSpec produced (or looked up) by an on-ramp. ``runnable`` mirrors the\ndomain property: false when the intent did not resolve to a runnable task.",
+        "description": "A TaskSpec with distinct resolution, human-lock, and launch-ready states.",
         "properties": {
           "kind": {
             "const": "task_spec",
             "default": "task_spec",
             "title": "Kind",
             "type": "string"
+          },
+          "locked": {
+            "title": "Locked",
+            "type": "boolean"
+          },
+          "resolved": {
+            "title": "Resolved",
+            "type": "boolean"
           },
           "runnable": {
             "title": "Runnable",
@@ -1370,6 +1510,8 @@
         },
         "required": [
           "task_spec",
+          "resolved",
+          "locked",
           "runnable"
         ],
         "title": "TaskSpecResponse",
@@ -2430,6 +2572,55 @@
           }
         },
         "summary": "Create Freeform Task"
+      }
+    },
+    "/api/matters/{matter_id}/tasks/{task_spec_id}/lock": {
+      "post": {
+        "description": "Record exact human approval; actor and source are server-derived.",
+        "operationId": "lock_task_api_matters__matter_id__tasks__task_spec_id__lock_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "task_spec_id",
+            "required": true,
+            "schema": {
+              "title": "Task Spec Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskSpecLockResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Lock Task"
       }
     },
     "/health": {

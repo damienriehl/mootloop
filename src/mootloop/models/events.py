@@ -11,7 +11,15 @@ from typing import Annotated, Literal
 
 from pydantic import Field, field_validator
 
-from mootloop.models.common import MatterId, RubricId, RunId, StrictModel, TaskSpecId, TurnId
+from mootloop.models.common import (
+    MatterId,
+    RubricId,
+    RunId,
+    StrictModel,
+    TaskSpecId,
+    TaskSpecLockId,
+    TurnId,
+)
 from mootloop.models.gates import GateResult
 from mootloop.models.run import TurnRecord
 
@@ -51,6 +59,10 @@ class RunStarted(StrictModel):
     # The on-ramp TaskSpec this run started from, when any (plan FE-2.5). Optional so
     # older journals and direct ``start_run(task=...)`` calls fold unchanged.
     task_spec_id: TaskSpecId | None = None
+    # Exact human approval snapshotted by the launch manifest. Optional for historical
+    # journals and direct task starts that do not use the on-ramp.
+    task_spec_lock_id: TaskSpecLockId | None = None
+    task_spec_lock_sha256: str | None = None
 
 
 class StageStarted(StrictModel):

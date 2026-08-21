@@ -20,6 +20,7 @@ from mootloop.close import (
 )
 from mootloop.models.common import VersionedModel
 from mootloop.models.context import CorpusSnapshot, RunContextManifest
+from mootloop.models.taskspec import TaskSpecLock
 
 pytestmark = pytest.mark.invariant
 
@@ -56,6 +57,7 @@ def test_run_context_models_have_explicit_close_inventory_paths() -> None:
 
     assert stores_by_model[RunContextManifest] == "runs/*/context/manifest.json"
     assert stores_by_model[CorpusSnapshot] == "runs/*/context/corpus.json"
+    assert stores_by_model[TaskSpecLock] == "tasks/locks.jsonl"
 
 
 def test_gate_flags_an_unregistered_model() -> None:

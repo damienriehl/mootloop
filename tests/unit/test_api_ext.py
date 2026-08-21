@@ -416,6 +416,7 @@ def test_export_openapi_cli_writes_valid_json_with_new_paths(tmp_path: Path) -> 
     assert "post" in paths["/api/matters/{matter_id}/runs"]
     assert "post" in paths["/api/matters/{matter_id}/runs/{run_id}/raise-cap"]
     assert "post" in paths["/api/matters/{matter_id}/runs/{run_id}/reopen"]
+    assert "post" in paths["/api/matters/{matter_id}/tasks/{task_spec_id}/lock"]
 
 
 def test_openapi_components_show_discriminated_unions() -> None:

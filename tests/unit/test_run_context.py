@@ -33,7 +33,7 @@ from mootloop.orchestrator import (
 )
 from mootloop.panels import build_panel_report
 from mootloop.tasks import DiscoveryResponsesAdapter
-from mootloop.taskspec import TaskSpecStore, create_freeform
+from mootloop.taskspec import TaskSpecStore, create_freeform, lock_task_spec
 from mootloop.vault import init_vault
 from tests.conftest import make_matter
 
@@ -145,13 +145,17 @@ def test_start_rejects_invalid_task_spec_binding(
 def test_start_commits_versioned_manifest_and_task_spec(tmp_path: Path) -> None:
     vault = _vault(tmp_path)
     spec = create_freeform(vault, "acme-v-widgets", "answer the discovery", NOW)
+    lock_task_spec(
+        vault, "acme-v-widgets", str(spec.task_spec_id), "test-attorney", NOW
+    )
     run_id = start_run(vault, TASK, NOW, run_id="ctx-start", task_spec_id=str(spec.task_spec_id))
 
     started = next(event for event in read_events(vault, run_id) if isinstance(event, RunStarted))
     context = load_run_context(vault, run_id)
     assert started.context_manifest_sha256
-    assert context.manifest.schema_version == "1.2"
+    assert context.manifest.schema_version == "1.3"
     assert context.manifest.task_spec == spec
+    assert context.manifest.task_spec_lock is not None
     assert context.manifest.adapter_behavior.draft_directive
     assert context.manifest.adapter_behavior.judge_question
 
@@ -762,6 +766,9 @@ def test_loader_rejects_run_started_identity_drift(
 def test_loader_rejects_run_started_task_spec_drift(tmp_path: Path) -> None:
     vault = _vault(tmp_path)
     spec = create_freeform(vault, "acme-v-widgets", "answer the discovery", NOW)
+    lock_task_spec(
+        vault, "acme-v-widgets", str(spec.task_spec_id), "test-attorney", NOW
+    )
     run_id = start_run(
         vault, TASK, NOW, run_id="ctx-event-task-spec", task_spec_id=str(spec.task_spec_id)
     )

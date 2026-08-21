@@ -39,7 +39,7 @@ from mootloop.models.matters import MatterSummary
 from mootloop.models.panels import PanelReport
 from mootloop.models.requests import RequestSet
 from mootloop.models.task import TaskAdapterConfig
-from mootloop.models.taskspec import TaskSpec
+from mootloop.models.taskspec import TaskSpec, TaskSpecLock
 from mootloop.registry import MatterRegistry
 from mootloop.vault import (
     RunLock,
@@ -128,6 +128,12 @@ MATTER_SCOPED_STORES: tuple[MatterScopedStore, ...] = (
         glob="tasks/specs.jsonl",
         description="Begin-task on-ramp TaskSpec store.",
         model=TaskSpec,
+    ),
+    MatterScopedStore(
+        name="task-spec-locks",
+        glob="tasks/locks.jsonl",
+        description="Append-only exact human TaskSpec launch approvals.",
+        model=TaskSpecLock,
     ),
     MatterScopedStore(
         name="access-audit",

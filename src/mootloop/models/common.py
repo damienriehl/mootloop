@@ -21,6 +21,7 @@ DocId = NewType("DocId", str)
 DecisionId = NewType("DecisionId", str)
 CitationId = NewType("CitationId", str)
 TaskSpecId = NewType("TaskSpecId", str)
+TaskSpecLockId = NewType("TaskSpecLockId", str)
 TurnId = NewType("TurnId", str)
 RubricId = NewType("RubricId", str)
 

@@ -21,6 +21,7 @@ from mootloop.taskspec import (
     TaskSpecStore,
     create_freeform,
     list_specs,
+    lock_task_spec,
     make_task_spec_id,
     resolve_freeform,
 )
@@ -181,6 +182,7 @@ def test_start_run_records_task_spec_id_on_run_started(tmp_path: Path) -> None:
 
     vault = _build_single_request_vault(tmp_path)
     spec = create_freeform(vault, MATTER, "answer the discovery", NOW)
+    lock_task_spec(vault, MATTER, str(spec.task_spec_id), "test-attorney", NOW)
     run_id = start_run(vault, "discovery-responses", NOW, task_spec_id=spec.task_spec_id)
     event = _run_started(vault, run_id)
     assert event.task_spec_id == spec.task_spec_id  # type: ignore[attr-defined]
@@ -197,6 +199,7 @@ def test_start_run_task_spec_id_defaults_none(tmp_path: Path) -> None:
 def test_cli_start_binds_task_spec_id(tmp_path: Path) -> None:
     vault = _build_single_request_vault(tmp_path)
     spec = create_freeform(vault, MATTER, "answer the discovery", NOW)
+    lock_task_spec(vault, MATTER, str(spec.task_spec_id), "test-attorney", NOW)
 
     result = CliRunner().invoke(
         app,
@@ -212,4 +215,5 @@ def test_service_module_reexports() -> None:
     # The service surface the routes import from stays stable.
     assert taskspec_svc.create_freeform is create_freeform
     assert taskspec_svc.list_specs is list_specs
+    assert taskspec_svc.lock_task_spec is lock_task_spec
     assert taskspec_svc.resolve_freeform is resolve_freeform

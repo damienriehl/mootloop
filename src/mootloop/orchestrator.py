@@ -47,7 +47,14 @@ from mootloop.journal import (
 from mootloop.llm import LLMProvider, TokenUsage
 from mootloop.models.budget import EstimateRange
 from mootloop.models.citations import Citation
-from mootloop.models.common import MatterId, RubricId, RunId, TaskSpecId, TurnId
+from mootloop.models.common import (
+    MatterId,
+    RubricId,
+    RunId,
+    TaskSpecId,
+    TaskSpecLockId,
+    TurnId,
+)
 from mootloop.models.context import AssembledContextItem, ContextContribution
 from mootloop.models.events import (
     CapRaised,
@@ -263,6 +270,7 @@ def start_run(
             context_contributions,
         )
         resolved_config = run_context.manifest.resolved_config
+        task_spec_lock = run_context.manifest.task_spec_lock
         context_manifest_sha256 = write_run_context(vault_root, run_context)
         append(
             vault_root,
@@ -276,6 +284,14 @@ def start_run(
                 context_manifest_sha256=context_manifest_sha256,
                 mode=resolved_config.run_mode,
                 task_spec_id=TaskSpecId(task_spec_id) if task_spec_id is not None else None,
+                task_spec_lock_id=(
+                    TaskSpecLockId(task_spec_lock.task_spec_lock_id)
+                    if task_spec_lock is not None
+                    else None
+                ),
+                task_spec_lock_sha256=(
+                    task_spec_lock.record_sha256 if task_spec_lock is not None else None
+                ),
             ),
         )
         _finalize(vault_root, resolved_id, now, run_context)
