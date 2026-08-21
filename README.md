@@ -176,9 +176,12 @@ pipeline), this phase makes loops *terminate on quality* and *respect a budget*:
   a rotated key, a config change — `mootloop run reopen --reason "…"` transitions it
   back to `running` on an audited journal event. No state is ever hand-edited.
 
-Earlier phases remain: **corpus ingestion** (`mootloop ingest`), the **discovery
-parser** (`mootloop requests parse`), and the append-only **fact repository**
-(`mootloop facts add` / `list`). A fully synthetic MN breach-of-contract matter lives
+Earlier phases remain: **corpus ingestion** (`mootloop ingest`, then `corpus actions`
+and `corpus tag` for role/privilege review), the **discovery parser** (`mootloop
+requests parse`), and the append-only **fact repository** (`mootloop facts
+propose` / `interview` / `review`, with direct reviewed imports through `facts add`).
+Only triaged corpus text and accepted facts enter immutable run context. A fully
+synthetic MN breach-of-contract matter lives
 in `fixtures/synthetic-matter/` and runs the whole path in CI. The hosted Claude
 provider and driver have completed a partial real-provider run, proving the provider,
 queue, and spend-metering plumbing. That run stopped at `needs_attention` before a

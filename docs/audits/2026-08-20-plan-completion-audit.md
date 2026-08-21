@@ -40,8 +40,8 @@ missing older source plan.
 
 ## Current Validation Evidence
 
-- Backend verification: the final `make check` passed: ruff clean, mypy strict clean
-  across 85 source files, and 737 tests passed at 92% coverage.
+- Backend verification: the latest local `make check` passed: ruff clean, mypy strict
+  clean across 98 source files, and 940 tests passed at 92% coverage.
 - Frontend verification: ESLint clean, TypeScript clean, 9 Vitest files / 37 tests
   passed, backend and generated-client OpenAPI drift checks pass, and the production
   build succeeds.
@@ -83,9 +83,9 @@ Source: `docs/plans/2026-07-11-001-feat-mootloop-v1-agentic-litigation-pipeline-
 | ID | Planned task | Status | Evidence or queue |
 |---|---|---|---|
 | V1-0 | Scaffold, vault schema/lock, privacy guardrails, synthetic fixture, CLI init | COMPLETE | Current package, vault hardening, privacy tools, fixtures, and tests implement the phase. |
-| V1-1a | Folder ingest, normalization, manifest, failure surfacing, role/privilege tags | PARTIAL | Generic ingest exists and fails closed. The historical real-folder run left 240 conversion items and one oversized item; private-folder completion is D-04. |
+| V1-1a | Folder ingest, normalization, manifest, failure surfacing, role/privilege tags | COMPLETE locally / DECISION-GATED protected conversion | U-04A now provides stable no-follow capture, deterministic protected action classifications, concurrent-safe role/privilege confirmation, and run-visibility exclusion. The historical real-folder conversion queue remains U-04B behind D-04/D-05. |
 | V1-1b | Parse interrogatories/RFPs/RFAs into per-request items | COMPLETE | Parsers and unit/invariant coverage exist. |
-| V1-1c | Fact repository, provenance, and gap questions | COMPLETE locally / DECISION-GATED live | Models and services exist; the prior hosted run loaded zero client facts. Live fact supply and validation are D-02/D-03. |
+| V1-1c | Fact repository, provenance, and gap questions | COMPLETE locally / DECISION-GATED live | U-04A adds append-only proposed/reviewed fact transitions, exact reviewed-document provenance checks, deterministic gap interviews, and accepted-only run context. The prior hosted run loaded zero client facts; live fact supply and validation remain D-02/D-03. |
 | V1-2a | Six personas, discovery adapter, defaults, thin full pipeline | COMPLETE | Persona/stage/orchestrator code and synthetic pipeline tests exist. |
 | V1-2b | Journaled crash resume, idempotent turns, derailment detection, non-degeneracy | COMPLETE for current pipeline | Runs replay an exact approved launch snapshot, fail closed on missing/tampered context, and repair journaled hosted launch delivery idempotently. |
 | V1-2c | Individually enable/bypass personas and select thin-full/deep-core/adversarial-first | OPEN-AUTO | Thin-full exists; full controls/strategies do not. U-06. |

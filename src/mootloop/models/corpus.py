@@ -17,12 +17,30 @@ from pydantic import Field
 
 from mootloop.models.common import DocId, StrictModel, VersionedModel
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
 
 MANIFEST_PATH = ("corpus", "manifest.json")
 
 # One of the four terminal states a document reaches at ingest.
 IngestStatus = Literal["ok", "needs_conversion", "unreadable", "too_large"]
+TriageIssue = Literal[
+    "needs_ocr",
+    "password_protected",
+    "corrupt",
+    "unsupported_format",
+    "too_large",
+    "unreadable",
+]
+IngestActionKind = Literal[
+    "confirm_role",
+    "confirm_privilege",
+    "needs_ocr",
+    "password_protected",
+    "corrupt",
+    "unsupported_format",
+    "too_large",
+    "unreadable",
+]
 
 
 class DocRole(StrEnum):
@@ -51,8 +69,30 @@ class CorpusDoc(StrictModel):
     role: DocRole | None = None
     privileged: bool | None = None
     ingest_status: IngestStatus
+    triage_issue: TriageIssue | None = None
     normalized_path: str | None = None
     ingested_at: str
+
+    @property
+    def run_visible(self) -> bool:
+        """Only normalized documents with both human triage calls may enter runs."""
+        return (
+            self.ingest_status == "ok"
+            and self.normalized_path is not None
+            and self.role is not None
+            and self.privileged is not None
+        )
+
+
+class IngestAction(StrictModel):
+    """One deterministic human action required before a document is usable."""
+
+    action_id: str
+    doc_id: DocId
+    original_name: str
+    kind: IngestActionKind
+    reason: str
+    blocks_run_visibility: bool = True
 
 
 class Manifest(VersionedModel):
@@ -106,6 +146,7 @@ class IngestReport(StrictModel):
     """The result of one `ingest_folder` call: every document processed this run."""
 
     entries: list[IngestEntry] = Field(default_factory=list)
+    actions: list[IngestAction] = Field(default_factory=list)
 
     def with_status(self, status: IngestStatus) -> list[IngestEntry]:
         return [e for e in self.entries if e.doc.ingest_status == status]

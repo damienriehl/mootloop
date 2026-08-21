@@ -36,10 +36,13 @@ from mootloop.errors import (
 )
 from mootloop.export import link as export_link
 from mootloop.export import service as export_service
-from mootloop.facts import FactStore, add_facts_from_file
-from mootloop.ingest import content_doc_id, ingest_folder
+from mootloop.facts import FactStore, add_facts_from_file, build_fact_interview
+from mootloop.ingest import content_doc_id, ingest_actions, ingest_folder, set_doc_tag
 from mootloop.journal import load_state
 from mootloop.llm import FakeLLMProvider
+from mootloop.models.common import DocId
+from mootloop.models.corpus import DocRole
+from mootloop.models.facts import Provenance
 from mootloop.models.matter import SCHEMA_VERSION, MatterConfig
 from mootloop.models.requests import RequestType
 from mootloop.models.run import DiscardedTurn
@@ -52,6 +55,7 @@ requests_app = typer.Typer(
     help="Parse served discovery into request work items.", no_args_is_help=True
 )
 facts_app = typer.Typer(help="Manage the fact repository.", no_args_is_help=True)
+corpus_app = typer.Typer(help="Review corpus triage and run visibility.", no_args_is_help=True)
 run_app = typer.Typer(
     help="Drive an orchestrator run (stepwise state machine).", no_args_is_help=True
 )
@@ -78,6 +82,7 @@ export_app = typer.Typer(
 )
 app.add_typer(requests_app, name="requests")
 app.add_typer(facts_app, name="facts")
+app.add_typer(corpus_app, name="corpus")
 app.add_typer(run_app, name="run")
 app.add_typer(cite_app, name="cite")
 app.add_typer(research_app, name="research")
@@ -104,6 +109,13 @@ class DecisionActionArg(StrEnum):
     approve = "approve"
     modify = "modify"
     deny = "deny"
+
+
+class FactReviewActionArg(StrEnum):
+    """Human disposition for a proposed fact."""
+
+    accept = "accept"
+    reject = "reject"
 
 
 def _now() -> str:
@@ -294,9 +306,51 @@ def ingest(
     for status in ("needs_conversion", "unreadable", "too_large"):
         for entry in report.with_status(status):
             typer.secho(
-                f"  [{status}] {entry.doc.original_name}: {entry.reason}",
+                f"  [{status}] {entry.doc.original_name!r}: {entry.reason}",
                 fg=typer.colors.YELLOW,
             )
+    actions = report.actions
+    if actions:
+        typer.echo(f"Action queue: {len(actions)} item(s)")
+        for item in actions:
+            typer.echo(f"  {item.action_id} [{item.kind}] {item.original_name!r}")
+
+
+@corpus_app.command("actions")
+def corpus_actions(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    json_output: Annotated[bool, typer.Option("--json", help="Emit JSON")] = False,
+) -> None:
+    """List deterministic actions blocking document run visibility."""
+    actions = ingest_actions(vault_path)
+    if json_output:
+        typer.echo(json.dumps([item.model_dump(mode="json") for item in actions]))
+        return
+    if not actions:
+        typer.echo("No corpus triage actions.")
+        return
+    for item in actions:
+        typer.echo(f"{item.action_id} [{item.kind}] {item.original_name!r}: {item.reason}")
+
+
+@corpus_app.command("tag")
+def corpus_tag(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    doc_id: Annotated[str, typer.Argument(help="Corpus document id")],
+    role: Annotated[DocRole | None, typer.Option("--role", help="Confirmed document role")] = None,
+    privileged: Annotated[
+        bool | None,
+        typer.Option("--privileged/--not-privileged", help="Confirmed privilege call"),
+    ] = None,
+) -> None:
+    """Record human role and/or privilege confirmation for a document."""
+    if role is None and privileged is None:
+        raise _fail(IngestError("corpus tag requires --role or a privilege flag")) from None
+    try:
+        updated = set_doc_tag(vault_path, doc_id, role=role, privileged=privileged)
+    except (IngestError, VaultBoundaryError) as exc:
+        raise _fail(exc) from exc
+    typer.echo(json.dumps(updated.model_dump(mode="json")))
 
 
 @requests_app.command("parse")
@@ -351,9 +405,93 @@ def facts_list(
         typer.echo("No facts recorded.")
         return
     for fact in current:
-        flag = "" if fact.provenance else "  [UNSUPPORTED]"
+        flags = []
+        if fact.review_status != "accepted":
+            flags.append(fact.review_status.upper())
+        if not fact.provenance:
+            flags.append("UNSUPPORTED")
+        flag = f"  [{' / '.join(flags)}]" if flags else ""
         typer.echo(f"{fact.fact_id} (v{fact.version}, conf={fact.confidence}){flag}")
         typer.echo(f"  {fact.statement}")
+
+
+@facts_app.command("propose")
+def facts_propose(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    statement: Annotated[str, typer.Option("--statement", help="Proposed fact statement")],
+    confidence: Annotated[float, typer.Option("--confidence", min=0.0, max=1.0)] = 1.0,
+    doc_id: Annotated[str | None, typer.Option("--doc-id", help="Supporting corpus doc")] = None,
+    quote: Annotated[str | None, typer.Option("--quote", help="Exact supporting quote")] = None,
+    location: Annotated[
+        str | None, typer.Option("--location", help="Optional location hint")
+    ] = None,
+    supersedes: Annotated[
+        str | None, typer.Option("--supersedes", help="Reviewed predecessor fact id")
+    ] = None,
+) -> None:
+    """Append an unapproved fact candidate for hard-human review."""
+    if (doc_id is None) != (quote is None):
+        raise _fail(FactError("--doc-id and --quote must be supplied together")) from None
+    provenance = (
+        [Provenance(doc_id=DocId(doc_id), quote=quote, location_hint=location)]
+        if doc_id is not None and quote is not None
+        else []
+    )
+    try:
+        store = FactStore(vault_path)
+        fact = (
+            store.propose_revision(
+                supersedes,
+                statement,
+                provenance=provenance,
+                confidence=confidence,
+            )
+            if supersedes is not None
+            else store.propose_fact(
+                statement,
+                provenance=provenance,
+                confidence=confidence,
+            )
+        )
+    except (FactError, VaultBoundaryError) as exc:
+        raise _fail(exc) from exc
+    typer.echo(fact.model_dump_json())
+
+
+@facts_app.command("review")
+def facts_review(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    fact_id: Annotated[str, typer.Argument(help="Pending fact id")],
+    action: Annotated[FactReviewActionArg, typer.Option("--action", help="accept | reject")],
+    note: Annotated[str | None, typer.Option("--note", help="Optional review note")] = None,
+) -> None:
+    """Record a hard-human fact acceptance or rejection."""
+    try:
+        fact = FactStore(vault_path).review_fact(
+            fact_id,
+            action=action.value,
+            reviewer=pwd.getpwuid(os.geteuid()).pw_name,
+            reviewed_at=_now(),
+            note=note,
+        )
+    except (FactError, VaultBoundaryError) as exc:
+        raise _fail(exc) from exc
+    typer.echo(fact.model_dump_json())
+
+
+@facts_app.command("interview")
+def facts_interview(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    json_output: Annotated[bool, typer.Option("--json", help="Emit JSON")] = False,
+) -> None:
+    """Show deterministic fact-review and evidentiary-gap questions."""
+    interview = build_fact_interview(vault_path)
+    if json_output:
+        typer.echo(interview.model_dump_json())
+        return
+    typer.echo(f"Run-visible facts: {interview.run_visible_fact_count}")
+    for question in interview.questions:
+        typer.echo(f"{question.question_id} [{question.kind}] {question.prompt}")
 
 
 # --- run verbs (thin adapters over the orchestrator) ------------------------

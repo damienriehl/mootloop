@@ -297,8 +297,18 @@ flowchart TD
   queued: U-09 supplies the anchored annotated-draft artifact before it can join the
   seal, and D-09 still needs a concrete immutable remote signed-head provider before
   coordinated host-writer resistance can be claimed.
-- **U-04A/U-04B and U-05 through U-17C remain queued** under their stated dependencies
-  and decision gates. **U-18 is COMPLETE for U-01, U-02, and U-03:**
+- **U-04A COMPLETE locally.** Mixed-format ingest now emits deterministic protected
+  actions for OCR, password, corrupt, unsupported, unreadable, oversized, role, and
+  privilege work. Original files are captured through stable no-follow descriptors;
+  manifest mutations and append-only fact review transitions are process-safe and
+  durable. Only normalized role/privilege-reviewed documents and accepted facts enter
+  immutable run context. Pending revisions preserve the reviewed predecessor until
+  acceptance, provenance acceptance verifies an exact quote in a reviewed document,
+  and deterministic interviews surface review, support, repair, and uncovered-document
+  gaps. Empty or wholly unreviewed ingests fail before run creation. Publication and
+  remote CI evidence remain this unit's U-18 tail.
+- **U-04B and U-05 through U-17C remain queued** under their stated dependencies and
+  decision gates. **U-18 is COMPLETE for U-01, U-02, and U-03:**
   PR #33 merged as `74dec0a` after backend, invariant, and frontend CI passed on code
   head `acc1e51`; PR #35 merged as `b2ff6c7` after all six push/PR jobs passed on code
   head `96da3c6`; PR #36 merged as `7e9f03e` after the final code head `4c5cd64`
@@ -307,7 +317,7 @@ flowchart TD
   No hosted matter or deployment was accessed during this execution.
 
 Verification at this checkpoint: backend ruff and strict mypy across 98 source files
-pass; 924 backend tests pass at 92% coverage; frontend ESLint, TypeScript, 9 Vitest
+pass; 940 backend tests pass at 92% coverage; frontend ESLint, TypeScript, 9 Vitest
 files / 37 tests, OpenAPI generation/drift, and the production build pass. U-03's
 structured review covered correctness, security, adversarial behavior, tests,
 maintainability, reliability, project standards, API contracts, agent parity, and
@@ -450,8 +460,8 @@ invalidate predictably.
 reviewed facts enter run context, without requiring private folders or a converter
 choice.
 
-**Files:** `src/mootloop/ingest.py`, `facts.py`, `cli.py`, corpus models, a new local
-conversion adapter, synthetic fixtures, and ingest/fact tests.
+**Files:** `src/mootloop/ingest.py`, `facts.py`, `cli.py`, corpus models, synthetic
+fixtures, and ingest/fact tests. The converter adapter belongs to U-04B after D-05.
 
 **Work:** preserve fail-closed password/corrupt/OCR/size
 classifications; add role/privilege confirmation, fact interview, provenance, and gap

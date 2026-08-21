@@ -78,6 +78,18 @@ uv run mootloop ingest ~/Matters/<matter-id> ~/case-docs --tags ~/case-docs/tags
 ```
 
 Anything unreadable or needing conversion is reported, never silently skipped.
+Every ingested document also remains outside run context until both its role and
+privilege status are confirmed. Work the deterministic queue and record each call:
+
+```bash
+uv run mootloop corpus actions ~/Matters/<matter-id>
+uv run mootloop corpus tag ~/Matters/<matter-id> <doc-id> \
+    --role client-doc --not-privileged
+```
+
+Password-protected, corrupt, OCR-needed, unsupported, unreadable, and oversized files
+stay in that queue for the protected conversion workflow. If the corpus is empty or
+every document is still unreviewed, run start fails closed.
 
 ## 3. Parse each served discovery set
 
@@ -99,6 +111,21 @@ passages in ingested documents:
 uv run mootloop facts add ~/Matters/<matter-id> --input facts.json
 uv run mootloop facts list ~/Matters/<matter-id>
 ```
+
+For interview-generated candidates, use the append-only proposal/review path. Pending
+and rejected candidates never enter a run; accepting a candidate requires exact
+provenance in a role/privilege-reviewed normalized document:
+
+```bash
+uv run mootloop facts propose ~/Matters/<matter-id> \
+    --statement "The contract price is $50,000." \
+    --doc-id <doc-id> --quote "The price is $50,000."
+uv run mootloop facts interview ~/Matters/<matter-id>
+uv run mootloop facts review ~/Matters/<matter-id> <fact-id> --action accept
+```
+
+Use `facts propose --supersedes <fact-id>` for a correction. The reviewed predecessor
+remains run-visible until the attorney accepts the replacement.
 
 ## 5. Drive the run from Claude Code (Max plan — no API cost)
 
