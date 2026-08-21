@@ -33,6 +33,7 @@ export const keys = {
           gates: () => [...runKey, "gates"] as const,
           decisions: () => [...runKey, "decisions"] as const,
           requests: () => [...runKey, "requests"] as const,
+          productionSuggestions: () => [...runKey, "production-suggestions"] as const,
           integrity: () => [...runKey, "integrity"] as const,
           // Export room: this run's deliverables + certify-and-release gate (FE-2.5).
           deliverables: () => [...runKey, "deliverables"] as const,

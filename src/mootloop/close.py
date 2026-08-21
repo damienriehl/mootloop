@@ -49,6 +49,7 @@ from mootloop.models.matter import MatterConfig
 from mootloop.models.matters import MatterSummary
 from mootloop.models.panels import PanelReport
 from mootloop.models.pipeline import ResolvedPipeline
+from mootloop.models.production import ProductionSuggestionBundle, ProductionSuggestionReview
 from mootloop.models.requests import RequestSet
 from mootloop.models.task import TaskAdapterConfig
 from mootloop.models.taskspec import TaskSpec, TaskSpecLock
@@ -220,6 +221,18 @@ MATTER_SCOPED_STORES: tuple[MatterScopedStore, ...] = (
         glob="runs/*/scores/panels/report.json",
         description="Per-run judge-panel reports.",
         model=PanelReport,
+    ),
+    MatterScopedStore(
+        name="run-production-suggestions",
+        glob="runs/*/production/suggestions.json",
+        description="Review-only RFP document classification proposals and exclusions.",
+        model=ProductionSuggestionBundle,
+    ),
+    MatterScopedStore(
+        name="run-production-reviews",
+        glob="runs/*/production/reviews.jsonl",
+        description="Append-only human classification and separate production decisions.",
+        model=ProductionSuggestionReview,
     ),
     MatterScopedStore(
         name="run-artifacts",

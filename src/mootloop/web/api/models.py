@@ -18,6 +18,12 @@ from mootloop.models.common import StrictModel, VersionedModel
 from mootloop.models.decisions import Decision, ResolutionAction
 from mootloop.models.events import RunMode, RunStatus
 from mootloop.models.gates import GateResult
+from mootloop.models.production import (
+    ProductionDisposition,
+    ProductionSuggestionExclusion,
+    ProductionSuggestionView,
+    SuggestionReviewAction,
+)
 from mootloop.models.requests import RequestItem
 from mootloop.models.run import AttentionBlocker
 from mootloop.models.taskspec import TaskSpec, TaskSpecLock
@@ -165,6 +171,34 @@ class JudgeProfileQueuedResponse(VersionedModel):
     kind: Literal["judge_profile_queued"] = "judge_profile_queued"
     item_id: str
     status: Literal["queued"] = "queued"
+
+
+class ProductionSuggestionsQueuedResponse(VersionedModel):
+    schema_version: str = SCHEMA_VERSION
+    kind: Literal["production_suggestions_queued"] = "production_suggestions_queued"
+    run_id: str
+    item_id: str
+    status: Literal["queued"] = "queued"
+
+
+class ProductionSuggestionsResponse(VersionedModel):
+    schema_version: str = SCHEMA_VERSION
+    kind: Literal["production_suggestions"] = "production_suggestions"
+    run_id: str
+    suggestions: list[ProductionSuggestionView] = Field(default_factory=list)
+    exclusions: list[ProductionSuggestionExclusion] = Field(default_factory=list)
+
+
+class ProductionSuggestionResponse(VersionedModel):
+    schema_version: str = SCHEMA_VERSION
+    kind: Literal["production_suggestion"] = "production_suggestion"
+    suggestion: ProductionSuggestionView
+
+
+class ProductionSuggestionReviewRequest(StrictModel):
+    action: SuggestionReviewAction
+    production_disposition: ProductionDisposition | None = None
+    reason: str = Field(default="", max_length=2000)
 
 
 class RunStatusSummary(VersionedModel):

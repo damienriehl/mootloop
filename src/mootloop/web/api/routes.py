@@ -23,6 +23,7 @@ from mootloop import decisions as decisions_svc
 from mootloop import orchestrator
 from mootloop import taskspec as taskspec_svc
 from mootloop.citations.check_runner import require_completed_draft_set
+from mootloop.context import load_run_context
 from mootloop.engine.launch import launch_run as launch_run_service
 from mootloop.engine.queue import Queue as WorkQueue
 from mootloop.engine.queue import WorkItem
@@ -32,6 +33,10 @@ from mootloop.journal import load_state
 from mootloop.models.attestations import ReviewIntegrityStatus
 from mootloop.models.common import MatterId
 from mootloop.models.matters import MatterSummary
+from mootloop.production_suggestions import (
+    ProductionSuggestionStore,
+    review_production_suggestion,
+)
 from mootloop.registry import MatterRegistry
 from mootloop.vault import safe_vault_path
 from mootloop.web import audit
@@ -392,6 +397,97 @@ def queue_judge_profile(
         )
     )
     return models.JudgeProfileQueuedResponse(item_id=item_id)
+
+
+@router.post("/api/matters/{matter_id}/runs/{run_id}/production/suggestions/generate")
+def queue_production_suggestions(
+    matter_id: str,
+    run_id: str,
+    principal: Principal,
+    vault: Vault,
+    queue: QueueDep,
+    _csrf: Csrf,
+    _audited: Annotated[None, Depends(_audit_dep("production_suggestions_queue"))],
+) -> models.ProductionSuggestionsQueuedResponse:
+    """Queue deterministic RFP classifications; this route never records production."""
+    del principal
+    load_run_context(vault, run_id)
+    item_id = f"production:{matter_id}:{run_id}"
+    queue.ensure_enqueued(
+        WorkItem.create(
+            lane="interactive",
+            matter_id=matter_id,
+            run_id=run_id,
+            kind="production_suggestions",
+            now=datetime.now(UTC),
+            item_id=item_id,
+        )
+    )
+    return models.ProductionSuggestionsQueuedResponse(run_id=run_id, item_id=item_id)
+
+
+@router.get("/api/matters/{matter_id}/runs/{run_id}/production/suggestions")
+def list_production_suggestions(
+    matter_id: str,
+    run_id: str,
+    principal: Principal,
+    vault: Vault,
+    _audited: Annotated[None, Depends(_audit_dep("production_suggestions_list"))],
+) -> models.ProductionSuggestionsResponse:
+    del matter_id, principal
+    store = ProductionSuggestionStore(vault, run_id)
+    bundle = store.load_bundle()
+    return models.ProductionSuggestionsResponse(
+        run_id=run_id,
+        suggestions=store.list_all(),
+        exclusions=bundle.exclusions if bundle else [],
+    )
+
+
+@router.get(
+    "/api/matters/{matter_id}/runs/{run_id}/production/suggestions/{suggestion_id}"
+)
+def get_production_suggestion(
+    matter_id: str,
+    run_id: str,
+    suggestion_id: str,
+    principal: Principal,
+    vault: Vault,
+    _audited: Annotated[None, Depends(_audit_dep("production_suggestion_show"))],
+) -> models.ProductionSuggestionResponse:
+    del matter_id, principal
+    item = ProductionSuggestionStore(vault, run_id).get(suggestion_id)
+    if item is None:
+        raise OrchestratorError(f"unknown production suggestion {suggestion_id!r}")
+    return models.ProductionSuggestionResponse(suggestion=item)
+
+
+@router.post(
+    "/api/matters/{matter_id}/runs/{run_id}/production/suggestions/{suggestion_id}/review"
+)
+def review_production_suggestion_route(
+    matter_id: str,
+    run_id: str,
+    suggestion_id: str,
+    body: models.ProductionSuggestionReviewRequest,
+    principal: Principal,
+    vault: Vault,
+    _csrf: Csrf,
+    _audited: Annotated[None, Depends(_audit_dep("production_suggestion_review"))],
+) -> models.ProductionSuggestionResponse:
+    del matter_id
+    item = review_production_suggestion(
+        vault,
+        run_id,
+        suggestion_id,
+        action=body.action,
+        production_disposition=body.production_disposition,
+        actor=principal.email,
+        channel="api",
+        recorded_at=_now_iso(),
+        reason=body.reason,
+    )
+    return models.ProductionSuggestionResponse(suggestion=item)
 
 
 # --- decision resolve (write; typed 409 on lock contention) -----------------

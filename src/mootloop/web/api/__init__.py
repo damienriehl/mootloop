@@ -30,6 +30,7 @@ from mootloop.errors import (
     LockHeldError,
     MatterNotFoundError,
     OrchestratorError,
+    ProductionSuggestionError,
     QueueError,
     RunNotFoundError,
     TaskSpecError,
@@ -66,6 +67,13 @@ def _install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(CitationError)
     async def _citation(request: Request, exc: CitationError) -> JSONResponse:
         return JSONResponse(status_code=400, content={"error": "citation", "detail": str(exc)})
+
+    @app.exception_handler(ProductionSuggestionError)
+    async def _production(request: Request, exc: ProductionSuggestionError) -> JSONResponse:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "production_suggestion", "detail": str(exc)},
+        )
 
     @app.exception_handler(OrchestratorError)
     async def _orchestrator(request: Request, exc: OrchestratorError) -> JSONResponse:

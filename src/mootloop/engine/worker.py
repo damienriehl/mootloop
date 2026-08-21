@@ -280,6 +280,33 @@ class Worker:
                 return True
             self.queue.complete(item.item_id, self.worker_id)
             return True
+        if item.kind == "production_suggestions":
+            from mootloop.production_suggestions import (
+                ProductionSuggestionLeaseLostError,
+                build_production_suggestions,
+            )
+
+            try:
+                build_production_suggestions(
+                    vault,
+                    run_id,
+                    now.isoformat(),
+                    heartbeat=lambda: self.queue.heartbeat(
+                        item.item_id,
+                        self.worker_id,
+                        self.now_fn(),
+                        visibility_timeout_s=self.visibility_timeout_s,
+                    ),
+                )
+            except ProductionSuggestionLeaseLostError:
+                logger.warning(
+                    "worker %s: lost the lease on production item %s; stopping",
+                    self.worker_id,
+                    item.item_id,
+                )
+                return True
+            self.queue.complete(item.item_id, self.worker_id)
+            return True
         run_dir = vault / "runs" / run_id
         provider = self.provider_factory(vault, run_dir, self.billing_mode)
         now_iso = now.isoformat()

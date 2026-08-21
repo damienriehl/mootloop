@@ -54,6 +54,7 @@ run_app = typer.Typer(
 cite_app = typer.Typer(help="Extract and verify citations.", no_args_is_help=True)
 research_app = typer.Typer(help="Manage the citation research-request queue.", no_args_is_help=True)
 judge_app = typer.Typer(help="Build and inspect assigned-judge profiles.", no_args_is_help=True)
+production_app = typer.Typer(help="Review RFP document suggestions.", no_args_is_help=True)
 decide_app = typer.Typer(help="Review and resolve attorney-gate decisions.", no_args_is_help=True)
 web_app = typer.Typer(help="Public demo web tier (synthetic matter only).", no_args_is_help=True)
 matters_app = typer.Typer(
@@ -80,6 +81,7 @@ app.add_typer(run_app, name="run")
 app.add_typer(cite_app, name="cite")
 app.add_typer(research_app, name="research")
 app.add_typer(judge_app, name="judge")
+app.add_typer(production_app, name="production")
 app.add_typer(decide_app, name="decide")
 app.add_typer(web_app, name="web")
 app.add_typer(matters_app, name="matters")
@@ -110,6 +112,22 @@ class FactReviewActionArg(StrEnum):
 
     accept = "accept"
     reject = "reject"
+
+
+class ProductionReviewActionArg(StrEnum):
+    """CLI-facing RFP suggestion review action."""
+
+    accept = "accept"
+    reject = "reject"
+    production_review = "production_review"
+
+
+class ProductionDispositionArg(StrEnum):
+    """CLI-facing substantive production disposition."""
+
+    produce = "produce"
+    withhold = "withhold"
+    defer = "defer"
 
 
 def _now() -> str:

@@ -204,6 +204,53 @@ def test_worker_dispatches_and_completes_judge_profile_job(
     assert queue.snapshot() == []
 
 
+def test_worker_dispatches_production_suggestions_without_model_provider(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, run_id = _build_matters_root(tmp_path)
+    queue = Queue(root)
+    queue.enqueue(
+        WorkItem.create(
+            lane="interactive",
+            matter_id=MATTER_ID,
+            run_id=run_id,
+            kind="production_suggestions",
+            now=NOW,
+            item_id=f"production:{MATTER_ID}:{run_id}",
+        )
+    )
+    calls: list[tuple[str, str]] = []
+
+    def build(
+        vault: Path,
+        dispatched_run_id: str,
+        now: str,
+        *,
+        heartbeat: object,
+    ) -> object:
+        del vault, now
+        assert callable(heartbeat)
+        assert heartbeat() is True
+        calls.append((dispatched_run_id, "renewed"))
+        return object()
+
+    monkeypatch.setattr(
+        "mootloop.production_suggestions.build_production_suggestions",
+        build,
+    )
+
+    def no_provider(vault: Path, run_dir: Path, billing_mode: str) -> LLMProvider:
+        del vault, run_dir, billing_mode
+        raise AssertionError("production suggestion work must not construct a model provider")
+
+    worker = Worker(root, "w-production", queue, no_provider)
+    assert worker.run_once(NOW) is True
+
+    assert calls == [(run_id, "renewed")]
+    assert queue.snapshot() == []
+
+
 def test_judge_profile_job_stops_without_completing_after_lease_loss(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
