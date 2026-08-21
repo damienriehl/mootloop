@@ -34,6 +34,7 @@ from mootloop.models.context import (
     RunContextManifest,
     StoredContextContribution,
 )
+from mootloop.models.conversion import ConversionReceipt
 from mootloop.models.corpus import Manifest
 from mootloop.models.decisions import Decision
 from mootloop.models.facts import Fact
@@ -108,6 +109,12 @@ MATTER_SCOPED_STORES: tuple[MatterScopedStore, ...] = (
         glob="corpus/**/*",
         description="Ingested originals, normalized, and curated documents.",
         model=None,
+    ),
+    MatterScopedStore(
+        name="corpus-conversions",
+        glob="corpus/conversions/*.json",
+        description="Protected conversion receipts binding exact input, output, and tool.",
+        model=ConversionReceipt,
     ),
     MatterScopedStore(
         name="citation-ledger",

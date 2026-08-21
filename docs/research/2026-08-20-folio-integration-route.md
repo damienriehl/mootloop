@@ -73,7 +73,10 @@ spaCy/regex, and local embeddings are preferred for the initial synthetic gate.
 
 ## Implementation consequence
 
-- U-04B owns the isolated `folio-enrich` adapter and synthetic conversion tests.
+- U-04B uses the synchronous extraction-only `POST /enrich/extract` route, not the
+  stateful enrichment job API. The adapter is fixed-endpoint, bounded, and
+  receipt-backed; its container has no egress or vault mount. Rendering remains a
+  presentation-only follow-up rather than a competing conversion route.
 - U-12 uses pinned `folio-python` access for deterministic catalog/search, backed by
   the update contract above.
 - U-13/UI work may adapt rendering helpers only after confirming their license and

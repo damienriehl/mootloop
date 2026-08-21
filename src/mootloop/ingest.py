@@ -436,7 +436,7 @@ def _ingest_one(
                 )
                 reason = f"no normalizer for {suffix}"
             else:
-                normalized_rel = _write_normalized(vault_root, doc_id, markdown)
+                normalized_rel = write_normalized_text(vault_root, doc_id, markdown)
                 status, triage_issue, reason = "ok", None, None
 
     doc = CorpusDoc(
@@ -477,12 +477,52 @@ def _error_doc(
     )
 
 
-def _write_normalized(vault_root: Path | str, doc_id: DocId, markdown: str) -> str:
+def write_normalized_text(vault_root: Path | str, doc_id: DocId, markdown: str) -> str:
+    """Durably publish normalized text at the one canonical path for ``doc_id``."""
     rel = f"corpus/normalized/{doc_id}.md"
     path = safe_vault_path(vault_root, "corpus", "normalized", f"{doc_id}.md")
     text = markdown if markdown.endswith("\n") else markdown + "\n"
     atomic_write_text(path, text)
+    fsync_file_and_parent(path)
     return rel
+
+
+def promote_converted_document(vault_root: Path | str, doc_id: str) -> CorpusDoc:
+    """Promote one durably converted document while preserving concurrent review tags."""
+    normalized_rel = f"corpus/normalized/{doc_id}.md"
+    expected_path = Path(vault_root).resolve() / normalized_rel
+    normalized_path = safe_vault_path(
+        vault_root, "corpus", "normalized", f"{doc_id}.md"
+    )
+    if normalized_path != expected_path or normalized_path.is_symlink():
+        raise IngestError(f"normalized conversion path is not canonical for {doc_id}")
+    if not normalized_path.is_file():
+        raise IngestError(f"normalized conversion output is missing for {doc_id}")
+    with _manifest_lock(vault_root):
+        manifest = Manifest.load(vault_root)
+        doc = manifest.get(doc_id)
+        if doc is None:
+            raise IngestError(f"unknown doc_id: {doc_id}")
+        if (
+            doc.ingest_status == "ok"
+            and doc.triage_issue is None
+            and doc.normalized_path == normalized_rel
+        ):
+            return doc
+        if doc.ingest_status != "needs_conversion":
+            raise IngestError(
+                f"document {doc_id} cannot be promoted from {doc.ingest_status}"
+            )
+        updated = doc.model_copy(
+            update={
+                "ingest_status": "ok",
+                "triage_issue": None,
+                "normalized_path": normalized_rel,
+            }
+        )
+        manifest.upsert(updated)
+        manifest.save(vault_root)
+        return updated
 
 
 # --- non-interactive tagging service ----------------------------------------

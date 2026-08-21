@@ -29,6 +29,10 @@ class IngestError(MootloopError):
     """A corpus ingest precondition failed (bad source dir, unresolvable tag, …)."""
 
 
+class ConversionError(IngestError):
+    """A protected document conversion failed its isolation or integrity contract."""
+
+
 class FactError(MootloopError):
     """A fact-store precondition failed (unknown fact id, unresolvable provenance, …)."""
 

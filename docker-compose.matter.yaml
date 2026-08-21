@@ -78,6 +78,9 @@ services:
       MOOTLOOP_EGRESS_PROXY_URL: http://egress-proxy:3128
       MOOTLOOP_ENGINE_CONFIG_DIR: /var/lib/mootloop-engine-config
       MOOTLOOP_CANARY_REGISTRY: /srv/mootloop-worker/.canaries.json
+      MOOTLOOP_FOLIO_ENRICH_URL: http://folio-enrich:8731
+      MOOTLOOP_FOLIO_ENRICH_IMAGE: ${MOOTLOOP_FOLIO_ENRICH_IMAGE:?digest-pinned image required}
+      MOOTLOOP_FOLIO_ENRICH_COMMIT: ${MOOTLOOP_FOLIO_ENRICH_COMMIT:?reviewed commit required}
     volumes:
       # Control-plane queue metadata is shared; no sibling vault is mounted.
       - /srv/mootloop-matters/.queue:/srv/mootloop-worker/.queue
@@ -95,8 +98,11 @@ services:
       - /home/mootloop/.mootloop:/home/mootloop/.mootloop:ro
     networks:
       - driver-egress
+      - driver-conversion
     depends_on:
       egress-proxy:
+        condition: service_healthy
+      folio-enrich:
         condition: service_healthy
     # Must outlast an in-flight claude turn (timeout_s=600) so SIGTERM drains cleanly.
     stop_grace_period: 630s
@@ -123,8 +129,48 @@ services:
       - driver-egress
       - proxy-outbound
 
+  folio-enrich:
+    profiles: ["matter-worker"]
+    image: ${MOOTLOOP_FOLIO_ENRICH_IMAGE:?digest-pinned folio-enrich image required}
+    restart: unless-stopped
+    read_only: true
+    user: appuser
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    mem_limit: 2g
+    cpus: "2.0"
+    expose:
+      - "8731"
+    environment:
+      PORT: "8731"
+      FOLIO_ENRICH_JOBS_DIR: /tmp/jobs
+      FOLIO_ENRICH_FEEDBACK_DIR: /tmp/feedback
+      FOLIO_ENRICH_EMBEDDING_DISABLED: "true"
+      FOLIO_ENRICH_FOLIO_AUTO_UPDATE: "false"
+      FOLIO_ENRICH_OLLAMA_AUTO_MANAGE: "false"
+      FOLIO_ENRICH_ENABLED_ONTOLOGIES: '["folio"]'
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=256m,mode=1777
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:8731/health')
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    networks:
+      - driver-conversion
+
 networks:
   driver-egress:
+    internal: true
+  driver-conversion:
     internal: true
   proxy-outbound: {}
 

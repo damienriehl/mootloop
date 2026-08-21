@@ -10,6 +10,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from mootloop import secrets
+from mootloop.conversion_client import (
+    validate_folio_enrich_commit,
+    validate_folio_enrich_image,
+)
 from mootloop.engine.claude_provider import HeadlessClaudeProvider
 from mootloop.engine.isolation import PROXY_PASSWORD_ENV, hosted_wrapper
 from mootloop.engine.queue import Queue
@@ -146,9 +150,13 @@ def start_matter_worker(
     compose_file: Path,
     proxy_password_file: Path,
     engine_config_root: Path,
+    folio_enrich_image: str,
+    folio_enrich_commit: str,
     runner: ComposeRunner = subprocess.run,
 ) -> None:
     """Validate host inputs, then start one fixed-target Compose worker project."""
+    validate_folio_enrich_image(folio_enrich_image)
+    validate_folio_enrich_commit(folio_enrich_commit)
     binding = resolve_driver_binding(matters_root, RuntimeMode.HOSTED, matter_id)
     if binding.vault is None or binding.matter_id is None:  # pragma: no cover
         raise DriverError("hosted matter binding did not resolve a vault")
@@ -184,6 +192,8 @@ def start_matter_worker(
             "MOOTLOOP_MATTER_SOURCE": str(binding.vault),
             "MOOTLOOP_ENGINE_CONFIG_SOURCE": str(engine_config_source),
             "MOOTLOOP_EGRESS_PROXY_PASSWORD_FILE": str(proxy_password_file.resolve()),
+            "MOOTLOOP_FOLIO_ENRICH_IMAGE": folio_enrich_image,
+            "MOOTLOOP_FOLIO_ENRICH_COMMIT": folio_enrich_commit,
         }
     )
     project_id = str(binding.matter_id).replace(".", "-")
@@ -200,6 +210,7 @@ def start_matter_worker(
         "-d",
         "driver",
         "egress-proxy",
+        "folio-enrich",
     ]
     try:
         runner(command, check=True, env=environment, text=True)

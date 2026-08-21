@@ -22,6 +22,11 @@ from mootloop.citations import verify
 from mootloop.citations.extract import extract_citations
 from mootloop.citations.ledger import ResearchQueue
 from mootloop.context import load_run_context
+from mootloop.conversion import (
+    FOLIO_ENRICH_COMMIT,
+    FolioEnrichConverter,
+    convert_corpus_document,
+)
 from mootloop.discovery_parser import parse_discovery_document, save_requests
 from mootloop.engine import driver as driver_service
 from mootloop.errors import (
@@ -47,7 +52,7 @@ from mootloop.models.matter import SCHEMA_VERSION, MatterConfig
 from mootloop.models.requests import RequestType
 from mootloop.models.run import DiscardedTurn
 from mootloop.registry import MatterRegistry
-from mootloop.runtime import RuntimeMode
+from mootloop.runtime import RUNTIME_MODE_ENV, RuntimeMode, validate_runtime_mode
 from mootloop.vault import init_vault, load_matter, matter_validation_issues
 
 app = typer.Typer(help="MootLoop — agentic law firm simulator.", no_args_is_help=True)
@@ -351,6 +356,27 @@ def corpus_tag(
     except (IngestError, VaultBoundaryError) as exc:
         raise _fail(exc) from exc
     typer.echo(json.dumps(updated.model_dump(mode="json")))
+
+
+@corpus_app.command("convert")
+def corpus_convert(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    doc_id: Annotated[str, typer.Argument(help="Corpus document id")],
+) -> None:
+    """Convert one reviewed document through the configured protected sidecar."""
+    try:
+        mode = validate_runtime_mode(os.environ.get(RUNTIME_MODE_ENV, RuntimeMode.LOCAL))
+        converter = FolioEnrichConverter.from_env(mode)
+        _doc, receipt = convert_corpus_document(
+            vault_path,
+            doc_id,
+            converter=converter,
+            converted_at=_now(),
+            actor=pwd.getpwuid(os.geteuid()).pw_name,
+        )
+    except (MootloopError, ValueError) as exc:
+        raise _fail(exc) from exc
+    typer.echo(json.dumps(receipt.model_dump(mode="json")))
 
 
 @requests_app.command("parse")
@@ -1341,6 +1367,17 @@ def driver_start_matter_worker(
         Path,
         typer.Option("--engine-config-root", help="Private durable Claude-state root"),
     ] = Path("/srv/mootloop-engine-config"),
+    folio_enrich_image: Annotated[
+        str,
+        typer.Option(
+            "--folio-enrich-image",
+            help="Reviewed folio-enrich OCI image pinned by sha256 digest",
+        ),
+    ] = "",
+    folio_enrich_commit: Annotated[
+        str,
+        typer.Option("--folio-enrich-commit", help="Reviewed folio-enrich source commit"),
+    ] = FOLIO_ENRICH_COMMIT,
     compose_file: Annotated[
         Path,
         typer.Option("--compose-file", help="Matter-worker Compose file"),
@@ -1354,6 +1391,8 @@ def driver_start_matter_worker(
             compose_file=compose_file,
             proxy_password_file=proxy_password_file,
             engine_config_root=engine_config_root,
+            folio_enrich_image=folio_enrich_image,
+            folio_enrich_commit=folio_enrich_commit,
         )
     except MootloopError as exc:
         raise _fail(exc) from exc

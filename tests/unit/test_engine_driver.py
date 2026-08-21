@@ -7,11 +7,14 @@ from pathlib import Path
 
 import pytest
 
+from mootloop.conversion import FOLIO_ENRICH_COMMIT
 from mootloop.engine import driver
-from mootloop.errors import DriverError, VaultBoundaryError
+from mootloop.errors import ConversionError, DriverError, VaultBoundaryError
 from mootloop.registry import MatterRegistry
 from mootloop.runtime import RuntimeMode
 from tests.conftest import make_matter
+
+IMAGE = "ghcr.io/alea-institute/folio-enrich@sha256:" + "a" * 64
 
 
 def _hosted_matter(tmp_path: Path, matter_id: str = "2026-08-21-acme-test") -> tuple[Path, Path]:
@@ -70,6 +73,8 @@ def test_start_matter_worker_validates_then_uses_fixed_mount_source(
         compose_file=compose,
         proxy_password_file=password,
         engine_config_root=engine_config_root,
+        folio_enrich_image=IMAGE,
+        folio_enrich_commit=FOLIO_ENRICH_COMMIT,
         runner=runner,
     )
 
@@ -82,7 +87,9 @@ def test_start_matter_worker_validates_then_uses_fixed_mount_source(
     )
     assert environment["MOOTLOOP_MATTER_ID"] == "2026-08-21-acme-test"
     assert environment["MOOTLOOP_EGRESS_PROXY_PASSWORD_FILE"] == str(password.resolve())
-    assert command[-4:] == ["up", "-d", "driver", "egress-proxy"]
+    assert environment["MOOTLOOP_FOLIO_ENRICH_IMAGE"] == IMAGE
+    assert environment["MOOTLOOP_FOLIO_ENRICH_COMMIT"] == FOLIO_ENRICH_COMMIT
+    assert command[-5:] == ["up", "-d", "driver", "egress-proxy", "folio-enrich"]
     assert kwargs["check"] is True and kwargs["text"] is True
     assert (engine_config_root / "2026-08-21-acme-test").stat().st_mode & 0o077 == 0
 
@@ -114,6 +121,8 @@ def test_start_matter_worker_reuses_durable_per_matter_engine_config(
             compose_file=compose,
             proxy_password_file=password,
             engine_config_root=engine_config_root,
+            folio_enrich_image=IMAGE,
+            folio_enrich_commit=FOLIO_ENRICH_COMMIT,
             runner=runner,
         )
 
@@ -147,6 +156,8 @@ def test_start_matter_worker_rejects_invalid_id_before_runner(
             compose_file=compose,
             proxy_password_file=password,
             engine_config_root=tmp_path / "engine-config",
+            folio_enrich_image=IMAGE,
+            folio_enrich_commit=FOLIO_ENRICH_COMMIT,
             runner=runner,
         )
     assert called is False
@@ -171,4 +182,39 @@ def test_start_matter_worker_rejects_unsafe_or_mismatched_proxy_secret(
             compose_file=compose,
             proxy_password_file=password,
             engine_config_root=tmp_path / "engine-config",
+            folio_enrich_image=IMAGE,
+            folio_enrich_commit=FOLIO_ENRICH_COMMIT,
         )
+
+
+@pytest.mark.parametrize(
+    ("image", "commit"),
+    [
+        ("ghcr.io/alea-institute/folio-enrich:latest", FOLIO_ENRICH_COMMIT),
+        (IMAGE, "0" * 40),
+    ],
+)
+def test_start_matter_worker_rejects_unreviewed_converter_before_runner(
+    tmp_path: Path,
+    image: str,
+    commit: str,
+) -> None:
+    called = False
+
+    def runner(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        nonlocal called
+        called = True
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    with pytest.raises(ConversionError):
+        driver.start_matter_worker(
+            tmp_path / "matters",
+            "2026-08-21-acme-test",
+            compose_file=tmp_path / "compose.yaml",
+            proxy_password_file=tmp_path / "password",
+            engine_config_root=tmp_path / "engine-config",
+            folio_enrich_image=image,
+            folio_enrich_commit=commit,
+            runner=runner,
+        )
+    assert called is False

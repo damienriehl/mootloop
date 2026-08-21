@@ -45,7 +45,7 @@ short label is less detailed.
 | D3-H7 | Ethical walls and cross-matter learning exclusion | OPEN-AUTO — U-09 |
 | D3-H8 | Immutable verification source, chained logs/decisions, full attestation tuple | COMPLETE locally — exact-byte v2 commitment and mutation gates |
 | D3-H9 | Fixed legal-host egress allowlist; no content-derived target | PARTIAL — U-02/U-07 |
-| D3-H10 | Defensive DOCX/ZIP/XXE parsing and pinned model/catalog fetches | OPEN-AUTO — U-09/D-12 |
+| D3-H10 | Defensive DOCX/ZIP/XXE parsing and pinned model/catalog fetches | PARTIAL — U-04B isolates and pins protected conversion; local edit parsing U-09 and catalog updates U-12 |
 | D3-M11 | Per-matter canaries and fail-closed privacy scanning | COMPLETE locally; runtime path U-02 |
 | D3-M12 | Shared export controls for every CLI/skill path | COMPLETE for current sealed exports; extensions U-11A |
 | D3-13 | Every confidentiality/attestation error fails closed | PARTIAL — enforced per landing unit |
