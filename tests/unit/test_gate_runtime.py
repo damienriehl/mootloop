@@ -64,8 +64,18 @@ def test_catalog_orders_dependencies_before_dependents_stably() -> None:
 
 
 def test_catalog_rejects_duplicate_unknown_missing_and_cyclic_definitions() -> None:
+    with pytest.raises(GateConfigurationError, match="name cannot be empty"):
+        _definition("")
+    with pytest.raises(GateConfigurationError, match="dependency cycle"):
+        _definition("one", depends_on=("one",))
+    with pytest.raises(GateConfigurationError, match="duplicate dependencies"):
+        _definition("one", depends_on=("two", "two"))
+
     with pytest.raises(GateConfigurationError, match="duplicate gate definition"):
         GateCatalog((_definition("one"), _definition("one")))
+
+    with pytest.raises(GateConfigurationError, match="depends on unknown gate 'ghost'"):
+        GateCatalog((_definition("one", depends_on=("ghost",)),))
 
     catalog = GateCatalog((_definition("one"), _definition("two", depends_on=("one",))))
     with pytest.raises(GateConfigurationError, match="unknown gate"):
@@ -100,6 +110,51 @@ def test_runner_stops_after_a_halting_failure() -> None:
     assert calls == ["parse"]
     assert [result.gate for result in run.results] == ["parse"]
     assert run.halted_by == "parse"
+
+
+def test_runner_rejects_duplicate_implementations_and_mismatched_results() -> None:
+    calls: list[str] = []
+    definition = _definition("parse")
+    gate = _RecordingGate(definition, calls, GatePass(gate="parse"))
+    with pytest.raises(GateConfigurationError, match="duplicate implementations"):
+        GateRunner((gate, gate))
+
+    mismatched = _RecordingGate(definition, calls, GatePass(gate="other"))
+    with pytest.raises(GateConfigurationError, match="returned result for 'other'"):
+        GateRunner((mismatched,)).run(("parse",), object())
+
+
+def test_runner_skips_inapplicable_gates_and_keeps_nonhalting_failures() -> None:
+    @dataclass(frozen=True)
+    class _SkippedGate:
+        definition: GateDefinition
+
+        def applies(self, _context: object) -> bool:
+            return False
+
+        def evaluate(self, _context: object) -> GateResult:
+            raise AssertionError("an inapplicable gate must not be evaluated")
+
+    calls: list[str] = []
+    failed = _RecordingGate(
+        _definition("failed"),
+        calls,
+        GateFail(gate="failed", findings=[GateFinding(code="bad", message="bad")]),
+    )
+    passed = _RecordingGate(
+        _definition("passed", depends_on=("failed",)),
+        calls,
+        GatePass(gate="passed"),
+    )
+    skipped = _SkippedGate(_definition("skipped", depends_on=("passed",)))
+
+    run = GateRunner((skipped, passed, failed)).run(
+        ("skipped", "passed", "failed"), object()
+    )
+
+    assert calls == ["failed", "passed"]
+    assert [result.gate for result in run.results] == ["failed", "passed"]
+    assert run.halted_by is None
 
 
 def test_task_adapter_declares_every_current_turn_gate_in_dependency_order() -> None:

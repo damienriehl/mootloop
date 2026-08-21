@@ -747,18 +747,7 @@ def attest_status(
 
 
 # Import command modules only after the shared Typer apps and helpers exist.
-from . import operations as _operations  # noqa: E402,F401
-
-# The run group was historically registered inline above. Replace that registration
-# with the focused command module while preserving `mootloop.cli:app` and import
-# compatibility for callers that still reference this package.
-run_app.registered_commands.clear()
-from . import run as _run  # noqa: E402,F401,I001
-
-cite_app.registered_commands.clear()
-research_app.registered_commands.clear()
-decide_app.registered_commands.clear()
-from . import review as _review  # noqa: E402,F401,I001
+from . import operations as _operations, review as _review, run as _run  # noqa: E402,F401,I001
 
 
 if __name__ == "__main__":
