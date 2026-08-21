@@ -200,7 +200,7 @@ def _load_corpus(
         digest = _sha256(raw)
         texts.append(
             CorpusTextSnapshot(
-                doc_id=str(doc.doc_id),
+                doc_id=doc.doc_id,
                 locator=doc.normalized_path,
                 sha256=digest,
                 text=text,

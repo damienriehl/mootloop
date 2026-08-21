@@ -44,6 +44,7 @@ from mootloop.journal import (
 from mootloop.llm import LLMProvider, TokenUsage
 from mootloop.models.budget import EstimateRange
 from mootloop.models.citations import Citation
+from mootloop.models.common import MatterId, RunId, TaskSpecId, TurnId
 from mootloop.models.events import (
     CapRaised,
     CheckpointCleared,
@@ -230,14 +231,14 @@ def start_run(
             vault_root,
             resolved_id,
             RunStarted(
-                run_id=resolved_id,
-                matter_id=matter.matter_id,
+                run_id=RunId(resolved_id),
+                matter_id=MatterId(matter.matter_id),
                 task=task,
                 rubric_version=binding.config.rubric_id,
                 config_digest=config_digest(binding.config),
                 context_manifest_sha256=context_manifest_sha256,
                 mode=resolved_mode,
-                task_spec_id=task_spec_id,
+                task_spec_id=TaskSpecId(task_spec_id) if task_spec_id is not None else None,
             ),
         )
         _finalize(vault_root, resolved_id, now, run_context)
@@ -441,7 +442,7 @@ def _book_spend(
         vault_root,
         run_id,
         SpendRecorded(
-            turn_id=turn_id,
+            turn_id=TurnId(turn_id),
             input_tokens=usage.input_tokens,
             cache_read=usage.cache_read,
             cache_write=usage.cache_write,
@@ -688,7 +689,11 @@ def verify_run_citations(
     gate = verify.citation_gate(
         vault_root, citations, now=now, max_cache_age_days=max_cache_age_days
     )
-    append(vault_root, run_id, GateEvaluated(turn_id=f"{run_id}-citations", result=gate))
+    append(
+        vault_root,
+        run_id,
+        GateEvaluated(turn_id=TurnId(f"{run_id}-citations"), result=gate),
+    )
     return summary
 
 

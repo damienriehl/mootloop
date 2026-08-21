@@ -23,6 +23,7 @@ from typing import Any, Protocol
 from mootloop.convergence import ConvergenceEvaluator, RoundState
 from mootloop.errors import TaskConfigError
 from mootloop.gates import completeness
+from mootloop.models.common import RunId, TurnId
 from mootloop.models.events import RunState
 from mootloop.models.panels import PanelResult
 from mootloop.models.requests import RequestItem, code_from_request_id
@@ -189,8 +190,8 @@ class StageContext:
         if feedback and self.attempt(seq) > 1:
             context["previous_attempt_rejected_because"] = feedback
         return TurnSpec(
-            turn_id=self.layout.turn_id(seq),
-            run_id=self.run_id,
+            turn_id=TurnId(self.layout.turn_id(seq)),
+            run_id=RunId(self.run_id),
             persona=persona,
             request_id=self.request.request_id,
             stage=stage,

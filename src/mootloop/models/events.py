@@ -11,7 +11,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field, field_validator
 
-from mootloop.models.common import StrictModel
+from mootloop.models.common import MatterId, RubricId, RunId, StrictModel, TaskSpecId, TurnId
 from mootloop.models.gates import GateResult
 from mootloop.models.run import TurnRecord
 
@@ -39,10 +39,10 @@ RunMode = Literal["autonomous", "gated", "observed"]
 
 class RunStarted(StrictModel):
     kind: Literal["run_started"] = "run_started"
-    run_id: str
-    matter_id: str
+    run_id: RunId
+    matter_id: MatterId
     task: str
-    rubric_version: str
+    rubric_version: RubricId
     config_digest: str
     # Exact bytes of the immutable launch manifest. Optional only so historical
     # journals still parse; every lifecycle operation fails closed when it is absent.
@@ -50,7 +50,7 @@ class RunStarted(StrictModel):
     mode: RunMode = "autonomous"
     # The on-ramp TaskSpec this run started from, when any (plan FE-2.5). Optional so
     # older journals and direct ``start_run(task=...)`` calls fold unchanged.
-    task_spec_id: str | None = None
+    task_spec_id: TaskSpecId | None = None
 
 
 class StageStarted(StrictModel):
@@ -65,7 +65,7 @@ class TurnCompleted(StrictModel):
 
 class TurnDiscarded(StrictModel):
     kind: Literal["turn_discarded"] = "turn_discarded"
-    turn_id: str
+    turn_id: TurnId
     reason: str
     attempt: int
     # What exactly failed (compact validation errors / gate findings), replayed into
@@ -76,13 +76,13 @@ class TurnDiscarded(StrictModel):
 
 class GateEvaluated(StrictModel):
     kind: Literal["gate_evaluated"] = "gate_evaluated"
-    turn_id: str
+    turn_id: TurnId
     result: GateResult
 
 
 class SpendRecorded(StrictModel):
     kind: Literal["spend_recorded"] = "spend_recorded"
-    turn_id: str
+    turn_id: TurnId
     input_tokens: int
     cache_read: int
     cache_write: int
@@ -186,7 +186,7 @@ class TurnIntent(StrictModel):
     can never push a run past its budget cap unnoticed."""
 
     kind: Literal["turn_intent"] = "turn_intent"
-    turn_id: str
+    turn_id: TurnId
     model: str
     billing_mode: Literal["subscription", "api"]
     max_plausible_usd: float

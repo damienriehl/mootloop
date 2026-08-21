@@ -15,7 +15,7 @@ import yaml
 from pydantic import Field, ValidationError, field_validator
 
 from mootloop.errors import TaskConfigError
-from mootloop.models.common import StrictModel, VersionedModel
+from mootloop.models.common import RubricId, StrictModel, VersionedModel
 from mootloop.models.config import IMMUTABLE_IDENTITY_PATHS, STRUCTURAL_LEAF_PATHS
 
 SCHEMA_VERSION = "1.0"
@@ -62,7 +62,7 @@ class TaskAdapterConfig(VersionedModel):
     panels: PanelConfig = Field(default_factory=PanelConfig)
     convergence: ConvergenceConfig = Field(default_factory=ConvergenceConfig)
     gates: list[str] = Field(default_factory=list)
-    rubric_id: str
+    rubric_id: RubricId
     rubric_threshold: float = Field(default=0.75, ge=0.0, le=1.0)
     # An objection surviving fewer than this fraction of the panel triggers a
     # restructure pass on its request (plan Phase 6).

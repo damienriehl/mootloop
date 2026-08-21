@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from mootloop.models.common import MatterId, RunId, StrictModel, VersionedModel
+from mootloop.models.common import DocId, MatterId, RunId, StrictModel, VersionedModel
 from mootloop.models.corpus import Manifest
 from mootloop.models.facts import Fact
 from mootloop.models.matter import MatterConfig
@@ -50,7 +50,7 @@ class AdapterBehavior(StrictModel):
 class CorpusTextSnapshot(StrictModel):
     """One normalized corpus document captured exactly at launch."""
 
-    doc_id: str
+    doc_id: DocId
     locator: str
     sha256: str
     text: str

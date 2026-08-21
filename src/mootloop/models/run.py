@@ -14,7 +14,7 @@ from typing import Any, Literal
 
 from pydantic import Field
 
-from mootloop.models.common import RequestId, StrictModel
+from mootloop.models.common import RequestId, RunId, StrictModel, TurnId
 from mootloop.models.gates import GateResult
 
 
@@ -70,8 +70,8 @@ class TurnSpec(StrictModel):
     persona body plus this context, never stored here.
     """
 
-    turn_id: str
-    run_id: str
+    turn_id: TurnId
+    run_id: RunId
     persona: PersonaName
     request_id: RequestId | None = None
     stage: str
