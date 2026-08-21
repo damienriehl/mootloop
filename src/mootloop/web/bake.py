@@ -222,8 +222,10 @@ def build_demo_vault(dest_dir: Path | str) -> Path:
     curated.write_text(f"# {DEMO_CITATION} (curated authority)\n", encoding="utf-8")
     verify_run_citations(vault, run_id, DEMO_NOW)
 
-    # Any remaining policy-delegable gates, then the attorney attests.
+    # Any remaining policy-delegable gates, then build the exact review copy before
+    # the synthetic attorney attests it.
     _resolve_open_decisions(vault, run_id)
+    export_run(vault, run_id, DEMO_NOW, force_draft=True)
     attest_service.attest(vault, run_id, DEMO_ATTORNEY, DEMO_NOW)
 
     # Derived views the API serves directly, then the export itself.

@@ -18,7 +18,7 @@ from mootloop.export.service import export_run
 from mootloop.facts import FactStore
 from mootloop.llm import FakeLLMProvider
 from mootloop.models.common import DocId
-from mootloop.models.gates import GateFail
+from mootloop.models.gates import GateFail, GatePass
 from mootloop.models.matter import Attorney
 from mootloop.models.requests import RequestItem, RequestSet, RequestType, make_request_id
 from mootloop.orchestrator import run_with_provider, start_run, verify_run_citations
@@ -48,7 +48,9 @@ def _vault(tmp_path: Path, request_type: RequestType) -> Path:
     return vault
 
 
-def _finished_and_resolved(tmp_path: Path, run_id: str) -> Path:
+def _finished_and_resolved(
+    tmp_path: Path, run_id: str, *, prepare_review_copy: bool = True
+) -> Path:
     """A ROG run driven to finished, all decisions resolved, citations verified."""
     vault = _vault(tmp_path, RequestType.INTERROGATORY)
     start_run(vault, "discovery-responses", NOW, run_id=run_id)
@@ -70,6 +72,8 @@ def _finished_and_resolved(tmp_path: Path, run_id: str) -> Path:
             NOW,
         )
     verify_run_citations(vault, run_id, NOW)
+    if prepare_review_copy:
+        export_run(vault, run_id, NOW, force_draft=True)
     return vault
 
 
@@ -90,6 +94,22 @@ def test_attest_blocked_while_decisions_open(tmp_path: Path) -> None:
     # Hard-human RFA gate is open -> attestation refused.
     with pytest.raises(AttestationBlockedError):
         attest.attest(vault, run_id, "Jane", NOW)
+
+
+def test_attest_requires_and_preserves_the_existing_review_copy(tmp_path: Path) -> None:
+    vault = _finished_and_resolved(
+        tmp_path,
+        "att-review-copy",
+        prepare_review_copy=False,
+    )
+    with pytest.raises(AttestationBlockedError, match="build and review"):
+        attest.attest(vault, "att-review-copy", "Jane", NOW)
+
+    preview = export_run(vault, "att-review-copy", NOW, force_draft=True)
+    reviewed_bytes = preview.master.read_bytes()
+    attest.attest(vault, "att-review-copy", "Jane", LATER)
+
+    assert preview.master.read_bytes() == reviewed_bytes
 
 
 def test_whitespace_only_edit_does_not_invalidate(tmp_path: Path) -> None:
@@ -448,8 +468,38 @@ def test_residue_failure_removes_clean_outputs_without_sealing(
     assert result.is_draft is True
     assert result.export_ready is False
     assert any(blocker.startswith("residue:") for blocker in result.blockers)
-    assert not list((vault / "deliverables" / "att-residue-fail" / "docx").glob("*.docx"))
+    docx = (vault / "deliverables" / "att-residue-fail" / "docx").glob("*.docx")
+    assert not [path for path in docx if ".draft." not in path.name.lower()]
     assert attest.latest_export_seal(vault, "att-residue-fail") is None
+
+
+def test_skipped_docx_renderer_does_not_seal_or_block_later_render(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    vault = _finished_and_resolved(tmp_path, "att-render-later")
+    attest.attest(vault, "att-render-later", "Jane", NOW)
+    monkeypatch.setattr("mootloop.export.docx_render.pandoc_available", lambda: False)
+
+    skipped = export_run(vault, "att-render-later", NOW)
+    assert skipped.docx_skipped_reason == "pandoc not installed"
+    assert attest.latest_export_seal(vault, "att-render-later") is None
+
+    monkeypatch.setattr("mootloop.export.docx_render.pandoc_available", lambda: True)
+
+    def render(source: Path, output: Path, reference: Path, *, draft: bool) -> None:
+        del source, reference, draft
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(b"clean-docx")
+
+    monkeypatch.setattr("mootloop.export.docx_render.render_docx", render)
+    monkeypatch.setattr(
+        "mootloop.export.residue.scan_docx",
+        lambda path: GatePass(gate="residue"),
+    )
+
+    rendered = export_run(vault, "att-render-later", LATER)
+    assert rendered.docx
+    assert attest.sealed_export_state(vault, "att-render-later").status == "valid"
 
 
 def test_gate_ledger_folds_decisions_and_attestation(tmp_path: Path) -> None:
@@ -482,6 +532,7 @@ def test_gate_ledger_folds_decisions_and_attestation(tmp_path: Path) -> None:
     assert "decisions" not in blockers
     assert blockers == ["attestation"]
 
+    export_run(vault, run_id, NOW, force_draft=True)
     attest.attest(vault, run_id, "Jane", NOW)
     assert gate_ledger.export_ready(vault, run_id) == (True, [])
 

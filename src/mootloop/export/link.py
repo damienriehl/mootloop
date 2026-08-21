@@ -88,10 +88,12 @@ def _resolve_deliverable(vault_root: Path | str, run_id: str, name: str) -> Path
     evaluate the export-ready gate against the wrong run. So reject path-shaped parts
     up front and re-assert containment under the run's own directory.
     """
-    parts = [p for p in name.split("/") if p]
-    if not parts:
-        raise ExportLinkError(f"empty deliverable name for run {run_id!r}")
-    if name.startswith("/") or "\\" in name or any(p in (".", "..") for p in parts):
+    parts = name.split("/")
+    if (
+        name.startswith("/")
+        or "\\" in name
+        or any(part in ("", ".", "..") for part in parts)
+    ):
         raise ExportLinkError(f"invalid deliverable name {name!r} for run {run_id!r}")
     base = safe_vault_path(vault_root, "deliverables", run_id)
     path = safe_vault_path(vault_root, "deliverables", run_id, *parts)

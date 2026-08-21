@@ -327,13 +327,10 @@ def attest(vault_root: Path | str, run_id: str, reviewer: str, now: str) -> Atte
             raise AttestationBlockedError(
                 f"cannot attest run {run_id!r}: {len(open_decisions)} open decision(s): {ids}"
             )
-        from mootloop.export.master import build_court_master
-
-        build_court_master(vault_root, run_id, now, run_context=context)
         master = current_master_sha256(vault_root, run_id, run_context=context)
         if master is None:
             raise AttestationBlockedError(
-                f"cannot attest run {run_id!r}: the md-master deliverable does not exist"
+                f"cannot attest run {run_id!r}: build and review the draft export first"
             )
         _, seq = _latest_attestation_and_count(vault_root, run_id)
         record = Attestation(

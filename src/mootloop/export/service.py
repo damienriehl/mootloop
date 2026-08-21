@@ -170,8 +170,6 @@ def _export_run_locked(
 
     if not docx_render.pandoc_available():
         result.docx_skipped_reason = "pandoc not installed"
-        if qualifies_clean:
-            attest.record_export_seal_locked(vault_root, run_id, now)
         return result
 
     reference = reference_doc_path(reference_doc, draft=is_draft)

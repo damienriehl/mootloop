@@ -157,6 +157,8 @@ rejects the proposal.
 uv run mootloop cite verify ~/Matters/<matter-id> --run <run-id>
 uv run mootloop research list ~/Matters/<matter-id>    # anything needing human research
 uv run mootloop run gates ~/Matters/<matter-id> <run-id>   # the export predicate
+uv run mootloop export build ~/Matters/<matter-id> <run-id> --force-draft
+# Review deliverables/<run-id>/master.md before the human attest act.
 uv run mootloop attest ~/Matters/<matter-id> <run-id>  # records the local OS principal
 uv run mootloop attest-status ~/Matters/<matter-id> <run-id> --json
 ```

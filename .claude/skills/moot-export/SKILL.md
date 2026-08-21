@@ -31,6 +31,9 @@ uv run mootloop attest-status "$VAULT" "$RUN" --json
 Do **not** resolve gates or attest yourself — privilege calls, RFA dispositions, and
 attestation are human-by-design (`decide`/`attest` are their own verbs).
 
+The first draft build is the review copy. The attorney must inspect its `master.md`
+before attesting; `attest` never creates or rewrites the artifact it commits.
+
 ## 2. Export
 
 ```

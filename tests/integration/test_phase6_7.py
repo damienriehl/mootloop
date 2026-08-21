@@ -112,6 +112,11 @@ def _finish_run(vault: Path, run_id: str, provider: FakeLLMProvider) -> None:
         break
 
 
+def _prepare_review_copy(vault: Path, run_id: str) -> bytes:
+    """Build the DRAFT generation the attorney reviews before attesting."""
+    return export_run(vault, run_id, NOW, force_draft=True).master.read_bytes()
+
+
 def test_low_survival_panel_drives_restructure(tmp_path: Path) -> None:
     vault = _build(tmp_path, [("rogs-set1.txt", RequestType.INTERROGATORY)])
     run_id = start_run(vault, "discovery-responses", NOW, run_id="p67-restruct")
@@ -162,7 +167,10 @@ def test_full_export_flow(tmp_path: Path) -> None:
             vault, run_id, decision.decision_id, "approve", decision.proposal.recommended,
             "", "Test Attorney", "human", NOW,
         )
+    reviewed_master = _prepare_review_copy(vault, run_id)
     attest.attest(vault, run_id, "Jane Attorney", NOW)
+    master_path = attest.master_deliverable_path(vault, run_id)
+    assert master_path is not None and master_path.read_bytes() == reviewed_master
     ready, _ = gate_ledger.export_ready(vault, run_id)
     assert ready is True
 
@@ -222,6 +230,7 @@ def test_clean_export_produces_residue_clean_docx(tmp_path: Path) -> None:
             vault, run_id, decision.decision_id, "approve", decision.proposal.recommended,
             "", "A", "human", NOW,
         )
+    _prepare_review_copy(vault, run_id)
     attest.attest(vault, run_id, "Jane", NOW)
 
     result = export_run(vault, run_id, NOW)
@@ -255,6 +264,7 @@ def test_post_attestation_edit_refuses_clean_export(tmp_path: Path) -> None:
             vault, run_id, decision.decision_id, "approve", decision.proposal.recommended,
             "", "A", "human", NOW,
         )
+    _prepare_review_copy(vault, run_id)
     attest.attest(vault, run_id, "Jane", NOW)
     assert export_run(vault, run_id, NOW).is_draft is False
 
@@ -282,6 +292,7 @@ def _attested_run(tmp_path: Path, run_id: str, *, signed: bool = True) -> Path:
             vault, run_id, decision.decision_id, "approve", decision.proposal.recommended,
             "", "A", "human", NOW,
         )
+    _prepare_review_copy(vault, run_id)
     attest.attest(vault, run_id, "Jane", NOW)
     return vault
 

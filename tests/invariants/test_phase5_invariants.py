@@ -13,6 +13,7 @@ import pytest
 
 from mootloop.decisions import DecisionStore, resolve
 from mootloop.discovery_parser import save_requests
+from mootloop.export.service import export_run
 from mootloop.facts import FactStore
 from mootloop.llm import FakeLLMProvider
 from mootloop.models.attestations import Attestation
@@ -107,6 +108,7 @@ def test_attestations_jsonl_lines_parse(tmp_path: Path) -> None:
             vault, run_id, d.decision_id, "approve", d.proposal.recommended, "", "A", "human", NOW
         )
     verify_run_citations(vault, run_id, NOW)
+    export_run(vault, run_id, NOW, force_draft=True)
     attest.attest(vault, run_id, "Jane", NOW)
 
     path = vault / "runs" / run_id / "attestations.jsonl"

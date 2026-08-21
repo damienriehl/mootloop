@@ -284,8 +284,9 @@ flowchart TD
   non-root image probe, Compose validation, review gates, and remote CI passed. U-17A's
   deployed network/direct-egress/ACL/kill/cross-matter proof remains D-03-gated and is
   not claimed by U-02.
-- **U-03 local integrity core COMPLETE.** The human v2 attestation commits the exact
-  court master, citation ledger, run journal and turn evidence, decision log and
+- **U-03 local integrity core COMPLETE.** The human v2 attestation requires an existing
+  attorney-reviewed draft and commits that exact court master, citation ledger, run
+  journal and turn evidence, decision log and
   sidecars, launch fact state, intact access-audit prefix, reviewer, and timestamp.
   Clean export appends a linked exact-byte artifact seal; every download/list path
   revalidates it, and any single-byte bound-state drift re-imposes DRAFT. JSONL stores
@@ -305,7 +306,7 @@ flowchart TD
   No hosted matter or deployment was accessed during this execution.
 
 Verification at this checkpoint: backend ruff and strict mypy across 98 source files
-pass; 919 backend tests pass at 91% coverage; frontend ESLint, TypeScript, 9 Vitest
+pass; 924 backend tests pass at 92% coverage; frontend ESLint, TypeScript, 9 Vitest
 files / 37 tests, OpenAPI generation/drift, and the production build pass. U-03's
 structured review covered correctness, security, adversarial behavior, tests,
 maintainability, reliability, project standards, API contracts, agent parity, and

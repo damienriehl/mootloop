@@ -231,6 +231,15 @@ def test_unknown_deliverable_is_rejected(ready_vault: Path, signer: LinkSigner) 
         mint_link(ready_vault, MATTER, RUN, "nope.docx", NOW, signer)
 
 
+@pytest.mark.parametrize("name", ["sets//master.md", "master.md/", "//master.md"])
+def test_noncanonical_name_cannot_bypass_a_sealed_artifact_gate(
+    ready_vault: Path, signer: LinkSigner, name: str
+) -> None:
+    _seed(ready_vault, "sets/master.md")
+    with pytest.raises(ExportLinkError, match="invalid deliverable"):
+        mint_link(ready_vault, MATTER, RUN, name, NOW, signer)
+
+
 # --- traversal: the name is confined to THIS run's deliverable dir ------------
 
 
