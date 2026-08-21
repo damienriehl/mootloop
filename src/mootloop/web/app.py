@@ -18,16 +18,16 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
 import mootloop
+from mootloop.context import load_run_context
 from mootloop.decisions import DecisionStore
-from mootloop.export import deliverables_dir, load_request_sets
+from mootloop.export import deliverables_dir
 from mootloop.gate_ledger import build_ledger
 from mootloop.journal import load_state
 from mootloop.models.matter import MatterConfig
 from mootloop.models.panels import PanelReport
 from mootloop.models.requests import code_from_request_id
 from mootloop.models.run import DraftOutput
-from mootloop.orchestrator import load_request_units, operative_drafts, status_summary
-from mootloop.tasks import get_binding
+from mootloop.orchestrator import operative_drafts, status_summary
 from mootloop.vault import load_matter
 
 DEFAULT_VAULT = "/app/demo-vault"
@@ -109,9 +109,8 @@ def api_run() -> dict[str, Any]:
     run_id = _run_id(vault)
     summary = status_summary(vault, run_id)
     state = load_state(vault, run_id)
-    if state.task is None:
-        raise HTTPException(status_code=503, detail="baked run has no RunStarted event")
-    config = get_binding(state.task).config
+    run_context = load_run_context(vault, run_id)
+    config = run_context.binding.config
     persona_turns: dict[str, int] = {}
     for record in state.completed_turns.values():
         persona = record.spec.persona.value
@@ -149,7 +148,7 @@ def api_requests() -> list[dict[str, Any]]:
 
     family_order = {"rog": 0, "rfp": 1, "rfa": 2}
     units = sorted(
-        load_request_units(vault),
+        load_run_context(vault, run_id).units,
         key=lambda u: (
             family_order.get(code_from_request_id(str(u.request_id)), 9),
             u.set_number,
@@ -176,8 +175,8 @@ def api_requests() -> list[dict[str, Any]]:
     return out
 
 
-def _require_request(vault: Path, request_id: str) -> str:
-    known = {str(u.request_id) for u in load_request_units(vault)}
+def _require_request(vault: Path, run_id: str, request_id: str) -> str:
+    known = {str(u.request_id) for u in load_run_context(vault, run_id).units}
     if request_id not in known:
         raise HTTPException(status_code=404, detail=f"unknown request {request_id!r}")
     return request_id
@@ -187,7 +186,7 @@ def _require_request(vault: Path, request_id: str) -> str:
 def api_request_turns(request_id: str) -> list[dict[str, Any]]:
     vault = _vault_root()
     run_id = _run_id(vault)
-    _require_request(vault, request_id)
+    _require_request(vault, run_id, request_id)
     state = load_state(vault, run_id)
     records = sorted(
         (r for r in state.completed_turns.values() if str(r.spec.request_id) == request_id),
@@ -214,7 +213,7 @@ def api_request_turns(request_id: str) -> list[dict[str, Any]]:
 def api_request_panel(request_id: str) -> list[dict[str, Any]]:
     vault = _vault_root()
     run_id = _run_id(vault)
-    _require_request(vault, request_id)
+    _require_request(vault, run_id, request_id)
     report_path = vault / "runs" / run_id / "scores" / "panels" / "report.json"
     if not report_path.is_file():
         return []
@@ -236,7 +235,7 @@ def api_request_panel(request_id: str) -> list[dict[str, Any]]:
 def api_request_response(request_id: str) -> dict[str, Any]:
     vault = _vault_root()
     run_id = _run_id(vault)
-    _require_request(vault, request_id)
+    _require_request(vault, run_id, request_id)
     draft: DraftOutput | None = None
     for item, item_draft in operative_drafts(vault, run_id):
         if str(item.request_id) == request_id:
@@ -251,6 +250,7 @@ def api_request_response(request_id: str) -> dict[str, Any]:
 def api_decisions() -> list[dict[str, Any]]:
     vault = _vault_root()
     run_id = _run_id(vault)
+    load_run_context(vault, run_id)
     decisions = DecisionStore(vault, run_id).list_all()
     decisions.sort(key=lambda d: d.decision_id)
     return [d.model_dump(mode="json") for d in decisions]
@@ -311,6 +311,7 @@ def api_deliverable(name: str) -> PlainTextResponse:
 @app.get("/api/sets")
 def api_sets() -> list[dict[str, Any]]:
     vault = _vault_root()
+    request_sets = load_run_context(vault, _run_id(vault)).manifest.request_sets
     return [
         {
             "request_type": s.request_type.value,
@@ -318,7 +319,7 @@ def api_sets() -> list[dict[str, Any]]:
             "title": s.title,
             "requests": len([i for i in s.items if i.subpart is None]),
         }
-        for s in load_request_sets(vault)
+        for s in request_sets
     ]
 
 

@@ -10,12 +10,12 @@ from mootloop.models.common import DocId
 from mootloop.models.requests import RequestItem, RequestSet, RequestType
 from mootloop.models.run import DiscardedTurn, PersonaName
 from mootloop.orchestrator import (
+    assemble_prompt,
     plan_next,
     record_turn,
     start_run,
     status_summary,
 )
-from mootloop.stages import render_prompt
 
 NOW = "2026-07-11T00:00:00+00:00"
 
@@ -52,7 +52,9 @@ def _run_step(vault: Path, run_id: str, provider: FakeLLMProvider) -> list[str]:
     specs = plan_next(vault, run_id)
     ran: list[str] = []
     for spec in specs:
-        result: RawTurnResult = provider.run_turn(spec, render_prompt(spec))
+        result: RawTurnResult = provider.run_turn(
+            spec, assemble_prompt(vault, run_id, spec.turn_id)
+        )
         record_turn(vault, run_id, spec.turn_id, result.text, result.usage, NOW)
         ran.append(spec.persona.value)
     return ran
@@ -141,7 +143,7 @@ def test_completed_turn_record_is_idempotent(tmp_path: Path) -> None:
     run_id = start_run(vault, "discovery-responses", NOW, run_id="unit-0005")
     provider = FakeLLMProvider()
     spec = plan_next(vault, run_id)[0]
-    result = provider.run_turn(spec, render_prompt(spec))
+    result = provider.run_turn(spec, assemble_prompt(vault, run_id, spec.turn_id))
     first = record_turn(vault, run_id, spec.turn_id, result.text, result.usage, NOW)
     # Re-recording the same turn returns the stored record, not a new one.
     again = record_turn(vault, run_id, spec.turn_id, result.text, result.usage, NOW)

@@ -17,6 +17,10 @@ jobs:
         run: uv sync
       - name: Lint + typecheck + test
         run: make check
+      - name: Check backend OpenAPI drift
+        run: |
+          uv run mootloop api export-openapi /tmp/mootloop-openapi.generated.json
+          diff -u openapi.json /tmp/mootloop-openapi.generated.json
 
   invariants:
     runs-on: ubuntu-latest
@@ -30,3 +34,29 @@ jobs:
         run: uv sync
       - name: Repo-hygiene invariants
         run: uv run pytest tests/invariants -v
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Test
+        run: npm test
+      - name: Check OpenAPI schema drift
+        run: npm run openapi:check
+      - name: Build
+        run: npm run build

@@ -44,6 +44,9 @@ class RunStarted(StrictModel):
     task: str
     rubric_version: str
     config_digest: str
+    # Exact bytes of the immutable launch manifest. Optional only so historical
+    # journals still parse; every lifecycle operation fails closed when it is absent.
+    context_manifest_sha256: str | None = None
     mode: RunMode = "autonomous"
     # The on-ramp TaskSpec this run started from, when any (plan FE-2.5). Optional so
     # older journals and direct ``start_run(task=...)`` calls fold unchanged.
@@ -216,6 +219,8 @@ class RunState(StrictModel):
     matter_id: str | None = None
     task: str | None = None
     rubric_version: str | None = None
+    context_manifest_sha256: str | None = None
+    task_spec_id: str | None = None
     mode: RunMode = "autonomous"
     status: RunStatus = "running"
     current_stage: str | None = None

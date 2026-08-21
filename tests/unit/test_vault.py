@@ -18,6 +18,7 @@ from mootloop.vault import (
     RunLock,
     _real,
     assert_vault_outside_repo,
+    atomic_write_once_text,
     create_vault,
     detect_sync_folder,
     enclosing_git_repo,
@@ -455,6 +456,16 @@ def test_lock_file_is_never_observable_half_written(tmp_path: Path) -> None:
     assert payload["run_id"] == "run-1" and payload["pid"] == os.getpid()
     assert {"pid", "hostname", "run_id", "started_at", "heartbeat_at"} <= payload.keys()
     lock.release()
+
+
+def test_atomic_write_once_text_never_replaces_existing_bytes(tmp_path: Path) -> None:
+    path = tmp_path / "context" / "manifest.json"
+
+    atomic_write_once_text(path, "first\n")
+
+    with pytest.raises(FileExistsError):
+        atomic_write_once_text(path, "second\n")
+    assert path.read_text(encoding="utf-8") == "first\n"
 
 
 # --- boundary hardening ------------------------------------------------------

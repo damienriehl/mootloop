@@ -13,18 +13,17 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from mootloop import decisions
+from mootloop.context import RunContext, load_run_context
 from mootloop.errors import LockHeldError
 from mootloop.journal import load_state
 from mootloop.models.run import DraftOutput
 from mootloop.stages import first_incomplete_stage, render_prompt
-from mootloop.vault import RunLock, atomic_write_text, load_matter, safe_vault_path
+from mootloop.vault import RunLock, atomic_write_text, safe_vault_path
 
 if TYPE_CHECKING:
     from mootloop.llm import LLMProvider, RawTurnResult
     from mootloop.models.events import RunState
-    from mootloop.models.requests import RequestItem
     from mootloop.models.run import TurnSpec
-    from mootloop.tasks import TaskBinding
 
 logger = logging.getLogger("mootloop.provider_driver")
 
@@ -71,47 +70,59 @@ def _run_turn_with_lock_renewal(
     assert result is not None
     return result
 
+
 def run_with_provider(
     vault_root: Path | str,
     run_id: str,
     provider: LLMProvider,
     now: str,
     *,
-    max_attempts: int,
+    max_attempts: int | None,
     max_concurrency: int = 1,
 ) -> RunState:
-    """Drive the orchestrator primitives to completion via a sync provider."""
+    """Drive a run with the retry ceiling committed at launch."""
     # Import lazily: orchestrator exposes the stable public wrapper for this driver.
     from mootloop import orchestrator
 
     del max_concurrency  # Reserved for the v1-compatible public API.
-    binding = orchestrator._binding_for(vault_root, run_id)
-    tier_models = orchestrator._tier_models(vault_root)
+    run_context = load_run_context(vault_root, run_id)
+    binding = run_context.binding
+    tier_models = run_context.manifest.tier_models
+    max_attempts = orchestrator._launch_max_attempts(run_context, max_attempts)
     with RunLock(vault_root, run_id) as lock:
         while True:
             lock.heartbeat(best_effort=True)
             state = load_state(vault_root, run_id)
             if state.finished:
                 break
-            units = orchestrator.load_request_units(vault_root)
-            if orchestrator._over_cap(vault_root, state):
-                orchestrator._cap_transition(vault_root, run_id, binding, units)
+            units = run_context.units
+            if orchestrator._over_cap(state, run_context):
+                orchestrator._cap_transition(vault_root, run_id, run_context)
                 break
-            facts = orchestrator._load_facts(vault_root)
+            facts = run_context.facts
             specs = orchestrator._plan(
                 run_id, state, binding, units, facts, max_attempts, tier_models
             )
             if not specs:
-                orchestrator._finalize(vault_root, run_id, binding, units, now)
-                write_observed_status(vault_root, run_id, binding, units)
+                orchestrator._finalize(vault_root, run_id, now, run_context)
+                write_observed_status(vault_root, run_id, run_context)
                 break
             for spec in specs:
                 fresh = load_state(vault_root, run_id)
                 if fresh.finished or spec.turn_id in fresh.completed_turns:
                     continue
                 result = _run_turn_with_lock_renewal(
-                    lock, provider, spec, render_prompt(spec)
+                    lock,
+                    provider,
+                    spec,
+                    render_prompt(spec, run_context.manifest.persona_bodies[spec.persona]),
                 )
+                # The provider is an untrusted blocking boundary. Rebind from disk
+                # immediately before the first protected write so a provider-side or
+                # concurrent context mutation cannot ride a stale in-memory manifest.
+                run_context = load_run_context(vault_root, run_id)
+                binding = run_context.binding
+                units = run_context.units
                 orchestrator._record_spec(
                     vault_root,
                     run_id,
@@ -124,6 +135,7 @@ def run_with_provider(
                     fresh,
                     max_attempts,
                     result.provider_call_id,
+                    run_context,
                 )
     return load_state(vault_root, run_id)
 
@@ -131,28 +143,32 @@ def run_with_provider(
 def write_observed_status(
     vault_root: Path | str,
     run_id: str,
-    binding: TaskBinding,
-    units: list[RequestItem],
+    run_context: RunContext | None = None,
 ) -> None:
     """Overwrite the derived observed-mode status view."""
     state = load_state(vault_root, run_id)
     if state.mode != "observed":
         return
+    run_context = run_context or load_run_context(vault_root, run_id)
     path = safe_vault_path(vault_root, "runs", run_id, "STATUS.md")
-    atomic_write_text(path, _render_status_md(vault_root, run_id, binding, units, state))
+    atomic_write_text(
+        path,
+        _render_status_md(vault_root, run_id, state, run_context),
+    )
 
 
 def _render_status_md(
     vault_root: Path | str,
     run_id: str,
-    binding: TaskBinding,
-    units: list[RequestItem],
     state: RunState,
+    run_context: RunContext,
 ) -> str:
     from mootloop import orchestrator
 
-    matter = load_matter(vault_root)
-    facts = orchestrator._load_facts(vault_root)
+    matter = run_context.manifest.matter_config
+    binding = run_context.binding
+    units = run_context.units
+    facts = run_context.facts
     lines = [
         f"# Run status — `{run_id}`",
         "",
@@ -173,7 +189,7 @@ def _render_status_md(
             units,
             facts,
             index,
-            orchestrator.DEFAULT_MAX_ATTEMPTS,
+            run_context.manifest.max_attempts,
         )
         lines.append(f"| `{unit.request_id}` | {first_incomplete_stage(context) or 'complete'} |")
     open_decisions = decisions.DecisionStore(vault_root, run_id).list_open()
@@ -191,14 +207,15 @@ def _render_status_md(
 def assemble(
     vault_root: Path | str,
     run_id: str,
-    binding: TaskBinding,
-    units: list[RequestItem],
     state: RunState,
+    run_context: RunContext,
 ) -> Path:
     """Write the markdown deliverable with one fenced anchor per request."""
     from mootloop import orchestrator
 
-    facts = orchestrator._load_facts(vault_root)
+    binding = run_context.binding
+    units = run_context.units
+    facts = run_context.facts
     lines = [
         f"# Discovery Responses — {binding.config.task}",
         "",
@@ -207,7 +224,13 @@ def assemble(
     ]
     for index, request in enumerate(units):
         context = orchestrator._context_for(
-            run_id, state, binding, units, facts, index, orchestrator.DEFAULT_MAX_ATTEMPTS
+            run_id,
+            state,
+            binding,
+            units,
+            facts,
+            index,
+            run_context.manifest.max_attempts,
         )
         record = context.operative_draft()
         draft = DraftOutput.model_validate(record.output) if record else None

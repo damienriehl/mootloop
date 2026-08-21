@@ -16,7 +16,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-import yaml
 
 from mootloop.engine.queue import Queue, WorkItem
 from mootloop.engine.worker import Worker
@@ -49,7 +48,9 @@ def _seat_factory(vault_root: Path, run_dir: Path, billing_mode: str) -> LLMProv
     return _SeatProvider()  # type: ignore[return-value]
 
 
-def _build_matters_root(tmp_path: Path) -> tuple[Path, str]:
+def _build_matters_root(
+    tmp_path: Path, *, hard_cap_usd: float | None = None
+) -> tuple[Path, str]:
     from mootloop.discovery_parser import save_requests
     from mootloop.facts import FactStore
     from mootloop.orchestrator import start_run
@@ -57,7 +58,12 @@ def _build_matters_root(tmp_path: Path) -> tuple[Path, str]:
 
     root = tmp_path / "matters"
     registry = MatterRegistry(root=root)
-    vault = registry.create(make_matter(MATTER_ID))
+    matter = make_matter(MATTER_ID)
+    if hard_cap_usd is not None:
+        matter = matter.model_copy(
+            update={"budget": matter.budget.model_copy(update={"hard_cap_usd": hard_cap_usd})}
+        )
+    vault = registry.create(matter)
     save_requests(
         vault,
         RequestSet(
@@ -505,11 +511,8 @@ class _DatedIdProvider:
 def test_hard_cap_fires_on_spend_reported_with_a_dated_model_id(tmp_path: Path) -> None:
     """Every id a real provider reports was unpriced, so `usd_equiv` was $0.00 for
     every turn, `total_spend_usd` never moved, and the hard cap never fired."""
-    root, run_id = _build_matters_root(tmp_path)
+    root, run_id = _build_matters_root(tmp_path, hard_cap_usd=6.0)
     vault = MatterRegistry(root=root).resolve(MATTER_ID)
-    config = yaml.safe_load((vault / "matter.yaml").read_text(encoding="utf-8"))
-    config["budget"]["hard_cap_usd"] = 6.0
-    (vault / "matter.yaml").write_text(yaml.safe_dump(config), encoding="utf-8")
 
     queue = Queue(root)
     _enqueue_run_turn(queue, run_id, "wi-cap")

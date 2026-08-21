@@ -20,8 +20,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from mootloop.context import RunContext, load_run_context
 from mootloop.decisions import DecisionStore
-from mootloop.export import deliverables_dir, load_request_sets
+from mootloop.export import deliverables_dir
 from mootloop.models.decisions import DecisionKind
 from mootloop.models.matter import Attorney, MatterConfig
 from mootloop.models.requests import (
@@ -33,7 +34,7 @@ from mootloop.models.requests import (
 )
 from mootloop.models.run import DraftOutput
 from mootloop.orchestrator import operative_drafts
-from mootloop.vault import atomic_write_text, load_matter
+from mootloop.vault import atomic_write_text
 
 # The EXACT MN interrogatory perjury declaration (Minn. R. Civ. P. 33; plan D7).
 MN_VERIFICATION_DECLARATION = (
@@ -233,12 +234,19 @@ def _set_body(
     return lines
 
 
-def build_set_masters(vault_root: Path | str, run_id: str, now: str) -> list[tuple[str, Path]]:
+def build_set_masters(
+    vault_root: Path | str,
+    run_id: str,
+    now: str,
+    *,
+    run_context: RunContext | None = None,
+) -> list[tuple[str, Path]]:
     """Write one self-contained court-formatted markdown file per served set (caption +
     title + responses + signature + certificate) under ``deliverables/<run-id>/sets/``.
     Returns ``(set-label, path)`` pairs — the per-set DOCX render sources (plan D8)."""
-    matter = load_matter(vault_root)
-    request_sets = load_request_sets(vault_root)
+    context = run_context or load_run_context(vault_root, run_id)
+    matter = context.manifest.matter_config
+    request_sets = context.manifest.request_sets
     drafts: dict[str, DraftOutput | None] = {
         str(item.request_id): draft for item, draft in operative_drafts(vault_root, run_id)
     }
@@ -261,10 +269,17 @@ def build_set_masters(vault_root: Path | str, run_id: str, now: str) -> list[tup
     return out
 
 
-def build_court_master(vault_root: Path | str, run_id: str, now: str) -> Path:
+def build_court_master(
+    vault_root: Path | str,
+    run_id: str,
+    now: str,
+    *,
+    run_context: RunContext | None = None,
+) -> Path:
     """Assemble the court-formatted master and write ``deliverables/<run-id>/master.md``."""
-    matter = load_matter(vault_root)
-    request_sets = load_request_sets(vault_root)
+    context = run_context or load_run_context(vault_root, run_id)
+    matter = context.manifest.matter_config
+    request_sets = context.manifest.request_sets
     drafts: dict[str, DraftOutput | None] = {
         str(item.request_id): draft for item, draft in operative_drafts(vault_root, run_id)
     }
@@ -289,18 +304,25 @@ def build_court_master(vault_root: Path | str, run_id: str, now: str) -> Path:
     return path
 
 
-def build_verification_page(vault_root: Path | str, run_id: str, now: str) -> Path | None:
+def build_verification_page(
+    vault_root: Path | str,
+    run_id: str,
+    now: str,
+    *,
+    run_context: RunContext | None = None,
+) -> Path | None:
     """Write the separate ``verification.md`` client-oath page for rog sets (plan D7).
 
     Returns None (and writes nothing) when the run served no interrogatory set — only
     interrogatories carry the Rule 33 client verification. Unsigned: the client signs
     on paper.
     """
-    request_sets = load_request_sets(vault_root)
+    context = run_context or load_run_context(vault_root, run_id)
+    request_sets = context.manifest.request_sets
     rog_sets = [s for s in request_sets if s.request_type is RequestType.INTERROGATORY]
     if not rog_sets:
         return None
-    matter = load_matter(vault_root)
+    matter = context.manifest.matter_config
     lines: list[str] = []
     lines.extend(_caption_block(matter))
     lines.append("")

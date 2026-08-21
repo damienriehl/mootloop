@@ -30,6 +30,7 @@ from mootloop.errors import (
     MatterNotFoundError,
     OrchestratorError,
     QueueError,
+    RunNotFoundError,
     TaskSpecError,
     VaultBoundaryError,
 )
@@ -64,6 +65,10 @@ def _install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(OrchestratorError)
     async def _orchestrator(request: Request, exc: OrchestratorError) -> JSONResponse:
         return JSONResponse(status_code=409, content={"error": "orchestrator", "detail": str(exc)})
+
+    @app.exception_handler(RunNotFoundError)
+    async def _run_not_found(request: Request, exc: RunNotFoundError) -> JSONResponse:
+        return JSONResponse(status_code=404, content={"error": "run_not_found"})
 
     @app.exception_handler(QueueError)
     async def _queue(request: Request, exc: QueueError) -> JSONResponse:

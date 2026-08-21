@@ -179,8 +179,11 @@ pipeline), this phase makes loops *terminate on quality* and *respect a budget*:
 Earlier phases remain: **corpus ingestion** (`mootloop ingest`), the **discovery
 parser** (`mootloop requests parse`), and the append-only **fact repository**
 (`mootloop facts add` / `list`). A fully synthetic MN breach-of-contract matter lives
-in `fixtures/synthetic-matter/` and runs the whole path in CI. Live model calls are
-not wired in v1 — the `FakeLLMProvider` drives every run.
+in `fixtures/synthetic-matter/` and runs the whole path in CI. The hosted Claude
+provider and driver have completed a partial real-provider run, proving the provider,
+queue, and spend-metering plumbing. That run stopped at `needs_attention` before a
+clean, grounded end-to-end result, so full hosted validation remains open. CI and the
+public demo continue to use the deterministic `FakeLLMProvider`.
 
 ### Budget: estimate, meter, cap
 
@@ -318,8 +321,9 @@ MOOTLOOP_DOWNLOAD_SIGNING_KEY # download-link HMAC key (pre-seed on hosts with a
 
 ## Engine (hosted driver, FE-1)
 
-> **Engine + run lifecycle — code-complete, awaiting a first live `claude -p` run.**
-> The same orchestrator core the CLI drives, wrapped in a supervised worker.
+> **Engine + run lifecycle — code-complete, with partial live-provider evidence.**
+> The same orchestrator core the CLI drives, wrapped in a supervised worker. A clean,
+> grounded end-to-end hosted validation remains open.
 
 - **Headless Claude provider** — a persona turn runs as a sandboxed `claude -p`
   subprocess (`engine/claude_provider.py`), not an HTTP model call. The subprocess sees

@@ -22,7 +22,9 @@ from mootloop import orchestrator
 from mootloop.cli import app as cli_app
 from mootloop.engine.queue import Queue
 from mootloop.errors import AccessAuthError, QueueError
+from mootloop.journal import append
 from mootloop.models.common import DocId
+from mootloop.models.events import RunStarted
 from mootloop.models.matter import MatterConfig
 from mootloop.models.requests import RequestItem, RequestSet, RequestType
 from mootloop.registry import MatterRegistry
@@ -140,6 +142,47 @@ def test_run_read_views_return_folded_views(
     assert [r["request_id"] for r in payload["requests"]] == ["ROG-1"]
 
 
+def test_legacy_run_status_is_readable_but_replay_is_blocked(
+    client: TestClient, registry: MatterRegistry, matter: MatterConfig
+) -> None:
+    vault = registry.resolve(matter.matter_id)
+    run_id = "legacy-no-context"
+    append(
+        vault,
+        run_id,
+        RunStarted(
+            run_id=run_id,
+            matter_id=str(matter.matter_id),
+            task="discovery-responses",
+            rubric_version="discovery-responses-v1.0",
+            config_digest="legacy-digest",
+        ),
+    )
+
+    status = client.get(f"/api/matters/{matter.matter_id}/runs/{run_id}", headers=_AUTH)
+    assert status.status_code == 200
+    assert status.json()["replayable"] is False
+    assert "no committed context manifest" in status.json()["context_blocker"]
+
+    continued = client.post(
+        f"/api/matters/{matter.matter_id}/runs/{run_id}/continue",
+        headers=_csrf(client),
+    )
+    assert continued.status_code == 409
+
+
+def test_unknown_run_status_is_not_a_non_replayable_run(
+    client: TestClient, matter: MatterConfig
+) -> None:
+    status = client.get(
+        f"/api/matters/{matter.matter_id}/runs/does-not-exist",
+        headers=_AUTH,
+    )
+
+    assert status.status_code == 404
+    assert status.json() == {"error": "run_not_found"}
+
+
 # --- run lifecycle write wrappers -------------------------------------------
 
 
@@ -173,7 +216,7 @@ def test_start_run_wrapper_creates_a_run(
     resp = client.post(
         f"/api/matters/{matter.matter_id}/runs",
         headers=headers,
-        json={"task": "discovery-responses"},
+        json={"run_id": "api-start-wrapper", "task": "discovery-responses"},
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -186,7 +229,9 @@ def test_start_run_wrapper_creates_a_run(
 
 def test_start_run_requires_csrf(client: TestClient, matter: MatterConfig) -> None:
     resp = client.post(
-        f"/api/matters/{matter.matter_id}/runs", headers=_AUTH, json={"task": "discovery-responses"}
+        f"/api/matters/{matter.matter_id}/runs",
+        headers=_AUTH,
+        json={"run_id": "api-start-no-csrf", "task": "discovery-responses"},
     )
     assert resp.status_code == 403
 

@@ -7,11 +7,12 @@ import json
 from pathlib import Path
 
 import pytest
+import yaml
 
 from mootloop import attest, gate_ledger, orchestrator
 from mootloop.decisions import DecisionStore, open_by_taxonomy, resolve
 from mootloop.discovery_parser import save_requests
-from mootloop.errors import AttestationBlockedError
+from mootloop.errors import AttestationBlockedError, OrchestratorError
 from mootloop.facts import FactStore
 from mootloop.llm import FakeLLMProvider
 from mootloop.models.common import DocId
@@ -105,9 +106,36 @@ def test_content_edit_invalidates_and_blocks_export(tmp_path: Path) -> None:
     assert "attestation" in blockers
 
 
+def test_matter_edit_invalidates_and_re_attestation_requires_new_run(tmp_path: Path) -> None:
+    vault = _finished_and_resolved(tmp_path, "att-matter-edit")
+    attest.attest(vault, "att-matter-edit", "Jane", NOW)
+    matter_path = vault / "matter.yaml"
+    matter = yaml.safe_load(matter_path.read_text(encoding="utf-8"))
+    matter["caption"]["case_number"] = "changed-after-launch"
+    matter_path.write_text(yaml.safe_dump(matter), encoding="utf-8")
+
+    check = attest.check_attestation(vault, "att-matter-edit", LATER)
+
+    assert check.status == "invalidated"
+    assert "changed after launch" in (check.reason or "")
+    with pytest.raises(AttestationBlockedError, match="start a new run"):
+        attest.attest(vault, "att-matter-edit", "Jane", LATER)
+
+
 def test_check_attestation_missing_before_attest(tmp_path: Path) -> None:
     vault = _finished_and_resolved(tmp_path, "att-missing")
     assert attest.check_attestation(vault, "att-missing", NOW).status == "missing"
+
+
+def test_attest_fails_closed_before_append_when_manifest_is_tampered(tmp_path: Path) -> None:
+    vault = _finished_and_resolved(tmp_path, "att-context-tamper")
+    manifest = vault / "runs" / "att-context-tamper" / "context" / "manifest.json"
+    manifest.write_text("{}\n", encoding="utf-8")
+
+    with pytest.raises(OrchestratorError, match="context manifest.*(tampered|digest)"):
+        attest.attest(vault, "att-context-tamper", "Jane", NOW)
+
+    assert not (vault / "runs" / "att-context-tamper" / "attestations.jsonl").exists()
 
 
 def test_legacy_attestation_is_reported_as_incompatible_not_content_drift(

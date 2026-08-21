@@ -13,7 +13,6 @@ re-executed. Three drivers share this one path: FakeLLMProvider (tests), the
 
 from __future__ import annotations
 
-import hashlib
 from datetime import date, datetime
 from pathlib import Path
 
@@ -26,8 +25,15 @@ from mootloop.citations.http import Transport
 from mootloop.citations.ledger import DEFAULT_MAX_CACHE_AGE_DAYS
 from mootloop.citations.ratelimit import TokenBucket
 from mootloop.citations.verify import VerifySummary
+from mootloop.context import (
+    RunContext,
+    build_run_context,
+    config_digest,
+    load_run_context,
+    load_run_corpus,
+    write_run_context,
+)
 from mootloop.errors import OrchestratorError
-from mootloop.facts import FactStore
 from mootloop.gates import completeness, degeneracy, fabrication
 from mootloop.journal import (
     append,
@@ -54,6 +60,7 @@ from mootloop.models.events import (
     StageStarted,
     TurnCompleted,
     TurnDiscarded,
+    TurnIntent,
 )
 from mootloop.models.gates import GateResult
 from mootloop.models.requests import RequestItem, RequestSet, code_from_request_id
@@ -84,14 +91,18 @@ from mootloop.vault import RunLock, atomic_write_text, load_matter, safe_vault_p
 DEFAULT_MAX_ATTEMPTS = 3
 
 
+def _launch_max_attempts(run_context: RunContext, requested: int | None) -> int:
+    committed = run_context.manifest.max_attempts
+    if requested is not None and requested != committed:
+        raise OrchestratorError(
+            f"max_attempts is launch-bound at {committed}; requested {requested}"
+        )
+    return committed
+
+
 def _date_of(now: str) -> date:
     """The calendar date an injected ISO timestamp falls on (never ``datetime.now``)."""
     return datetime.fromisoformat(now).date()
-
-
-def _tier_models(vault_root: Path | str) -> dict[str, str]:
-    """The run's per-role model map, resolved from the matter's budget tier (D5)."""
-    return budget.tier_models(load_matter(vault_root).budget.tier)
 
 
 # --- vault reads ------------------------------------------------------------
@@ -108,13 +119,6 @@ def load_request_units(vault_root: Path | str) -> list[RequestItem]:
         units.extend(item for item in request_set.items if item.subpart is None)
     units.sort(key=lambda i: (i.set_number, i.number))
     return units
-
-
-def _load_facts(vault_root: Path | str) -> list[dict[str, str]]:
-    return [
-        {"fact_id": f.fact_id, "statement": f.statement}
-        for f in FactStore(vault_root).get_current()
-    ]
 
 
 # --- context construction ---------------------------------------------------
@@ -165,11 +169,6 @@ def _plan(
 # --- public: start ----------------------------------------------------------
 
 
-def _config_digest(binding: TaskBinding) -> str:
-    raw = binding.config.model_dump_json().encode("utf-8")
-    return hashlib.sha256(raw).hexdigest()[:16]
-
-
 def _compact_ts(now: str) -> str:
     return "".join(ch for ch in now if ch.isdigit())
 
@@ -183,6 +182,7 @@ def start_run(
     mode: RunMode | None = None,
     task_spec_id: str | None = None,
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+    idempotent: bool = False,
 ) -> str:
     """Begin a run: write RunStarted under the run lock; finalize if there is no work.
 
@@ -190,11 +190,42 @@ def start_run(
     (plan D12 precedence). ``task_spec_id`` records the on-ramp TaskSpec the run started
     from (plan FE-2.5), when any.
     """
-    binding = get_binding(task)
-    matter = load_matter(vault_root)
-    resolved_mode: RunMode = mode or matter.run_mode
     resolved_id = run_id or f"{task}-{_compact_ts(now)}"
     with RunLock(vault_root, resolved_id):
+        if read_events(vault_root, resolved_id):
+            if idempotent:
+                context = load_run_context(vault_root, resolved_id)
+                same_launch = (
+                    context.manifest.task == task
+                    and (
+                        str(context.manifest.task_spec.task_spec_id)
+                        if context.manifest.task_spec is not None
+                        else None
+                    )
+                    == task_spec_id
+                    and (mode is None or context.manifest.effective_mode == mode)
+                    and context.manifest.max_attempts == max_attempts
+                )
+                if same_launch:
+                    return resolved_id
+                raise OrchestratorError(
+                    f"run {resolved_id!r} already exists with a different launch context"
+                )
+            raise OrchestratorError(f"run {resolved_id!r} has already started")
+        binding = get_binding(task)
+        matter = load_matter(vault_root)
+        resolved_mode: RunMode = mode or matter.run_mode
+        run_context = build_run_context(
+            vault_root,
+            resolved_id,
+            task,
+            binding,
+            matter,
+            resolved_mode,
+            max_attempts,
+            task_spec_id,
+        )
+        context_manifest_sha256 = write_run_context(vault_root, run_context)
         append(
             vault_root,
             resolved_id,
@@ -203,13 +234,13 @@ def start_run(
                 matter_id=matter.matter_id,
                 task=task,
                 rubric_version=binding.config.rubric_id,
-                config_digest=_config_digest(binding),
+                config_digest=config_digest(binding.config),
+                context_manifest_sha256=context_manifest_sha256,
                 mode=resolved_mode,
                 task_spec_id=task_spec_id,
             ),
         )
-        units = load_request_units(vault_root)
-        _finalize(vault_root, resolved_id, binding, units, now)
+        _finalize(vault_root, resolved_id, now, run_context)
     return resolved_id
 
 
@@ -220,22 +251,31 @@ def plan_next(
     vault_root: Path | str,
     run_id: str,
     *,
-    max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+    max_attempts: int | None = None,
 ) -> list[TurnSpec]:
     """The TurnSpecs that can execute now (per-request fan-out, cap-respecting)."""
-    binding = _binding_for(vault_root, run_id)
+    run_context = load_run_context(vault_root, run_id)
+    binding = run_context.binding
+    max_attempts = _launch_max_attempts(run_context, max_attempts)
     state = load_state(vault_root, run_id)
     # A paused run schedules nothing and short-circuits the cap check (plan FE-1).
     if state.status == "paused":
         return []
-    units = load_request_units(vault_root)
+    units = run_context.units
     # Budget hard cap (plan D5): at/over cap, gracefully checkpoint before planning.
-    if not state.finished and _over_cap(vault_root, state):
+    if not state.finished and _over_cap(state, run_context):
         with RunLock(vault_root, run_id):
-            _cap_transition(vault_root, run_id, binding, units)
+            _cap_transition(vault_root, run_id, run_context)
         return []
-    facts = _load_facts(vault_root)
-    return _plan(run_id, state, binding, units, facts, max_attempts, _tier_models(vault_root))
+    return _plan(
+        run_id,
+        state,
+        binding,
+        units,
+        run_context.facts,
+        max_attempts,
+        run_context.manifest.tier_models,
+    )
 
 
 def find_spec(
@@ -243,7 +283,7 @@ def find_spec(
     run_id: str,
     turn_id: str,
     *,
-    max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+    max_attempts: int | None = None,
 ) -> TurnSpec:
     for spec in plan_next(vault_root, run_id, max_attempts=max_attempts):
         if spec.turn_id == turn_id:
@@ -256,10 +296,26 @@ def assemble_prompt(
     run_id: str,
     turn_id: str,
     *,
-    max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+    max_attempts: int | None = None,
 ) -> str:
     """Render the full prompt for a currently-schedulable turn."""
-    return render_prompt(find_spec(vault_root, run_id, turn_id, max_attempts=max_attempts))
+    run_context = load_run_context(vault_root, run_id)
+    spec = find_spec(vault_root, run_id, turn_id, max_attempts=max_attempts)
+    return render_prompt(spec, run_context.manifest.persona_bodies[spec.persona])
+
+
+def record_turn_intent(vault_root: Path | str, run_id: str, event: TurnIntent) -> None:
+    """Commit provider spend intent only against a currently valid launch context."""
+    with RunLock(vault_root, run_id):
+        load_run_context(vault_root, run_id)
+        append(vault_root, run_id, event)
+
+
+def finish_needs_attention(vault_root: Path | str, run_id: str) -> None:
+    """Record a recoverable terminal state only against a valid launch context."""
+    with RunLock(vault_root, run_id):
+        load_run_context(vault_root, run_id)
+        append(vault_root, run_id, RunFinished(status="needs_attention"))
 
 
 # --- public: record ---------------------------------------------------------
@@ -273,12 +329,14 @@ def record_turn(
     usage: TokenUsage | None,
     now: str,
     *,
-    max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+    max_attempts: int | None = None,
     provider_call_id: str | None = None,
 ) -> TurnRecord | DiscardedTurn:
     """Validate -> degeneracy gate -> journal. Derailment => discard (never repair)."""
-    binding = _binding_for(vault_root, run_id)
     with RunLock(vault_root, run_id):
+        run_context = load_run_context(vault_root, run_id)
+        binding = run_context.binding
+        max_attempts = _launch_max_attempts(run_context, max_attempts)
         state = load_state(vault_root, run_id)
         if turn_id in state.completed_turns:
             record = state.completed_turns[turn_id]
@@ -297,9 +355,17 @@ def record_turn(
                 provider_call_id=provider_call_id,
             )
             return record
-        units = load_request_units(vault_root)
-        facts = _load_facts(vault_root)
-        specs = _plan(run_id, state, binding, units, facts, max_attempts, _tier_models(vault_root))
+        units = run_context.units
+        facts = run_context.facts
+        specs = _plan(
+            run_id,
+            state,
+            binding,
+            units,
+            facts,
+            max_attempts,
+            run_context.manifest.tier_models,
+        )
         spec = _find_spec_in(specs, turn_id)
         return _record_spec(
             vault_root,
@@ -313,6 +379,7 @@ def record_turn(
             state,
             max_attempts,
             provider_call_id,
+            run_context,
         )
 
 
@@ -398,6 +465,7 @@ def _record_spec(
     state: RunState,
     max_attempts: int,
     provider_call_id: str | None,
+    run_context: RunContext,
 ) -> TurnRecord | DiscardedTurn:
     model_cls = OUTPUT_SCHEMAS[spec.output_schema_name]
     try:
@@ -444,7 +512,7 @@ def _record_spec(
         gate_results.append(comp)
         # Fabrication gate on every draft/bolster turn (plan D12): every assertion must
         # trace to a fact or corpus. Recorded, non-fatal at turn time; blocks at export.
-        fab = _fabrication_gate(vault_root, output)
+        fab = _fabrication_gate(vault_root, output, run_context)
         append(vault_root, run_id, GateEvaluated(turn_id=spec.turn_id, result=fab))
         gate_results.append(fab)
 
@@ -472,19 +540,19 @@ def _record_spec(
     )
 
     # Final rubric gate: aggregate the decorrelated panel once the last seat lands.
-    _maybe_emit_rubric_gate(vault_root, run_id, spec, binding, units)
+    _maybe_emit_rubric_gate(vault_root, run_id, spec, binding, units, run_context)
 
     # Budget hard cap (plan D5): graceful checkpoint before scheduling anything more.
-    if _over_cap(vault_root, load_state(vault_root, run_id)):
-        _cap_transition(vault_root, run_id, binding, units)
-        _write_observed_status(vault_root, run_id, binding, units)
+    if _over_cap(load_state(vault_root, run_id), run_context):
+        _cap_transition(vault_root, run_id, run_context)
+        _write_observed_status(vault_root, run_id, run_context)
         return record
 
-    _finalize(vault_root, run_id, binding, units, now)
+    _finalize(vault_root, run_id, now, run_context)
     # Gated mode (plan Phase 5): pause at the next stage boundary or on open
     # policy-delegable decisions, once this turn leaves the run still running.
-    _maybe_checkpoint(vault_root, run_id, binding, units)
-    _write_observed_status(vault_root, run_id, binding, units)
+    _maybe_checkpoint(vault_root, run_id, run_context)
+    _write_observed_status(vault_root, run_id, run_context)
     return record
 
 
@@ -501,10 +569,13 @@ def _completeness_gate(
     return completeness.evaluate(draft, binding.rubric, code, req_text)
 
 
-def _fabrication_gate(vault_root: Path | str, draft: DraftOutput) -> GateResult:
-    """Fabrication gate for one draft: assertions vs. current facts + corpus (plan D12)."""
-    facts = FactStore(vault_root).get_current()
-    corpus_text = fabrication.build_corpus_text(vault_root)
+def _fabrication_gate(
+    vault_root: Path | str, draft: DraftOutput, run_context: RunContext
+) -> GateResult:
+    """Fabrication gate for one draft against its launch-snapshotted evidence."""
+    facts = run_context.manifest.facts
+    snapshot = load_run_corpus(vault_root, run_context)
+    corpus_text = "\n".join(item.text for item in snapshot.documents)
     return fabrication.check(draft, facts, corpus_text)
 
 
@@ -513,13 +584,22 @@ def _fabrication_gate(vault_root: Path | str, draft: DraftOutput) -> GateResult:
 
 def _operative_citations(vault_root: Path | str, run_id: str) -> list[Citation]:
     """Every distinct citation in the run's operative (final) draft per request."""
-    binding = _binding_for(vault_root, run_id)
+    run_context = load_run_context(vault_root, run_id)
+    binding = run_context.binding
     state = load_state(vault_root, run_id)
-    units = load_request_units(vault_root)
-    facts = _load_facts(vault_root)
+    units = run_context.units
+    facts = run_context.facts
     found: dict[str, Citation] = {}
     for i in range(len(units)):
-        ctx = _context_for(run_id, state, binding, units, facts, i, DEFAULT_MAX_ATTEMPTS)
+        ctx = _context_for(
+            run_id,
+            state,
+            binding,
+            units,
+            facts,
+            i,
+            run_context.manifest.max_attempts,
+        )
         record = ctx.operative_draft()
         if record is None:
             continue
@@ -537,13 +617,22 @@ def operative_draft_turn_ids(vault_root: Path | str, run_id: str) -> dict[str, s
     The gate ledger uses this to answer "which draft's gate verdict governs export":
     the one whose text would actually be served, not every draft the run ever made.
     """
-    binding = _binding_for(vault_root, run_id)
+    run_context = load_run_context(vault_root, run_id)
+    binding = run_context.binding
     state = load_state(vault_root, run_id)
-    units = load_request_units(vault_root)
-    facts = _load_facts(vault_root)
+    units = run_context.units
+    facts = run_context.facts
     out: dict[str, str] = {}
     for i in range(len(units)):
-        ctx = _context_for(run_id, state, binding, units, facts, i, DEFAULT_MAX_ATTEMPTS)
+        ctx = _context_for(
+            run_id,
+            state,
+            binding,
+            units,
+            facts,
+            i,
+            run_context.manifest.max_attempts,
+        )
         record = ctx.operative_draft()
         if record is not None:
             out[str(units[i].request_id)] = record.spec.turn_id
@@ -555,13 +644,22 @@ def operative_drafts(
 ) -> list[tuple[RequestItem, DraftOutput | None]]:
     """Each request paired with its operative (final, post-restructure) draft, or None
     if the request never produced one. The export builders read from here (plan Phase 7)."""
-    binding = _binding_for(vault_root, run_id)
+    run_context = load_run_context(vault_root, run_id)
+    binding = run_context.binding
     state = load_state(vault_root, run_id)
-    units = load_request_units(vault_root)
-    facts = _load_facts(vault_root)
+    units = run_context.units
+    facts = run_context.facts
     out: list[tuple[RequestItem, DraftOutput | None]] = []
     for i in range(len(units)):
-        ctx = _context_for(run_id, state, binding, units, facts, i, DEFAULT_MAX_ATTEMPTS)
+        ctx = _context_for(
+            run_id,
+            state,
+            binding,
+            units,
+            facts,
+            i,
+            run_context.manifest.max_attempts,
+        )
         record = ctx.operative_draft()
         out.append((units[i], DraftOutput.model_validate(record.output) if record else None))
     return out
@@ -615,6 +713,7 @@ def _maybe_emit_rubric_gate(
     spec: TurnSpec,
     binding: TaskBinding,
     units: list[RequestItem],
+    run_context: RunContext,
 ) -> None:
     """When the final rubric seat lands, aggregate the panel (median-per-criterion,
     weighted) into a single ``rubric`` GateEvaluated event (plan D6)."""
@@ -625,7 +724,13 @@ def _maybe_emit_rubric_gate(
     if idx is None:
         return
     ctx = _context_for(
-        run_id, state, binding, units, _load_facts(vault_root), idx, DEFAULT_MAX_ATTEMPTS
+        run_id,
+        state,
+        binding,
+        units,
+        run_context.facts,
+        idx,
+        run_context.manifest.max_attempts,
     )
     if not RubricGateStage().is_complete(ctx):
         return
@@ -684,45 +789,45 @@ def _discard(
 # --- budget hard cap (plan D5) ----------------------------------------------
 
 
-def _effective_cap(vault_root: Path | str, state: RunState) -> float | None:
-    """The cap now in force: a ``CapRaised`` override wins over matter.yaml."""
+def effective_cap(state: RunState, run_context: RunContext) -> float | None:
+    """The cap now in force: a ``CapRaised`` override wins over launch context."""
     if state.cap_raised_to is not None:
         return state.cap_raised_to
-    return load_matter(vault_root).budget.hard_cap_usd
+    return run_context.manifest.matter_config.budget.hard_cap_usd
 
 
-def _over_cap(vault_root: Path | str, state: RunState) -> bool:
+def _over_cap(state: RunState, run_context: RunContext) -> bool:
     # Conservative cap (plan FD-6): count every unreconciled write-ahead intent at its
     # max-plausible cost, so an in-flight turn presses against the cap until it settles.
     projected = state.total_spend_usd + sum(state.pending_intents.values())
-    cap = _effective_cap(vault_root, state)
+    cap = effective_cap(state, run_context)
     return cap is not None and projected >= cap
 
 
 def _cap_transition(
     vault_root: Path | str,
     run_id: str,
-    binding: TaskBinding,
-    units: list[RequestItem],
+    run_context: RunContext,
 ) -> None:
     """Graceful at-cap checkpoint: write a gaps report, then mark the run ``capped``
     (a resumable finished state a later ``raise-cap`` reopens)."""
     state = load_state(vault_root, run_id)
     if state.finished:
         return
-    _write_gaps_report(vault_root, run_id, binding, units, state)
+    _write_gaps_report(vault_root, run_id, state, run_context)
     append(vault_root, run_id, RunFinished(status="capped"))
 
 
 def _write_gaps_report(
     vault_root: Path | str,
     run_id: str,
-    binding: TaskBinding,
-    units: list[RequestItem],
     state: RunState,
+    run_context: RunContext,
 ) -> Path:
-    facts = _load_facts(vault_root)
-    cap = _effective_cap(vault_root, state)
+    binding = run_context.binding
+    units = run_context.units
+    facts = run_context.facts
+    cap = effective_cap(state, run_context)
     lines: list[str] = [
         f"# Gaps report — run `{run_id}`",
         "",
@@ -732,7 +837,15 @@ def _write_gaps_report(
     ]
     unfinished: list[tuple[str, str]] = []
     for i in range(len(units)):
-        ctx = _context_for(run_id, state, binding, units, facts, i, DEFAULT_MAX_ATTEMPTS)
+        ctx = _context_for(
+            run_id,
+            state,
+            binding,
+            units,
+            facts,
+            i,
+            run_context.manifest.max_attempts,
+        )
         if request_complete(ctx):
             continue
         stopped = first_incomplete_stage(ctx) or "unknown"
@@ -757,6 +870,7 @@ def _write_gaps_report(
 def raise_cap(vault_root: Path | str, run_id: str, to_usd: float) -> None:
     """Append a ``CapRaised`` event, reopening a capped run to ``running`` (plan D5)."""
     with RunLock(vault_root, run_id):
+        load_run_context(vault_root, run_id)
         append(vault_root, run_id, CapRaised(to_usd=to_usd))
 
 
@@ -769,10 +883,11 @@ def _all_requests_complete(
     binding: TaskBinding,
     units: list[RequestItem],
     state: RunState,
+    facts: list[dict[str, str]],
+    max_attempts: int,
 ) -> bool:
-    facts = _load_facts(vault_root)
     for i in range(len(units)):
-        ctx = _context_for(run_id, state, binding, units, facts, i, DEFAULT_MAX_ATTEMPTS)
+        ctx = _context_for(run_id, state, binding, units, facts, i, max_attempts)
         if not request_complete(ctx):
             return False
     return True
@@ -781,9 +896,8 @@ def _all_requests_complete(
 def _finalize(
     vault_root: Path | str,
     run_id: str,
-    binding: TaskBinding,
-    units: list[RequestItem],
     now: str,
+    run_context: RunContext,
 ) -> None:
     """Once every request is complete, assemble the DRAFT deliverable, then either
     finish or block on open hard-human attorney gates (plan Phase 5).
@@ -794,12 +908,22 @@ def _finalize(
     state = load_state(vault_root, run_id)
     if state.status not in ("running", "needs_decisions"):
         return  # finished / needs_attention / capped / checkpoint are handled elsewhere
-    if not _all_requests_complete(vault_root, run_id, binding, units, state):
+    binding = run_context.binding
+    units = run_context.units
+    if not _all_requests_complete(
+        vault_root,
+        run_id,
+        binding,
+        units,
+        state,
+        run_context.facts,
+        run_context.manifest.max_attempts,
+    ):
         return
     # The md-master is a DRAFT until attestation; assemble it now so it exists for the
     # gate ledger and attestation hash even while decisions are pending.
-    _assemble(vault_root, run_id, binding, units, state)
-    matter = load_matter(vault_root)
+    _assemble(vault_root, run_id, state, run_context)
+    matter = run_context.manifest.matter_config
     if decisions.open_by_taxonomy(vault_root, run_id, matter, "hard-human"):
         if state.status != "needs_decisions":
             append(vault_root, run_id, RunFinished(status="needs_decisions"))
@@ -818,9 +942,8 @@ def finalize_if_ready(
     state = load_state(vault_root, run_id)
     if state.task is None or state.status not in ("running", "needs_decisions"):
         return state
-    binding = get_binding(state.task)
-    units = load_request_units(vault_root)
-    _finalize(vault_root, run_id, binding, units, now)
+    run_context = load_run_context(vault_root, run_id)
+    _finalize(vault_root, run_id, now, run_context)
     return load_state(vault_root, run_id)
 
 
@@ -850,17 +973,19 @@ def state_marker(status: str) -> str:
 def _maybe_checkpoint(
     vault_root: Path | str,
     run_id: str,
-    binding: TaskBinding,
-    units: list[RequestItem],
+    run_context: RunContext,
 ) -> None:
     """Gated mode: pause the run when it is uniformly poised to enter a checkpoint
     stage, or (once) while policy-delegable decisions are open."""
     state = load_state(vault_root, run_id)
     if state.mode != "gated" or state.status != "running":
         return
-    facts = _load_facts(vault_root)
-    tier = _tier_models(vault_root)
-    specs = _plan(run_id, state, binding, units, facts, DEFAULT_MAX_ATTEMPTS, tier)
+    binding = run_context.binding
+    units = run_context.units
+    facts = run_context.facts
+    max_attempts = run_context.manifest.max_attempts
+    tier_models = run_context.manifest.tier_models
+    specs = _plan(run_id, state, binding, units, facts, max_attempts, tier_models)
     if specs:
         stages = {s.stage for s in specs}
         if len(stages) == 1:
@@ -868,7 +993,7 @@ def _maybe_checkpoint(
             if stage in _CHECKPOINT_STAGE_ORDER and stage not in state.cleared_checkpoints:
                 append(vault_root, run_id, CheckpointReached(boundary=stage))
                 return
-    matter = load_matter(vault_root)
+    matter = run_context.manifest.matter_config
     if "policy_decisions" not in state.cleared_checkpoints and decisions.open_by_taxonomy(
         vault_root, run_id, matter, "policy-delegable"
     ):
@@ -881,6 +1006,7 @@ def pause_run(vault_root: Path | str, run_id: str, reason: str = "manual") -> No
     Refuses to pause a terminally-complete run (``finished`` / ``needs_attention`` /
     ``capped``) — a paused run must be resumable, and those states are not."""
     with RunLock(vault_root, run_id):
+        load_run_context(vault_root, run_id)
         state = load_state(vault_root, run_id)
         if state.is_terminal:
             raise OrchestratorError(f"run {run_id!r} is complete ({state.status}); cannot pause")
@@ -890,6 +1016,7 @@ def pause_run(vault_root: Path | str, run_id: str, reason: str = "manual") -> No
 def resume_run(vault_root: Path | str, run_id: str) -> None:
     """Resume a paused run (plan FE-1): append ``RunResumed`` so it reopens to running."""
     with RunLock(vault_root, run_id):
+        load_run_context(vault_root, run_id)
         state = load_state(vault_root, run_id)
         if state.status != "paused":
             raise OrchestratorError(f"run {run_id!r} is not paused")
@@ -899,6 +1026,7 @@ def resume_run(vault_root: Path | str, run_id: str) -> None:
 def continue_run(vault_root: Path | str, run_id: str) -> None:
     """Clear a gated checkpoint (``mootloop run continue``) so the run resumes."""
     with RunLock(vault_root, run_id):
+        load_run_context(vault_root, run_id)
         events = read_events(vault_root, run_id)
         state = load_state(vault_root, run_id)
         if state.status != "checkpoint":
@@ -917,7 +1045,7 @@ def attention_blockers(
     vault_root: Path | str,
     run_id: str,
     *,
-    max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+    max_attempts: int | None = None,
     grant_attempts: int = 0,
 ) -> list[AttentionBlocker]:
     """Everything still blocking a ``needs_attention`` run, folded from the journal.
@@ -926,8 +1054,10 @@ def attention_blockers(
     ``grant_attempts`` asks the *prospective* question ``reopen`` needs — "would this
     grant clear the block?" — by raising the ceiling the check measures against.
     """
+    run_context = load_run_context(vault_root, run_id)
+    launch_attempts = _launch_max_attempts(run_context, max_attempts)
     state = load_state(vault_root, run_id)
-    ceiling = effective_max_attempts(state, max_attempts) + grant_attempts
+    ceiling = effective_max_attempts(state, launch_attempts) + grant_attempts
     return [
         AttentionBlocker(
             kind="counter_capped_turn",
@@ -949,7 +1079,7 @@ def reopen_run(
     reason: str,
     grant_attempts: int = 0,
     reopened_by: str = "operator",
-    max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+    max_attempts: int | None = None,
 ) -> RunState:
     """Reopen a ``needs_attention`` run to ``running`` (``mootloop run reopen``).
 
@@ -970,6 +1100,7 @@ def reopen_run(
     if grant_attempts < 0:
         raise OrchestratorError("grant_attempts must be >= 0")
     with RunLock(vault_root, run_id):
+        load_run_context(vault_root, run_id)
         state = load_state(vault_root, run_id)
         if state.status != "needs_attention":
             raise OrchestratorError(
@@ -1005,6 +1136,7 @@ def reopen_enqueue_pending(vault_root: Path | str, run_id: str) -> bool:
     journal-then-queue operation after a queue failure. It does not make the reopen
     transition itself generally idempotent.
     """
+    load_run_context(vault_root, run_id)
     events = read_events(vault_root, run_id)
     return bool(
         events
@@ -1020,7 +1152,7 @@ def run_with_provider(
     provider: LLMProvider,
     now: str,
     *,
-    max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+    max_attempts: int | None = None,
     max_concurrency: int = 1,
 ) -> RunState:
     """Drive plan_next/record_turn to completion via ``provider`` (sync in v1)."""
@@ -1036,16 +1168,6 @@ def run_with_provider(
     )
 
 
-# --- internals --------------------------------------------------------------
-
-
-def _binding_for(vault_root: Path | str, run_id: str) -> TaskBinding:
-    state = load_state(vault_root, run_id)
-    if state.task is None:
-        raise OrchestratorError(f"run {run_id!r} has no RunStarted event")
-    return get_binding(state.task)
-
-
 def _find_spec_in(specs: list[TurnSpec], turn_id: str) -> TurnSpec:
     for spec in specs:
         if spec.turn_id == turn_id:
@@ -1056,7 +1178,13 @@ def _find_spec_in(specs: list[TurnSpec], turn_id: str) -> TurnSpec:
 def status_summary(vault_root: Path | str, run_id: str) -> dict[str, object]:
     """A machine-readable status snapshot for the ``status`` CLI verb / skill loop."""
     state = load_state(vault_root, run_id)
-    units = load_request_units(vault_root)
+    context_blocker: str | None = None
+    try:
+        run_context = load_run_context(vault_root, run_id)
+    except OrchestratorError as exc:
+        run_context = None
+        context_blocker = str(exc)
+    units = run_context.units if run_context is not None else []
     total_tokens = (
         state.total_input_tokens
         + state.total_cache_read
@@ -1082,7 +1210,9 @@ def status_summary(vault_root: Path | str, run_id: str) -> dict[str, object]:
         "attention_blockers": [
             b.model_dump(mode="json")
             for b in (
-                attention_blockers(vault_root, run_id) if state.status == "needs_attention" else []
+                attention_blockers(vault_root, run_id)
+                if state.status == "needs_attention" and run_context is not None
+                else []
             )
         ],
         "total_tokens": total_tokens,
@@ -1092,7 +1222,13 @@ def status_summary(vault_root: Path | str, run_id: str) -> dict[str, object]:
         "output_tokens": state.total_output_tokens,
         "spend_usd": round(state.total_spend_usd, 6),
         "spend_label": "notional (plan mode)",
-        "hard_cap_usd": _effective_cap(vault_root, state),
+        "hard_cap_usd": (
+            effective_cap(state, run_context)
+            if run_context is not None
+            else state.cap_raised_to
+        ),
+        "replayable": run_context is not None,
+        "context_blocker": context_blocker,
         "current_stage": state.current_stage,
     }
 

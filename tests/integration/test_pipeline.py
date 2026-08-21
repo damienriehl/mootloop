@@ -21,6 +21,7 @@ from mootloop.models.common import DocId
 from mootloop.models.matter import MatterConfig
 from mootloop.models.requests import RequestType
 from mootloop.orchestrator import (
+    assemble_prompt,
     attention_blockers,
     load_request_units,
     plan_next,
@@ -29,7 +30,6 @@ from mootloop.orchestrator import (
     run_with_provider,
     start_run,
 )
-from mootloop.stages import render_prompt
 from mootloop.vault import init_vault
 from tests.conftest import resolve_all_decisions
 
@@ -98,7 +98,9 @@ def test_kill_resume_never_reexecutes_completed_turns(tmp_path: Path) -> None:
         for spec in specs:
             if executed >= 5:
                 break
-            result: RawTurnResult = provider_a.run_turn(spec, render_prompt(spec))
+            result: RawTurnResult = provider_a.run_turn(
+                spec, assemble_prompt(vault, run_id, spec.turn_id)
+            )
             record_turn(vault, run_id, spec.turn_id, result.text, result.usage, NOW)
             executed += 1
     completed_before = set(load_state(vault, run_id).completed_turns)
@@ -154,7 +156,7 @@ def test_turn_body_written_once(tmp_path: Path) -> None:
     provider = FakeLLMProvider()
 
     spec = plan_next(vault, run_id)[0]
-    result = provider.run_turn(spec, render_prompt(spec))
+    result = provider.run_turn(spec, assemble_prompt(vault, run_id, spec.turn_id))
     record_turn(vault, run_id, spec.turn_id, result.text, result.usage, NOW)
 
     body = turn_body_path(vault, run_id, spec.turn_id)

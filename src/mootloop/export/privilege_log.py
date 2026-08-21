@@ -11,9 +11,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from mootloop.context import RunContext, load_run_context
 from mootloop.decisions import DecisionStore
 from mootloop.export import deliverables_dir
-from mootloop.models.corpus import CorpusDoc, Manifest
+from mootloop.models.corpus import CorpusDoc
 from mootloop.models.decisions import DecisionKind
 from mootloop.vault import atomic_write_text
 
@@ -37,9 +38,15 @@ def _row(doc_id: str, date: str, author: str, recipients: str, doc_type: str,
     return "| " + " | ".join(cells) + " |"
 
 
-def build_privilege_log(vault_root: Path | str, run_id: str) -> Path:
+def build_privilege_log(
+    vault_root: Path | str,
+    run_id: str,
+    *,
+    run_context: RunContext | None = None,
+) -> Path:
     """Write ``deliverables/<run-id>/privilege-log.md`` and return its path."""
-    manifest = Manifest.load(vault_root)
+    context = run_context or load_run_context(vault_root, run_id)
+    manifest = context.manifest.corpus_manifest
     privileged = [d for d in manifest.docs if d.privileged is True]
     resolved_calls = {
         str(d.request_id): d

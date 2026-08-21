@@ -12,8 +12,10 @@ from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
+from typer.testing import CliRunner
 
 from mootloop import taskspec as taskspec_svc
+from mootloop.cli import app
 from mootloop.models.taskspec import TaskSpec
 from mootloop.taskspec import (
     TaskSpecStore,
@@ -190,6 +192,20 @@ def test_start_run_task_spec_id_defaults_none(tmp_path: Path) -> None:
     vault = _build_single_request_vault(tmp_path)
     run_id = start_run(vault, "discovery-responses", NOW)
     assert _run_started(vault, run_id).task_spec_id is None  # type: ignore[attr-defined]
+
+
+def test_cli_start_binds_task_spec_id(tmp_path: Path) -> None:
+    vault = _build_single_request_vault(tmp_path)
+    spec = create_freeform(vault, MATTER, "answer the discovery", NOW)
+
+    result = CliRunner().invoke(
+        app,
+        ["run", "start", str(vault), "--task-spec-id", str(spec.task_spec_id)],
+    )
+
+    assert result.exit_code == 0, result.output
+    run_id = result.output.strip()
+    assert _run_started(vault, run_id).task_spec_id == spec.task_spec_id  # type: ignore[attr-defined]
 
 
 def test_service_module_reexports() -> None:

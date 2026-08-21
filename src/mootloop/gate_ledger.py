@@ -14,10 +14,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from mootloop import attest
+from mootloop.context import load_run_context
 from mootloop.decisions import DecisionStore
 from mootloop.journal import load_state, read_events
 from mootloop.models.events import GateEvaluated
-from mootloop.orchestrator import load_request_units, operative_draft_turn_ids
+from mootloop.orchestrator import operative_draft_turn_ids
 from mootloop.vault import atomic_write_text, safe_vault_path
 
 # Per-request turn gates, in report order, plus the run-level gates. Degeneracy and
@@ -123,7 +124,7 @@ class GateLedgerDoc:
 def build_ledger(vault_root: Path | str, run_id: str) -> GateLedgerDoc:
     """Assemble the gate-ledger document (pure; no writes)."""
     per_request, superseded, citation_status = _turn_gate_status(vault_root, run_id)
-    units = load_request_units(vault_root)
+    units = load_run_context(vault_root, run_id).units
     open_decisions = DecisionStore(vault_root, run_id).list_open()
     open_by_request: dict[str, int] = {}
     request_less_open = 0

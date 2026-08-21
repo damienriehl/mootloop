@@ -21,7 +21,10 @@ from mootloop.resources import rubric_path, task_config_path
 class TaskAdapter(Protocol):
     """Per-task behavior seam. Framing only — no pipeline mechanics."""
 
-    task: str
+    @property
+    def task(self) -> str:
+        """Stable registry key for this adapter."""
+        ...
 
     def draft_directive(self) -> str:
         """Task-specific instruction injected into a drafting turn."""

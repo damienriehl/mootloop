@@ -46,11 +46,10 @@ from pathlib import Path
 from mootloop import budget, orchestrator
 from mootloop.engine.queue import Queue, WorkItem
 from mootloop.errors import AuthError, SeatLimitError, TurnError
-from mootloop.journal import append
 from mootloop.llm import LLMProvider, RawTurnResult
-from mootloop.models.events import RunFinished, TurnIntent
+from mootloop.models.events import TurnIntent
 from mootloop.models.run import TurnSpec
-from mootloop.vault import RunLock, validate_id
+from mootloop.vault import validate_id
 
 logger = logging.getLogger("mootloop.engine.worker")
 
@@ -215,8 +214,7 @@ class Worker:
             return
         with contextlib.suppress(Exception):
             vault = self._resolve_vault(item.matter_id)
-            with RunLock(vault, item.run_id):
-                append(vault, item.run_id, RunFinished(status="needs_attention"))
+            orchestrator.finish_needs_attention(vault, item.run_id)
         with contextlib.suppress(OSError):
             self._write_notification(item.matter_id, item.run_id, reason="poison_item", now=now)
         self.queue.complete(item.item_id, self.worker_id)
@@ -247,7 +245,7 @@ class Worker:
                 return True
             spec = specs[0]
             model = spec.model or "claude"
-            append(
+            orchestrator.record_turn_intent(
                 vault,
                 run_id,
                 TurnIntent(
@@ -391,8 +389,7 @@ class Worker:
     def _finish_needs_attention(
         self, vault: Path, run_id: str, item: WorkItem, *, reason: str, now: datetime
     ) -> None:
-        with RunLock(vault, run_id):
-            append(vault, run_id, RunFinished(status="needs_attention"))
+        orchestrator.finish_needs_attention(vault, run_id)
         self._write_notification(item.matter_id, run_id, reason=reason, now=now)
         self.queue.complete(item.item_id, self.worker_id)
 

@@ -21,6 +21,7 @@ from mootloop import taskspec as taskspec_service
 from mootloop.citations import verify
 from mootloop.citations.extract import extract_citations
 from mootloop.citations.ledger import ResearchQueue
+from mootloop.context import load_run_context
 from mootloop.discovery_parser import parse_discovery_document, save_requests
 from mootloop.errors import (
     AttestationBlockedError,
@@ -368,11 +369,18 @@ def run_start(
     mode: Annotated[
         RunModeArg | None, typer.Option("--mode", help="autonomous | gated | observed")
     ] = None,
+    task_spec_id: Annotated[
+        str | None, typer.Option("--task-spec-id", help="Approved TaskSpec id")
+    ] = None,
 ) -> None:
     """Begin a run: write RunStarted, acquire the run lock, print the run id."""
     try:
         run_id = orchestrator.start_run(
-            vault_path, task, _now(), mode=mode.value if mode else None
+            vault_path,
+            task,
+            _now(),
+            mode=mode.value if mode else None,
+            task_spec_id=task_spec_id,
         )
     except MootloopError as exc:
         raise _fail(exc) from exc
@@ -763,7 +771,7 @@ def decide_list(
 ) -> None:
     """List the run's open attorney-gate decisions."""
     try:
-        matter = load_matter(vault_path)
+        matter = load_run_context(vault_path, run_id).manifest.matter_config
         open_decisions = decisions_service.DecisionStore(vault_path, run_id).list_open()
     except MootloopError as exc:
         raise _fail(exc) from exc
@@ -787,7 +795,11 @@ def decide_show(
     decision_id: Annotated[str, typer.Argument(help="Decision id")],
 ) -> None:
     """Show a single decision's full proposal (and resolution, if any)."""
-    decision = decisions_service.DecisionStore(vault_path, run_id).get(decision_id)
+    try:
+        load_run_context(vault_path, run_id)
+        decision = decisions_service.DecisionStore(vault_path, run_id).get(decision_id)
+    except MootloopError as exc:
+        raise _fail(exc) from exc
     if decision is None:
         raise _fail(DecisionError(f"unknown decision {decision_id!r}")) from None
     typer.echo(decision.model_dump_json(indent=2))
@@ -828,14 +840,13 @@ def decide_resolve(
     ] = None,
     choose: Annotated[str | None, typer.Option("--choose", help="Chosen option key")] = None,
     note: Annotated[str, typer.Option("--note", help="Resolution note")] = "",
-    by: Annotated[str | None, typer.Option("--by", help="Deciding attorney's name")] = None,
     input_file: Annotated[
         Path | None, typer.Option("--input", help="JSON list of resolutions (batch)")
     ] = None,
 ) -> None:
-    """Resolve one decision, or a batch via ``--input`` (source is human unless the
-    batch entry marks it ``policy``)."""
+    """Resolve one decision, or a batch via ``--input`` as the local OS principal."""
     try:
+        actor = pwd.getpwuid(os.geteuid()).pw_name
         if input_file is not None:
             if not input_file.is_file():
                 raise MootloopError(f"--input file not found: {input_file}")
@@ -850,14 +861,14 @@ def decide_resolve(
                     entry.get("action", "approve"),
                     entry.get("choose"),
                     entry.get("note", ""),
-                    entry.get("by", by or "batch"),
-                    entry.get("source", "human"),
+                    actor,
+                    "human",
                 )
             typer.echo(f"resolved {len(entries)} decision(s)")
             return
-        if decision_id is None or action is None or by is None:
-            raise MootloopError("single resolve needs <decision-id>, --action, and --by")
-        _resolve_one(vault_path, run_id, decision_id, action.value, choose, note, by, "human")
+        if decision_id is None or action is None:
+            raise MootloopError("single resolve needs <decision-id> and --action")
+        _resolve_one(vault_path, run_id, decision_id, action.value, choose, note, actor, "human")
         typer.echo(f"resolved {decision_id}: {action.value}")
     except (MootloopError, KeyError) as exc:
         raise _fail(exc if isinstance(exc, MootloopError) else DecisionError(str(exc))) from exc
@@ -958,11 +969,11 @@ def web_bake(
 def attest(
     vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
     run_id: Annotated[str, typer.Argument(help="Run id")],
-    by: Annotated[str, typer.Option("--by", help="Reviewing attorney's name")],
 ) -> None:
-    """Record an attestation over the run's md-master (plan D9). Refuses on open gates."""
+    """Attest as the local OS principal; refuses when attorney gates remain open."""
     try:
-        record = attest_service.attest(vault_path, run_id, by, _now())
+        actor = pwd.getpwuid(os.geteuid()).pw_name
+        record = attest_service.attest(vault_path, run_id, actor, _now())
     except (AttestationBlockedError, MootloopError) as exc:
         raise _fail(exc) from exc
     typer.echo(f"attested {run_id}: master {record.master_sha256[:12]} by {record.reviewer}")

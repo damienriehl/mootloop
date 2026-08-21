@@ -219,6 +219,22 @@ def test_run_status_labels_spend_notional(tmp_path: Path) -> None:
     assert '"spend_usd"' in status.output
 
 
+def test_run_status_reports_non_replayable_context_without_failing(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    _seed_requests(vault)
+    run_id = runner.invoke(app, ["run", "start", str(vault)]).output.strip()
+    (vault / "runs" / run_id / "context" / "corpus.json").write_text(
+        "{}\n", encoding="utf-8"
+    )
+
+    status = runner.invoke(app, ["run", "status", str(vault), run_id, "--json"])
+
+    assert status.exit_code == 0, status.output
+    payload = json.loads(status.output)
+    assert payload["replayable"] is False
+    assert "corpus snapshot" in payload["context_blocker"]
+
+
 def test_run_raise_cap_appends_event(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     _seed_requests(vault)

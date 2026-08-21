@@ -89,7 +89,7 @@ def test_autonomous_batches_then_resolve_attest_exports(tmp_path: Path) -> None:
     assert not DecisionStore(vault, run_id).list_open()
 
     # Attest -> export ready.
-    result = runner.invoke(app, ["attest", str(vault), run_id, "--by", "Jane Attorney"])
+    result = runner.invoke(app, ["attest", str(vault), run_id])
     assert result.exit_code == 0, result.output
     assert gate_ledger.export_ready(vault, run_id) == (True, [])
 
@@ -117,8 +117,8 @@ def test_post_attestation_edit_invalidates_and_reblocks(tmp_path: Path) -> None:
     verify_run_citations(vault, run_id, NOW)
     for d in DecisionStore(vault, run_id).list_open():
         args = ["decide", "resolve", str(vault), run_id, d.decision_id]
-        runner.invoke(app, [*args, "--action", "approve", "--by", "J"])
-    runner.invoke(app, ["attest", str(vault), run_id, "--by", "Jane"])
+        runner.invoke(app, [*args, "--action", "approve"])
+    runner.invoke(app, ["attest", str(vault), run_id])
     assert gate_ledger.export_ready(vault, run_id)[0] is True
 
     # A substantive post-attestation edit re-imposes DRAFT.

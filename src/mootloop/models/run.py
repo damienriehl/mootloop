@@ -66,8 +66,8 @@ class TurnSpec(StrictModel):
     """Everything a driver needs to run one persona turn — and nothing more.
 
     ``prompt_context`` carries the injected inputs (request text, facts, prior
-    outputs) as plain data; the rendered prompt is assembled from the persona body
-    plus this context, never stored here.
+    outputs) as plain data; the rendered prompt is assembled from the launch-snapshotted
+    persona body plus this context, never stored here.
     """
 
     turn_id: str

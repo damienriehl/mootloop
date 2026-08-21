@@ -17,8 +17,7 @@ from mootloop.journal import load_state, read_events
 from mootloop.llm import FakeLLMProvider, RawTurnResult, TokenUsage
 from mootloop.models.events import SpendRecorded
 from mootloop.models.run import DiscardedTurn
-from mootloop.orchestrator import plan_next, record_turn, start_run
-from mootloop.stages import render_prompt
+from mootloop.orchestrator import assemble_prompt, plan_next, record_turn, start_run
 from tests.unit.test_orchestrator_planning import (
     NOW,
     _build_single_request_vault,
@@ -92,7 +91,9 @@ def test_replayed_completed_turn_books_new_spend_but_never_double_books(
     run_id = start_run(vault, "discovery-responses", NOW, run_id="spend-0003")
     provider = FakeLLMProvider()
     spec = plan_next(vault, run_id)[0]
-    turn: RawTurnResult = provider.run_turn(spec, render_prompt(spec))
+    turn: RawTurnResult = provider.run_turn(
+        spec, assemble_prompt(vault, run_id, spec.turn_id)
+    )
 
     first = record_turn(
         vault, run_id, spec.turn_id, turn.text, USAGE, NOW, provider_call_id="call-1"

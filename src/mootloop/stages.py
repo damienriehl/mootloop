@@ -11,7 +11,7 @@ material change, drives convergence), and a **decorrelated 3-judge** final gate 
 bolster. Presence criteria are never sent to a judge — the completeness gate scores
 those in code.
 
-Prompts are assembled from the persona body (``personas/*.md``) plus the injected
+Prompts are assembled from the run's launch-snapshotted persona body plus the injected
 inputs carried on the spec — no excellence prose is hard-coded here.
 """
 
@@ -41,7 +41,6 @@ from mootloop.models.run import (
 )
 from mootloop.models.task import TaskAdapterConfig
 from mootloop.panels import fold_objection_results
-from mootloop.resources import persona_body
 from mootloop.tasks import TaskAdapter
 
 ASSEMBLE_STAGE = "assemble"
@@ -649,15 +648,14 @@ def first_incomplete_stage(ctx: StageContext) -> str | None:
 # --- prompt assembly --------------------------------------------------------
 
 
-def render_prompt(spec: TurnSpec) -> str:
-    """Assemble the rendered prompt: persona body + injected inputs + output contract.
+def render_prompt(spec: TurnSpec, body: str) -> str:
+    """Assemble the rendered prompt: snapshotted persona body + inputs + contract.
 
     All ingested/prior-turn content rides in a fenced DATA block that the persona
     body's hard rules mark as non-instructional (injection fencing, plan D3/C1).
     """
     import json
 
-    body = persona_body(spec.persona.body_slug)
     directive = str(spec.prompt_context.get("directive", "Complete your persona's task."))
     inputs = {k: v for k, v in spec.prompt_context.items() if k != "directive"}
     payload = json.dumps(inputs, indent=2, default=str)

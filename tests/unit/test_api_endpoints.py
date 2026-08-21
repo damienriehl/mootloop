@@ -193,7 +193,7 @@ def test_start_run_enqueues_run_lane_work_item(
     resp = client.post(
         f"/api/matters/{matter.matter_id}/runs",
         headers=headers,
-        json={"task": "discovery-responses"},
+        json={"run_id": "api-enqueue-run", "task": "discovery-responses"},
     )
     assert resp.status_code == 200
     run_id = resp.json()["run_id"]
@@ -204,6 +204,15 @@ def test_start_run_enqueues_run_lane_work_item(
     assert item.kind == "run_turn"
     assert item.matter_id == matter.matter_id
     assert item.run_id == run_id
+
+    retry = client.post(
+        f"/api/matters/{matter.matter_id}/runs",
+        headers=_with_csrf(client),
+        json={"run_id": "api-enqueue-run", "task": "discovery-responses"},
+    )
+    assert retry.status_code == 200
+    assert retry.json()["run_id"] == run_id
+    assert len(queue.snapshot()) == 1
 
 
 def test_runs_unknown_matter_returns_404(client: TestClient) -> None:
@@ -284,7 +293,11 @@ def test_mutating_route_401_without_auth_regardless_of_matter(
     client: TestClient, matter_id: str
 ) -> None:
     # POST with neither Access JWT nor CSRF fails on auth (401), never on resolve (404/400).
-    resp = client.post(f"/api/matters/{matter_id}/runs", headers=_NO_AUTH, json={"task": "x"})
+    resp = client.post(
+        f"/api/matters/{matter_id}/runs",
+        headers=_NO_AUTH,
+        json={"run_id": "unauthorized-run", "task": "x"},
+    )
     assert resp.status_code == 401
 
 
