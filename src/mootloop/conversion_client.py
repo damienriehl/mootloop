@@ -38,6 +38,16 @@ _FORMAT_BY_SUFFIX = {
 SUPPORTED_CONVERSION_SUFFIXES = frozenset(_FORMAT_BY_SUFFIX)
 
 
+def conversion_format_for_suffix(suffix: str) -> str:
+    """Return the exact folio-enrich parser format selected for a supported suffix."""
+    try:
+        return _FORMAT_BY_SUFFIX[suffix]
+    except KeyError as exc:
+        raise ConversionError(
+            f"unsupported protected conversion suffix: {suffix or '<none>'}"
+        ) from exc
+
+
 def validate_folio_enrich_image(image_ref: str) -> str:
     """Require an OCI digest reference; mutable tags are never accepted."""
     repository = image_ref.split("@", 1)[0] if "@" in image_ref else ""
@@ -82,9 +92,10 @@ def _validate_endpoint(endpoint: str, runtime_mode: RuntimeMode) -> str:
 def validate_converter_output(text: object) -> str:
     if not isinstance(text, str) or not text or "\x00" in text:
         raise ConversionError("converter output must be non-empty text without NUL bytes")
-    if len(text.encode("utf-8")) > MAX_CONVERTER_OUTPUT_BYTES:
+    normalized = text if text.endswith("\n") else text + "\n"
+    if len(normalized.encode("utf-8")) > MAX_CONVERTER_OUTPUT_BYTES:
         raise ConversionError("converter output exceeds the protected conversion limit")
-    return text if text.endswith("\n") else text + "\n"
+    return normalized
 
 
 class FolioEnrichConverter:
@@ -130,9 +141,7 @@ class FolioEnrichConverter:
         ):
             raise ConversionError("converter filename must be safe basename metadata")
         suffix = Path(filename).suffix.lower()
-        format_name = _FORMAT_BY_SUFFIX.get(suffix)
-        if format_name is None:
-            raise ConversionError(f"unsupported protected conversion suffix: {suffix or '<none>'}")
+        format_name = conversion_format_for_suffix(suffix)
         if len(data) > MAX_CONVERSION_INPUT_BYTES:
             raise ConversionError("conversion input exceeds the protected conversion limit")
         request = {

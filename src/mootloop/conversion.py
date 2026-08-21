@@ -20,6 +20,7 @@ from mootloop.conversion_client import (
     MAX_CONVERTER_OUTPUT_BYTES,
     SUPPORTED_CONVERSION_SUFFIXES,
     FolioEnrichConverter,
+    conversion_format_for_suffix,
     validate_converter_output,
     validate_folio_enrich_commit,
     validate_folio_enrich_image,
@@ -112,7 +113,7 @@ def _exact_vault_path(vault_root: Path | str, *parts: str) -> Path:
     return resolved
 
 
-def _load_original(vault_root: Path | str, doc: CorpusDoc) -> tuple[bytes, str]:
+def _load_original(vault_root: Path | str, doc: CorpusDoc) -> tuple[bytes, str, str]:
     suffix = Path(doc.original_name).suffix.lower()
     if suffix not in SUPPORTED_CONVERSION_SUFFIXES:
         raise ConversionError(f"unsupported protected conversion suffix: {suffix or '<none>'}")
@@ -124,13 +125,14 @@ def _load_original(vault_root: Path | str, doc: CorpusDoc) -> tuple[bytes, str]:
     )
     if content_doc_id(data) != doc.doc_id:
         raise ConversionError("conversion original content no longer matches its doc_id")
-    return data, suffix
+    return data, suffix, conversion_format_for_suffix(suffix)
 
 
 def _conversion_id(
     matter_id: MatterId,
     doc_id: DocId,
     input_sha256: str,
+    input_format: str,
     converter: DocumentConverter,
 ) -> str:
     digest = canonical_json_sha256(
@@ -138,6 +140,7 @@ def _conversion_id(
             "matter_id": matter_id,
             "doc_id": doc_id,
             "input_sha256": input_sha256,
+            "input_format": input_format,
             "converter": converter.name,
             "image": converter.image_ref,
             "commit": converter.source_commit,
@@ -170,6 +173,7 @@ def _validate_recovery(
     matter_id: MatterId,
     doc: CorpusDoc,
     input_sha256: str,
+    input_format: str,
     conversion_id: str,
     converter: DocumentConverter,
     normalized_path: Path,
@@ -179,6 +183,7 @@ def _validate_recovery(
         "conversion_id": conversion_id,
         "doc_id": doc.doc_id,
         "input_sha256": input_sha256,
+        "input_format": input_format,
         "normalized_path": f"corpus/normalized/{doc.doc_id}.md",
         "converter": converter.name,
         "converter_image": converter.image_ref,
@@ -202,6 +207,7 @@ def _new_receipt(
     conversion_id: str,
     doc: CorpusDoc,
     input_sha256: str,
+    input_format: str,
     output_sha256: str,
     converter: DocumentConverter,
     converted_at: str,
@@ -213,6 +219,7 @@ def _new_receipt(
         conversion_id=conversion_id,
         doc_id=doc.doc_id,
         input_sha256=input_sha256,
+        input_format=input_format,
         output_sha256=output_sha256,
         normalized_path=f"corpus/normalized/{doc.doc_id}.md",
         converter=converter.name,
@@ -258,14 +265,24 @@ def convert_corpus_document(
             raise ConversionError(
                 f"document {doc_id} requires a manual protected action before conversion"
             )
-        data, suffix = _load_original(vault_root, doc)
+        data, suffix, input_format = _load_original(vault_root, doc)
         input_sha256 = hashlib.sha256(data).hexdigest()
         matter_id = MatterId(load_matter(vault_root).matter_id)
-        conversion_id = _conversion_id(matter_id, doc.doc_id, input_sha256, converter)
+        conversion_id = _conversion_id(
+            matter_id,
+            doc.doc_id,
+            input_sha256,
+            input_format,
+            converter,
+        )
         receipt_path = _receipt_path(vault_root, conversion_id)
         normalized_path = _exact_vault_path(
             vault_root, "corpus", "normalized", f"{doc.doc_id}.md"
         )
+        if doc.ingest_status == "ok" and not receipt_path.is_file():
+            raise ConversionError(
+                f"document {doc_id} is already normalized without a conversion receipt"
+            )
         if receipt_path.exists():
             receipt = _load_receipt(receipt_path)
             _validate_recovery(
@@ -273,6 +290,7 @@ def convert_corpus_document(
                 matter_id=matter_id,
                 doc=doc,
                 input_sha256=input_sha256,
+                input_format=input_format,
                 conversion_id=conversion_id,
                 converter=converter,
                 normalized_path=normalized_path,
@@ -287,6 +305,7 @@ def convert_corpus_document(
                 conversion_id=conversion_id,
                 doc=doc,
                 input_sha256=input_sha256,
+                input_format=input_format,
                 output_sha256=hashlib.sha256(output_bytes).hexdigest(),
                 converter=converter,
                 converted_at=converted_at,
@@ -306,6 +325,7 @@ def convert_corpus_document(
                     matter_id=matter_id,
                     doc=doc,
                     input_sha256=input_sha256,
+                    input_format=input_format,
                     conversion_id=conversion_id,
                     converter=converter,
                     normalized_path=normalized_path,

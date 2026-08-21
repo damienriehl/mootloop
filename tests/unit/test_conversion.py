@@ -17,6 +17,7 @@ from mootloop.conversion import (
     FolioEnrichConverter,
     convert_corpus_document,
 )
+from mootloop.conversion_client import MAX_CONVERTER_OUTPUT_BYTES, validate_converter_output
 from mootloop.ingest import ingest_actions, ingest_folder, set_doc_tag
 from mootloop.models.corpus import DocRole, Manifest
 from mootloop.runtime import RuntimeMode
@@ -192,6 +193,7 @@ def test_conversion_promotes_text_and_persists_exact_receipt(tmp_path: Path) -> 
     assert doc.triage_issue is None
     assert receipt.source_matter_id == make_matter().matter_id
     assert receipt.doc_id == doc.doc_id
+    assert receipt.input_format == "pdf"
     assert receipt.converter_image == IMAGE
     assert receipt.converter_commit == FOLIO_ENRICH_COMMIT
     assert receipt.output_sha256
@@ -243,6 +245,70 @@ def test_invalid_converter_output_never_changes_manifest(tmp_path: Path, text: s
     assert doc is not None
     assert doc.ingest_status == "needs_conversion"
     assert doc.normalized_path is None
+
+
+def test_newline_normalization_is_included_in_the_output_limit() -> None:
+    with pytest.raises(ConversionError, match="output"):
+        validate_converter_output("x" * MAX_CONVERTER_OUTPUT_BYTES)
+
+    accepted = validate_converter_output("x" * (MAX_CONVERTER_OUTPUT_BYTES - 1))
+    assert len(accepted.encode("utf-8")) == MAX_CONVERTER_OUTPUT_BYTES
+
+
+def test_already_normalized_document_requires_an_existing_conversion_receipt(
+    tmp_path: Path,
+) -> None:
+    vault = _vault(tmp_path)
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "mail.eml").write_text("Subject: Test\n\nAlready normalized.\n")
+    doc = ingest_folder(vault, source, now=NOW).entries[0].doc
+    converter = FakeConverter()
+
+    with pytest.raises(ConversionError, match="without a conversion receipt"):
+        convert_corpus_document(
+            vault,
+            str(doc.doc_id),
+            converter=converter,
+            converted_at=NOW,
+            actor="local-attorney",
+        )
+
+    assert converter.calls == 0
+    assert Manifest.load(vault).get(str(doc.doc_id)) == doc
+
+
+def test_same_bytes_under_a_different_parser_format_get_a_distinct_receipt(
+    tmp_path: Path,
+) -> None:
+    vault, doc_id = _reviewed_pdf(tmp_path)
+    first_converter = FakeConverter("PDF extraction.\n")
+    _doc, first_receipt = convert_corpus_document(
+        vault,
+        doc_id,
+        converter=first_converter,
+        converted_at=NOW,
+        actor="local-attorney",
+    )
+    original = next((vault / "corpus" / "originals").glob("*.pdf"))
+    second_source = tmp_path / "second-source"
+    second_source.mkdir()
+    (second_source / "same-bytes.rtf").write_bytes(original.read_bytes())
+    ingest_folder(vault, second_source, now=NOW)
+    second_converter = FakeConverter("RTF extraction.\n")
+
+    _doc, second_receipt = convert_corpus_document(
+        vault,
+        doc_id,
+        converter=second_converter,
+        converted_at=NOW,
+        actor="local-attorney",
+    )
+
+    assert first_receipt.input_format == "pdf"
+    assert second_receipt.input_format == "rtf"
+    assert first_receipt.conversion_id != second_receipt.conversion_id
+    assert second_converter.calls == 1
 
 
 def test_symlinked_original_fails_closed_without_converter_call(tmp_path: Path) -> None:

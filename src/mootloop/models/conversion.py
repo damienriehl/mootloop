@@ -24,6 +24,7 @@ class ConversionReceipt(MatterProvenanced, VersionedModel):
     conversion_id: str
     doc_id: DocId
     input_sha256: str
+    input_format: str
     output_sha256: str
     normalized_path: str
     converter: str
