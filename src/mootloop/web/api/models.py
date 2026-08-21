@@ -150,6 +150,23 @@ class RunActionResponse(VersionedModel):
     status: RunStatus
 
 
+class CitationCheckQueuedResponse(VersionedModel):
+    """A durable hosted cite-checker job accepted for one run."""
+
+    schema_version: str = SCHEMA_VERSION
+    kind: Literal["citation_check_queued"] = "citation_check_queued"
+    run_id: str
+    item_id: str
+    status: Literal["queued"] = "queued"
+
+
+class JudgeProfileQueuedResponse(VersionedModel):
+    schema_version: str = SCHEMA_VERSION
+    kind: Literal["judge_profile_queued"] = "judge_profile_queued"
+    item_id: str
+    status: Literal["queued"] = "queued"
+
+
 class RunStatusSummary(VersionedModel):
     """Single-run status envelope for the cockpit (folded from the journal). Exposes
     the `RunStatus` Literal; also returned by the start-run wrapper."""

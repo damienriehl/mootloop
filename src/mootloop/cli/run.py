@@ -216,8 +216,8 @@ def run_panels(
     if json_output:
         typer.echo(report.model_dump_json())
         return
-    if not report.results:
-        typer.echo("No panel results yet (judge panel not complete).")
+    if not report.results and not report.jury_signals:
+        typer.echo("No panel results yet.")
         return
     for result in report.results:
         color = typer.colors.GREEN if result.survival_rate >= 0.5 else typer.colors.RED
@@ -226,6 +226,13 @@ def run_panels(
             f"{result.survive_votes}/{result.total_votes} survive "
             f"({result.survival_rate:.0%})",
             fg=color,
+        )
+    for signal in report.jury_signals:
+        typer.echo(
+            f"{signal.request_id}  directional jury: "
+            f"comprehension {signal.mean_comprehension:.1f}/5, "
+            f"persuasion {signal.mean_persuasion:.1f}/5 "
+            f"({signal.total_readers} readers; not a prediction)"
         )
 
 

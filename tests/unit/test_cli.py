@@ -11,12 +11,14 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from mootloop import orchestrator
 from mootloop.cli import app
 from mootloop.context import load_run_context
 from mootloop.context_sources import FIRM_PREFERENCES_ENV, ContextContributionStore
 from mootloop.engine.queue import Queue
 from mootloop.errors import QueueError
 from mootloop.journal import read_events
+from mootloop.llm import FakeLLMProvider
 from mootloop.models.common import MatterId
 from mootloop.models.context import ContextContribution
 from mootloop.models.events import RunEnqueued, RunReopened, RunStarted
@@ -561,6 +563,83 @@ def test_cite_verify_requires_exactly_one_source(tmp_path: Path) -> None:
     _init_from_fixture(vault)
     result = runner.invoke(app, ["cite", "verify", str(vault)])
     assert result.exit_code == 1
+
+
+def test_cite_check_enqueues_hosted_interactive_job(tmp_path: Path) -> None:
+    matters_root = tmp_path / "matters"
+    vault = matters_root / "northfield-widgets-v-granite-supply"
+    _seed_requests(vault)
+    run_id = orchestrator.start_run(
+        vault, "discovery-responses", "2026-08-21T16:00:00+00:00", run_id="cite-check"
+    )
+    orchestrator.run_with_provider(
+        vault,
+        run_id,
+        FakeLLMProvider(),
+        "2026-08-21T16:00:00+00:00",
+    )
+
+    result = runner.invoke(
+        app,
+        ["cite", "check", str(vault), "--run", run_id],
+        env={**os.environ, "MOOTLOOP_MATTERS_ROOT": str(matters_root)},
+    )
+
+    assert result.exit_code == 0, result.output
+    assert result.output == (
+        "queued cite:northfield-widgets-v-granite-supply:"
+        "cite-check\n"
+    )
+    [item] = Queue(matters_root).snapshot()
+    assert item.lane == "interactive"
+    assert item.kind == "citation_propositions"
+
+
+def test_judge_profile_enqueues_hosted_interactive_job(tmp_path: Path) -> None:
+    matters_root = tmp_path / "matters"
+    vault = matters_root / "northfield-widgets-v-granite-supply"
+    _init_from_fixture(vault)
+
+    result = runner.invoke(
+        app,
+        ["judge", "profile", str(vault)],
+        env={**os.environ, "MOOTLOOP_MATTERS_ROOT": str(matters_root)},
+    )
+
+    assert result.exit_code == 0, result.output
+    assert result.output == (
+        "queued judge-profile:northfield-widgets-v-granite-supply\n"
+    )
+    [item] = Queue(matters_root).snapshot()
+    assert item.lane == "interactive"
+    assert item.kind == "judge_profile"
+    assert item.run_id == "judge-profile"
+
+
+def test_judge_profile_fails_closed_for_hosted_path_config_identity_mismatch(
+    tmp_path: Path,
+) -> None:
+    matters_root = tmp_path / "matters"
+    vault = matters_root / "northfield-widgets-v-granite-supply"
+    _init_from_fixture(vault)
+    matter_path = vault / "matter.yaml"
+    matter_path.write_text(
+        matter_path.read_text(encoding="utf-8").replace(
+            "matter_id: northfield-widgets-v-granite-supply",
+            "matter_id: renamed-matter",
+        ),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        ["judge", "profile", str(vault)],
+        env={**os.environ, "MOOTLOOP_MATTERS_ROOT": str(matters_root)},
+    )
+
+    assert result.exit_code != 0
+    assert "does not match matter identity" in result.output
+    assert Queue(matters_root).snapshot() == []
 
 
 def test_research_list_and_fulfill(tmp_path: Path) -> None:

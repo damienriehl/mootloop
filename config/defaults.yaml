@@ -11,6 +11,7 @@ loop_caps:
 panels:
   judges: 3
   jury: false
+  jurors: 5
   rubric_judges: 3
 convergence:
   score_delta_floor: 0.02

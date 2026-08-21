@@ -201,6 +201,7 @@ def estimate_run(
       - partner_loop: critiques (1..ap) + redrafts (0..ap-1) + in-loop rubric (1..ap)
       - oc_attack / bolster: their caps
       - judge_panel: judges × objections
+      - jury_panel: directional lay readers, when enabled
       - rubric_gate: the decorrelated final panel
     """
     assume = assumptions or EstimateAssumptions()
@@ -210,6 +211,7 @@ def estimate_run(
     bolster = config.loop_caps.bolster
     judges = config.panels.judges
     rubric_panel = config.panels.rubric_judges
+    jurors = config.panels.jurors if config.panels.jury else 0
     obj = assume.objections_per_request
 
     # (stage, role, min_calls_per_request, max_calls_per_request)
@@ -235,6 +237,8 @@ def estimate_run(
         elif stage == "restructure":
             # Costed restructure fires only when an objection is weak.
             plan.append((stage, "personas", 0, config.loop_caps.restructure))
+        elif stage == "jury_panel" and jurors:
+            plan.append((stage, "judges", jurors, jurors))
         elif stage == "rubric_gate":
             plan.append((stage, "rubric", rubric_panel, rubric_panel))
 

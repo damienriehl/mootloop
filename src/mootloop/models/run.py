@@ -59,7 +59,9 @@ _PERSONA_ROLE: dict[PersonaName, str] = {
 SCHEMA_DRAFT = "draft"
 SCHEMA_CRITIQUE = "critique"
 SCHEMA_JUDGE = "judge"
+SCHEMA_JUROR = "juror"
 SCHEMA_RUBRIC = "rubric_score"
+SCHEMA_CITE_CHECK = "cite_check"
 
 
 class TurnSpec(StrictModel):
@@ -133,6 +135,17 @@ class JudgeOutput(StrictModel):
     self_assessment: str
 
 
+class JurorOutput(StrictModel):
+    """A bounded lay-reader signal, never a legal conclusion or outcome prediction."""
+
+    comprehension_score: int = Field(ge=1, le=5)
+    persuasion_score: int = Field(ge=1, le=5)
+    confusion_points: list[str] = Field(default_factory=list)
+    credibility_concerns: list[str] = Field(default_factory=list)
+    directional_only: Literal[True] = True
+    self_assessment: str
+
+
 class CriterionScore(StrictModel):
     """One rubric-judge score for a single (correctness) criterion, 0-5."""
 
@@ -153,15 +166,33 @@ class RubricScoreOutput(StrictModel):
     self_assessment: str
 
 
+class CiteCheckOutput(StrictModel):
+    """Whether exact supplied authority passages support one attributed proposition."""
+
+    status: Literal["supported", "unsupported", "ambiguous"]
+    evidence_passage_ids: list[str] = Field(default_factory=list)
+    reasoning: str
+    self_assessment: str
+
+
 # The one place schema names bind to models. Drivers/validators look up here.
 OUTPUT_SCHEMAS: dict[str, type[StrictModel]] = {
     SCHEMA_DRAFT: DraftOutput,
     SCHEMA_CRITIQUE: CritiqueOutput,
     SCHEMA_JUDGE: JudgeOutput,
+    SCHEMA_JUROR: JurorOutput,
     SCHEMA_RUBRIC: RubricScoreOutput,
+    SCHEMA_CITE_CHECK: CiteCheckOutput,
 }
 
-TurnOutput = DraftOutput | CritiqueOutput | JudgeOutput | RubricScoreOutput
+TurnOutput = (
+    DraftOutput
+    | CritiqueOutput
+    | JudgeOutput
+    | JurorOutput
+    | RubricScoreOutput
+    | CiteCheckOutput
+)
 
 
 class TurnRecord(StrictModel):

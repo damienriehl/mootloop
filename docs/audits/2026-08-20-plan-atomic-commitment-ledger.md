@@ -32,8 +32,8 @@ short label is less detailed.
 | D1-06 | Drafting-specific convergence signals and real rubric deltas | COMPLETE |
 | D2-01 | Namespaced `mootloop` Claude Code plugin and verbs | OPEN-AUTO — U-11A |
 | D2-02 | Disable model invocation for every side-effecting skill | OPEN-AUTO — U-11A |
-| D2-03 | One parameterized judge/juror persona rather than forks | PARTIAL — U-07/U-11A |
-| D2-04 | Least-privilege persona/panel/cite-checker tool sets | PARTIAL — U-02/U-07 |
+| D2-03 | One parameterized judge/juror persona rather than forks | PARTIAL — runtime complete in U-07; plugin packaging U-11A |
+| D2-04 | Least-privilege persona/panel/cite-checker tool sets | COMPLETE locally — no persona tools; hosted egress remains D3-H9/D-18 |
 | D2-05 | Persona-body contract and injected excellence standard | COMPLETE |
 | D2-06 | Compact run-skill navigator over durable references | OPEN-AUTO — U-11A |
 | D3-C1 | Fence all untrusted text as data; content never drives tools/control flow | PARTIAL — run context, execution isolation, and ingest visibility complete; hostile reimport U-09 |
@@ -44,7 +44,7 @@ short label is less detailed.
 | D3-H6 | Secrets outside vault/repo, minimal env, runtime redaction | PARTIAL — U-02 |
 | D3-H7 | Ethical walls and cross-matter learning exclusion | OPEN-AUTO — U-09 |
 | D3-H8 | Immutable verification source, chained logs/decisions, full attestation tuple | COMPLETE locally — exact-byte v2 commitment and mutation gates |
-| D3-H9 | Fixed legal-host egress allowlist; no content-derived target | PARTIAL — U-02/U-07 |
+| D3-H9 | Fixed legal-host egress allowlist; no content-derived target | PARTIAL — application paths/hosts fixed; hosted proxy expansion D-18 |
 | D3-H10 | Defensive DOCX/ZIP/XXE parsing and pinned model/catalog fetches | PARTIAL — U-04B isolates and pins protected conversion; local edit parsing U-09 and catalog updates U-12 |
 | D3-M11 | Per-matter canaries and fail-closed privacy scanning | COMPLETE locally; runtime path U-02 |
 | D3-M12 | Shared export controls for every CLI/skill path | COMPLETE for current sealed exports; extensions U-11A |
@@ -54,7 +54,7 @@ short label is less detailed.
 | D4-02 | Global bounded fan-out and one process-wide citation bucket/chunking | PARTIAL — bucket complete; fan-out U-16 |
 | D4-03 | Byte-stable prompt prefix/cache breakpoint and cache-write sequencing | OPEN-AUTO — U-16 |
 | D4-04 | Batch objections per judge and bound bolster loop | OPEN-AUTO — U-16 |
-| D4-05 | Distilled bounded calibrated-judge profile | OPEN-AUTO — U-07 |
+| D4-05 | Distilled bounded calibrated-judge profile | COMPLETE locally — exact public evidence, holdout error, bounded Judge-only readback |
 | D4-06 | Estimate panel term and self-calibrating derail factor | PARTIAL — U-16 |
 | D5-01 | Budget tiers vary persona model, iterations, and output caps | PARTIAL — U-16 |
 | D5-02 | Cache-aware per-model metering formula | COMPLETE |
@@ -65,19 +65,19 @@ short label is less detailed.
 | D6-01 | Low default loop caps; increases require measurements | COMPLETE; calibration U-16 |
 | D6-02 | External critics/gates; no Associate self-review substitution | COMPLETE |
 | D6-03 | Convergence requires score delta and material-change checks | COMPLETE |
-| D6-04 | Jury output directional only and never a gate | OPEN-AUTO — U-07 |
-| D6-05 | Judge-specific calibration must be empirically evaluated | OPEN-AUTO — U-07 |
+| D6-04 | Jury output directional only and never a gate | COMPLETE |
+| D6-05 | Judge-specific calibration must be empirically evaluated | COMPLETE locally — deterministic held-out evaluation required before readback |
 | D7-01 | Interrogatory completeness, particularity, signature, and MN restatement/oath | COMPLETE for current adapter |
 | D7-02 | RFP per-item disposition, specificity, withheld flag/basis, partial production, timing | COMPLETE for current adapter |
 | D7-03 | RFA fair disposition and reasonable-inquiry recital; every disposition human-gated | COMPLETE for current adapter |
 | D7-04 | Per-document privilege-log fields with categorical option | COMPLETE for current export |
 | D7-05 | Filing document structure and no boilerplate general objections | COMPLETE for current adapter/export |
-| D7-06 | Sanctions authorities encoded as deterministic/rubric penalties | PARTIAL — proposition proof U-07 |
+| D7-06 | Sanctions authorities encoded as deterministic/rubric penalties | COMPLETE — Fischer/Liguria/Heller gates plus exact proposition-support proof |
 | D8-01 | Court-template DOCX rendering without destructive field rewrites | COMPLETE |
 | D8-02 | Bookmark plus sentinel anchor recovery from raw OOXML | OPEN-AUTO — U-09 |
 | D8-03 | Parse tracked insertions/deletions and revision metadata directly | OPEN-AUTO — U-09 |
 | D8-04 | Google suggestions/comments reimport and large-export handling | DECISION-GATED — D-06/U-09 |
-| D8-05 | Clean eyecite text with offset back-mapping and bounded tokenizer choice | PARTIAL — U-07/U-09 |
+| D8-05 | Clean eyecite text with offset back-mapping and bounded tokenizer choice | COMPLETE — original spans plus explicit Aho–Corasick default |
 | D8-06 | CriticMarkup representation for pending edits | OPEN-AUTO — U-09 |
 | D9-01 | Citation-cache staleness, disclosure, and citator research request | COMPLETE for current clients |
 | D9-02 | Retention/destruction-date/litigation-hold close policy and destruction manifest | OPEN-AUTO — U-11A |

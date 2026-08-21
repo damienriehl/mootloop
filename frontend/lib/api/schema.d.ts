@@ -62,6 +62,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/matters/{matter_id}/judge-profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Queue Judge Profile
+         * @description Queue the public-opinion profile builder for this matter's assigned judge.
+         */
+        post: operations["queue_judge_profile_api_matters__matter_id__judge_profile_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/matters/{matter_id}/runs": {
         parameters: {
             query?: never;
@@ -108,6 +128,26 @@ export interface paths {
         put?: never;
         /** Attest Run */
         post: operations["attest_run_api_matters__matter_id__runs__run_id__attest_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/matters/{matter_id}/runs/{run_id}/citations/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Queue Citation Checks
+         * @description Queue durable opinion/proposition checks through the matter-bound driver.
+         */
+        post: operations["queue_citation_checks_api_matters__matter_id__runs__run_id__citations_check_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -624,6 +664,33 @@ export interface components {
             valid: boolean;
         };
         /**
+         * CitationCheckQueuedResponse
+         * @description A durable hosted cite-checker job accepted for one run.
+         */
+        CitationCheckQueuedResponse: {
+            /** Item Id */
+            item_id: string;
+            /**
+             * Kind
+             * @default citation_check_queued
+             * @constant
+             */
+            kind: "citation_check_queued";
+            /** Run Id */
+            run_id: string;
+            /**
+             * Schema Version
+             * @default 1.0
+             */
+            schema_version: string;
+            /**
+             * Status
+             * @default queued
+             * @constant
+             */
+            status: "queued";
+        };
+        /**
          * CsrfToken
          * @description The CSRF token returned alongside the double-submit cookie.
          */
@@ -954,6 +1021,28 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** JudgeProfileQueuedResponse */
+        JudgeProfileQueuedResponse: {
+            /** Item Id */
+            item_id: string;
+            /**
+             * Kind
+             * @default judge_profile_queued
+             * @constant
+             */
+            kind: "judge_profile_queued";
+            /**
+             * Schema Version
+             * @default 1.0
+             */
+            schema_version: string;
+            /**
+             * Status
+             * @default queued
+             * @constant
+             */
+            status: "queued";
         };
         /**
          * MatterSummary
@@ -1533,6 +1622,37 @@ export interface operations {
             };
         };
     };
+    queue_judge_profile_api_matters__matter_id__judge_profile_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matter_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JudgeProfileQueuedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_runs_api_matters__matter_id__runs_get: {
         parameters: {
             query?: never;
@@ -1650,6 +1770,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AttestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    queue_citation_checks_api_matters__matter_id__runs__run_id__citations_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matter_id: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CitationCheckQueuedResponse"];
                 };
             };
             /** @description Validation Error */

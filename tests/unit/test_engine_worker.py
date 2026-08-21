@@ -124,6 +124,125 @@ def test_worker_drains_run_to_finished_with_intents_reconciled(tmp_path: Path) -
     assert queue.snapshot() == []  # the item was completed
 
 
+def test_worker_dispatches_and_completes_citation_proposition_job(tmp_path: Path) -> None:
+    root, run_id = _build_matters_root(tmp_path)
+    queue = Queue(root)
+    _enqueue_run_turn(queue, run_id, "wi-run-before-cites")
+    worker = Worker(root, "w-cite", queue, _fake_factory)
+    assert worker.run_once(NOW) is True
+    assert queue.snapshot() == []
+    queue.enqueue(
+        WorkItem.create(
+            lane="interactive",
+            matter_id=MATTER_ID,
+            run_id=run_id,
+            kind="citation_propositions",
+            now=NOW,
+            item_id=f"cite:{MATTER_ID}:{run_id}",
+        )
+    )
+
+    assert worker.run_once(NOW) is True
+
+    assert queue.snapshot() == []
+    vault = MatterRegistry(root=root).resolve(MATTER_ID)
+    assert any(
+        event.result.gate == "citation_propositions"
+        for event in read_events(vault, run_id)
+        if event.kind == "gate_evaluated"
+    )
+
+
+def test_worker_dispatches_and_completes_judge_profile_job(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, _run_id = _build_matters_root(tmp_path)
+    queue = Queue(root)
+    queue.enqueue(
+        WorkItem.create(
+            lane="interactive",
+            matter_id=MATTER_ID,
+            run_id="judge-profile",
+            kind="judge_profile",
+            now=NOW,
+            item_id=f"judge-profile:{MATTER_ID}",
+        )
+    )
+    calls: list[str] = []
+
+    heartbeats: list[str] = []
+
+    def build(
+        vault: Path,
+        matter: object,
+        now: str,
+        *,
+        heartbeat: object,
+    ) -> object:
+        del vault, matter
+        calls.append(now)
+        assert callable(heartbeat)
+        heartbeat()
+        heartbeats.append("renewed")
+        return object()
+
+    monkeypatch.setattr(
+        "mootloop.judge_profiles.build_assigned_judge_profile",
+        build,
+    )
+
+    def no_provider(vault: Path, run_dir: Path, billing_mode: str) -> LLMProvider:
+        del vault, run_dir, billing_mode
+        raise AssertionError("judge-profile work must not construct a model provider")
+
+    worker = Worker(root, "w-profile", queue, no_provider)
+    assert worker.run_once(NOW) is True
+
+    assert calls == [NOW.isoformat()]
+    assert heartbeats == ["renewed"]
+    assert queue.snapshot() == []
+
+
+def test_judge_profile_job_stops_without_completing_after_lease_loss(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, _run_id = _build_matters_root(tmp_path)
+    queue = Queue(root)
+    queue.enqueue(
+        WorkItem.create(
+            lane="interactive",
+            matter_id=MATTER_ID,
+            run_id="judge-profile",
+            kind="judge_profile",
+            now=NOW,
+            item_id=f"judge-profile:{MATTER_ID}",
+        )
+    )
+
+    def build(
+        vault: Path,
+        matter: object,
+        now: str,
+        *,
+        heartbeat: object,
+    ) -> object:
+        del vault, matter, now
+        assert callable(heartbeat)
+        heartbeat()
+        raise AssertionError("lost lease must stop the build")
+
+    monkeypatch.setattr("mootloop.judge_profiles.build_assigned_judge_profile", build)
+    monkeypatch.setattr(queue, "heartbeat", lambda *args, **kwargs: False)
+    worker = Worker(root, "w-profile", queue, _fake_factory)
+
+    assert worker.run_once(NOW) is True
+
+    [remaining] = queue.snapshot()
+    assert remaining.item_id == f"judge-profile:{MATTER_ID}"
+
+
 def test_worker_seat_limit_pauses_and_reschedules_slot(tmp_path: Path) -> None:
     root, run_id = _build_matters_root(tmp_path)
     queue = Queue(root)

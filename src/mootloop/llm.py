@@ -17,9 +17,11 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from mootloop.models.run import (
+    SCHEMA_CITE_CHECK,
     SCHEMA_CRITIQUE,
     SCHEMA_DRAFT,
     SCHEMA_JUDGE,
+    SCHEMA_JUROR,
     SCHEMA_RUBRIC,
     TurnSpec,
 )
@@ -139,6 +141,15 @@ def _default_output(spec: TurnSpec) -> dict[str, Any]:
             ],
             "self_assessment": "Ruled on all objections.",
         }
+    if spec.output_schema_name == SCHEMA_JUROR:
+        return {
+            "comprehension_score": 4,
+            "persuasion_score": 3,
+            "confusion_points": [],
+            "credibility_concerns": [],
+            "directional_only": True,
+            "self_assessment": "A bounded lay readthrough, not a prediction.",
+        }
     if spec.output_schema_name == SCHEMA_RUBRIC:
         criteria = ctx.get("criteria", [])
         ids = [c["id"] for c in criteria if isinstance(c, dict) and "id" in c]
@@ -149,6 +160,15 @@ def _default_output(spec: TurnSpec) -> dict[str, Any]:
             ],
             "overall_notes": "Adequate against the injected criteria.",
             "self_assessment": "Scored each injected criterion.",
+        }
+    if spec.output_schema_name == SCHEMA_CITE_CHECK:
+        passages = ctx.get("passages", [])
+        ids = [p["passage_id"] for p in passages if isinstance(p, dict) and "passage_id" in p]
+        return {
+            "status": "ambiguous",
+            "evidence_passage_ids": ids[:1],
+            "reasoning": "The bounded excerpts do not establish support conclusively.",
+            "self_assessment": "Only the supplied passages were reviewed.",
         }
     raise ValueError(f"no default output for schema {spec.output_schema_name!r}")
 

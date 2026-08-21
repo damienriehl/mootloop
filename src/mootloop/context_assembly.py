@@ -219,7 +219,13 @@ def items_for_turn(
 ) -> tuple[AssembledContextItem, ...]:
     """Re-apply task/persona permissions at the final TurnSpec boundary."""
     if persona not in _INTERNAL_CONTEXT_PERSONAS:
-        return ()
+        return tuple(
+            item
+            for item in items
+            if item.persona_scope
+            and persona in item.persona_scope
+            and (not item.task_scope or task in item.task_scope)
+        )
     return tuple(
         item
         for item in items

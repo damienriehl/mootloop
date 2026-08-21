@@ -2,7 +2,14 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { continueRun, pauseRun, raiseCap, resumeRun } from "@/lib/api/runs";
+import {
+  continueRun,
+  pauseRun,
+  queueCitationChecks,
+  queueJudgeProfile,
+  raiseCap,
+  resumeRun,
+} from "@/lib/api/runs";
 import { keys } from "@/lib/api/keys";
 import { LockContentionError } from "@/lib/api/errors";
 import type { RunStatus, RunStatusSummary } from "@/lib/api/types";
@@ -14,7 +21,13 @@ interface Props {
   status: RunStatus;
 }
 
-type Action = "pause" | "resume" | "continue" | "raise-cap";
+type Action =
+  | "pause"
+  | "resume"
+  | "continue"
+  | "raise-cap"
+  | "check-citations"
+  | "judge-profile";
 
 /** Run controls with OPTIMISTIC mutations + typed-409 conflict handling (FD-8/FD-9). */
 export function RunControls({ matterId, runId, status }: Props) {
@@ -22,6 +35,7 @@ export function RunControls({ matterId, runId, status }: Props) {
   const detailKey = keys.matter(matterId).run(runId).detail();
   const [error, setError] = useState<string | null>(null);
   const [capInput, setCapInput] = useState("");
+  const [notice, setNotice] = useState<string | null>(null);
 
   /** Optimistically patch the cached run status, snapshot for rollback. */
   async function optimisticStatus(next: RunStatus) {
@@ -89,12 +103,41 @@ export function RunControls({ matterId, runId, status }: Props) {
     onSettled: () => client.invalidateQueries({ queryKey: detailKey }),
   });
 
-  const busy = pause.isPending || resume.isPending || cont.isPending || bumpCap.isPending;
+  const checkCitations = useMutation({
+    mutationFn: () => queueCitationChecks({ matterId, runId }),
+    onMutate: () => {
+      setError(null);
+      setNotice(null);
+    },
+    onError: (err) => onError(err, undefined),
+    onSuccess: () => setNotice("Citation-support checks queued."),
+    onSettled: () => client.invalidateQueries({ queryKey: keys.matter(matterId).run(runId).gates() }),
+  });
+
+  const judgeProfile = useMutation({
+    mutationFn: () => queueJudgeProfile(matterId),
+    onMutate: () => {
+      setError(null);
+      setNotice(null);
+    },
+    onError: (err) => onError(err, undefined),
+    onSuccess: () => setNotice("Assigned-judge public-opinion profile queued."),
+  });
+
+  const busy =
+    pause.isPending ||
+    resume.isPending ||
+    cont.isPending ||
+    bumpCap.isPending ||
+    checkCitations.isPending ||
+    judgeProfile.isPending;
   const pending = (a: Action) =>
     (a === "pause" && pause.isPending) ||
     (a === "resume" && resume.isPending) ||
     (a === "continue" && cont.isPending) ||
-    (a === "raise-cap" && bumpCap.isPending);
+    (a === "raise-cap" && bumpCap.isPending) ||
+    (a === "check-citations" && checkCitations.isPending) ||
+    (a === "judge-profile" && judgeProfile.isPending);
 
   return (
     <div className="border border-rule bg-paper-raised p-4 shadow-ledger">
@@ -144,11 +187,32 @@ export function RunControls({ matterId, runId, status }: Props) {
             Raise cap
           </ControlButton>
         </div>
+
+        <ControlButton
+          onClick={() => checkCitations.mutate()}
+          disabled={busy || !["finished", "needs_decisions"].includes(status)}
+          pending={pending("check-citations")}
+        >
+          Check citation support
+        </ControlButton>
+
+        <ControlButton
+          onClick={() => judgeProfile.mutate()}
+          disabled={busy}
+          pending={pending("judge-profile")}
+        >
+          Build judge profile
+        </ControlButton>
       </div>
 
       {error && (
         <p role="alert" aria-live="assertive" className="mt-3 font-mono text-sm text-fail">
           {error}
+        </p>
+      )}
+      {notice && (
+        <p role="status" aria-live="polite" className="mt-3 font-mono text-sm text-pass">
+          {notice}
         </p>
       )}
     </div>

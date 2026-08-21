@@ -22,9 +22,11 @@ from pydantic import ValidationError
 
 from mootloop import budget, decisions
 from mootloop.citations import verify
+from mootloop.citations.check import proposition_export_gate
 from mootloop.citations.extract import extract_citations
 from mootloop.citations.http import Transport
-from mootloop.citations.ledger import DEFAULT_MAX_CACHE_AGE_DAYS
+from mootloop.citations.ledger import DEFAULT_MAX_CACHE_AGE_DAYS, VerificationLedger
+from mootloop.citations.propositions import extract_citation_propositions
 from mootloop.citations.ratelimit import TokenBucket
 from mootloop.citations.verify import VerifySummary
 from mootloop.context import (
@@ -48,7 +50,7 @@ from mootloop.journal import (
 )
 from mootloop.llm import LLMProvider, TokenUsage
 from mootloop.models.budget import EstimateRange
-from mootloop.models.citations import Citation
+from mootloop.models.citations import Citation, CitationProposition, VerificationStatus
 from mootloop.models.common import (
     MatterId,
     RubricId,
@@ -78,7 +80,7 @@ from mootloop.models.events import (
     TurnIntent,
     validate_run_queue_intent,
 )
-from mootloop.models.gates import GateResult
+from mootloop.models.gates import GateFail, GatePass, GatePending, GateResult
 from mootloop.models.requests import RequestItem, RequestSet, code_from_request_id
 from mootloop.models.rubric import final_gate
 from mootloop.models.run import (
@@ -728,6 +730,36 @@ def _operative_citations(vault_root: Path | str, run_id: str) -> list[Citation]:
     return list(found.values())
 
 
+def operative_citation_propositions(
+    vault_root: Path | str, run_id: str
+) -> list[CitationProposition]:
+    """Every exact citation/proposition occurrence in the operative response text."""
+    run_context = load_run_context(vault_root, run_id)
+    binding = run_context.binding
+    state = load_state(vault_root, run_id)
+    units = run_context.units
+    found: dict[str, CitationProposition] = {}
+    for index in range(len(units)):
+        ctx = _context_for(
+            run_id,
+            state,
+            binding,
+            units,
+            run_context.facts,
+            index,
+            run_context.manifest.resolved_config.max_attempts,
+        )
+        record = ctx.operative_draft()
+        if record is None:
+            continue
+        draft = DraftOutput.model_validate(record.output)
+        for proposition in extract_citation_propositions(
+            draft.response_text, source_turn_id=record.spec.turn_id
+        ):
+            found.setdefault(proposition.proposition_id, proposition)
+    return list(found.values())
+
+
 def operative_draft_turn_ids(vault_root: Path | str, run_id: str) -> dict[str, str]:
     """``request_id -> turn_id`` of each request's operative (final) draft.
 
@@ -823,9 +855,28 @@ def citation_export_gate(
     """The export-readiness citation gate: reads the immutable ledger (no HTTP) and
     blocks unless every citation in the operative drafts is verified/curated (plan H8)."""
     citations = _operative_citations(vault_root, run_id)
-    return verify.citation_gate(
+    existence = verify.citation_gate(
         vault_root, citations, now=now, max_cache_age_days=max_cache_age_days
     )
+    folded = VerificationLedger(vault_root).folded(
+        now=datetime.fromisoformat(now), max_cache_age_days=max_cache_age_days
+    )
+    case_propositions = [
+        proposition
+        for proposition in operative_citation_propositions(vault_root, run_id)
+        if (
+            (record := folded.get(proposition.citation_id)) is not None
+            and record.status == VerificationStatus.VERIFIED
+            and record.source == "courtlistener"
+        )
+    ]
+    support = proposition_export_gate(vault_root, run_id, case_propositions)
+    findings = [*existence.findings, *support.findings]
+    if existence.status == "fail" or support.status == "fail":
+        return GateFail(gate="citation", findings=findings)
+    if existence.status == "pending" or support.status == "pending":
+        return GatePending(gate="citation", findings=findings)
+    return GatePass(gate="citation", findings=findings)
 
 
 def _maybe_emit_rubric_gate(

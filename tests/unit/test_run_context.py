@@ -248,6 +248,29 @@ def test_legacy_matter_runtime_is_fallback_below_firm_and_explicit_overlay(
     assert matter_source.locator == "matter.yaml#runtime"
 
 
+def test_legacy_matter_jury_settings_are_snapshotted_as_allowlisted_overlay(
+    tmp_path: Path,
+) -> None:
+    vault = _vault(tmp_path)
+    matter = yaml.safe_load((vault / "matter.yaml").read_text(encoding="utf-8"))
+    matter["panels"] = {"jury_enabled": True, "jurors": 2}
+    (vault / "matter.yaml").write_text(yaml.safe_dump(matter), encoding="utf-8")
+
+    run_id = start_run(vault, TASK, NOW, run_id="ctx-jury-overlay")
+    launched = load_run_context(vault, run_id)
+    assert launched.manifest.resolved_config.panels.jury is True
+    assert launched.manifest.resolved_config.panels.jurors == 2
+    assert launched.binding.config.panels.jury is True
+    assert launched.binding.config.panels.jurors == 2
+    assert PersonaName.JUROR in launched.manifest.persona_bodies
+
+    matter["panels"] = {"jury_enabled": False, "jurors": 0}
+    (vault / "matter.yaml").write_text(yaml.safe_dump(matter), encoding="utf-8")
+    replayed = load_run_context(vault, run_id)
+    assert replayed.manifest.resolved_config.panels.jury is True
+    assert replayed.manifest.resolved_config.panels.jurors == 2
+
+
 def test_idempotent_run_reuse_compares_current_effective_config(tmp_path: Path) -> None:
     vault = _vault(tmp_path)
     firm = tmp_path / "firm-preferences.yaml"

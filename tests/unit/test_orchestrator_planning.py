@@ -8,15 +8,15 @@ from typing import Any
 
 import pytest
 
-from mootloop import orchestrator
+from mootloop import orchestrator, panels
 from mootloop.errors import PipelineConfigError
 from mootloop.facts import FactStore
 from mootloop.gate_ledger import build_ledger
 from mootloop.journal import read_events, turn_body_path
 from mootloop.llm import FakeLLMProvider, RawTurnResult
 from mootloop.models.common import DocId
-from mootloop.models.events import JournalEvent, TurnCompleted
-from mootloop.models.matter import MatterConfig, Personas
+from mootloop.models.events import GateEvaluated, JournalEvent, TurnCompleted
+from mootloop.models.matter import MatterConfig, Panels, Personas
 from mootloop.models.requests import RequestItem, RequestSet, RequestType
 from mootloop.models.run import DiscardedTurn, PersonaName
 from mootloop.orchestrator import (
@@ -91,6 +91,43 @@ def test_stage_order_single_request(tmp_path: Path) -> None:
 
     assert plan_next(vault, run_id) == []
     assert status_summary(vault, run_id)["status"] == "finished"
+
+
+def test_optional_jury_is_directional_provenanced_and_never_a_gate(tmp_path: Path) -> None:
+    matter = make_matter().model_copy(
+        update={"panels": Panels(jury_enabled=True, jurors=2)}
+    )
+    vault = _build_single_request_vault(tmp_path, matter)
+    run_id = start_run(vault, "discovery-responses", NOW, run_id="jury-enabled")
+    provider = FakeLLMProvider()
+
+    for _ in range(20):
+        specs = plan_next(vault, run_id)
+        assert specs
+        if specs[0].persona == PersonaName.JUROR:
+            break
+        _run_step(vault, run_id, provider)
+    else:
+        pytest.fail("enabled jury stage was never planned")
+
+    assert [spec.persona for spec in specs] == [PersonaName.JUROR, PersonaName.JUROR]
+    assert all(spec.stage == "jury_panel" for spec in specs)
+    assert all(spec.prompt_context["directional_only"] is True for spec in specs)
+    assert all(spec.prompt_context["draft_provenance"]["sha256"] for spec in specs)
+    juror_turn_ids = {str(spec.turn_id) for spec in specs}
+    assert _run_step(vault, run_id, provider) == [PersonaName.JUROR.value] * 2
+
+    report = panels.build_panel_report(vault, run_id)
+    [signal] = report.jury_signals
+    assert signal.directional_only is True
+    assert signal.total_readers == 2
+    juror_gate_events = [
+        event
+        for event in read_events(vault, run_id)
+        if isinstance(event, GateEvaluated) and str(event.turn_id) in juror_turn_ids
+    ]
+    assert juror_gate_events
+    assert {event.result.gate for event in juror_gate_events} == {"degeneracy"}
 
 
 def test_partner_loop_respects_cap(tmp_path: Path) -> None:

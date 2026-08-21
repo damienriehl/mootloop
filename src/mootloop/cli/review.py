@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import pwd
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -13,12 +14,22 @@ import typer
 from mootloop import decisions as decisions_service
 from mootloop import orchestrator
 from mootloop.citations import verify
+from mootloop.citations.check_runner import (
+    require_completed_draft_set,
+    run_proposition_checks,
+)
 from mootloop.citations.extract import extract_citations
 from mootloop.citations.ledger import ResearchQueue
 from mootloop.context import load_run_context
+from mootloop.engine.launch import classify_vault_for_queue
+from mootloop.engine.queue import Queue, WorkItem
 from mootloop.errors import CitationError, DecisionError, MootloopError, VaultBoundaryError
+from mootloop.judge_profiles import build_assigned_judge_profile
+from mootloop.llm import FakeLLMProvider
+from mootloop.registry import MatterRegistry
+from mootloop.vault import load_matter
 
-from . import DecisionActionArg, _fail, _now, cite_app, decide_app, research_app
+from . import DecisionActionArg, _fail, _now, cite_app, decide_app, judge_app, research_app
 
 
 def _print_verify_summary(summary: verify.VerifySummary) -> None:
@@ -57,6 +68,50 @@ def cite_verify(
     _print_verify_summary(summary)
 
 
+@cite_app.command("check")
+def cite_check(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Option("--run", help="Run whose propositions to check")],
+    fake: Annotated[bool, typer.Option("--fake", help="Execute with FakeLLMProvider")]
+    = False,
+) -> None:
+    """Queue hosted proposition checks, or execute deterministically with ``--fake``."""
+    try:
+        load_run_context(vault_path, run_id)
+        require_completed_draft_set(vault_path, run_id)
+        if fake:
+            prepared = run_proposition_checks(
+                vault_path,
+                run_id,
+                FakeLLMProvider(),
+                _now(),
+            )
+            typer.echo(
+                f"checked {len(prepared.bundles)} proposition(s); "
+                f"research needed for {len(prepared.unresolved)}"
+            )
+            return
+        matter = load_matter(vault_path)
+        registry = MatterRegistry()
+        hosted_vault = registry.resolve(matter.matter_id)
+        if hosted_vault.resolve() != vault_path.resolve():
+            raise MootloopError("standalone cite check requires --fake")
+        item_id = f"cite:{matter.matter_id}:{run_id}"
+        Queue(registry.root).ensure_enqueued(
+            WorkItem.create(
+                lane="interactive",
+                matter_id=matter.matter_id,
+                run_id=run_id,
+                kind="citation_propositions",
+                now=datetime.now(UTC),
+                item_id=item_id,
+            )
+        )
+    except (MootloopError, VaultBoundaryError) as exc:
+        raise _fail(exc) from exc
+    typer.echo(f"queued {item_id}")
+
+
 @research_app.command("list")
 def research_list(
     vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
@@ -89,6 +144,41 @@ def research_fulfill(
     except (CitationError, VaultBoundaryError) as exc:
         raise _fail(exc) from exc
     typer.echo(f"fulfilled {request_id}: {record.citation_id} verified (curated)")
+
+
+@judge_app.command("profile")
+def judge_profile(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+) -> None:
+    """Build locally, or queue the hosted assigned-judge public-opinion profile."""
+    try:
+        registry = MatterRegistry()
+        matter, queue = classify_vault_for_queue(vault_path, registry=registry)
+        if queue is not None:
+            item_id = f"judge-profile:{matter.matter_id}"
+            queue.ensure_enqueued(
+                WorkItem.create(
+                    lane="interactive",
+                    matter_id=matter.matter_id,
+                    run_id="judge-profile",
+                    kind="judge_profile",
+                    now=datetime.now(UTC),
+                    item_id=item_id,
+                )
+            )
+            typer.echo(f"queued {item_id}")
+            return
+        result = build_assigned_judge_profile(vault_path, matter, _now())
+    except (MootloopError, VaultBoundaryError) as exc:
+        raise _fail(exc) from exc
+    if result.profile is None:
+        typer.echo(f"research required: {result.warning}")
+        return
+    status = "calibrated" if result.profile.calibration.calibrated else "uncalibrated"
+    typer.echo(
+        f"built {result.profile.profile_id}: {status}; "
+        f"held-out error={result.profile.calibration.error_rate}"
+    )
 
 
 @decide_app.command("list")

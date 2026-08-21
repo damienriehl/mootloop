@@ -26,7 +26,12 @@ from pydantic import BaseModel
 from mootloop.errors import CloseError, LockHeldError, MatterNotFoundError
 from mootloop.models.attestations import Attestation, ExportSeal, ReviewIntegrityStatus
 from mootloop.models.audit import GENESIS_PREV_HASH, AccessAuditEntry
-from mootloop.models.citations import ResearchRequest, VerificationRecord
+from mootloop.models.citations import (
+    OpinionAuthorityStoreRecord,
+    PropositionVerificationRecord,
+    ResearchRequest,
+    VerificationRecord,
+)
 from mootloop.models.common import MatterId, VersionedModel
 from mootloop.models.config import DefaultRunConfig, FirmPreferences, ResolvedRunConfig
 from mootloop.models.context import (
@@ -38,6 +43,7 @@ from mootloop.models.conversion import ConversionReceipt
 from mootloop.models.corpus import Manifest
 from mootloop.models.decisions import Decision
 from mootloop.models.facts import Fact
+from mootloop.models.judge_profiles import JudgeProfile
 from mootloop.models.lifecycle import CloseRecord
 from mootloop.models.matter import MatterConfig
 from mootloop.models.matters import MatterSummary
@@ -122,6 +128,24 @@ MATTER_SCOPED_STORES: tuple[MatterScopedStore, ...] = (
         glob="law/verifications.jsonl",
         description="Citation-verification ledger.",
         model=VerificationRecord,
+    ),
+    MatterScopedStore(
+        name="citation-proposition-ledger",
+        glob="law/proposition-verifications.jsonl",
+        description="Exact-authority proposition-support ledger.",
+        model=PropositionVerificationRecord,
+    ),
+    MatterScopedStore(
+        name="courtlistener-opinion-authorities",
+        glob="law/authorities/*.json",
+        description="Content-addressed public opinion snapshots.",
+        model=OpinionAuthorityStoreRecord,
+    ),
+    MatterScopedStore(
+        name="assigned-judge-profiles",
+        glob="law/judge-profiles/*.json",
+        description="Bounded public-opinion judge profiles and calibration evidence.",
+        model=JudgeProfile,
     ),
     MatterScopedStore(
         name="curated-law",

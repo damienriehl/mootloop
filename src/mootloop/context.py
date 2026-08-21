@@ -193,23 +193,36 @@ def resolve_launch_config(
             hard_cap_usd=matter_config.budget.hard_cap_usd,
         ),
     )
+    matter_content: dict[str, object] = {}
+    if "panels" in matter_config.model_fields_set:
+        legacy_panels: dict[str, object] = {}
+        if "jury_enabled" in matter_config.panels.model_fields_set:
+            legacy_panels["jury"] = matter_config.panels.jury_enabled
+        if "jurors" in matter_config.panels.model_fields_set:
+            legacy_panels["jurors"] = matter_config.panels.jurors
+        if legacy_panels:
+            matter_content["panels"] = legacy_panels
+    if matter_config.run_config is not None:
+        authored = matter_config.run_config.model_dump(exclude_unset=True)
+        authored_panels = authored.pop("panels", None)
+        matter_content.update(authored)
+        if authored_panels is not None:
+            current_panels = matter_content.get("panels")
+            combined_panels: dict[str, object] = (
+                dict(current_panels) if isinstance(current_panels, dict) else {}
+            )
+            combined_panels.update(authored_panels)
+            matter_content["panels"] = combined_panels
     matter_overlay = (
-        ConfigLayerInput.from_mapping(
-            "matter.yaml#run_config",
-            matter_config.run_config.model_dump(exclude_unset=True),
-        )
-        if matter_config.run_config is not None
+        ConfigLayerInput.from_mapping("matter.yaml#run_config", matter_content)
+        if matter_content
         else None
     )
     matter_provenance = ConfigLayerInput.from_mapping(
         "matter.yaml#runtime",
         {
             "legacy_fallback": legacy_fallback.model_dump(exclude_unset=True),
-            "run_config": (
-                matter_config.run_config.model_dump(exclude_unset=True)
-                if matter_config.run_config is not None
-                else {}
-            ),
+            "run_config": matter_content,
         },
     )
     invocation: dict[str, object] = {}

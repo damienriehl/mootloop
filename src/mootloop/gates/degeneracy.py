@@ -13,7 +13,14 @@ from __future__ import annotations
 
 from mootloop.gates import HEDGE_DESCRIPTION, has_hedge
 from mootloop.models.gates import GateFail, GateFinding, GatePass, GateResult
-from mootloop.models.run import CritiqueOutput, DraftOutput, JudgeOutput, RubricScoreOutput
+from mootloop.models.run import (
+    CiteCheckOutput,
+    CritiqueOutput,
+    DraftOutput,
+    JudgeOutput,
+    JurorOutput,
+    RubricScoreOutput,
+)
 
 GATE_NAME = "degeneracy"
 
@@ -66,7 +73,14 @@ def _check_draft(draft: DraftOutput) -> list[GateFinding]:
 
 
 def evaluate(
-    output: DraftOutput | CritiqueOutput | JudgeOutput | RubricScoreOutput,
+    output: (
+        DraftOutput
+        | CritiqueOutput
+        | JudgeOutput
+        | JurorOutput
+        | RubricScoreOutput
+        | CiteCheckOutput
+    ),
 ) -> GateResult:
     """Evaluate the degeneracy gate against a validated turn output."""
     if isinstance(output, DraftOutput):

@@ -12,8 +12,10 @@ from mootloop.context_sources import (
 from mootloop.engine.outbox import drain_run_outbox
 from mootloop.engine.queue import Queue
 from mootloop.errors import MatterNotFoundError, VaultBoundaryError
+from mootloop.judge_profiles import JudgeProfileStore, profile_context_contribution
 from mootloop.models.common import MatterId
 from mootloop.models.events import QueueIntent, RunMode
+from mootloop.models.matter import MatterConfig
 from mootloop.registry import MatterRegistry
 from mootloop.vault import load_matter
 
@@ -42,6 +44,19 @@ def _commit_launch(
         if queue is not None
         else None
     )
+    matter = load_matter(vault_root)
+    contributions = list(ContextContributionStore(vault_root).list_all())
+    judge_profile = JudgeProfileStore(vault_root).latest_or_none()
+    if (
+        judge_profile is not None
+        and judge_profile.calibration.calibrated
+        and judge_profile.judge_name == matter.caption.judge_name
+        and judge_profile.court_name == matter.caption.court_name
+        and judge_profile.jurisdiction_state == matter.jurisdiction.state
+    ):
+        contributions.append(
+            profile_context_contribution(judge_profile, MatterId(matter.matter_id))
+        )
     started_id = orchestrator.start_run(
         vault_root,
         task,
@@ -51,7 +66,7 @@ def _commit_launch(
         task_spec_id=task_spec_id,
         idempotent=idempotent,
         firm_preferences_path=configured_firm_preferences_path(),
-        context_contributions=ContextContributionStore(vault_root).list_all(),
+        context_contributions=tuple(contributions),
         queue_intent=intent,
     )
     if queue is not None:
@@ -108,6 +123,26 @@ def launch_run_from_path(
     registry: MatterRegistry | None = None,
 ) -> str:
     """Classify a CLI vault as local or hosted, failing closed on registry poison."""
+    matter, queue = classify_vault_for_queue(vault_root, registry=registry)
+    return _commit_launch(
+        vault_root,
+        task,
+        launched_at,
+        run_id=run_id,
+        mode=mode,
+        task_spec_id=task_spec_id,
+        idempotent=idempotent,
+        queue=queue,
+        matter_id=MatterId(matter.matter_id) if queue is not None else None,
+    )
+
+
+def classify_vault_for_queue(
+    vault_root: Path | str,
+    *,
+    registry: MatterRegistry | None = None,
+) -> tuple[MatterConfig, Queue | None]:
+    """Classify one physical vault as hosted or local without trusting matter.yaml alone."""
     registry = registry or MatterRegistry()
     matter = load_matter(vault_root)
     vault_real = Path(vault_root).resolve()
@@ -134,14 +169,4 @@ def launch_run_from_path(
         raise VaultBoundaryError(
             f"vault {vault_real} does not match registered matter path {registered.resolve()}"
         )
-    return _commit_launch(
-        vault_root,
-        task,
-        launched_at,
-        run_id=run_id,
-        mode=mode,
-        task_spec_id=task_spec_id,
-        idempotent=idempotent,
-        queue=queue,
-        matter_id=MatterId(matter.matter_id) if queue is not None else None,
-    )
+    return matter, queue

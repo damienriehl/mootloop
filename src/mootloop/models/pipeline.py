@@ -21,6 +21,10 @@ SELECTABLE_PIPELINE_PERSONAS: tuple[PersonaName, ...] = (
     PersonaName.JUDGE,
     PersonaName.RUBRIC_JUDGE,
 )
+AUTHORED_AUXILIARY_PERSONAS: tuple[PersonaName, ...] = (
+    PersonaName.JUROR,
+    PersonaName.CITE_CHECKER,
+)
 PIPELINE_STAGE_NAMES = frozenset(
     {
         "associate_draft",
@@ -29,6 +33,7 @@ PIPELINE_STAGE_NAMES = frozenset(
         "bolster",
         "judge_panel",
         "restructure",
+        "jury_panel",
         "rubric_gate",
         "assemble",
     }
@@ -59,6 +64,11 @@ def pipeline_turn_ceiling(config: TaskAdapterConfig, *, rubric_enabled: bool) ->
         + (config.loop_caps.bolster if "bolster" in stages else 0)
         + (config.panels.judges if "judge_panel" in stages else 0)
         + (config.loop_caps.restructure if "restructure" in stages else 0)
+        + (
+            config.panels.jurors
+            if "jury_panel" in stages and config.panels.jury
+            else 0
+        )
         + (config.panels.rubric_judges if "rubric_gate" in stages else 0)
     )
 

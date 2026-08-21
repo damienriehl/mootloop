@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 
 from mootloop.models.matter import Personas
+from mootloop.models.pipeline import AUTHORED_AUXILIARY_PERSONAS
 from mootloop.models.run import PersonaName
 from mootloop.pipeline import ACTIVE_PIPELINE_PERSONAS
 from mootloop.resources import PERSONAS_DIR
@@ -17,7 +18,10 @@ def test_every_selectable_pipeline_persona_has_exactly_one_body() -> None:
         path.stem.replace("-", "_")
         for path in Path(PERSONAS_DIR).glob("*.md")
         if not path.name.startswith("_")
-    } == {persona.value for persona in ACTIVE_PIPELINE_PERSONAS}
+    } == {
+        persona.value
+        for persona in (*ACTIVE_PIPELINE_PERSONAS, *AUTHORED_AUXILIARY_PERSONAS)
+    }
 
 
 def test_persona_bodies_do_not_embed_discovery_task_prose() -> None:

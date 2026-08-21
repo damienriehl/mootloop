@@ -15,10 +15,14 @@ import pytest
 from fastapi.testclient import TestClient
 
 from mootloop import orchestrator
+from mootloop.discovery_parser import save_requests
 from mootloop.engine.queue import Queue
 from mootloop.errors import AccessAuthError, LockHeldError
+from mootloop.llm import FakeLLMProvider
 from mootloop.models.attestations import Attestation
+from mootloop.models.common import DocId
 from mootloop.models.matter import MatterConfig
+from mootloop.models.requests import RequestItem, RequestSet, RequestType
 from mootloop.registry import MatterRegistry
 from mootloop.web import audit
 from mootloop.web.api import create_matter_api, routes
@@ -65,6 +69,26 @@ def _with_csrf(client: TestClient) -> dict[str, str]:
     issued = client.get("/api/csrf", headers=_AUTH)
     assert issued.status_code == 200
     return {**_AUTH, "x-csrf-token": issued.json()["csrf_token"]}
+
+
+def _seed_request(vault: Path) -> None:
+    save_requests(
+        vault,
+        RequestSet(
+            request_type=RequestType.INTERROGATORY,
+            set_number=1,
+            title="Interrogatories",
+            items=[
+                RequestItem(
+                    request_id="ROG-1",  # type: ignore[arg-type]
+                    set_number=1,
+                    number=1,
+                    text="Identify each witness.",
+                    source_doc=DocId("doc-api-citation-race"),
+                )
+            ],
+        ),
+    )
 
 
 def test_matters_requires_valid_access(client: TestClient) -> None:
@@ -222,6 +246,85 @@ def test_start_run_enqueues_run_lane_work_item(
     assert retry.status_code == 200
     assert retry.json()["run_id"] == run_id
     assert len(queue.snapshot()) == 1
+
+
+def test_citation_check_endpoint_enqueues_interactive_durable_job(
+    client: TestClient,
+    queue: Queue,
+    registry: MatterRegistry,
+    matter: MatterConfig,
+) -> None:
+    vault = registry.resolve(matter.matter_id)
+    _seed_request(vault)
+    run_id = orchestrator.start_run(
+        vault, "discovery-responses", _NOW_ISO, run_id="api-citation-check"
+    )
+    orchestrator.run_with_provider(vault, run_id, FakeLLMProvider(), _NOW_ISO)
+
+    response = client.post(
+        f"/api/matters/{matter.matter_id}/runs/{run_id}/citations/check",
+        headers=_with_csrf(client),
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "schema_version": "1.0",
+        "kind": "citation_check_queued",
+        "run_id": run_id,
+        "item_id": f"cite:{matter.matter_id}:{run_id}",
+        "status": "queued",
+    }
+    [item] = queue.snapshot()
+    assert item.lane == "interactive"
+    assert item.kind == "citation_propositions"
+    assert item.matter_id == matter.matter_id
+    assert item.run_id == run_id
+
+
+def test_citation_check_endpoint_rejects_draft_race(
+    client: TestClient,
+    queue: Queue,
+    registry: MatterRegistry,
+    matter: MatterConfig,
+) -> None:
+    vault = registry.resolve(matter.matter_id)
+    _seed_request(vault)
+    run_id = orchestrator.start_run(
+        vault, "discovery-responses", _NOW_ISO, run_id="api-citation-race"
+    )
+
+    response = client.post(
+        f"/api/matters/{matter.matter_id}/runs/{run_id}/citations/check",
+        headers=_with_csrf(client),
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"] == "citation"
+    assert "completed draft set" in response.json()["detail"]
+    assert queue.snapshot() == []
+
+
+def test_judge_profile_endpoint_enqueues_interactive_durable_job(
+    client: TestClient,
+    queue: Queue,
+    matter: MatterConfig,
+) -> None:
+    response = client.post(
+        f"/api/matters/{matter.matter_id}/judge-profile",
+        headers=_with_csrf(client),
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "schema_version": "1.0",
+        "kind": "judge_profile_queued",
+        "item_id": f"judge-profile:{matter.matter_id}",
+        "status": "queued",
+    }
+    [item] = queue.snapshot()
+    assert item.lane == "interactive"
+    assert item.kind == "judge_profile"
+    assert item.run_id == "judge-profile"
 
 
 def test_runs_unknown_matter_returns_404(client: TestClient) -> None:

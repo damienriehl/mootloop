@@ -17,14 +17,15 @@ from __future__ import annotations
 from pathlib import Path
 
 from mootloop.models.common import RequestId
-from mootloop.models.panels import PanelReport, PanelResult
-from mootloop.models.run import JudgeOutput, Objection, ObjectionRuling
+from mootloop.models.panels import JurySignal, PanelReport, PanelResult
+from mootloop.models.run import JudgeOutput, JurorOutput, Objection, ObjectionRuling
 from mootloop.vault import atomic_write_text, safe_vault_path
 
 PANEL_REPORT_PATH = ("scores", "panels", "report.json")
 DEFAULT_RESTRUCTURE_THRESHOLD = 0.5
 
 _MAX_REASONING_SAMPLES = 3
+_MAX_JURY_SAMPLES = 5
 
 
 def _align_rulings(
@@ -105,6 +106,40 @@ def fold_objection_results(
     return results
 
 
+def fold_jury_signal(
+    run_id: str,
+    request_id: str,
+    juror_outputs: list[JurorOutput],
+) -> JurySignal:
+    """Fold lay-reader outputs into an explicitly non-predictive directional signal."""
+    if not juror_outputs:
+        raise ValueError("at least one juror output is required")
+    count = len(juror_outputs)
+    confusion = [
+        point.strip()
+        for output in juror_outputs
+        for point in output.confusion_points
+        if point.strip()
+    ][:_MAX_JURY_SAMPLES]
+    credibility = [
+        concern.strip()
+        for output in juror_outputs
+        for concern in output.credibility_concerns
+        if concern.strip()
+    ][:_MAX_JURY_SAMPLES]
+    return JurySignal(
+        run_id=run_id,
+        request_id=RequestId(request_id),
+        total_readers=count,
+        mean_comprehension=sum(output.comprehension_score for output in juror_outputs)
+        / count,
+        mean_persuasion=sum(output.persuasion_score for output in juror_outputs) / count,
+        confusion_samples=confusion,
+        credibility_samples=credibility,
+        directional_only=True,
+    )
+
+
 def build_panel_report(vault_root: Path | str, run_id: str) -> PanelReport:
     """Fold every request's judge panel into a `PanelReport`, persist it, and return it.
 
@@ -122,6 +157,7 @@ def build_panel_report(vault_root: Path | str, run_id: str) -> PanelReport:
     facts = run_context.facts
 
     results: list[PanelResult] = []
+    jury_signals: list[JurySignal] = []
     for i in range(len(units)):
         ctx = orchestrator._context_for(
             run_id,
@@ -141,15 +177,24 @@ def build_panel_report(vault_root: Path | str, run_id: str) -> PanelReport:
             seq = ctx.layout.judge_slot(j)
             if ctx.done(seq):
                 judge_outputs.append(JudgeOutput.model_validate(ctx.record(seq).output))
-        if not judge_outputs:
-            continue
-        results.extend(
-            fold_objection_results(
-                run_id, str(units[i].request_id), draft.objections, judge_outputs
+        if judge_outputs:
+            results.extend(
+                fold_objection_results(
+                    run_id, str(units[i].request_id), draft.objections, judge_outputs
+                )
             )
-        )
+        if ctx.config.panels.jury:
+            juror_outputs: list[JurorOutput] = []
+            for j in range(1, ctx.config.panels.jurors + 1):
+                seq = ctx.layout.jury_slot(j)
+                if ctx.done(seq):
+                    juror_outputs.append(JurorOutput.model_validate(ctx.record(seq).output))
+            if juror_outputs:
+                jury_signals.append(
+                    fold_jury_signal(run_id, str(units[i].request_id), juror_outputs)
+                )
 
-    report = PanelReport(run_id=run_id, results=results)
+    report = PanelReport(run_id=run_id, results=results, jury_signals=jury_signals)
     path = safe_vault_path(vault_root, "runs", run_id, *PANEL_REPORT_PATH)
     atomic_write_text(path, report.model_dump_json(indent=2) + "\n")
     return report

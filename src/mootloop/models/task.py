@@ -12,7 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
-from pydantic import Field, ValidationError, field_validator
+from pydantic import Field, ValidationError, field_validator, model_validator
 
 from mootloop.errors import TaskConfigError
 from mootloop.models.common import RubricId, StrictModel, VersionedModel
@@ -41,9 +41,16 @@ class PanelConfig(StrictModel):
 
     judges: int = Field(default=3, ge=1)
     jury: bool = False
+    jurors: int = Field(default=0, ge=0)
     # Decorrelated rubric-scoring panel at the final gate (plan D6 — stays at N≈3
     # regardless of tier; reliability plateaus for correlated judges).
     rubric_judges: int = Field(default=3, ge=1)
+
+    @model_validator(mode="after")
+    def validate_jury_size(self) -> PanelConfig:
+        if self.jury and self.jurors < 1:
+            raise ValueError("jurors must be at least 1 when jury is enabled")
+        return self
 
 
 class ConvergenceConfig(StrictModel):

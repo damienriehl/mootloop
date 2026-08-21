@@ -6,8 +6,10 @@
 import type { ApiClient } from "./client";
 import { getClient } from "./client";
 import type {
+  CitationCheckQueuedResponse,
   GateLedgerResponse,
   RaiseCapRequest,
+  JudgeProfileQueuedResponse,
   ReopenRunRequest,
   RequestsResponse,
   RunActionResponse,
@@ -131,6 +133,28 @@ export async function reopenRun(
     await client.POST("/api/matters/{matter_id}/runs/{run_id}/reopen", {
       params: { path: { matter_id: matterId, run_id: runId } },
       body,
+    }),
+  );
+}
+
+export async function queueCitationChecks(
+  { matterId, runId }: Ids,
+  client: ApiClient = getClient(),
+): Promise<CitationCheckQueuedResponse> {
+  return unwrap(
+    await client.POST("/api/matters/{matter_id}/runs/{run_id}/citations/check", {
+      params: { path: { matter_id: matterId, run_id: runId } },
+    }),
+  );
+}
+
+export async function queueJudgeProfile(
+  matterId: string,
+  client: ApiClient = getClient(),
+): Promise<JudgeProfileQueuedResponse> {
+  return unwrap(
+    await client.POST("/api/matters/{matter_id}/judge-profile", {
+      params: { path: { matter_id: matterId } },
     }),
   );
 }
