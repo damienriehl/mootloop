@@ -26,9 +26,9 @@ short label is less detailed.
 |---|---|---|
 | D1-01 | Core orchestration behind `TurnExecutor`/`LLMProvider`; fake provider tests | COMPLETE |
 | D1-02 | YAML-plus-strategy TaskAdapter; new task avoids core changes | PARTIAL — immutable binding complete; synthesis U-12 |
-| D1-03 | Uniform Gate protocol with scope, dependencies, and one gate ledger | PARTIAL — U-05 |
-| D1-04 | Agent/persona/task-binding layering contract | PARTIAL — U-05/U-06 |
-| D1-05 | Local protocol seams and pinned provenance for copied components | PARTIAL — U-05 |
+| D1-03 | Uniform Gate protocol with scope, dependencies, and one gate ledger | COMPLETE |
+| D1-04 | Agent/persona/task-binding layering contract | PARTIAL — gate/task layering complete; persona strategy U-06 |
+| D1-05 | Local protocol seams and pinned provenance for copied components | COMPLETE |
 | D1-06 | Drafting-specific convergence signals and real rubric deltas | COMPLETE |
 | D2-01 | Namespaced `mootloop` Claude Code plugin and verbs | OPEN-AUTO — U-11A |
 | D2-02 | Disable model invocation for every side-effecting skill | OPEN-AUTO — U-11A |
@@ -91,13 +91,13 @@ short label is less detailed.
 | D10-01 | Domain models own types; versions, migrations, strict extras | COMPLETE for current persisted models |
 | D10-02 | Discriminated GateResult union and exhaustive export handling | COMPLETE |
 | D10-03 | LLM provider/fake-provider protocol | COMPLETE |
-| D10-04 | Frozen StageContext and write-once StageResult | PARTIAL — U-05 |
+| D10-04 | Frozen StageContext and write-once StageResult | COMPLETE |
 | D10-05 | Sync core; async only at HTTP/fan-out edges | COMPLETE |
 | D10-06 | Pure journal fold | COMPLETE |
 | D10-07 | One five-layer frozen resolved configuration | COMPLETE |
-| D10-08 | Inject copied-component score sources; no hardcoded deltas | PARTIAL — U-05 |
+| D10-08 | Inject copied-component score sources; no hardcoded deltas | COMPLETE |
 | D10-09 | Deterministic/replayed/invariant/paid-oracle test tiers | PARTIAL — U-10 |
-| D10-10 | Thin Typer adapters and CLI package split as verbs grow | PARTIAL — U-05 |
+| D10-10 | Thin Typer adapters and CLI package split as verbs grow | COMPLETE |
 | D10-11 | Six-concern learning package across three trust zones | OPEN-AUTO — U-09 |
 | D10-12 | `MatterText`/`PublicText` types and scrub producer | PARTIAL — U-02/U-09 |
 | D11-01 | Every action/human gate has structured read/write primitive | PARTIAL — U-11A/U-11B |
@@ -108,9 +108,9 @@ short label is less detailed.
 | D11-06 | JSON sidecars beside human turn/score artifacts | OPEN-AUTO — U-11A |
 | D11-07 | Emergent in-domain task proof and structured derailment completion signal | PARTIAL — U-10/U-12 |
 | D12-01 | Canonical source/derived-artifact vocabulary, trace tree, evidence-pack IDs | PARTIAL — U-11A |
-| D12-02 | Canonical IDs including response/passages/facts/citations/decisions/learnings | PARTIAL — manifest/run IDs complete; U-05/U-09 |
+| D12-02 | Canonical IDs including response/passages/facts/citations/decisions/learnings | PARTIAL — current run/gate IDs complete; learning IDs U-09 |
 | D12-03 | Five-layer config precedence and structural override allowlist | COMPLETE |
-| D12-04 | Gate execution-order column and canonical gate names | OPEN-AUTO — U-05 |
+| D12-04 | Gate execution-order column and canonical gate names | COMPLETE |
 | D13-01 | Pre-first-serve professional-responsibility spine | PARTIAL — immutable context complete; U-02–U-04B/U-11A/U-17 |
 | D13-02 | Post-serve learning, breadth, strategy, oracle, and CLI work retained | OPEN/DEFERRED — U-06/U-09/U-10/U-11B and successor queue |
 | D13-03 | Google/annotated and other explicitly delayed lanes remain visible | DECISION/DEFERRED — D-06/U-03/U-09/successor queue |
