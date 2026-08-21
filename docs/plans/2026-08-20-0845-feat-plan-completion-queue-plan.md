@@ -307,7 +307,9 @@ flowchart TD
   and deterministic interviews surface review, support, repair, and uncovered-document
   gaps. Empty or wholly unreviewed ingests fail before run creation. Legacy manifests
   also retain a conservative remedy for every non-runnable terminal state.
-- **U-04B and U-05 through U-17C remain queued** under their stated dependencies and
+- **U-04B is COMPLETE locally for the converter code and synthetic tests, with its
+  deployed/protected evidence tail still gated by U-17A and fresh D-03 authorization.**
+  **U-05 through U-17C remain queued** under their stated dependencies and
   decision gates. **U-18 is COMPLETE for U-01, U-02, U-03, and U-04A:**
   PR #33 merged as `74dec0a` after backend, invariant, and frontend CI passed on code
   head `acc1e51`; PR #35 merged as `b2ff6c7` after all six push/PR jobs passed on code

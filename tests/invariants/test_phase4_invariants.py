@@ -27,16 +27,27 @@ NOW = "2026-07-11T00:00:00+00:00"
 _SECRET_RE = re.compile(r"(?i)\b(Token|Bearer)\s+\S+|\bsk-[A-Za-z0-9_\-]{8,}")
 
 
-def test_only_http_module_imports_httpx() -> None:
-    """Egress is contained to citations/http.py (plan H9): nothing else imports httpx."""
+def test_only_sanctioned_http_modules_import_httpx() -> None:
+    """HTTP is contained to the citation client and fixed no-egress conversion client."""
+    allowed = {
+        "src/mootloop/citations/http.py",
+        "src/mootloop/conversion_client.py",
+    }
     offenders: list[str] = []
     for path in SRC.rglob("*.py"):
-        if path.name == "http.py" and path.parent.name == "citations":
+        relative = str(path.relative_to(REPO_ROOT))
+        if relative in allowed:
             continue
         text = path.read_text(encoding="utf-8")
         if re.search(r"^\s*(import httpx|from httpx\b)", text, re.MULTILINE):
             offenders.append(str(path.relative_to(REPO_ROOT)))
-    assert offenders == [], f"only citations/http.py may import httpx; offenders: {offenders}"
+    assert offenders == [], f"only sanctioned HTTP clients may import httpx: {offenders}"
+
+    conversion = (SRC / "conversion_client.py").read_text(encoding="utf-8")
+    assert '"http://folio-enrich:8731"' in conversion
+    assert '"http://127.0.0.1:8731"' in conversion
+    assert "trust_env=False" in conversion
+    assert "follow_redirects=False" in conversion
 
 
 def test_citator_disclosure_names_a_citator() -> None:

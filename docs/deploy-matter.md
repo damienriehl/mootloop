@@ -22,9 +22,12 @@ The core has two services, plus one isolated worker project per active matter
 - `egress-proxy` — one per worker project. The driver can reach only this internal
   proxy; authenticated Squid ACLs allow model traffic to `api.anthropic.com:443` and
   deny every other destination.
+- `folio-enrich` — one per worker project. It extracts text on a separate private
+  `driver-conversion` network, has no outbound network or vault mount, and is selected
+  only by an exact image digest plus reviewed source commit.
 
-Only `web` crosses the public boundary. `api`, `driver`, and `egress-proxy` are never
-published and never get an fqdn.
+Only `web` crosses the public boundary. `api`, `driver`, `egress-proxy`, and
+`folio-enrich` are never published and never get an fqdn.
 
 The isolation rationale and hostile-spike record are in
 `docs/decisions/2026-08-21-hosted-matter-isolation-adr.md`.
@@ -35,6 +38,9 @@ The isolation rationale and hostile-spike record are in
 - `api` — `Dockerfile.matter-api` (FastAPI, `--factory mootloop.web.api:create_matter_api`, pandoc, non-root UID/GID 3200, no vault baked).
 - `driver` / `egress-proxy` — `Dockerfile.driver` (base deps + Node 22 + pinned
   `@anthropic-ai/claude-code`, Squid, pandoc, non-root UID/GID 3200).
+- `folio-enrich` — external image pinned by its exact OCI SHA-256 digest. The host
+  launcher accepts only the reviewed source commit documented in
+  `docs/protected-conversion.md`; verify source-to-image provenance before deployment.
 
 The non-root driver applies an unprivileged Landlock ruleset before every model process.
 It requires no setuid helper, added capability, unconfined seccomp profile, or Docker
@@ -127,6 +133,8 @@ uv run mootloop driver start-matter-worker 2025-10-16-riehl-fence \
   --matters-root /srv/mootloop-matters \
   --engine-config-root /srv/mootloop-engine-config \
   --proxy-password-file /home/mootloop/.mootloop/egress-proxy-password \
+  --folio-enrich-image ghcr.io/alea-institute/folio-enrich@sha256:<64-hex-digest> \
+  --folio-enrich-commit f5364365346d93a3aa01fd5fecf219090afe5410 \
   --compose-file docker-compose.matter.yaml
 ```
 
@@ -135,7 +143,8 @@ the path-containment choke point. Creation must fail if the vault, compose file,
 matching proxy secret, or private engine-state root is absent. Verify the driver has
 only five mounts: its one vault, its private persistent engine-state directory,
 `.queue`, the read-only global canary registry, and the read-only secrets directory;
-verify its only network is `driver-egress`. The provider's Landlock allowlist exposes
+verify its only outbound-capable route is `driver-egress`; `driver-conversion` reaches
+only the no-egress converter. The provider's Landlock allowlist exposes
 only immutable runtime files and the per-run Claude config tree; the matter vault,
 `.queue`, global canary registry, and complete secrets directory are inaccessible to
 the persona subprocess. Normal turns receive all matter context through fenced prompt
@@ -144,9 +153,11 @@ stores Claude state below `/srv/mootloop-engine-config/<matter-id>` so `--resume
 survives container replacement. Treat that state as credential-bearing: mode `0700`,
 never back it up, and delete it only when the matter's resumable runs are retired.
 
-The driver waits for Squid's healthcheck before starting. Squid receives only the
-dedicated Compose secret and joins the outbound network; the driver remains on the
-internal `driver-egress` network.
+The driver waits for both Squid and folio-enrich healthchecks before starting. Squid
+receives only the dedicated Compose secret and joins the outbound network. The driver
+joins the internal `driver-egress` and `driver-conversion` networks; folio-enrich joins
+only `driver-conversion`. See `docs/protected-conversion.md` for conversion evidence and
+the real-folder authorization gate.
 
 To drain, send a normal compose stop and allow the configured 630 seconds. SIGTERM is
 observed at the next durable turn boundary; the worker releases its claim for recovery.

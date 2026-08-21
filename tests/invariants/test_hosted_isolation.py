@@ -14,6 +14,7 @@ def test_driver_mounts_one_matter_and_reaches_network_only_through_proxy() -> No
     services = compose["services"]
     driver = services["driver"]
     proxy = services["egress-proxy"]
+    converter = services["folio-enrich"]
 
     string_mounts = [mount for mount in driver["volumes"] if isinstance(mount, str)]
     bind_mounts = [mount for mount in driver["volumes"] if isinstance(mount, dict)]
@@ -41,12 +42,30 @@ def test_driver_mounts_one_matter_and_reaches_network_only_through_proxy() -> No
     assert driver["environment"]["MOOTLOOP_ENGINE_CONFIG_DIR"] == (
         "/var/lib/mootloop-engine-config"
     )
-    assert driver["networks"] == ["driver-egress"]
+    assert driver["networks"] == ["driver-egress", "driver-conversion"]
     assert set(proxy["networks"]) == {"driver-egress", "proxy-outbound"}
     assert driver["depends_on"]["egress-proxy"]["condition"] == "service_healthy"
+    assert driver["depends_on"]["folio-enrich"]["condition"] == "service_healthy"
     assert proxy["secrets"] == ["egress_proxy_password"]
     assert "volumes" not in proxy
     assert compose["networks"]["driver-egress"]["internal"] is True
+    assert compose["networks"]["driver-conversion"]["internal"] is True
+    assert converter["networks"] == ["driver-conversion"]
+    assert converter["read_only"] is True
+    assert converter["cap_drop"] == ["ALL"]
+    assert converter["security_opt"] == ["no-new-privileges:true"]
+    assert "ports" not in converter and "volumes" not in converter
+    assert "proxy-outbound" not in converter["networks"]
+    assert converter["image"].startswith("${MOOTLOOP_FOLIO_ENRICH_IMAGE:?")
+    converter_env = converter["environment"]
+    assert converter_env["FOLIO_ENRICH_EMBEDDING_DISABLED"] == "true"
+    assert converter_env["FOLIO_ENRICH_FOLIO_AUTO_UPDATE"] == "false"
+    assert converter_env["FOLIO_ENRICH_OLLAMA_AUTO_MANAGE"] == "false"
+    assert not any(
+        marker in key
+        for key in converter_env
+        for marker in ("API_KEY", "TOKEN", "PASSWORD", "SECRET")
+    )
     dockerfile = (ROOT / "Dockerfile.driver").read_text(encoding="utf-8")
     assert "USER mootloop" in dockerfile
     assert "bubblewrap" not in dockerfile
