@@ -41,6 +41,10 @@ class TaskConfigError(MootloopError):
     """A task-adapter config failed to load or validate. Message names each bad field."""
 
 
+class GateConfigurationError(TaskConfigError):
+    """A gate catalog or selected dependency graph is invalid."""
+
+
 class ConfigResolutionError(MootloopError):
     """A run-configuration source or structural override failed closed."""
 

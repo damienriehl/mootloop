@@ -161,6 +161,8 @@ OUTPUT_SCHEMAS: dict[str, type[StrictModel]] = {
     SCHEMA_RUBRIC: RubricScoreOutput,
 }
 
+TurnOutput = DraftOutput | CritiqueOutput | JudgeOutput | RubricScoreOutput
+
 
 class TurnRecord(StrictModel):
     """A completed turn: its spec, the validated output (as a dict), the gate

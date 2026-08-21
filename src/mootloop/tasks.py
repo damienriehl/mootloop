@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from mootloop.errors import TaskConfigError
+from mootloop.gates.runtime import DEFAULT_GATE_CATALOG
 from mootloop.models.rubric import Rubric, load_rubric
 from mootloop.models.task import TaskAdapterConfig, load_task_config
 from mootloop.resources import rubric_path, task_config_path
@@ -84,5 +85,6 @@ def get_binding(task: str) -> TaskBinding:
         known = ", ".join(sorted(_REGISTRY)) or "(none)"
         raise TaskConfigError(f"unknown task {task!r}; registered tasks: {known}")
     config = load_task_config(task_config_path(task))
+    DEFAULT_GATE_CATALOG.order(config.gates)
     rubric = load_rubric(rubric_path(config.rubric_id))
     return TaskBinding(config=config, adapter=factory(), rubric=rubric)
