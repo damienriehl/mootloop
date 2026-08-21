@@ -1303,6 +1303,8 @@ export interface components {
         };
         /** ProductionSuggestionsResponse */
         ProductionSuggestionsResponse: {
+            /** Eligible */
+            eligible: boolean;
             /** Exclusions */
             exclusions?: components["schemas"]["ProductionSuggestionExclusion"][];
             /**

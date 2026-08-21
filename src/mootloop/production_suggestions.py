@@ -62,6 +62,18 @@ def _suggestion_id(
     return ProductionSuggestionId(f"prod-suggestion-{digest}")
 
 
+def production_suggestions_eligible(vault_root: Path | str, run_id: str) -> bool:
+    """Return whether the immutable run snapshot contains at least one RFP."""
+    context = load_run_context(vault_root, run_id)
+    return any(str(unit.request_id).startswith("RFP-") for unit in context.units)
+
+
+def require_production_suggestions_eligible(vault_root: Path | str, run_id: str) -> None:
+    """Fail before queueing when a run has no RFP work to classify."""
+    if not production_suggestions_eligible(vault_root, run_id):
+        raise ProductionSuggestionError("run has no RFP requests")
+
+
 class ProductionSuggestionStore:
     """Write-once generated bundle plus append-only human review events."""
 

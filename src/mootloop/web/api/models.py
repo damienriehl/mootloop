@@ -185,6 +185,7 @@ class ProductionSuggestionsResponse(VersionedModel):
     schema_version: str = SCHEMA_VERSION
     kind: Literal["production_suggestions"] = "production_suggestions"
     run_id: str
+    eligible: bool
     suggestions: list[ProductionSuggestionView] = Field(default_factory=list)
     exclusions: list[ProductionSuggestionExclusion] = Field(default_factory=list)
 

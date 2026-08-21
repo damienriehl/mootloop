@@ -29,6 +29,7 @@ from mootloop.llm import FakeLLMProvider
 from mootloop.production_suggestions import (
     ProductionSuggestionStore,
     build_production_suggestions,
+    require_production_suggestions_eligible,
     review_production_suggestion,
 )
 from mootloop.registry import MatterRegistry
@@ -206,6 +207,7 @@ def production_generate(
     try:
         registry = MatterRegistry()
         matter, queue = classify_vault_for_queue(vault_path, registry=registry)
+        require_production_suggestions_eligible(vault_path, run_id)
         if queue is not None:
             item_id = f"production:{matter.matter_id}:{run_id}"
             queue.ensure_enqueued(

@@ -242,3 +242,32 @@ def test_cli_generate_list_and_review_use_the_shared_durable_service(tmp_path: P
     )
     assert reviewed.exit_code == 0, reviewed.output
     assert json.loads(reviewed.output)["review_status"] == "accepted"
+
+
+def test_cli_refuses_non_rfp_run_before_generation(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    init_vault(vault, make_matter(), registry_path=tmp_path / "canaries.json")
+    save_requests(
+        vault,
+        RequestSet(
+            request_type=RequestType.INTERROGATORY,
+            set_number=1,
+            title="Interrogatories",
+            items=[
+                RequestItem(
+                    request_id=RequestId("ROG-1"),
+                    set_number=1,
+                    number=1,
+                    text="Identify each witness.",
+                    source_doc=DocId("doc-servedrog00001"),
+                )
+            ],
+        ),
+    )
+    run_id = start_run(vault, "discovery-responses", NOW, run_id="no-production-review")
+
+    result = runner.invoke(app, ["production", "generate", str(vault), "--run", run_id])
+
+    assert result.exit_code == 1
+    assert "run has no RFP requests" in result.output
+    assert ProductionSuggestionStore(vault, run_id).load_bundle() is None

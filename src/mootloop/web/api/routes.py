@@ -23,7 +23,6 @@ from mootloop import decisions as decisions_svc
 from mootloop import orchestrator
 from mootloop import taskspec as taskspec_svc
 from mootloop.citations.check_runner import require_completed_draft_set
-from mootloop.context import load_run_context
 from mootloop.engine.launch import launch_run as launch_run_service
 from mootloop.engine.queue import Queue as WorkQueue
 from mootloop.engine.queue import WorkItem
@@ -35,6 +34,8 @@ from mootloop.models.common import MatterId
 from mootloop.models.matters import MatterSummary
 from mootloop.production_suggestions import (
     ProductionSuggestionStore,
+    production_suggestions_eligible,
+    require_production_suggestions_eligible,
     review_production_suggestion,
 )
 from mootloop.registry import MatterRegistry
@@ -411,7 +412,7 @@ def queue_production_suggestions(
 ) -> models.ProductionSuggestionsQueuedResponse:
     """Queue deterministic RFP classifications; this route never records production."""
     del principal
-    load_run_context(vault, run_id)
+    require_production_suggestions_eligible(vault, run_id)
     item_id = f"production:{matter_id}:{run_id}"
     queue.ensure_enqueued(
         WorkItem.create(
@@ -439,6 +440,7 @@ def list_production_suggestions(
     bundle = store.load_bundle()
     return models.ProductionSuggestionsResponse(
         run_id=run_id,
+        eligible=production_suggestions_eligible(vault, run_id),
         suggestions=store.list_all(),
         exclusions=bundle.exclusions if bundle else [],
     )

@@ -396,6 +396,29 @@ def test_production_suggestions_endpoint_enqueues_review_only_job(
     assert item.lane == "interactive"
 
 
+def test_production_suggestions_rejects_non_rfp_run_before_queueing(
+    client: TestClient,
+    queue: Queue,
+    registry: MatterRegistry,
+    matter: MatterConfig,
+) -> None:
+    vault = registry.resolve(matter.matter_id)
+    _seed_request(vault)
+    run_id = orchestrator.start_run(
+        vault, "discovery-responses", _NOW_ISO, run_id="api-no-production"
+    )
+    base = f"/api/matters/{matter.matter_id}/runs/{run_id}/production/suggestions"
+
+    listed = client.get(base, headers=_AUTH)
+    assert listed.status_code == 200
+    assert listed.json()["eligible"] is False
+
+    response = client.post(f"{base}/generate", headers=_with_csrf(client))
+    assert response.status_code == 400
+    assert response.json()["detail"] == "run has no RFP requests"
+    assert queue.snapshot() == []
+
+
 def test_production_suggestion_api_records_actor_and_separates_production_decision(
     client: TestClient,
     registry: MatterRegistry,
@@ -412,6 +435,7 @@ def test_production_suggestion_api_records_actor_and_separates_production_decisi
 
     listed = client.get(base, headers=_AUTH)
     assert listed.status_code == 200
+    assert listed.json()["eligible"] is True
     assert listed.json()["suggestions"][0]["review_status"] == "needs_review"
 
     accepted = client.post(

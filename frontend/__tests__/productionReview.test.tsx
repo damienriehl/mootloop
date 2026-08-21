@@ -30,6 +30,7 @@ const suggestion = {
 };
 
 const reviewBodies: unknown[] = [];
+let eligible = true;
 
 const server = setupServer(
   http.get(`${ORIGIN}/api/csrf`, () => HttpResponse.json({ csrf_token: "test-token" })),
@@ -38,7 +39,8 @@ const server = setupServer(
       schema_version: "1.0",
       kind: "production_suggestions",
       run_id: "r1",
-      suggestions: [suggestion],
+      eligible,
+      suggestions: eligible ? [suggestion] : [],
       exclusions: [],
     }),
   ),
@@ -70,6 +72,7 @@ afterEach(() => {
   server.resetHandlers();
   resetCsrfToken();
   reviewBodies.length = 0;
+  eligible = true;
 });
 afterAll(() => {
   server.close();
@@ -99,5 +102,13 @@ describe("RFP production review separates classification from disclosure authori
       action: "production_review",
       production_disposition: "produce",
     });
+  });
+
+  it("disables generation when the immutable run snapshot has no RFPs", async () => {
+    eligible = false;
+    renderWithClient(<ProductionReviewQueue matterId="m1" runId="r1" />);
+
+    expect(await screen.findByText(/this run has no requests for production/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Generate suggestions" })).toBeDisabled();
   });
 });

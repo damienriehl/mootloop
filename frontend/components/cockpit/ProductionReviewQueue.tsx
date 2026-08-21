@@ -87,7 +87,7 @@ export function ProductionReviewQueue({ matterId, runId }: { matterId: string; r
         </div>
         <button
           type="button"
-          disabled={generate.isPending}
+          disabled={generate.isPending || data?.eligible === false}
           onClick={() => generate.mutate()}
           className="border border-rule-strong bg-paper px-3 py-1.5 font-mono text-sm hover:border-accent hover:text-accent disabled:opacity-50"
         >
@@ -95,7 +95,12 @@ export function ProductionReviewQueue({ matterId, runId }: { matterId: string; r
         </button>
       </div>
 
-      {suggestions.length > 0 ? (
+      {data?.eligible === false ? (
+        <p className="mt-4 font-mono text-sm text-ink-faint">
+          This run has no requests for production, so there are no document suggestions to
+          generate.
+        </p>
+      ) : suggestions.length > 0 ? (
         <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(14rem,0.8fr)_minmax(0,1.4fr)]">
           <div className="grid content-start gap-1" aria-label="Production suggestions">
             {suggestions.map((item) => (

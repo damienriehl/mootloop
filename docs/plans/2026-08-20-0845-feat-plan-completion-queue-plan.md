@@ -336,8 +336,8 @@ flowchart TD
   No hosted matter or deployment was accessed during this execution.
 
 Verification at this checkpoint: backend ruff and strict mypy across 116 source files
-pass; 1,051 backend tests pass at 91% coverage; frontend ESLint, TypeScript, 10 Vitest
-files / 38 tests, OpenAPI generation/drift, and the production build pass. U-03's
+pass; 1,053 backend tests pass at 91% coverage; frontend ESLint, TypeScript, 10 Vitest
+files / 39 tests, OpenAPI generation/drift, and the production build pass. U-03's
 structured review covered correctness, security, adversarial behavior, tests,
 maintainability, reliability, project standards, API contracts, agent parity, and
 performance; all material findings were repaired before the full gates. U-01's structured
@@ -617,8 +617,8 @@ generated TypeScript, and a cockpit list/detail queue. The cockpit explicitly st
 that classification acceptance never authorizes production. Planted relevant,
 irrelevant, privileged, and untriaged fixtures, Access-derived actor provenance,
 idempotent retry, worker no-provider dispatch, OpenAPI drift, and the UI action split
-are regression-tested. Final local gates passed 1,051 backend tests at 91% coverage,
-strict mypy over 116 source files, frontend lint/typecheck, 10 files / 38 tests, and a
+are regression-tested. Final local gates passed 1,053 backend tests at 91% coverage,
+strict mypy over 116 source files, frontend lint/typecheck, 10 files / 39 tests, and a
 production build. No hosted matter, protected data, model call, or deployment was used.
 
 ### U-09 — Close the local edit-learning loop

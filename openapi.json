@@ -1348,6 +1348,10 @@
       "ProductionSuggestionsResponse": {
         "additionalProperties": false,
         "properties": {
+          "eligible": {
+            "title": "Eligible",
+            "type": "boolean"
+          },
           "exclusions": {
             "items": {
               "$ref": "#/components/schemas/ProductionSuggestionExclusion"
@@ -1379,7 +1383,8 @@
           }
         },
         "required": [
-          "run_id"
+          "run_id",
+          "eligible"
         ],
         "title": "ProductionSuggestionsResponse",
         "type": "object"
