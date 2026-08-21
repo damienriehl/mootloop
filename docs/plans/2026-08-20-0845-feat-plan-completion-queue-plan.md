@@ -298,11 +298,12 @@ flowchart TD
   seal, and D-09 still needs a concrete immutable remote signed-head provider before
   coordinated host-writer resistance can be claimed.
 - **U-04A/U-04B and U-05 through U-17C remain queued** under their stated dependencies
-  and decision gates. **U-18 is COMPLETE for U-01 and U-02:**
+  and decision gates. **U-18 is COMPLETE for U-01, U-02, and U-03:**
   PR #33 merged as `74dec0a` after backend, invariant, and frontend CI passed on code
   head `acc1e51`; PR #35 merged as `b2ff6c7` after all six push/PR jobs passed on code
-  head `96da3c6`. Every actionable review finding on both PRs was fixed, replied to, and
-  resolved. Deployment is still gated.
+  head `96da3c6`; PR #36 merged as `7e9f03e` after the final code head `4c5cd64`
+  passed every required check. Every actionable review finding on all three PRs was
+  fixed, regression-tested, replied to, and resolved. Deployment is still gated.
   No hosted matter or deployment was accessed during this execution.
 
 Verification at this checkpoint: backend ruff and strict mypy across 98 source files
