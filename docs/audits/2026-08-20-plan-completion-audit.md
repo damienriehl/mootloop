@@ -8,11 +8,14 @@ uncommitted code change: the only pre-existing dirty file was the timer-managed
 `.claude/RESUME.md`. Both recent feature PRs are merged, and the backend and frontend
 validation suites are green.
 
-Execution update through 2026-08-21: U-01 through U-06 are complete locally,
-remotely reviewed, and merged. U-07 is complete locally; its hosted public-legal-source
-operability tail is isolated behind D-18 because the deployed proxy still allows only
-the model endpoint. No hosted call or deployment change was attempted. U-08 is the next
-autonomous unit.
+Execution update through 2026-08-21: U-01 through U-07 are complete, remotely reviewed,
+and merged. U-08 implementation and local validation are complete on PR #47. Its
+review-only production classifications are durable across service, CLI, API, worker,
+and cockpit surfaces, while the attorney's production disposition remains a separate
+human action. U-07's hosted public-legal-source operability tail remains isolated behind
+D-18 because the deployed proxy still allows only the model endpoint. No hosted call,
+protected-data read, or deployment change was attempted. U-09 is the next autonomous
+unit.
 
 The broader repository audit nevertheless found genuine unfinished work in the two
 legacy plans still marked `active`. This document is the completion ledger for every
@@ -110,7 +113,7 @@ Source: `docs/plans/2026-07-11-001-feat-mootloop-v1-agentic-litigation-pipeline-
 | V1-8 | Edited DOCX/GDoc reimport, anchored diffs, reviewed tier routing, scrubbed learning promotion/readback | OPEN-AUTO, with external lane gated | No edit-learning service exists. Local DOCX/core lifecycle is U-09; Google access is D-06. |
 | V1-9a | Hidden answer-key persona regression oracle in CI | OPEN-AUTO | No answer-key oracle exists. U-10. |
 | V1-9b | Hand-draft benchmark, judged live run, first compounding-loop cycle | DECISION-GATED | Requires attorney benchmark verdict and private matter access. D-01 through D-03. |
-| V1-X1 | RFP responsive/non-responsive light-production suggestions | OPEN-AUTO | No suggestion artifact/service exists. U-08. |
+| V1-X1 | RFP responsive/non-responsive light-production suggestions | COMPLETE locally / PR #47 | U-08 adds ranked immutable-snapshot candidates with exact provenance, privilege/triage exclusions, append-only human review, and a separate explicit production disposition across service, CLI, API, worker, and cockpit surfaces. |
 | V1-X2 | `folio-enrich` localhost-only ingest lane, allowlist preflight, no matter web search | COMPLETE locally / DEPLOYMENT-GATED | U-04B binds extraction to the fixed local/private endpoint, a digest-pinned reviewed source, bounded fixed-schema I/O, and a converter container with no egress, mounts, or public port. Synthetic deployed proof remains U-17A; real-folder evidence remains behind fresh D-03 authorization. |
 | V1-X3 | Full CLI breadth and non-discovery adapters | DEFERRED | Explicit post-first-serve scope. CLI parity foundations are U-11A/U-11B; adapter breadth remains in the Deferred Follow-up Queue. |
 | V1-X4 | README, AGENTS, THIRD-PARTY, mypy, ruff, pytest/invariants | COMPLETE | Files are present and both current validation suites pass. |

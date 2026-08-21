@@ -318,8 +318,9 @@ flowchart TD
   accepting substantive drift. Copied convergence mechanics have injected score and
   decision seams plus an exact upstream provenance pin. The Typer surface is split
   into focused modules with exact command/help parity across all 63 command paths.
-  **U-08 through U-17C remain queued** under their stated dependencies and
-  decision gates. **U-18 is COMPLETE for U-01, U-02, U-03, U-04A, U-04B, U-05, and U-06:**
+  **U-09 through U-17C remain queued** under their stated dependencies and
+  decision gates. **U-18 is COMPLETE for U-01 through U-07; U-08 implementation
+  and local validation are complete on PR #47:**
   PR #33 merged as `74dec0a` after backend, invariant, and frontend CI passed on code
   head `acc1e51`; PR #35 merged as `b2ff6c7` after all six push/PR jobs passed on code
   head `96da3c6`; PR #36 merged as `7e9f03e` after the final code head `4c5cd64`
@@ -327,14 +328,16 @@ flowchart TD
   jobs passed on code head `425d99e`; PR #40 merged as `424fe6f` after all six
   final-head jobs passed on code head `4f7927d`; PR #42 merged as `4907761` after all
   six final-head jobs passed on code head `d9f08e6`; PR #44 merged as `8fcdbcf` after
-  all final-head jobs passed on code head `b7dcee6`. Every actionable review finding
-  on all seven PRs was fixed, regression-tested, replied to, and resolved. Deployment
-  is still gated.
+  all final-head jobs passed on code head `b7dcee6`; PR #46 merged as `c7ae46c`
+  after all six final-head jobs passed on code head `b0aac2e`; PR #47 is the
+  authoritative shipping record for U-08. Every actionable review finding on the
+  merged PRs was fixed, regression-tested, replied to, and resolved. Deployment is
+  still gated.
   No hosted matter or deployment was accessed during this execution.
 
-Verification at this checkpoint: backend ruff and strict mypy across 114 source files
-pass; 1,043 backend tests pass at 91% coverage; frontend ESLint, TypeScript, 9 Vitest
-files / 37 tests, OpenAPI generation/drift, and the production build pass. U-03's
+Verification at this checkpoint: backend ruff and strict mypy across 116 source files
+pass; 1,053 backend tests pass at 91% coverage; frontend ESLint, TypeScript, 10 Vitest
+files / 39 tests, OpenAPI generation/drift, and the production build pass. U-03's
 structured review covered correctness, security, adversarial behavior, tests,
 maintainability, reliability, project standards, API contracts, agent parity, and
 performance; all material findings were repaired before the full gates. U-01's structured
@@ -565,7 +568,8 @@ eCFR/GovInfo/Federal Register as research requests until separately promoted.
 and provenance-tagged; calibration error and limits are recorded; unavailable/non-US
 sources degrade to explicit human research requests, never fabricated certainty.
 
-**Completion evidence (2026-08-21):** complete locally. Case-citation extraction uses
+**Completion evidence (2026-08-21):** PR #46 merged as `c7ae46c` from final code head
+`b0aac2e`. Case-citation extraction uses
 cleaned text with exact original-offset back-mapping and an explicitly pinned Aho–
 Corasick tokenizer. Completed drafts can queue durable cite-checker jobs through the
 service, CLI, API, and typed cockpit path. Checks use only fixed numeric CourtListener
@@ -585,7 +589,7 @@ sole hosted-operability tail: deployment's proxy still permits only the model en
 so no hosted legal-source call is attempted until its exact three-host expansion is
 authorized. No hosted matter or deployment was accessed.
 
-### U-08 — Add RFP production assistance
+### U-08 — Add RFP production assistance — COMPLETE
 
 **Outcome:** each RFP receives reviewable responsive/non-responsive document
 suggestions without auto-producing or disclosing documents.
@@ -601,6 +605,21 @@ production.
 
 **Acceptance:** planted relevant/irrelevant/privileged/untriaged documents produce the
 expected candidate set; no suggestion becomes a production act automatically.
+
+**Completion evidence (2026-08-21):** implemented on PR #47. A write-once bundle ranks
+the immutable launch-snapshot corpus separately for each RFP and binds every candidate
+to exact request/document hashes and its source locator. Privileged, untriaged, and
+unavailable documents are excluded before classification with a text-free audit trail.
+Every candidate starts `needs_review`; append-only human accept/reject records remain
+distinct from an explicit `produce`/`withhold`/`defer` disposition. One durable service
+drives typed CLI, authenticated and audited API, lease-renewing worker execution,
+generated TypeScript, and a cockpit list/detail queue. The cockpit explicitly states
+that classification acceptance never authorizes production. Planted relevant,
+irrelevant, privileged, and untriaged fixtures, Access-derived actor provenance,
+idempotent retry, worker no-provider dispatch, OpenAPI drift, and the UI action split
+are regression-tested. Final local gates passed 1,053 backend tests at 91% coverage,
+strict mypy over 116 source files, frontend lint/typecheck, 10 files / 39 tests, and a
+production build. No hosted matter, protected data, model call, or deployment was used.
 
 ### U-09 — Close the local edit-learning loop
 

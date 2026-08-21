@@ -26,10 +26,27 @@ from mootloop.engine.queue import Queue, WorkItem
 from mootloop.errors import CitationError, DecisionError, MootloopError, VaultBoundaryError
 from mootloop.judge_profiles import build_assigned_judge_profile
 from mootloop.llm import FakeLLMProvider
+from mootloop.production_suggestions import (
+    ProductionSuggestionStore,
+    build_production_suggestions,
+    require_production_suggestions_eligible,
+    review_production_suggestion,
+)
 from mootloop.registry import MatterRegistry
 from mootloop.vault import load_matter
 
-from . import DecisionActionArg, _fail, _now, cite_app, decide_app, judge_app, research_app
+from . import (
+    DecisionActionArg,
+    ProductionDispositionArg,
+    ProductionReviewActionArg,
+    _fail,
+    _now,
+    cite_app,
+    decide_app,
+    judge_app,
+    production_app,
+    research_app,
+)
 
 
 def _print_verify_summary(summary: verify.VerifySummary) -> None:
@@ -179,6 +196,105 @@ def judge_profile(
         f"built {result.profile.profile_id}: {status}; "
         f"held-out error={result.profile.calibration.error_rate}"
     )
+
+
+@production_app.command("generate")
+def production_generate(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Option("--run", help="Run whose RFPs to classify")],
+) -> None:
+    """Build locally, or queue hosted review-only RFP document suggestions."""
+    try:
+        registry = MatterRegistry()
+        matter, queue = classify_vault_for_queue(vault_path, registry=registry)
+        require_production_suggestions_eligible(vault_path, run_id)
+        if queue is not None:
+            item_id = f"production:{matter.matter_id}:{run_id}"
+            queue.ensure_enqueued(
+                WorkItem.create(
+                    lane="interactive",
+                    matter_id=matter.matter_id,
+                    run_id=run_id,
+                    kind="production_suggestions",
+                    now=datetime.now(UTC),
+                    item_id=item_id,
+                )
+            )
+            typer.echo(f"queued {item_id}")
+            return
+        result = build_production_suggestions(vault_path, run_id, _now())
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    typer.echo(f"generated {len(result.suggestions)} review-only suggestion(s)")
+
+
+@production_app.command("list")
+def production_list(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Option("--run", help="Run id")],
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """List folded suggestions without exposing excluded privileged content."""
+    try:
+        items = ProductionSuggestionStore(vault_path, run_id).list_all()
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    if json_output:
+        typer.echo(json.dumps([item.model_dump(mode="json") for item in items]))
+        return
+    if not items:
+        typer.echo("No production suggestions.")
+        return
+    for item in items:
+        typer.echo(
+            f"{item.suggestion_id}  {item.request_id}  {item.original_name}  "
+            f"{item.classification}  [{item.review_status}]"
+        )
+
+
+@production_app.command("show")
+def production_show(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Option("--run", help="Run id")],
+    suggestion_id: Annotated[str, typer.Argument(help="Suggestion id")],
+) -> None:
+    item = ProductionSuggestionStore(vault_path, run_id).get(suggestion_id)
+    if item is None:
+        raise _fail(MootloopError(f"unknown production suggestion {suggestion_id!r}")) from None
+    typer.echo(item.model_dump_json(indent=2))
+
+
+@production_app.command("review")
+def production_review(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Option("--run", help="Run id")],
+    suggestion_id: Annotated[str, typer.Argument(help="Suggestion id")],
+    action: Annotated[
+        ProductionReviewActionArg,
+        typer.Option("--action", help="accept | reject | production_review"),
+    ],
+    disposition: Annotated[
+        ProductionDispositionArg | None,
+        typer.Option("--disposition", help="produce | withhold | defer"),
+    ] = None,
+    reason: Annotated[str, typer.Option("--reason")] = "",
+) -> None:
+    """Record a trusted local human review; classification acceptance never produces."""
+    try:
+        result = review_production_suggestion(
+            vault_path,
+            run_id,
+            suggestion_id,
+            action=action.value,
+            production_disposition=disposition.value if disposition is not None else None,
+            actor=pwd.getpwuid(os.geteuid()).pw_name,
+            channel="cli",
+            recorded_at=_now(),
+            reason=reason,
+        )
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    typer.echo(result.model_dump_json())
 
 
 @decide_app.command("list")

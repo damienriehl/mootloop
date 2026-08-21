@@ -305,6 +305,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/matters/{matter_id}/runs/{run_id}/production/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Production Suggestions */
+        get: operations["list_production_suggestions_api_matters__matter_id__runs__run_id__production_suggestions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/matters/{matter_id}/runs/{run_id}/production/suggestions/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Queue Production Suggestions
+         * @description Queue deterministic RFP classifications; this route never records production.
+         */
+        post: operations["queue_production_suggestions_api_matters__matter_id__runs__run_id__production_suggestions_generate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/matters/{matter_id}/runs/{run_id}/production/suggestions/{suggestion_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Production Suggestion */
+        get: operations["get_production_suggestion_api_matters__matter_id__runs__run_id__production_suggestions__suggestion_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/matters/{matter_id}/runs/{run_id}/production/suggestions/{suggestion_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review Production Suggestion Route */
+        post: operations["review_production_suggestion_route_api_matters__matter_id__runs__run_id__production_suggestions__suggestion_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/matters/{matter_id}/runs/{run_id}/raise-cap": {
         parameters: {
             query?: never;
@@ -1076,6 +1147,181 @@ export interface components {
         PauseRequest: {
             /** Reason */
             reason?: string | null;
+        };
+        /**
+         * ProductionSuggestionExclusion
+         * @description Text-free proof that an ineligible document never entered classification.
+         */
+        ProductionSuggestionExclusion: {
+            /** Doc Id */
+            doc_id: string;
+            /** Original Name */
+            original_name: string;
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "privileged" | "untriaged" | "unavailable";
+            /** Request Id */
+            request_id: string;
+        };
+        /** ProductionSuggestionResponse */
+        ProductionSuggestionResponse: {
+            /**
+             * Kind
+             * @default production_suggestion
+             * @constant
+             */
+            kind: "production_suggestion";
+            /**
+             * Schema Version
+             * @default 1.0
+             */
+            schema_version: string;
+            suggestion: components["schemas"]["ProductionSuggestionView"];
+        };
+        /**
+         * ProductionSuggestionReview
+         * @description One append-only human action, separate from the generated classification.
+         */
+        ProductionSuggestionReview: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "accept" | "reject" | "production_review";
+            /** Actor */
+            actor: string;
+            /**
+             * Channel
+             * @enum {string}
+             */
+            channel: "api" | "cli";
+            /** Production Disposition */
+            production_disposition?: ("produce" | "withhold" | "defer") | null;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+            /** Recorded At */
+            recorded_at: string;
+            /** Review Id */
+            review_id: string;
+            /** Run Id */
+            run_id: string;
+            /**
+             * Schema Version
+             * @default 1.0
+             */
+            schema_version: string;
+            /** Source Matter Id */
+            source_matter_id: string;
+            /** Suggestion Id */
+            suggestion_id: string;
+        };
+        /** ProductionSuggestionReviewRequest */
+        ProductionSuggestionReviewRequest: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "accept" | "reject" | "production_review";
+            /** Production Disposition */
+            production_disposition?: ("produce" | "withhold" | "defer") | null;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+        };
+        /** ProductionSuggestionView */
+        ProductionSuggestionView: {
+            /**
+             * Classification
+             * @enum {string}
+             */
+            classification: "responsive" | "non_responsive";
+            /** Created At */
+            created_at: string;
+            /** Doc Id */
+            doc_id: string;
+            /** Document Sha256 */
+            document_sha256: string;
+            /** Original Name */
+            original_name: string;
+            /** Production Disposition */
+            production_disposition?: ("produce" | "withhold" | "defer") | null;
+            /** Reason */
+            reason: string;
+            /** Request Id */
+            request_id: string;
+            /** Request Sha256 */
+            request_sha256: string;
+            /** Review History */
+            review_history?: components["schemas"]["ProductionSuggestionReview"][];
+            /**
+             * Review Status
+             * @default needs_review
+             * @enum {string}
+             */
+            review_status: "needs_review" | "accepted" | "rejected";
+            /** Run Id */
+            run_id: string;
+            /** Score */
+            score: number;
+            /** Source Locator */
+            source_locator: string;
+            /** Source Matter Id */
+            source_matter_id: string;
+            /** Suggestion Id */
+            suggestion_id: string;
+        };
+        /** ProductionSuggestionsQueuedResponse */
+        ProductionSuggestionsQueuedResponse: {
+            /** Item Id */
+            item_id: string;
+            /**
+             * Kind
+             * @default production_suggestions_queued
+             * @constant
+             */
+            kind: "production_suggestions_queued";
+            /** Run Id */
+            run_id: string;
+            /**
+             * Schema Version
+             * @default 1.0
+             */
+            schema_version: string;
+            /**
+             * Status
+             * @default queued
+             * @constant
+             */
+            status: "queued";
+        };
+        /** ProductionSuggestionsResponse */
+        ProductionSuggestionsResponse: {
+            /** Eligible */
+            eligible: boolean;
+            /** Exclusions */
+            exclusions?: components["schemas"]["ProductionSuggestionExclusion"][];
+            /**
+             * Kind
+             * @default production_suggestions
+             * @constant
+             */
+            kind: "production_suggestions";
+            /** Run Id */
+            run_id: string;
+            /**
+             * Schema Version
+             * @default 1.0
+             */
+            schema_version: string;
+            /** Suggestions */
+            suggestions?: components["schemas"]["ProductionSuggestionView"][];
         };
         /**
          * RaiseCapRequest
@@ -2064,6 +2310,140 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunActionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_production_suggestions_api_matters__matter_id__runs__run_id__production_suggestions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matter_id: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductionSuggestionsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    queue_production_suggestions_api_matters__matter_id__runs__run_id__production_suggestions_generate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matter_id: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductionSuggestionsQueuedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_production_suggestion_api_matters__matter_id__runs__run_id__production_suggestions__suggestion_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matter_id: string;
+                run_id: string;
+                suggestion_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductionSuggestionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_production_suggestion_route_api_matters__matter_id__runs__run_id__production_suggestions__suggestion_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matter_id: string;
+                run_id: string;
+                suggestion_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductionSuggestionReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductionSuggestionResponse"];
                 };
             };
             /** @description Validation Error */

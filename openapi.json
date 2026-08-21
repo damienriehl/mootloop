@@ -1009,6 +1009,386 @@
         "title": "PauseRequest",
         "type": "object"
       },
+      "ProductionSuggestionExclusion": {
+        "additionalProperties": false,
+        "description": "Text-free proof that an ineligible document never entered classification.",
+        "properties": {
+          "doc_id": {
+            "title": "Doc Id",
+            "type": "string"
+          },
+          "original_name": {
+            "title": "Original Name",
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "privileged",
+              "untriaged",
+              "unavailable"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "doc_id",
+          "original_name",
+          "reason"
+        ],
+        "title": "ProductionSuggestionExclusion",
+        "type": "object"
+      },
+      "ProductionSuggestionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "production_suggestion",
+            "default": "production_suggestion",
+            "title": "Kind",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "suggestion": {
+            "$ref": "#/components/schemas/ProductionSuggestionView"
+          }
+        },
+        "required": [
+          "suggestion"
+        ],
+        "title": "ProductionSuggestionResponse",
+        "type": "object"
+      },
+      "ProductionSuggestionReview": {
+        "additionalProperties": false,
+        "description": "One append-only human action, separate from the generated classification.",
+        "properties": {
+          "action": {
+            "enum": [
+              "accept",
+              "reject",
+              "production_review"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "actor": {
+            "maxLength": 320,
+            "minLength": 1,
+            "title": "Actor",
+            "type": "string"
+          },
+          "channel": {
+            "enum": [
+              "api",
+              "cli"
+            ],
+            "title": "Channel",
+            "type": "string"
+          },
+          "production_disposition": {
+            "anyOf": [
+              {
+                "enum": [
+                  "produce",
+                  "withhold",
+                  "defer"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Production Disposition"
+          },
+          "reason": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Reason",
+            "type": "string"
+          },
+          "recorded_at": {
+            "title": "Recorded At",
+            "type": "string"
+          },
+          "review_id": {
+            "pattern": "^prod-review-[0-9a-f]{16}$",
+            "title": "Review Id",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "source_matter_id": {
+            "title": "Source Matter Id",
+            "type": "string"
+          },
+          "suggestion_id": {
+            "title": "Suggestion Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "review_id",
+          "source_matter_id",
+          "run_id",
+          "suggestion_id",
+          "action",
+          "actor",
+          "channel",
+          "recorded_at"
+        ],
+        "title": "ProductionSuggestionReview",
+        "type": "object"
+      },
+      "ProductionSuggestionReviewRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "accept",
+              "reject",
+              "production_review"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "production_disposition": {
+            "anyOf": [
+              {
+                "enum": [
+                  "produce",
+                  "withhold",
+                  "defer"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Production Disposition"
+          },
+          "reason": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "ProductionSuggestionReviewRequest",
+        "type": "object"
+      },
+      "ProductionSuggestionView": {
+        "additionalProperties": false,
+        "properties": {
+          "classification": {
+            "enum": [
+              "responsive",
+              "non_responsive"
+            ],
+            "title": "Classification",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "doc_id": {
+            "title": "Doc Id",
+            "type": "string"
+          },
+          "document_sha256": {
+            "title": "Document Sha256",
+            "type": "string"
+          },
+          "original_name": {
+            "title": "Original Name",
+            "type": "string"
+          },
+          "production_disposition": {
+            "anyOf": [
+              {
+                "enum": [
+                  "produce",
+                  "withhold",
+                  "defer"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Production Disposition"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "request_sha256": {
+            "title": "Request Sha256",
+            "type": "string"
+          },
+          "review_history": {
+            "items": {
+              "$ref": "#/components/schemas/ProductionSuggestionReview"
+            },
+            "title": "Review History",
+            "type": "array"
+          },
+          "review_status": {
+            "default": "needs_review",
+            "enum": [
+              "needs_review",
+              "accepted",
+              "rejected"
+            ],
+            "title": "Review Status",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          },
+          "source_locator": {
+            "title": "Source Locator",
+            "type": "string"
+          },
+          "source_matter_id": {
+            "title": "Source Matter Id",
+            "type": "string"
+          },
+          "suggestion_id": {
+            "title": "Suggestion Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "suggestion_id",
+          "source_matter_id",
+          "run_id",
+          "request_id",
+          "doc_id",
+          "original_name",
+          "source_locator",
+          "request_sha256",
+          "document_sha256",
+          "classification",
+          "score",
+          "reason",
+          "created_at"
+        ],
+        "title": "ProductionSuggestionView",
+        "type": "object"
+      },
+      "ProductionSuggestionsQueuedResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "item_id": {
+            "title": "Item Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "production_suggestions_queued",
+            "default": "production_suggestions_queued",
+            "title": "Kind",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "status": {
+            "const": "queued",
+            "default": "queued",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "item_id"
+        ],
+        "title": "ProductionSuggestionsQueuedResponse",
+        "type": "object"
+      },
+      "ProductionSuggestionsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "eligible": {
+            "title": "Eligible",
+            "type": "boolean"
+          },
+          "exclusions": {
+            "items": {
+              "$ref": "#/components/schemas/ProductionSuggestionExclusion"
+            },
+            "title": "Exclusions",
+            "type": "array"
+          },
+          "kind": {
+            "const": "production_suggestions",
+            "default": "production_suggestions",
+            "title": "Kind",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/ProductionSuggestionView"
+            },
+            "title": "Suggestions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "run_id",
+          "eligible"
+        ],
+        "title": "ProductionSuggestionsResponse",
+        "type": "object"
+      },
       "RaiseCapRequest": {
         "additionalProperties": false,
         "description": "The body of a raise-cap call \u2014 exactly one of an absolute ``to_usd`` cap or a\n``delta_usd`` increment over the run's current effective cap (plan D5).",
@@ -2735,6 +3115,227 @@
           }
         },
         "summary": "Pause Run Human"
+      }
+    },
+    "/api/matters/{matter_id}/runs/{run_id}/production/suggestions": {
+      "get": {
+        "operationId": "list_production_suggestions_api_matters__matter_id__runs__run_id__production_suggestions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionSuggestionsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Production Suggestions"
+      }
+    },
+    "/api/matters/{matter_id}/runs/{run_id}/production/suggestions/generate": {
+      "post": {
+        "description": "Queue deterministic RFP classifications; this route never records production.",
+        "operationId": "queue_production_suggestions_api_matters__matter_id__runs__run_id__production_suggestions_generate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionSuggestionsQueuedResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Queue Production Suggestions"
+      }
+    },
+    "/api/matters/{matter_id}/runs/{run_id}/production/suggestions/{suggestion_id}": {
+      "get": {
+        "operationId": "get_production_suggestion_api_matters__matter_id__runs__run_id__production_suggestions__suggestion_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "suggestion_id",
+            "required": true,
+            "schema": {
+              "title": "Suggestion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionSuggestionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Production Suggestion"
+      }
+    },
+    "/api/matters/{matter_id}/runs/{run_id}/production/suggestions/{suggestion_id}/review": {
+      "post": {
+        "operationId": "review_production_suggestion_route_api_matters__matter_id__runs__run_id__production_suggestions__suggestion_id__review_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "suggestion_id",
+            "required": true,
+            "schema": {
+              "title": "Suggestion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductionSuggestionReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionSuggestionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Review Production Suggestion Route"
       }
     },
     "/api/matters/{matter_id}/runs/{run_id}/raise-cap": {

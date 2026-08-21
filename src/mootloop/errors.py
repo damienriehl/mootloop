@@ -37,6 +37,10 @@ class FactError(MootloopError):
     """A fact-store precondition failed (unknown fact id, unresolvable provenance, …)."""
 
 
+class ProductionSuggestionError(MootloopError):
+    """An RFP production-suggestion or human-review contract failed closed."""
+
+
 class TaskConfigError(MootloopError):
     """A task-adapter config failed to load or validate. Message names each bad field."""
 

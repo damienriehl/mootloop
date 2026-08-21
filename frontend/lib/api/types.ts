@@ -12,6 +12,11 @@ export type RunStatusSummary = Schemas["RunStatusSummary"];
 export type RunActionResponse = Schemas["RunActionResponse"];
 export type CitationCheckQueuedResponse = Schemas["CitationCheckQueuedResponse"];
 export type JudgeProfileQueuedResponse = Schemas["JudgeProfileQueuedResponse"];
+export type ProductionSuggestionView = Schemas["ProductionSuggestionView"];
+export type ProductionSuggestionResponse = Schemas["ProductionSuggestionResponse"];
+export type ProductionSuggestionsResponse = Schemas["ProductionSuggestionsResponse"];
+export type ProductionSuggestionsQueuedResponse = Schemas["ProductionSuggestionsQueuedResponse"];
+export type ProductionSuggestionReviewRequest = Schemas["ProductionSuggestionReviewRequest"];
 export type GateLedgerResponse = Schemas["GateLedgerResponse"];
 export type DecisionsResponse = Schemas["DecisionsResponse"];
 export type RequestsResponse = Schemas["RequestsResponse"];
@@ -55,6 +60,10 @@ export type RunStatus = RunStatusSummary["status"];
 export type RunMode = RunStatusSummary["mode"];
 /** Resolution action for a decision. */
 export type ResolutionAction = ResolveRequest["action"];
+export type ProductionReviewAction = ProductionSuggestionReviewRequest["action"];
+export type ProductionDisposition = NonNullable<
+  ProductionSuggestionReviewRequest["production_disposition"]
+>;
 
 /** The terminal statuses — a run in one of these no longer ticks (FD-5). */
 export const TERMINAL_STATUSES: readonly RunStatus[] = ["finished", "needs_attention", "capped"];

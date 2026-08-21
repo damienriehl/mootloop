@@ -21,8 +21,10 @@ from mootloop.errors import AccessAuthError, LockHeldError
 from mootloop.llm import FakeLLMProvider
 from mootloop.models.attestations import Attestation
 from mootloop.models.common import DocId
+from mootloop.models.corpus import CorpusDoc, DocRole, Manifest
 from mootloop.models.matter import MatterConfig
 from mootloop.models.requests import RequestItem, RequestSet, RequestType
+from mootloop.production_suggestions import build_production_suggestions
 from mootloop.registry import MatterRegistry
 from mootloop.web import audit
 from mootloop.web.api import create_matter_api, routes
@@ -89,6 +91,48 @@ def _seed_request(vault: Path) -> None:
             ],
         ),
     )
+
+
+def _seed_rfp(vault: Path) -> None:
+    save_requests(
+        vault,
+        RequestSet(
+            request_type=RequestType.RFP,
+            set_number=1,
+            title="Requests for Production",
+            items=[
+                RequestItem(
+                    request_id="RFP-1",  # type: ignore[arg-type]
+                    set_number=1,
+                    number=1,
+                    text="Produce the service contract.",
+                    source_doc=DocId("doc-api-production"),
+                )
+            ],
+        ),
+    )
+
+
+def _seed_production_corpus(vault: Path) -> None:
+    doc_id = DocId("doc-api-responsive")
+    relative = f"corpus/normalized/{doc_id}.md"
+    path = vault / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("The signed service contract.", encoding="utf-8")
+    Manifest(
+        docs=[
+            CorpusDoc(
+                doc_id=doc_id,
+                original_name="service-contract.md",
+                media_type="text/markdown",
+                role=DocRole.CLIENT_DOC,
+                privileged=False,
+                ingest_status="ok",
+                normalized_path=relative,
+                ingested_at=_NOW_ISO,
+            )
+        ]
+    ).save(vault)
 
 
 def test_matters_requires_valid_access(client: TestClient) -> None:
@@ -325,6 +369,95 @@ def test_judge_profile_endpoint_enqueues_interactive_durable_job(
     assert item.lane == "interactive"
     assert item.kind == "judge_profile"
     assert item.run_id == "judge-profile"
+
+
+def test_production_suggestions_endpoint_enqueues_review_only_job(
+    client: TestClient,
+    queue: Queue,
+    registry: MatterRegistry,
+    matter: MatterConfig,
+) -> None:
+    vault = registry.resolve(matter.matter_id)
+    _seed_rfp(vault)
+    run_id = orchestrator.start_run(
+        vault, "discovery-responses", _NOW_ISO, run_id="api-production"
+    )
+
+    response = client.post(
+        f"/api/matters/{matter.matter_id}/runs/{run_id}/production/suggestions/generate",
+        headers=_with_csrf(client),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["kind"] == "production_suggestions_queued"
+    [item] = queue.snapshot()
+    assert item.item_id == f"production:{matter.matter_id}:{run_id}"
+    assert item.kind == "production_suggestions"
+    assert item.lane == "interactive"
+
+
+def test_production_suggestions_rejects_non_rfp_run_before_queueing(
+    client: TestClient,
+    queue: Queue,
+    registry: MatterRegistry,
+    matter: MatterConfig,
+) -> None:
+    vault = registry.resolve(matter.matter_id)
+    _seed_request(vault)
+    run_id = orchestrator.start_run(
+        vault, "discovery-responses", _NOW_ISO, run_id="api-no-production"
+    )
+    base = f"/api/matters/{matter.matter_id}/runs/{run_id}/production/suggestions"
+
+    listed = client.get(base, headers=_AUTH)
+    assert listed.status_code == 200
+    assert listed.json()["eligible"] is False
+
+    response = client.post(f"{base}/generate", headers=_with_csrf(client))
+    assert response.status_code == 400
+    assert response.json()["detail"] == "run has no RFP requests"
+    assert queue.snapshot() == []
+
+
+def test_production_suggestion_api_records_actor_and_separates_production_decision(
+    client: TestClient,
+    registry: MatterRegistry,
+    matter: MatterConfig,
+) -> None:
+    vault = registry.resolve(matter.matter_id)
+    _seed_rfp(vault)
+    _seed_production_corpus(vault)
+    run_id = orchestrator.start_run(
+        vault, "discovery-responses", _NOW_ISO, run_id="api-production-review"
+    )
+    suggestion = build_production_suggestions(vault, run_id, _NOW_ISO).suggestions[0]
+    base = f"/api/matters/{matter.matter_id}/runs/{run_id}/production/suggestions"
+
+    listed = client.get(base, headers=_AUTH)
+    assert listed.status_code == 200
+    assert listed.json()["eligible"] is True
+    assert listed.json()["suggestions"][0]["review_status"] == "needs_review"
+
+    accepted = client.post(
+        f"{base}/{suggestion.suggestion_id}/review",
+        headers=_with_csrf(client),
+        json={"action": "accept"},
+    )
+    assert accepted.status_code == 200
+    accepted_item = accepted.json()["suggestion"]
+    assert accepted_item["review_status"] == "accepted"
+    assert accepted_item["production_disposition"] is None
+    assert accepted_item["review_history"][0]["actor"] == "attorney@example.com"
+    assert accepted_item["review_history"][0]["channel"] == "api"
+
+    produced = client.post(
+        f"{base}/{suggestion.suggestion_id}/review",
+        headers=_with_csrf(client),
+        json={"action": "production_review", "production_disposition": "produce"},
+    )
+    assert produced.status_code == 200
+    assert produced.json()["suggestion"]["review_status"] == "accepted"
+    assert produced.json()["suggestion"]["production_disposition"] == "produce"
 
 
 def test_runs_unknown_matter_returns_404(client: TestClient) -> None:

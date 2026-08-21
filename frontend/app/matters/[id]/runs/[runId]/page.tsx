@@ -11,6 +11,7 @@ import { InstrumentBand } from "@/components/cockpit/InstrumentBand";
 import { PersonaStrip } from "@/components/cockpit/PersonaStrip";
 import { Timeline } from "@/components/cockpit/Timeline";
 import { RunControls } from "@/components/cockpit/RunControls";
+import { ProductionReviewQueue } from "@/components/cockpit/ProductionReviewQueue";
 import { GateChip } from "@/components/ui/GateChip";
 
 export default function CockpitPage() {
@@ -105,6 +106,8 @@ export default function CockpitPage() {
       />
 
       {replayable && <RunControls matterId={matterId} runId={runId} status={status} />}
+
+      {replayable && <ProductionReviewQueue matterId={matterId} runId={runId} />}
 
       <div>
         <h2 className="mb-2 font-mono text-[0.62rem] uppercase tracking-[0.12em] text-ink-faint">
