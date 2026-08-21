@@ -10,10 +10,14 @@ import yaml
 from pydantic import ValidationError
 
 from mootloop import budget
-from mootloop.errors import OrchestratorError
+from mootloop.errors import MigrationError, OrchestratorError
 from mootloop.facts import FACTS_PATH
 from mootloop.facts import fold as fold_facts
+from mootloop.migrations import load_versioned_json
 from mootloop.models.common import MatterId, RunId
+from mootloop.models.context import (
+    SCHEMA_VERSION as RUN_CONTEXT_SCHEMA_VERSION,
+)
 from mootloop.models.context import (
     AdapterBehavior,
     ContextSource,
@@ -468,8 +472,12 @@ def load_run_context(vault_root: Path | str, run_id: str) -> RunContext:
             f"run {run_id!r} context manifest was tampered with or has the wrong digest"
         )
     try:
-        manifest = RunContextManifest.model_validate_json(raw)
-    except ValidationError as exc:
+        manifest = load_versioned_json(
+            raw,
+            RunContextManifest,
+            current_version=RUN_CONTEXT_SCHEMA_VERSION,
+        )
+    except MigrationError as exc:
         raise OrchestratorError(
             f"run {run_id!r} context manifest failed validation: {exc}"
         ) from exc
