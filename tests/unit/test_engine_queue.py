@@ -35,6 +35,19 @@ def test_interactive_lane_drains_before_run_lane(tmp_path: Path) -> None:
     assert claimed is not None and claimed.item_id == "int-1"
 
 
+def test_bound_worker_cannot_claim_sibling_matter(tmp_path: Path) -> None:
+    queue = Queue(tmp_path)
+    sibling = _item("interactive", "sibling").model_copy(update={"matter_id": "sibling"})
+    own = _item("run", "own").model_copy(update={"matter_id": "bound-matter"})
+    queue.enqueue(sibling)
+    queue.enqueue(own)
+
+    claimed = queue.claim("w1", NOW, visibility_timeout_s=60, matter_id="bound-matter")
+
+    assert claimed is not None and claimed.item_id == "own"
+    assert queue.snapshot()[0].claimed_by is None
+
+
 def test_claim_hides_until_visibility_lapses(tmp_path: Path) -> None:
     queue = Queue(tmp_path)
     queue.enqueue(_item("run", "run-1"))
@@ -139,9 +152,7 @@ def test_ensure_enqueued_is_idempotent_by_item_id(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("conflicting", [False, True])
-def test_ensure_enqueued_rejects_duplicate_item_ids(
-    tmp_path: Path, conflicting: bool
-) -> None:
+def test_ensure_enqueued_rejects_duplicate_item_ids(tmp_path: Path, conflicting: bool) -> None:
     queue = Queue(tmp_path)
     item = _item("run", "duplicate-run")
     duplicate = item.model_copy(update={"run_id": "r2"}) if conflicting else item

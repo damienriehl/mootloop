@@ -28,7 +28,7 @@ from typing import Any, Literal
 from pydantic import Field
 
 from mootloop.errors import QueueError
-from mootloop.models.common import StrictModel
+from mootloop.models.common import MatterId, StrictModel
 from mootloop.vault import fsync_file_and_parent
 
 Lane = Literal["interactive", "run"]
@@ -181,7 +181,12 @@ class Queue:
         return item
 
     def claim(
-        self, worker_id: str, now: datetime, *, visibility_timeout_s: float
+        self,
+        worker_id: str,
+        now: datetime,
+        *,
+        visibility_timeout_s: float,
+        matter_id: MatterId | None = None,
     ) -> WorkItem | None:
         """Claim the highest-priority currently-visible item, or ``None`` if none.
 
@@ -190,7 +195,11 @@ class Queue:
         into the future so no other worker can take it until the lease lapses."""
         with self._locked():
             items = self._read()
-            visible = [it for it in items if _parse(it.visible_at) <= now]
+            visible = [
+                it
+                for it in items
+                if (matter_id is None or it.matter_id == matter_id) and _parse(it.visible_at) <= now
+            ]
             if not visible:
                 return None
             chosen = min(visible, key=lambda it: it._sort_key())

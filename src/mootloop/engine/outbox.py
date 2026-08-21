@@ -119,33 +119,43 @@ def drain_run_outbox(
         return True
 
 
+def drain_pending_vault_outboxes(
+    vault: Path | str,
+    queue: Queue,
+    matter_id: MatterId,
+) -> int:
+    """Repair every recoverable pending launch in one verified matter vault."""
+    delivered = 0
+    runs_dir = safe_vault_path(vault, "runs")
+    if not runs_dir.is_dir():
+        return delivered
+    for child in sorted(runs_dir.iterdir()):
+        if not child.is_dir() or child.name.startswith("."):
+            continue
+        try:
+            if drain_run_outbox(
+                vault,
+                queue,
+                child.name,
+                expected_matter_id=matter_id,
+            ):
+                delivered += 1
+        except (MootloopError, OSError, ValidationError):
+            logger.exception(
+                "could not drain run-start outbox (matter=%s run=%s)",
+                matter_id,
+                child.name,
+            )
+    return delivered
+
+
 def drain_pending_run_outboxes(matters_root: Path | str, queue: Queue) -> int:
     """Scan registered matter vaults and repair every recoverable pending launch.
 
     One corrupt/locked run is logged and skipped so it cannot starve other matters.
     It is never queued: ``drain_run_outbox`` validates context before queue mutation.
     """
-    registry = MatterRegistry(root=matters_root)
     delivered = 0
-    for matter_id, vault in registry.recovery_vaults():
-        runs_dir = safe_vault_path(vault, "runs")
-        if not runs_dir.is_dir():
-            continue
-        for child in sorted(runs_dir.iterdir()):
-            if not child.is_dir() or child.name.startswith("."):
-                continue
-            try:
-                if drain_run_outbox(
-                    vault,
-                    queue,
-                    child.name,
-                    expected_matter_id=matter_id,
-                ):
-                    delivered += 1
-            except (MootloopError, OSError, ValidationError):
-                logger.exception(
-                    "could not drain run-start outbox (matter=%s run=%s)",
-                    matter_id,
-                    child.name,
-                )
+    for matter_id, vault in MatterRegistry(root=matters_root).recovery_vaults():
+        delivered += drain_pending_vault_outboxes(vault, queue, matter_id)
     return delivered

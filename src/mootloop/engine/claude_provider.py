@@ -19,7 +19,7 @@ Every escape hatch is closed by construction:
 - A turn whose tools were refused is FAILED, not returned: the CLI exits 0 with a
   terminal ``is_error: false`` even then, so the per-tool ``is_error`` in the
   ``stream-json`` output is the only honest signal (see `_permission_denial`).
-- An optional ``egress_wrapper`` (e.g. a ``bwrap`` network jail) is PREPENDED to argv;
+- An optional ``egress_wrapper`` (the hosted Landlock preflight) is PREPENDED to argv;
   the jail itself is deployment config, but the seam and the prepend live here.
 
 The build seams (`build_settings` / `build_allowed_tools` / `build_env` / `build_argv`)
@@ -33,6 +33,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import stat
 import uuid
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
@@ -41,10 +42,21 @@ from pathlib import Path
 from typing import Any
 
 from mootloop import secrets
-from mootloop.errors import AuthError, SeatLimitError, TurnError
+from mootloop.engine.isolation import (
+    CONTROL_DIR_ENV,
+    PROVIDER_CONFIG_DIR_ENV,
+    PROVIDER_VAULT_ENV,
+    SECRETS_DIR_ENV,
+    HostedProxy,
+    hosted_wrapper,
+)
+from mootloop.errors import AuthError, EgressError, SeatLimitError, TurnError
 from mootloop.llm import RawTurnResult, TokenUsage
 from mootloop.models.run import TurnSpec
+from mootloop.privacy import CANARY_REGISTRY_ENV, scrub_outbound
+from mootloop.runtime import RuntimeMode, validate_runtime_mode
 from mootloop.secrets import SECRETS_FILE, register_secret
+from mootloop.vault import _is_within, _real, atomic_write_text, safe_vault_path
 
 # The approved context assembler supplies persona inputs in the prompt. These tools
 # remain only as an explicit diagnostic seam; normal persona turns receive none.
@@ -75,6 +87,7 @@ DEFAULT_ENGINE_CONFIG_DIR = Path.home() / ".mootloop" / "engine-config"
 def engine_config_root() -> Path:
     override = os.environ.get(ENGINE_CONFIG_ENV)
     return Path(override) if override else DEFAULT_ENGINE_CONFIG_DIR
+
 
 # A reply that is exactly one fenced code block (```json ... ```). The chat surface
 # wraps structured output in a fence; unwrapping it is transport normalization, not
@@ -241,9 +254,18 @@ class HeadlessClaudeProvider:
     max_turns: int = 6
     timeout_s: float = 600.0
     now: Clock = _utcnow
+    runtime_mode: RuntimeMode = RuntimeMode.LOCAL
 
     def __post_init__(self) -> None:
         self.run_dir = Path(self.run_dir)
+        self.runtime_mode = validate_runtime_mode(self.runtime_mode)
+        if self.runtime_mode is RuntimeMode.HOSTED and self.egress_wrapper != hosted_wrapper():
+            raise ValueError("hosted mode requires the exact built-in egress wrapper")
+        if self.runtime_mode is RuntimeMode.HOSTED:
+            config_real = _real(self._config_dir())
+            secrets_real = _real(SECRETS_FILE.parent)
+            if _is_within(config_real, secrets_real):
+                raise ValueError("hosted engine config must be outside the secrets mount")
 
     # -- resolved paths --
 
@@ -353,9 +375,7 @@ class HeadlessClaudeProvider:
                     *(self._outside_vault_read_deny() if allow_vault_reads else []),
                 ],
                 "allow": (
-                    [f"{tool}({vault}/**)" for tool in allowed_tools]
-                    if allow_vault_reads
-                    else []
+                    [f"{tool}({vault}/**)" for tool in allowed_tools] if allow_vault_reads else []
                 ),
             }
         }
@@ -390,6 +410,32 @@ class HeadlessClaudeProvider:
                 raise AuthError("CLAUDE_CODE_OAUTH_TOKEN is not configured")
             register_secret(token)
             env["CLAUDE_CODE_OAUTH_TOKEN"] = token
+        if self.runtime_mode is RuntimeMode.HOSTED:
+            config_dir = self._config_dir()
+            runtime_home = config_dir / "home"
+            runtime_tmp = config_dir / "tmp"
+            runtime_home.mkdir(mode=0o700, parents=True, exist_ok=True)
+            runtime_tmp.mkdir(mode=0o700, parents=True, exist_ok=True)
+            env["HOME"] = str(runtime_home)
+            env["TMPDIR"] = str(runtime_tmp)
+            proxy = HostedProxy.from_env()
+            env["HTTP_PROXY"] = proxy.url
+            env["HTTPS_PROXY"] = proxy.url
+            env["NO_PROXY"] = ""
+            env[PROVIDER_VAULT_ENV] = str(self._vault_real())
+            env[PROVIDER_CONFIG_DIR_ENV] = str(self._config_dir())
+            env[CONTROL_DIR_ENV] = str(self._vault_real().parent / ".queue")
+            env[SECRETS_DIR_ENV] = str(self._secrets_real().parent)
+            canary_registry = os.environ.get(CANARY_REGISTRY_ENV)
+            if not canary_registry or not os.path.isabs(canary_registry):
+                raise EgressError("hosted mode requires an absolute canary registry path")
+            try:
+                registry_mode = os.lstat(canary_registry).st_mode
+            except OSError as exc:
+                raise EgressError("hosted mode requires a regular canary registry file") from exc
+            if not stat.S_ISREG(registry_mode):
+                raise EgressError("hosted mode requires a regular canary registry file")
+            env[CANARY_REGISTRY_ENV] = canary_registry
         return env
 
     def build_argv(
@@ -468,9 +514,11 @@ class HeadlessClaudeProvider:
         atomic_write_text(path, json.dumps({"session_id": session_id}) + "\n")
 
     def _write_settings(self) -> Path:
-        from mootloop.vault import atomic_write_text, safe_vault_path
-
-        path = safe_vault_path(self.run_dir, "settings.json")
+        path = (
+            self._config_dir() / "settings.json"
+            if self.runtime_mode is RuntimeMode.HOSTED
+            else safe_vault_path(self.run_dir, "settings.json")
+        )
         atomic_write_text(path, json.dumps(self.build_settings(), indent=2) + "\n")
         return path
 
@@ -479,17 +527,26 @@ class HeadlessClaudeProvider:
     def run_turn(self, spec: TurnSpec, prompt: str) -> RawTurnResult:
         import subprocess  # local import: the module imports without a real claude bin
 
+        # Register the exact credential literals first, then tripwire the payload.
+        # This ordering blocks a loader-supplied token even when it is absent from the
+        # secrets file and does so before settings/argv creation or subprocess launch.
+        self._config_dir().mkdir(mode=0o700, parents=True, exist_ok=True)
+        env = self.build_env()
+        public_prompt = scrub_outbound(prompt)
         key = self._session_key(spec)
         session_id = self._load_session_id(key)
         settings_path = self._write_settings()
         argv = self.build_argv(settings_path, session_id=session_id, model=spec.model)
-        env = self.build_env()
         completed: subprocess.CompletedProcess[str] | None
         try:
             completed = subprocess.run(  # noqa: S603 — argv is fully constructed here
                 argv,
-                input=prompt,  # NOT argv: /proc/<pid>/cmdline is world-readable
-                cwd=str(self._vault_real()),
+                input=public_prompt,  # NOT argv: /proc/<pid>/cmdline is world-readable
+                cwd=str(
+                    self._config_dir()
+                    if self.runtime_mode is RuntimeMode.HOSTED
+                    else self._vault_real()
+                ),
                 env=env,
                 capture_output=True,
                 text=True,
@@ -540,9 +597,7 @@ class HeadlessClaudeProvider:
         if isinstance(session_id, str) and session_id:
             self._persist_session_id(key, session_id)
         usage = self._usage_from(payload)
-        return RawTurnResult(
-            text=_unfence(text), usage=usage, provider_call_id=uuid.uuid4().hex
-        )
+        return RawTurnResult(text=_unfence(text), usage=usage, provider_call_id=uuid.uuid4().hex)
 
     @staticmethod
     def _usage_from(payload: dict[str, Any]) -> TokenUsage | None:

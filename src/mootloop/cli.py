@@ -8,7 +8,7 @@ import pwd
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 import typer
 import yaml
@@ -23,6 +23,7 @@ from mootloop.citations.extract import extract_citations
 from mootloop.citations.ledger import ResearchQueue
 from mootloop.context import load_run_context
 from mootloop.discovery_parser import parse_discovery_document, save_requests
+from mootloop.engine import driver as driver_service
 from mootloop.errors import (
     AttestationBlockedError,
     CitationError,
@@ -43,10 +44,8 @@ from mootloop.models.matter import SCHEMA_VERSION, MatterConfig
 from mootloop.models.requests import RequestType
 from mootloop.models.run import DiscardedTurn
 from mootloop.registry import MatterRegistry
+from mootloop.runtime import RuntimeMode
 from mootloop.vault import init_vault, load_matter, matter_validation_issues
-
-if TYPE_CHECKING:
-    from mootloop.engine.worker import ProviderFactory
 
 app = typer.Typer(help="MootLoop — agentic law firm simulator.", no_args_is_help=True)
 requests_app = typer.Typer(
@@ -57,9 +56,7 @@ run_app = typer.Typer(
     help="Drive an orchestrator run (stepwise state machine).", no_args_is_help=True
 )
 cite_app = typer.Typer(help="Extract and verify citations.", no_args_is_help=True)
-research_app = typer.Typer(
-    help="Manage the citation research-request queue.", no_args_is_help=True
-)
+research_app = typer.Typer(help="Manage the citation research-request queue.", no_args_is_help=True)
 decide_app = typer.Typer(help="Review and resolve attorney-gate decisions.", no_args_is_help=True)
 web_app = typer.Typer(help="Public demo web tier (synthetic matter only).", no_args_is_help=True)
 matters_app = typer.Typer(
@@ -671,9 +668,7 @@ def run_estimate(
         )
     except MootloopError as exc:
         raise _fail(exc) from exc
-    typer.echo(
-        f"Estimate — task={task} tier={estimate.tier} requests={estimate.requests}"
-    )
+    typer.echo(f"Estimate — task={task} tier={estimate.tier} requests={estimate.requests}")
     typer.echo(
         f"  range: ${estimate.min_usd:.2f} (converge early) – "
         f"${estimate.max_usd:.2f} (all caps)  [notional, plan mode]"
@@ -961,9 +956,7 @@ def tasks_list(
 def tasks_lock(
     vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
     task_spec_id: Annotated[str, typer.Argument(help="Resolved TaskSpec id")],
-    json_output: Annotated[
-        bool, typer.Option("--json", help="Emit the TaskSpecLock JSON")
-    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Emit the TaskSpecLock JSON")] = False,
 ) -> None:
     """Human-lock a resolved TaskSpec and its exact adapter/rubric sources."""
     try:
@@ -1087,9 +1080,7 @@ def export_link_cmd(
     try:
         matter = load_matter(vault_path)
         signer = export_link.LinkSigner(load_or_create_signing_key())
-        link = export_link.mint_link(
-            vault_path, matter.matter_id, run_id, doc, _now(), signer
-        )
+        link = export_link.mint_link(vault_path, matter.matter_id, run_id, doc, _now(), signer)
     except MootloopError as exc:
         raise _fail(exc) from exc
     typer.echo(link.url)
@@ -1118,25 +1109,6 @@ def attest_status(
 # --- driver verbs (hosted worker loop, plan FE-1) ---------------------------
 
 
-def _provider_factory(fake: bool) -> ProviderFactory:
-    from mootloop.llm import LLMProvider
-
-    if fake:
-        def _fake(vault_root: Path, run_dir: Path, billing_mode: str) -> LLMProvider:
-            return FakeLLMProvider()
-
-        return _fake
-
-    def _headless(vault_root: Path, run_dir: Path, billing_mode: str) -> LLMProvider:
-        from mootloop.engine.claude_provider import HeadlessClaudeProvider
-
-        return HeadlessClaudeProvider(
-            vault_root=vault_root, run_dir=run_dir, billing_mode=billing_mode
-        )
-
-    return _headless
-
-
 @driver_app.command("run-once")
 def driver_run_once(
     matters_root: Annotated[Path, typer.Option("--matters-root", help="Matters-root dir")],
@@ -1144,13 +1116,27 @@ def driver_run_once(
     fake: Annotated[
         bool, typer.Option("--fake", help="Use the FakeLLMProvider (smoke test)")
     ] = False,
+    mode: Annotated[RuntimeMode, typer.Option("--mode", help="Execution trust mode")] = (
+        RuntimeMode.LOCAL
+    ),
+    matter_id: Annotated[
+        str | None, typer.Option("--matter-id", help="Only claim this mounted matter")
+    ] = None,
+    matter_vault: Annotated[
+        Path | None,
+        typer.Option("--matter-vault", help="Fixed mounted vault path for hosted mode"),
+    ] = None,
 ) -> None:
     """Run one driver tick: claim + drain one run (or report idle)."""
-    from mootloop.engine.queue import Queue
-    from mootloop.engine.worker import Worker
-
-    worker = Worker(matters_root, worker_id, Queue(matters_root), _provider_factory(fake))
     try:
+        worker = driver_service.build_driver_worker(
+            matters_root,
+            worker_id,
+            fake=fake,
+            mode=mode,
+            matter_id=matter_id,
+            matter_vault=matter_vault,
+        )
         did_work = worker.run_once(datetime.now(UTC))
     except MootloopError as exc:
         raise _fail(exc) from exc
@@ -1162,20 +1148,67 @@ def driver_serve(
     matters_root: Annotated[Path, typer.Option("--matters-root", help="Matters-root dir")],
     worker_id: Annotated[str, typer.Option("--worker-id", help="This worker's id")],
     interval: Annotated[float, typer.Option("--interval", help="Idle poll seconds")] = 1.0,
+    mode: Annotated[RuntimeMode, typer.Option("--mode", help="Execution trust mode")] = (
+        RuntimeMode.LOCAL
+    ),
+    matter_id: Annotated[
+        str | None, typer.Option("--matter-id", help="Only claim this mounted matter")
+    ] = None,
+    matter_vault: Annotated[
+        Path | None,
+        typer.Option("--matter-vault", help="Fixed mounted vault path for hosted mode"),
+    ] = None,
 ) -> None:
     """Run the supervised driver loop until SIGTERM (drains the current turn first)."""
     import time
 
-    from mootloop.engine.queue import Queue
-    from mootloop.engine.worker import Worker
+    try:
+        worker = driver_service.build_driver_worker(
+            matters_root,
+            worker_id,
+            fake=False,
+            mode=mode,
+            matter_id=matter_id,
+            matter_vault=matter_vault,
+        )
+        worker.serve(
+            now_fn=lambda: datetime.now(UTC),
+            sleep_fn=time.sleep,
+            stop=lambda: False,
+            interval=interval,
+        )
+    except MootloopError as exc:
+        raise _fail(exc) from exc
 
-    worker = Worker(matters_root, worker_id, Queue(matters_root), _provider_factory(False))
-    worker.serve(
-        now_fn=lambda: datetime.now(UTC),
-        sleep_fn=time.sleep,
-        stop=lambda: False,
-        interval=interval,
-    )
+
+@driver_app.command("start-matter-worker")
+def driver_start_matter_worker(
+    matter_id: Annotated[str, typer.Argument(help="Validated hosted matter id")],
+    matters_root: Annotated[Path, typer.Option("--matters-root", help="Host matters root")],
+    proxy_password_file: Annotated[
+        Path,
+        typer.Option("--proxy-password-file", help="Dedicated proxy-password file"),
+    ],
+    engine_config_root: Annotated[
+        Path,
+        typer.Option("--engine-config-root", help="Private durable Claude-state root"),
+    ] = Path("/srv/mootloop-engine-config"),
+    compose_file: Annotated[
+        Path,
+        typer.Option("--compose-file", help="Matter-worker Compose file"),
+    ] = Path("docker-compose.matter.yaml"),
+) -> None:
+    """Validate host paths, then start one isolated matter-worker project."""
+    try:
+        driver_service.start_matter_worker(
+            matters_root,
+            matter_id,
+            compose_file=compose_file,
+            proxy_password_file=proxy_password_file,
+            engine_config_root=engine_config_root,
+        )
+    except MootloopError as exc:
+        raise _fail(exc) from exc
 
 
 # --- api verbs (write-tier OpenAPI tooling, plan FE-2) ----------------------

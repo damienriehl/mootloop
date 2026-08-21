@@ -12,10 +12,18 @@ import os
 import secrets
 import stat
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from pydantic import BaseModel
+
+from mootloop import secrets as secret_store
+from mootloop.errors import OutboundPrivacyError
+from mootloop.models.common import PublicText
+from mootloop.runtime import RUNTIME_MODE_ENV, RuntimeMode
+from mootloop.secrets import SECRETS_FILE
 from mootloop.vault import CANARY_FILE, safe_vault_path
 
 CANARY_PREFIX = "MOOTLOOP-CANARY-"
@@ -33,6 +41,7 @@ def _default_registry() -> Path:
     """
     override = os.environ.get(CANARY_REGISTRY_ENV)
     return Path(override) if override else DEFAULT_REGISTRY
+
 
 FindingKind = str  # "canary" | "denylist" | "unscannable"
 
@@ -70,6 +79,36 @@ def load_registry(registry_path: Path | str | None = None) -> dict[str, Any]:
     return registry
 
 
+def _load_hosted_outbound_registry(
+    registry_path: Path | str | None,
+) -> dict[str, Any]:
+    path = Path(registry_path) if registry_path is not None else _default_registry()
+    try:
+        mode = path.lstat().st_mode
+        if not stat.S_ISREG(mode):
+            raise OutboundPrivacyError(
+                "hosted outbound policy requires a regular canary registry file"
+            )
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except OutboundPrivacyError:
+        raise
+    except (OSError, json.JSONDecodeError) as exc:
+        raise OutboundPrivacyError(
+            "hosted outbound policy requires a readable valid canary registry"
+        ) from exc
+    if not isinstance(data, dict):
+        raise OutboundPrivacyError("hosted canary registry must be a JSON object")
+    canaries = data.get("canaries")
+    denylist = data.get("denylist")
+    if not isinstance(canaries, dict) or not all(
+        isinstance(key, str) and isinstance(value, str) for key, value in canaries.items()
+    ):
+        raise OutboundPrivacyError("hosted canary registry has invalid canaries")
+    if not isinstance(denylist, list) or not all(isinstance(value, str) for value in denylist):
+        raise OutboundPrivacyError("hosted canary registry has invalid denylist")
+    return {"canaries": canaries, "denylist": denylist}
+
+
 def _save_registry(registry: dict[str, Any], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(registry, indent=2, sort_keys=True), encoding="utf-8")
@@ -93,6 +132,103 @@ def seed_canary(
     registry["canaries"][token] = matter_id
     _save_registry(registry, reg_path)
     return token
+
+
+# --- outbound confidentiality gate -----------------------------------------
+
+
+@dataclass(frozen=True)
+class _OutboundPolicy:
+    canaries: tuple[str, ...]
+    denylist: tuple[str, ...]
+    contains_secret: Callable[[str], bool]
+
+    @classmethod
+    def load(
+        cls,
+        *,
+        registry_path: Path | str | None,
+        secrets_file: Path,
+    ) -> _OutboundPolicy:
+        registry = (
+            _load_hosted_outbound_registry(registry_path)
+            if os.environ.get(RUNTIME_MODE_ENV) == RuntimeMode.HOSTED
+            else load_registry(registry_path)
+        )
+        return cls(
+            canaries=tuple(token for token in registry["canaries"] if token),
+            denylist=tuple(value for value in registry["denylist"] if value),
+            contains_secret=secret_store.exact_secret_matcher(secrets_file=secrets_file),
+        )
+
+    def scrub(self, text: str) -> PublicText:
+        if any(token in text for token in self.canaries):
+            raise OutboundPrivacyError("outbound payload contains a registered matter canary")
+        if any(value in text for value in self.denylist):
+            raise OutboundPrivacyError("outbound payload contains a denylisted value")
+        if self.contains_secret(text):
+            raise OutboundPrivacyError("outbound payload contains an exact secret value")
+        return PublicText(secret_store.redact(text))
+
+
+def _scrub_outbound_value(
+    value: Any,
+    *,
+    policy: _OutboundPolicy,
+) -> Any:
+    if isinstance(value, str):
+        return policy.scrub(value)
+    if isinstance(value, dict):
+        scrubbed: dict[str, Any] = {}
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise TypeError("outbound payload mapping keys must be strings")
+            scrubbed[policy.scrub(key)] = _scrub_outbound_value(item, policy=policy)
+        return scrubbed
+    if isinstance(value, (list, tuple)):
+        return [_scrub_outbound_value(item, policy=policy) for item in value]
+    return value
+
+
+def scrub_outbound(
+    text: str,
+    *,
+    registry_path: Path | str | None = None,
+    secrets_file: Path = SECRETS_FILE,
+) -> PublicText:
+    """Block tripwires/exact secrets, redact secret shapes, then trust-convert text."""
+    policy = _OutboundPolicy.load(
+        registry_path=registry_path,
+        secrets_file=secrets_file,
+    )
+    return policy.scrub(text)
+
+
+def serialize_outbound(
+    payload: Any,
+    *,
+    registry_path: Path | str | None = None,
+    secrets_file: Path = SECRETS_FILE,
+) -> PublicText:
+    """Return compact JSON only after recursively checking every string value.
+
+    Canary and exact-secret checks happen before ``json.dumps``. The only successful
+    return type is ``PublicText``, making this the shared trust-conversion point for
+    SSE, notifications, and future connector payloads.
+    """
+    if isinstance(payload, BaseModel):
+        payload = payload.model_dump(mode="json")
+    policy = _OutboundPolicy.load(
+        registry_path=registry_path,
+        secrets_file=secrets_file,
+    )
+    scrubbed = _scrub_outbound_value(
+        payload,
+        policy=policy,
+    )
+    return PublicText(
+        json.dumps(scrubbed, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    )
 
 
 # --- fail-closed grep -------------------------------------------------------

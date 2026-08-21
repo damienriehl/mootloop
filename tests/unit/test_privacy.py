@@ -2,17 +2,23 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
+from typing import get_type_hints
 
 import pytest
 
+from mootloop import privacy, secrets
+from mootloop.errors import OutboundPrivacyError
+from mootloop.models.common import PublicText
 from mootloop.privacy import (
     CANARY_REGISTRY_ENV,
     _default_registry,
     load_registry,
     privacy_grep,
     seed_canary,
+    serialize_outbound,
 )
 
 
@@ -35,6 +41,145 @@ def test_canary_registry_default_without_env(monkeypatch: pytest.MonkeyPatch) ->
     """Unset env keeps the historical ~/.mootloop/canaries.json default (local dev)."""
     monkeypatch.delenv(CANARY_REGISTRY_ENV, raising=False)
     assert _default_registry() == Path.home() / ".mootloop" / "canaries.json"
+
+
+def test_outbound_canary_blocks_before_json_serialization(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registry = tmp_path / "canaries.json"
+    registry.write_text(
+        json.dumps({"canaries": {"MOOTLOOP-CANARY-sibling": "sibling"}, "denylist": []}),
+        encoding="utf-8",
+    )
+    serialized = False
+
+    def should_not_serialize(*args: object, **kwargs: object) -> str:
+        nonlocal serialized
+        serialized = True
+        return "{}"
+
+    monkeypatch.setattr("mootloop.privacy.json.dumps", should_not_serialize)
+    with pytest.raises(OutboundPrivacyError, match="canary"):
+        serialize_outbound({"event": "MOOTLOOP-CANARY-sibling"}, registry_path=registry)
+    assert serialized is False
+
+
+def test_outbound_exact_secret_blocks_before_json_serialization(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    secrets_file = tmp_path / "secrets.env"
+    secrets_file.write_text("CUSTOM_SINK_TOKEN=plain-exact-value\n", encoding="utf-8")
+    serialized = False
+
+    def should_not_serialize(*args: object, **kwargs: object) -> str:
+        nonlocal serialized
+        serialized = True
+        return "{}"
+
+    monkeypatch.setattr("mootloop.privacy.json.dumps", should_not_serialize)
+    with pytest.raises(OutboundPrivacyError, match="secret"):
+        serialize_outbound({"event": "contains plain-exact-value"}, secrets_file=secrets_file)
+    assert serialized is False
+
+
+def test_outbound_registered_exact_secret_blocks(tmp_path: Path) -> None:
+    secrets.register_secret("registered-custom-literal-u02")
+    with pytest.raises(OutboundPrivacyError, match="secret"):
+        serialize_outbound(
+            {"event": "registered-custom-literal-u02"},
+            registry_path=tmp_path / "missing-canaries.json",
+            secrets_file=tmp_path / "missing-secrets.env",
+        )
+
+
+def test_allowed_outbound_payload_is_redacted_and_typed(tmp_path: Path) -> None:
+    payload = serialize_outbound(
+        {"message": "authorization Bearer shaped-token"},
+        registry_path=tmp_path / "missing-canaries.json",
+        secrets_file=tmp_path / "missing-secrets.env",
+    )
+    assert payload == '{"message":"authorization ***REDACTED***"}'
+    assert get_type_hints(serialize_outbound)["return"] is PublicText
+
+
+def test_outbound_policy_sources_are_loaded_once_per_payload(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    loads = {"registry": 0, "secrets": 0}
+
+    def load_registry_once(path: Path | str | None = None) -> dict[str, object]:
+        loads["registry"] += 1
+        return {"canaries": {}, "denylist": []}
+
+    def build_matcher_once(*, secrets_file: Path) -> object:
+        loads["secrets"] += 1
+        return lambda text: False
+
+    monkeypatch.setattr(privacy, "load_registry", load_registry_once)
+    monkeypatch.setattr(privacy.secret_store, "exact_secret_matcher", build_matcher_once)
+
+    serialize_outbound(
+        {"outer": [{"inner": "one"}, {"inner": "two"}]},
+        registry_path=tmp_path / "registry.json",
+        secrets_file=tmp_path / "secrets.env",
+    )
+
+    assert loads == {"registry": 1, "secrets": 1}
+
+
+def test_outbound_payload_rejects_non_string_mapping_keys(tmp_path: Path) -> None:
+    with pytest.raises(TypeError, match="mapping keys"):
+        serialize_outbound(
+            {1: "value"},
+            registry_path=tmp_path / "missing-canaries.json",
+            secrets_file=tmp_path / "missing-secrets.env",
+        )
+
+
+@pytest.mark.parametrize(
+    "registry_kind",
+    ["missing", "directory", "symlink", "malformed", "bad-canaries", "bad-denylist"],
+)
+def test_hosted_outbound_policy_requires_strict_registry(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    registry_kind: str,
+) -> None:
+    registry = tmp_path / "canaries.json"
+    if registry_kind == "directory":
+        registry.mkdir()
+    elif registry_kind == "symlink":
+        target = tmp_path / "target.json"
+        target.write_text('{"canaries":{},"denylist":[]}', encoding="utf-8")
+        registry.symlink_to(target)
+    elif registry_kind == "malformed":
+        registry.write_text("{", encoding="utf-8")
+    elif registry_kind == "bad-canaries":
+        registry.write_text('{"canaries":[],"denylist":[]}', encoding="utf-8")
+    elif registry_kind == "bad-denylist":
+        registry.write_text('{"canaries":{},"denylist":{}}', encoding="utf-8")
+    monkeypatch.setenv("MOOTLOOP_RUNTIME_MODE", "hosted")
+
+    with pytest.raises(OutboundPrivacyError, match="hosted"):
+        serialize_outbound(
+            {"event": "safe"},
+            registry_path=registry,
+            secrets_file=tmp_path / "missing-secrets.env",
+        )
+
+
+def test_local_outbound_policy_keeps_missing_registry_compatibility(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("MOOTLOOP_RUNTIME_MODE", "local")
+    assert (
+        serialize_outbound(
+            {"event": "safe"},
+            registry_path=tmp_path / "missing-canaries.json",
+            secrets_file=tmp_path / "missing-secrets.env",
+        )
+        == '{"event":"safe"}'
+    )
 
 
 def _git_init(path: Path) -> None:

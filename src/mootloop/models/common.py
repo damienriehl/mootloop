@@ -28,9 +28,9 @@ TurnId = NewType("TurnId", str)
 RubricId = NewType("RubricId", str)
 
 # --- Confidentiality-typed text --------------------------------------------
-# MatterText is confidential matter data; PublicText is publishable. The only
-# sanctioned producer of PublicText is a future scrub() — mypy then makes "matter
-# data in the web-search lane" a build failure.
+# MatterText is confidential matter data; PublicText is publishable. The sanctioned
+# producers are privacy.scrub_outbound and privacy.serialize_outbound; mypy then makes
+# "matter data in a public lane" a build failure.
 MatterText = NewType("MatterText", str)
 PublicText = NewType("PublicText", str)
 

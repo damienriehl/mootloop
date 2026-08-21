@@ -42,6 +42,45 @@ def _init_from_fixture(vault: Path) -> None:
     assert result.exit_code == 0, result.output
 
 
+def test_hosted_driver_refuses_unbound_or_missing_matter(tmp_path: Path) -> None:
+    base = ["driver", "run-once", "--matters-root", str(tmp_path), "--worker-id", "w1"]
+
+    unbound = runner.invoke(app, [*base, "--mode", "hosted", "--matter-id", "unbound"])
+    missing = runner.invoke(app, [*base, "--mode", "hosted", "--matter-id", "missing"])
+
+    assert unbound.exit_code != 0 and "requires a matter id" in unbound.output
+    assert missing.exit_code != 0 and "did work" not in missing.output
+
+
+def test_hosted_driver_accepts_explicit_fixed_vault(tmp_path: Path) -> None:
+    matters_root = tmp_path / "matters"
+    matters_root.mkdir()
+    vault = tmp_path / "mounted-matter"
+    _init_from_fixture(vault)
+
+    result = runner.invoke(
+        app,
+        [
+            "driver",
+            "run-once",
+            "--matters-root",
+            str(matters_root),
+            "--worker-id",
+            "w1",
+            "--mode",
+            "hosted",
+            "--matter-id",
+            "northfield-widgets-v-granite-supply",
+            "--matter-vault",
+            str(vault),
+            "--fake",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert result.output == "idle\n"
+
+
 def test_init_non_interactive_happy_path(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     result = runner.invoke(
@@ -323,9 +362,7 @@ def test_run_status_reports_non_replayable_context_without_failing(tmp_path: Pat
     vault = tmp_path / "vault"
     _seed_requests(vault)
     run_id = runner.invoke(app, ["run", "start", str(vault)]).output.strip()
-    (vault / "runs" / run_id / "context" / "corpus.json").write_text(
-        "{}\n", encoding="utf-8"
-    )
+    (vault / "runs" / run_id / "context" / "corpus.json").write_text("{}\n", encoding="utf-8")
 
     status = runner.invoke(app, ["run", "status", str(vault), run_id, "--json"])
 

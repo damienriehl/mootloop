@@ -17,6 +17,8 @@ from __future__ import annotations
 import json
 import os
 import stat
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -27,7 +29,15 @@ from mootloop.engine.claude_provider import (
     HeadlessClaudeProvider,
     _unfence,
 )
-from mootloop.errors import AuthError, SeatLimitError, TurnError
+from mootloop.engine.egress_exec import validate_isolated_command
+from mootloop.engine.isolation import hosted_wrapper
+from mootloop.errors import (
+    AuthError,
+    EgressError,
+    OutboundPrivacyError,
+    SeatLimitError,
+    TurnError,
+)
 from mootloop.models.run import PersonaName, TurnSpec
 
 
@@ -213,6 +223,311 @@ def test_argv_prepends_egress_wrapper_and_has_flags(tmp_path: Path) -> None:
     assert "--verbose" in argv
     tools = argv[argv.index("--allowedTools") + 1]
     assert tools == ""
+
+
+def test_hosted_mode_requires_egress_wrapper(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="egress wrapper"):
+        _provider(tmp_path, runtime_mode="hosted")
+
+
+def test_hosted_mode_rejects_caller_supplied_noop_wrapper(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="exact built-in"):
+        _provider(tmp_path, runtime_mode="hosted", egress_wrapper=["true"])
+
+
+def test_hosted_wrapper_uses_isolated_python_import_mode(tmp_path: Path) -> None:
+    planted = tmp_path / "mootloop"
+    planted.mkdir()
+    (planted / "__init__.py").write_text("raise SystemExit('shadowed')\n", encoding="utf-8")
+    wrapper = hosted_wrapper()
+
+    assert wrapper[:4] == [sys.executable, "-I", "-m", "mootloop.engine.egress_exec"]
+    probe = subprocess.run(
+        [sys.executable, "-I", "-c", "import mootloop; print(mootloop.__file__)"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert str(planted) not in probe.stdout
+
+
+def test_hosted_mode_requires_fixed_authenticated_proxy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("MOOTLOOP_EGRESS_PROXY_URL", "http://not-allowlisted:3128")
+    monkeypatch.setenv("MOOTLOOP_EGRESS_PROXY_PASSWORD", "proxy-secret")
+    monkeypatch.setenv(ENGINE_CONFIG_ENV, str(tmp_path / "engine-config"))
+    provider = _provider(
+        tmp_path,
+        runtime_mode="hosted",
+        egress_wrapper=hosted_wrapper(),
+    )
+    with pytest.raises(EgressError, match="egress-proxy"):
+        provider.build_env()
+
+
+def test_hosted_missing_proxy_auth_fails_before_subprocess(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    called = tmp_path / "subprocess-called"
+    fake = tmp_path / "claude"
+    fake.write_text(f"#!/bin/sh\ntouch {called}\n", encoding="utf-8")
+    fake.chmod(0o755)
+    monkeypatch.setenv("MOOTLOOP_EGRESS_PROXY_URL", "http://egress-proxy:3128")
+    monkeypatch.delenv("MOOTLOOP_EGRESS_PROXY_PASSWORD", raising=False)
+    monkeypatch.setattr("mootloop.engine.isolation.secrets.load_secret", lambda key: None)
+    monkeypatch.setenv(ENGINE_CONFIG_ENV, str(tmp_path / "engine-config"))
+    provider = _provider(
+        tmp_path,
+        runtime_mode="hosted",
+        egress_wrapper=hosted_wrapper(),
+        claude_bin=str(fake),
+    )
+
+    with pytest.raises(EgressError, match="PROXY_PASSWORD"):
+        provider.run_turn(_spec(), "safe prompt")
+    assert not called.exists()
+
+
+@pytest.mark.parametrize(
+    ("prompt", "register"),
+    [
+        ("MOOTLOOP-CANARY-provider-boundary", False),
+        ("registered-provider-secret-u02", True),
+    ],
+)
+def test_outbound_prompt_tripwire_blocks_before_subprocess(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    prompt: str,
+    register: bool,
+) -> None:
+    called = tmp_path / "subprocess-called"
+    fake = tmp_path / "claude"
+    fake.write_text(f"#!/bin/sh\ntouch {called}\n", encoding="utf-8")
+    fake.chmod(0o755)
+    registry = tmp_path / "canaries.json"
+    registry.write_text(
+        '{"canaries":{"MOOTLOOP-CANARY-provider-boundary":"matter"},"denylist":[]}',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("MOOTLOOP_CANARY_REGISTRY", str(registry))
+    if register:
+        secrets.register_secret(prompt)
+    provider = _provider(tmp_path, claude_bin=str(fake))
+
+    with pytest.raises(OutboundPrivacyError, match="outbound payload contains"):
+        provider.run_turn(_spec(), prompt)
+    assert not called.exists()
+
+
+def test_loader_supplied_secret_prompt_blocks_before_subprocess(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    token = "loader-only-exact-secret-u02"
+    called = tmp_path / "subprocess-called"
+    fake = tmp_path / "claude"
+    fake.write_text(f"#!/bin/sh\ntouch {called}\n", encoding="utf-8")
+    fake.chmod(0o755)
+    monkeypatch.setenv("MOOTLOOP_CANARY_REGISTRY", str(tmp_path / "missing-registry"))
+    provider = _provider(
+        tmp_path,
+        claude_bin=str(fake),
+        oauth_token_loader=lambda: token,
+    )
+
+    with pytest.raises(OutboundPrivacyError, match="exact secret"):
+        provider.run_turn(_spec(), token)
+    assert not called.exists()
+
+
+def test_hosted_env_routes_model_traffic_only_to_authenticated_proxy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("MOOTLOOP_EGRESS_PROXY_URL", "http://egress-proxy:3128")
+    monkeypatch.setattr("mootloop.engine.isolation.secrets.load_secret", lambda key: "proxy pass")
+    monkeypatch.setenv(ENGINE_CONFIG_ENV, str(tmp_path / "engine-config"))
+    canary_registry = tmp_path / "global-canaries.json"
+    canary_registry.write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("MOOTLOOP_CANARY_REGISTRY", str(canary_registry))
+    provider = _provider(tmp_path, runtime_mode="hosted", egress_wrapper=hosted_wrapper())
+
+    env = provider.build_env()
+
+    assert env["HTTP_PROXY"] == env["HTTPS_PROXY"]
+    assert env["HTTPS_PROXY"] == "http://mootloop:proxy%20pass@egress-proxy:3128"
+    assert env["NO_PROXY"] == ""
+    assert env["MOOTLOOP_CANARY_REGISTRY"] == str(canary_registry)
+    assert validate_isolated_command(["claude", "-p"], env) == ["claude", "-p"]
+    assert env["HOME"].startswith(env["CLAUDE_CONFIG_DIR"])
+    assert env["TMPDIR"].startswith(env["CLAUDE_CONFIG_DIR"])
+
+
+@pytest.mark.parametrize("registry_kind", ["missing", "directory", "symlink"])
+def test_hosted_mode_requires_regular_canary_registry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, registry_kind: str
+) -> None:
+    monkeypatch.setenv("MOOTLOOP_EGRESS_PROXY_URL", "http://egress-proxy:3128")
+    monkeypatch.setattr("mootloop.engine.isolation.secrets.load_secret", lambda key: "proxy pass")
+    monkeypatch.setenv(ENGINE_CONFIG_ENV, str(tmp_path / "engine-config"))
+    registry = tmp_path / "canaries.json"
+    if registry_kind == "directory":
+        registry.mkdir()
+    elif registry_kind == "symlink":
+        target = tmp_path / "target.json"
+        target.write_text("{}", encoding="utf-8")
+        registry.symlink_to(target)
+    monkeypatch.setenv("MOOTLOOP_CANARY_REGISTRY", str(registry))
+    provider = _provider(tmp_path, runtime_mode="hosted", egress_wrapper=hosted_wrapper())
+
+    with pytest.raises(EgressError, match="canary registry"):
+        provider.build_env()
+
+
+def test_hosted_wrapper_landlock_hides_matter_control_and_secrets(tmp_path: Path) -> None:
+    vault = tmp_path / "worker" / "bound-matter"
+    config = tmp_path / "config"
+    queue = tmp_path / "worker" / ".queue"
+    secrets_dir = tmp_path / "secrets"
+    canary_registry = tmp_path / "global-canaries.json"
+    for path in (vault, config, queue, secrets_dir):
+        path.mkdir(parents=True, exist_ok=True)
+    canary_registry.write_text("{}", encoding="utf-8")
+    env = {
+        "HTTP_PROXY": "http://mootloop:secret@egress-proxy:3128",
+        "HTTPS_PROXY": "http://mootloop:secret@egress-proxy:3128",
+        "MOOTLOOP_PROVIDER_VAULT": str(vault),
+        "MOOTLOOP_PROVIDER_CONFIG_DIR": str(config),
+        "MOOTLOOP_CONTROL_DIR": str(queue),
+        "MOOTLOOP_SECRETS_DIR": str(secrets_dir),
+        "MOOTLOOP_CANARY_REGISTRY": str(canary_registry),
+    }
+
+    (vault / "matter.txt").write_text("matter", encoding="utf-8")
+    (queue / "control.txt").write_text("control", encoding="utf-8")
+    (secrets_dir / "secret.txt").write_text("secret", encoding="utf-8")
+    (config / "allowed.txt").write_text("allowed", encoding="utf-8")
+    paths = [
+        str(vault / "matter.txt"),
+        str(queue / "control.txt"),
+        str(secrets_dir / "secret.txt"),
+        str(canary_registry),
+    ]
+    probe = (
+        "import json,pathlib; paths="
+        + repr(paths)
+        + "; out=[]; "
+        "exec('for p in paths:\\n try: pathlib.Path(p).read_text(); out.append(True)"
+        "\\n except OSError: out.append(False)'); "
+        f"print(json.dumps([out, pathlib.Path({str(config / 'allowed.txt')!r}).read_text()]))"
+    )
+    completed = subprocess.run(
+        [*hosted_wrapper(), "/usr/bin/python3", "-c", probe],
+        env={**os.environ, **env},
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    blocked, allowed = json.loads(completed.stdout)
+    assert blocked == [False, False, False, False]
+    assert allowed == "allowed"
+
+
+@pytest.mark.parametrize(
+    ("key", "value", "message"),
+    [
+        ("HTTP_PROXY", "http://egress-proxy:3128", "proxy"),
+        ("HTTPS_PROXY", "http://mootloop:secret@other-proxy:3128", "proxy"),
+        ("MOOTLOOP_PROVIDER_VAULT", "relative/vault", "paths"),
+        ("MOOTLOOP_CANARY_REGISTRY", "", "paths"),
+    ],
+)
+def test_hosted_wrapper_rejects_incomplete_or_untrusted_boundary(
+    tmp_path: Path, key: str, value: str, message: str
+) -> None:
+    paths = {
+        "MOOTLOOP_PROVIDER_VAULT": str(tmp_path / "vault"),
+        "MOOTLOOP_PROVIDER_CONFIG_DIR": str(tmp_path / "config"),
+        "MOOTLOOP_CONTROL_DIR": str(tmp_path / "queue"),
+        "MOOTLOOP_SECRETS_DIR": str(tmp_path / "secrets"),
+        "MOOTLOOP_CANARY_REGISTRY": str(tmp_path / "canaries.json"),
+    }
+    env = {
+        **paths,
+        "HTTP_PROXY": "http://mootloop:secret@egress-proxy:3128",
+        "HTTPS_PROXY": "http://mootloop:secret@egress-proxy:3128",
+    }
+    env[key] = value
+
+    with pytest.raises(SystemExit, match=message):
+        validate_isolated_command(["claude", "-p"], env)
+
+
+def test_hosted_wrapper_rejects_empty_command() -> None:
+    with pytest.raises(SystemExit, match="requires a command"):
+        validate_isolated_command([], {})
+
+
+def test_proxy_service_prepares_auth_file_before_exec(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from mootloop.engine import proxy_service
+
+    password_file = tmp_path / "squid-passwords"
+    source_password = tmp_path / "proxy-password"
+    source_password.write_text("proxy-secret\n", encoding="utf-8")
+    executed: list[str] = []
+    monkeypatch.setattr(proxy_service, "PASSWORD_FILE", str(password_file))
+    monkeypatch.setenv(proxy_service.PROXY_PASSWORD_FILE_ENV, str(source_password))
+    monkeypatch.setattr(
+        proxy_service.os,
+        "execvp",
+        lambda executable, argv: executed.extend([executable, *argv]),
+    )
+
+    proxy_service.main()
+
+    assert password_file.read_text(encoding="utf-8").startswith("mootloop:{SHA}")
+    assert password_file.stat().st_mode & 0o777 == 0o600
+    assert executed == ["squid", "squid", "-NYCd", "1"]
+
+
+@pytest.mark.parametrize("password_kind", ["missing", "directory", "symlink", "empty"])
+def test_proxy_service_fails_closed_on_invalid_password_source(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    password_kind: str,
+) -> None:
+    from mootloop.engine import proxy_service
+
+    source = tmp_path / "proxy-password"
+    if password_kind == "directory":
+        source.mkdir()
+    elif password_kind == "symlink":
+        target = tmp_path / "target"
+        target.write_text("proxy-secret\n", encoding="utf-8")
+        source.symlink_to(target)
+    elif password_kind == "empty":
+        source.write_text("", encoding="utf-8")
+    monkeypatch.setenv(proxy_service.PROXY_PASSWORD_FILE_ENV, str(source))
+    monkeypatch.setattr(
+        proxy_service.os,
+        "execvp",
+        lambda executable, argv: pytest.fail("Squid must not start"),
+    )
+
+    with pytest.raises(SystemExit, match="regular|unreadable|empty"):
+        proxy_service.main()
+
+
+@pytest.mark.parametrize("mode", ["local", "dev"])
+def test_local_and_dev_modes_are_explicit_and_do_not_inject_proxy(
+    tmp_path: Path, mode: str
+) -> None:
+    env = _provider(tmp_path, runtime_mode=mode).build_env()
+    assert "HTTPS_PROXY" not in env
 
 
 def test_argv_appends_resume_when_session_present(tmp_path: Path) -> None:
@@ -413,9 +728,7 @@ print(json.dumps({
 _PRIVILEGED = "PRIVILEGED-WORK-PRODUCT-b3f1e0"
 
 
-def test_prompt_travels_on_stdin_not_argv(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_prompt_travels_on_stdin_not_argv(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """REGRESSION. The persona prompt is privileged work product and was passed as an
     argv element, where `/proc/<pid>/cmdline` exposes it to every local process for the
     life of the turn — and where `subprocess.TimeoutExpired.__str__` embedded it into a

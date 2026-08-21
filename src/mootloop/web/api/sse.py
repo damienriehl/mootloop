@@ -14,11 +14,14 @@ layer; only `sse_run_events` is async, because the ASGI streaming response requi
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 
 from mootloop.journal import journal_path, load_state, tail_events
+from mootloop.models.common import PublicText
+from mootloop.privacy import serialize_outbound
 
 # Bounds keep the async generator from streaming forever (env-overridable for ops).
 _MAX_DURATION_ENV = "MOOTLOOP_SSE_MAX_SECONDS"
@@ -30,9 +33,13 @@ _KEEPALIVE_AFTER = 30.0
 KEEPALIVE_FRAME = ": keep-alive\n\n"
 
 
-def format_sse(event_json: str) -> str:
+def format_sse(event_json: str) -> PublicText:
     """Frame one JSON event line as an SSE ``data:`` event (pure)."""
-    return f"data: {event_json}\n\n"
+    return PublicText(f"data: {serialize_outbound(json.loads(event_json))}\n\n")
+
+
+def _format_event(event: object) -> PublicText:
+    return PublicText(f"data: {serialize_outbound(event)}\n\n")
 
 
 def iter_sse_lines(vault_root: Path | str, run_id: str, *, after_offset: int = 0) -> Iterator[str]:
@@ -41,7 +48,7 @@ def iter_sse_lines(vault_root: Path | str, run_id: str, *, after_offset: int = 0
     Pure and sync — a unit test can exercise the tail-to-SSE formatting without ASGI."""
     events, _new_offset = tail_events(journal_path(vault_root, run_id), after_offset)
     for event in events:
-        yield format_sse(event.model_dump_json())
+        yield _format_event(event)
 
 
 def _bounds() -> tuple[float, float]:
@@ -63,7 +70,7 @@ async def sse_run_events(vault_root: Path | str, run_id: str) -> AsyncIterator[s
         now = loop.time()
         if events:
             for event in events:
-                yield format_sse(event.model_dump_json())
+                yield _format_event(event)
             last_emit = now
         if load_state(vault_root, run_id).is_terminal:
             return
