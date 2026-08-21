@@ -1,8 +1,9 @@
 # MootLoop persona standard (task-agnostic)
 
 This is the shared excellence standard injected into every persona. It carries no
-task prose — the task adapter and the injected inputs supply that. Persona bodies
-reference this standard; they never duplicate it.
+task prose — the task adapter and the injected inputs supply that. Prompt assembly
+prepends these exact snapshotted bytes to every role body; role bodies never
+duplicate it.
 
 ## Hard rules (non-negotiable)
 

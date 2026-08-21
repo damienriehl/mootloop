@@ -722,8 +722,14 @@ def test_manifest_source_digests_match_captured_bytes(tmp_path: Path) -> None:
     snapshot = load_run_corpus(vault, context).documents[0]
     assert snapshot.sha256 == expected
     assert hashlib.sha256(snapshot.text.encode("utf-8")).hexdigest() == expected
+    standard_raw = (PERSONAS_DIR / "_standard.md").read_bytes()
     associate_raw = (PERSONAS_DIR / "associate.md").read_bytes()
-    assert context.manifest.persona_bodies[PersonaName.ASSOCIATE] == associate_raw.decode()
+    assert context.manifest.persona_bodies[PersonaName.ASSOCIATE] == (
+        standard_raw.decode().rstrip() + "\n\n" + associate_raw.decode().lstrip()
+    )
+    assert sources[("persona_body", "personas/_standard.md")] == hashlib.sha256(
+        standard_raw
+    ).hexdigest()
     assert sources[("persona_body", "personas/associate.md")] == hashlib.sha256(
         associate_raw
     ).hexdigest()

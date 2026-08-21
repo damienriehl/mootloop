@@ -27,14 +27,14 @@ short label is less detailed.
 | D1-01 | Core orchestration behind `TurnExecutor`/`LLMProvider`; fake provider tests | COMPLETE |
 | D1-02 | YAML-plus-strategy TaskAdapter; new task avoids core changes | PARTIAL — immutable binding complete; synthesis U-12 |
 | D1-03 | Uniform Gate protocol with scope, dependencies, and one gate ledger | COMPLETE |
-| D1-04 | Agent/persona/task-binding layering contract | PARTIAL — gate/task layering complete; persona strategy U-06 |
+| D1-04 | Agent/persona/task-binding layering contract | COMPLETE |
 | D1-05 | Local protocol seams and pinned provenance for copied components | COMPLETE |
 | D1-06 | Drafting-specific convergence signals and real rubric deltas | COMPLETE |
 | D2-01 | Namespaced `mootloop` Claude Code plugin and verbs | OPEN-AUTO — U-11A |
 | D2-02 | Disable model invocation for every side-effecting skill | OPEN-AUTO — U-11A |
 | D2-03 | One parameterized judge/juror persona rather than forks | PARTIAL — U-07/U-11A |
 | D2-04 | Least-privilege persona/panel/cite-checker tool sets | PARTIAL — U-02/U-07 |
-| D2-05 | Persona-body contract and injected excellence standard | PARTIAL — U-06 |
+| D2-05 | Persona-body contract and injected excellence standard | COMPLETE |
 | D2-06 | Compact run-skill navigator over durable references | OPEN-AUTO — U-11A |
 | D3-C1 | Fence all untrusted text as data; content never drives tools/control flow | PARTIAL — run context, execution isolation, and ingest visibility complete; hostile reimport U-09 |
 | D3-C2 | Fail-closed OSS scrub plus mandatory rendered human diff; no auto-commit | OPEN-AUTO — U-09 |
@@ -112,7 +112,7 @@ short label is less detailed.
 | D12-03 | Five-layer config precedence and structural override allowlist | COMPLETE |
 | D12-04 | Gate execution-order column and canonical gate names | COMPLETE |
 | D13-01 | Pre-first-serve professional-responsibility spine | PARTIAL — immutable context complete; U-02–U-04B/U-11A/U-17 |
-| D13-02 | Post-serve learning, breadth, strategy, oracle, and CLI work retained | OPEN/DEFERRED — U-06/U-09/U-10/U-11B and successor queue |
+| D13-02 | Post-serve learning, breadth, strategy, oracle, and CLI work retained | OPEN/DEFERRED — strategy complete; U-09/U-10/U-11B and successor queue remain |
 | D13-03 | Google/annotated and other explicitly delayed lanes remain visible | DECISION/DEFERRED — D-06/U-03/U-09/successor queue |
 
 ## Hosted cockpit FD-1–FD-10 amendments

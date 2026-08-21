@@ -8,11 +8,11 @@ uncommitted code change: the only pre-existing dirty file was the timer-managed
 `.claude/RESUME.md`. Both recent feature PRs are merged, and the backend and frontend
 validation suites are green.
 
-Execution update through 2026-08-21: U-01 through U-05 are now complete locally,
-remotely reviewed, and merged. U-05 landed in PR #42 as merge commit `4907761`; its
-final code head `d9f08e6` passed every required backend, invariant, and frontend job,
-and its sole actionable review finding was fixed, regression-tested, replied to, and
-resolved. U-06 is the next autonomous unit.
+Execution update through 2026-08-21: U-01 through U-06 are now complete locally,
+remotely reviewed, and merged. U-06 landed in PR #44 as merge commit `8fcdbcf`; its
+final code head `b7dcee6` passed every required backend, invariant, and frontend job.
+Both actionable review findings were fixed with regressions, replied to, and resolved.
+U-07 is the next autonomous unit.
 
 The broader repository audit nevertheless found genuine unfinished work in the two
 legacy plans still marked `active`. This document is the completion ledger for every
@@ -99,7 +99,7 @@ Source: `docs/plans/2026-07-11-001-feat-mootloop-v1-agentic-litigation-pipeline-
 | V1-1c | Fact repository, provenance, and gap questions | COMPLETE locally / DECISION-GATED live | U-04A adds append-only proposed/reviewed fact transitions, exact reviewed-document provenance checks, deterministic gap interviews, and accepted-only run context. The prior hosted run loaded zero client facts; live fact supply and validation remain D-02/D-03. |
 | V1-2a | Six personas, discovery adapter, defaults, thin full pipeline | COMPLETE | Persona/stage/orchestrator code and synthetic pipeline tests exist. |
 | V1-2b | Journaled crash resume, idempotent turns, derailment detection, non-degeneracy | COMPLETE for current pipeline | Runs replay an exact approved launch snapshot, fail closed on missing/tampered context, and repair journaled hosted launch delivery idempotently. |
-| V1-2c | Individually enable/bypass personas and select thin-full/deep-core/adversarial-first | OPEN-AUTO | Thin-full exists; full controls/strategies do not. U-06. |
+| V1-2c | Individually enable/bypass personas and select thin-full/deep-core/adversarial-first | COMPLETE | U-06 commits an immutable resolved graph, exact persona ownership/bypass, all three strategies, delegated obligations, deterministic cost/gate/replay behavior, and fail-closed invalid combinations. |
 | V1-3 | Convergence, locked/versioned rubric, rubric judges, estimates/metering/hard cap | COMPLETE | Implemented and covered; the unchecked rubric/check-suite boxes are stale. |
 | V1-4 | Citation clients/cache, fabrication gate, and research-request queue | COMPLETE for current routes | Gate framework and current legal-source clients exist. OpenLaws consolidation remains intentionally deferred. |
 | V1-5 | Decisions, gated/observed/autonomous modes, configurable attorney gates | COMPLETE | Durable decision and attestation primitives exist across CLI/API for current actions. |
@@ -130,8 +130,8 @@ delivery now share the same immutable commitment and recovery boundary.
 
 | ID | Reconciled status | Evidence or queue |
 |---|---|---|
-| D1 Architecture | PARTIAL | Provider/task/stage protocols, deterministic convergence, uniform gate ordering/dependencies, the gate ledger, and copied-component seams/provenance exist. Persona/pipeline strategy completion is U-06 and synthesis remains U-12. |
-| D2 Packaging and skills | PARTIAL | Six personas and two local skills exist. Namespaced plugin packaging, complete side-effect invocation guards, compact navigators, and skill/CLI breadth are U-06/U-11A/U-11B. |
+| D1 Architecture | PARTIAL | Provider/task/stage protocols, immutable persona/pipeline selection, deterministic convergence, uniform gate ordering/dependencies, the gate ledger, and copied-component seams/provenance exist. Synthesis remains U-12. |
+| D2 Packaging and skills | PARTIAL | Six executable personas with exact bodies and ownership contracts plus two local skills exist. Namespaced plugin packaging, complete side-effect invocation guards, compact navigators, and skill/CLI breadth remain U-11A/U-11B. |
 | D3 Adversarial security | PARTIAL | Path/vault/privacy/redaction/type controls exist. Enforced egress and isolation are U-02; complete integrity is U-03; hostile reimport/learning and Google ACL controls are U-09/D-06. |
 | D4 Performance and scale | OPEN-AUTO | Flat-context proof, bounded fan-out, prompt caching, objection batching, cache metrics, and calibrated retry/concurrency are U-16. The process-wide CourtListener bucket already exists. |
 | D5 Cost and budget | PARTIAL | Tiered models, dated pricing, cache-aware metering, estimates, labels, and caps exist. Output-cap, batching, cache, and self-calibration refinements remain U-16. |
@@ -142,7 +142,7 @@ delivery now share the same immutable commitment and recovery boundary.
 | D10 Python foundations | PARTIAL | Domain models, strict schemas, migrations, five-layer frozen config, unions, protocols, sync-core boundaries, folds, typed trust zones, gate ordering, write-once turn results, copied-component seams, and the CLI split exist. The learning package split is U-09. |
 | D11 Agent-native parity | PARTIAL | Current run/decision/attestation/export and TaskSpec-lock primitives have CLI/API paths. Full learning actions, sidecars, `context.md`, emergent-task proof, and the complete capability matrix are U-09/U-11A/U-11B. |
 | D12 Vocabulary, IDs, config | PARTIAL | Five-layer resolution, structural override controls, canonical gate names/order, and IDs consumed by current immutable run/gate context are complete. Learning-specific IDs remain U-09. |
-| D13 Sequencing | PARTIAL / DEFERRED | The pre-serve core mostly exists but clean validation is U-17. Edit-learning, strategies, oracle, CLI breadth, and benchmark are U-06/U-09/U-10/U-11A/U-11B; Google/non-discovery breadth remains D-06/deferred. |
+| D13 Sequencing | PARTIAL / DEFERRED | The pre-serve core mostly exists but clean validation is U-17. Edit-learning, oracle, CLI breadth, and benchmark are U-09/U-10/U-11A/U-11B; Google/non-discovery breadth remains D-06/deferred. |
 
 ## Plan 2 — Demo Server and Deployment
 

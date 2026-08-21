@@ -49,7 +49,13 @@ class DiscoveryResponsesAdapter:
             "Draft a response to the served request below. Answer or object per the "
             "governing discovery rule; state each objection's basis with particularity; "
             "ground every factual assertion in a listed fact_id or raise it as an "
-            "attorney_gate_item. Do not invent facts or law."
+            "attorney_gate_item. Answer fully to the extent you do not object and, for a "
+            "partial objection, identify the disputed part and answer the rest. Never use "
+            "'subject to and without waiving' or a variant. For an RFA, propose exactly one "
+            "Rule 36 disposition (admit, deny, qualify, or lack_of_knowledge); treat it as a "
+            "hard-human proposal, include a reasonable-inquiry recital for "
+            "lack_of_knowledge, and use null for interrogatories and RFPs. Do not invent "
+            "facts or law."
         )
 
     def judge_question(self) -> str:
