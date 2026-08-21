@@ -643,6 +643,52 @@
         "title": "DeliverablesResponse",
         "type": "object"
       },
+      "DocxRevision": {
+        "additionalProperties": false,
+        "description": "One tracked OOXML insertion or deletion inside a recovered anchor.",
+        "properties": {
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "kind": {
+            "enum": [
+              "insertion",
+              "deletion"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "text"
+        ],
+        "title": "DocxRevision",
+        "type": "object"
+      },
       "ExportSeal": {
         "additionalProperties": false,
         "description": "A deterministic export manifest linked to one attorney attestation.",
@@ -948,6 +994,534 @@
           "item_id"
         ],
         "title": "JudgeProfileQueuedResponse",
+        "type": "object"
+      },
+      "LearningImportRecord": {
+        "additionalProperties": false,
+        "description": "One exact edited-document recovery attempt, including blocked imports.",
+        "properties": {
+          "anchors": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/RecoveredAnchor"
+            },
+            "title": "Anchors",
+            "type": "array"
+          },
+          "auto_routable": {
+            "title": "Auto Routable",
+            "type": "boolean"
+          },
+          "blockers": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Blockers",
+            "type": "array"
+          },
+          "import_id": {
+            "title": "Import Id",
+            "type": "string"
+          },
+          "imported_at": {
+            "title": "Imported At",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "source_matter_id": {
+            "title": "Source Matter Id",
+            "type": "string"
+          },
+          "source_name": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Source Name",
+            "type": "string"
+          },
+          "source_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Source Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "import_id",
+          "source_matter_id",
+          "run_id",
+          "source_name",
+          "source_sha256",
+          "imported_at",
+          "auto_routable"
+        ],
+        "title": "LearningImportRecord",
+        "type": "object"
+      },
+      "LearningImportRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "source_base64": {
+            "maxLength": 90000000,
+            "minLength": 1,
+            "title": "Source Base64",
+            "type": "string"
+          },
+          "source_name": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Source Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_name",
+          "source_base64"
+        ],
+        "title": "LearningImportRequest",
+        "type": "object"
+      },
+      "LearningImportResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "import_record": {
+            "$ref": "#/components/schemas/LearningImportRecord"
+          },
+          "kind": {
+            "const": "learning_import",
+            "default": "learning_import",
+            "title": "Kind",
+            "type": "string"
+          },
+          "proposals": {
+            "items": {
+              "$ref": "#/components/schemas/LearningProposalView"
+            },
+            "title": "Proposals",
+            "type": "array"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "import_record"
+        ],
+        "title": "LearningImportResponse",
+        "type": "object"
+      },
+      "LearningPromotionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "confirm_scrub_diff": {
+            "default": false,
+            "title": "Confirm Scrub Diff",
+            "type": "boolean"
+          },
+          "excluded_matter_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Excluded Matter Ids",
+            "type": "array"
+          },
+          "reviewed_text": {
+            "maxLength": 131072,
+            "minLength": 1,
+            "title": "Reviewed Text",
+            "type": "string"
+          },
+          "scrub_diff_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Scrub Diff Sha256",
+            "type": "string"
+          },
+          "target_tier": {
+            "enum": [
+              "matter",
+              "firm",
+              "area"
+            ],
+            "title": "Target Tier",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target_tier",
+          "reviewed_text",
+          "scrub_diff_sha256"
+        ],
+        "title": "LearningPromotionRequest",
+        "type": "object"
+      },
+      "LearningProposalResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "learning_proposal",
+            "default": "learning_proposal",
+            "title": "Kind",
+            "type": "string"
+          },
+          "proposal": {
+            "$ref": "#/components/schemas/LearningProposalView"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "proposal"
+        ],
+        "title": "LearningProposalResponse",
+        "type": "object"
+      },
+      "LearningProposalView": {
+        "additionalProperties": false,
+        "description": "Current folded state plus immutable proposal and human history.",
+        "properties": {
+          "accepted_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted Text"
+          },
+          "active_tiers": {
+            "items": {
+              "enum": [
+                "matter",
+                "firm",
+                "area"
+              ],
+              "type": "string"
+            },
+            "title": "Active Tiers",
+            "type": "array"
+          },
+          "anchor_id": {
+            "title": "Anchor Id",
+            "type": "string"
+          },
+          "baseline_sha256": {
+            "title": "Baseline Sha256",
+            "type": "string"
+          },
+          "baseline_text": {
+            "title": "Baseline Text",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "critic_markup": {
+            "title": "Critic Markup",
+            "type": "string"
+          },
+          "edited_sha256": {
+            "title": "Edited Sha256",
+            "type": "string"
+          },
+          "edited_text": {
+            "title": "Edited Text",
+            "type": "string"
+          },
+          "import_id": {
+            "title": "Import Id",
+            "type": "string"
+          },
+          "proposal_id": {
+            "title": "Proposal Id",
+            "type": "string"
+          },
+          "proposed_text": {
+            "title": "Proposed Text",
+            "type": "string"
+          },
+          "proposed_tier": {
+            "enum": [
+              "matter",
+              "firm",
+              "area"
+            ],
+            "title": "Proposed Tier",
+            "type": "string"
+          },
+          "review_history": {
+            "items": {
+              "$ref": "#/components/schemas/LearningReview"
+            },
+            "title": "Review History",
+            "type": "array"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "source_matter_id": {
+            "title": "Source Matter Id",
+            "type": "string"
+          },
+          "status": {
+            "default": "needs_review",
+            "enum": [
+              "needs_review",
+              "accepted",
+              "rejected"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          },
+          "word_changes": {
+            "title": "Word Changes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "proposal_id",
+          "import_id",
+          "source_matter_id",
+          "run_id",
+          "task",
+          "anchor_id",
+          "baseline_text",
+          "edited_text",
+          "baseline_sha256",
+          "edited_sha256",
+          "critic_markup",
+          "word_changes",
+          "proposed_tier",
+          "proposed_text",
+          "created_at"
+        ],
+        "title": "LearningProposalView",
+        "type": "object"
+      },
+      "LearningProposalsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "imports": {
+            "items": {
+              "$ref": "#/components/schemas/LearningImportRecord"
+            },
+            "title": "Imports",
+            "type": "array"
+          },
+          "kind": {
+            "const": "learning_proposals",
+            "default": "learning_proposals",
+            "title": "Kind",
+            "type": "string"
+          },
+          "proposals": {
+            "items": {
+              "$ref": "#/components/schemas/LearningProposalView"
+            },
+            "title": "Proposals",
+            "type": "array"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "title": "LearningProposalsResponse",
+        "type": "object"
+      },
+      "LearningReview": {
+        "additionalProperties": false,
+        "description": "Append-only human acceptance, rejection, or cross-matter promotion.",
+        "properties": {
+          "action": {
+            "enum": [
+              "accept",
+              "reject",
+              "promote"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "actor": {
+            "maxLength": 320,
+            "minLength": 1,
+            "title": "Actor",
+            "type": "string"
+          },
+          "channel": {
+            "enum": [
+              "api",
+              "cli"
+            ],
+            "title": "Channel",
+            "type": "string"
+          },
+          "confirm_scrub_diff": {
+            "default": false,
+            "title": "Confirm Scrub Diff",
+            "type": "boolean"
+          },
+          "excluded_matter_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Excluded Matter Ids",
+            "type": "array"
+          },
+          "proposal_id": {
+            "title": "Proposal Id",
+            "type": "string"
+          },
+          "reason": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Reason",
+            "type": "string"
+          },
+          "recorded_at": {
+            "title": "Recorded At",
+            "type": "string"
+          },
+          "review_id": {
+            "pattern": "^learning-review-[0-9a-f]{16}$",
+            "title": "Review Id",
+            "type": "string"
+          },
+          "reviewed_text": {
+            "default": "",
+            "maxLength": 131072,
+            "title": "Reviewed Text",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "scrub_diff_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scrub Diff Sha256"
+          },
+          "source_matter_id": {
+            "title": "Source Matter Id",
+            "type": "string"
+          },
+          "target_tier": {
+            "anyOf": [
+              {
+                "enum": [
+                  "matter",
+                  "firm",
+                  "area"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Tier"
+          }
+        },
+        "required": [
+          "review_id",
+          "source_matter_id",
+          "proposal_id",
+          "action",
+          "actor",
+          "channel",
+          "recorded_at"
+        ],
+        "title": "LearningReview",
+        "type": "object"
+      },
+      "LearningReviewRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Reason",
+            "type": "string"
+          },
+          "reviewed_text": {
+            "default": "",
+            "maxLength": 131072,
+            "title": "Reviewed Text",
+            "type": "string"
+          }
+        },
+        "title": "LearningReviewRequest",
+        "type": "object"
+      },
+      "LearningScrubRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "reviewed_text": {
+            "maxLength": 131072,
+            "minLength": 1,
+            "title": "Reviewed Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reviewed_text"
+        ],
+        "title": "LearningScrubRequest",
+        "type": "object"
+      },
+      "LearningScrubResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "learning_scrub_preview",
+            "default": "learning_scrub_preview",
+            "title": "Kind",
+            "type": "string"
+          },
+          "rendered_diff": {
+            "title": "Rendered Diff",
+            "type": "string"
+          },
+          "rendered_diff_sha256": {
+            "title": "Rendered Diff Sha256",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rendered_diff",
+          "rendered_diff_sha256"
+        ],
+        "title": "LearningScrubResponse",
         "type": "object"
       },
       "MatterSummary": {
@@ -1417,6 +1991,50 @@
           }
         },
         "title": "RaiseCapRequest",
+        "type": "object"
+      },
+      "RecoveredAnchor": {
+        "additionalProperties": false,
+        "description": "The original/current text views recovered for one expected stable anchor.",
+        "properties": {
+          "anchor_id": {
+            "title": "Anchor Id",
+            "type": "string"
+          },
+          "current_text": {
+            "default": "",
+            "title": "Current Text",
+            "type": "string"
+          },
+          "original_text": {
+            "default": "",
+            "title": "Original Text",
+            "type": "string"
+          },
+          "revisions": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/DocxRevision"
+            },
+            "title": "Revisions",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "exact",
+              "sentinel",
+              "ambiguous",
+              "missing"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "anchor_id",
+          "status"
+        ],
+        "title": "RecoveredAnchor",
         "type": "object"
       },
       "ReopenRunRequest": {
@@ -2466,6 +3084,325 @@
         "summary": "Queue Judge Profile"
       }
     },
+    "/api/matters/{matter_id}/learnings/proposals": {
+      "get": {
+        "operationId": "list_learning_proposals_api_matters__matter_id__learnings_proposals_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningProposalsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Learning Proposals"
+      }
+    },
+    "/api/matters/{matter_id}/learnings/proposals/{proposal_id}": {
+      "get": {
+        "operationId": "get_learning_proposal_api_matters__matter_id__learnings_proposals__proposal_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningProposalResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Learning Proposal"
+      }
+    },
+    "/api/matters/{matter_id}/learnings/proposals/{proposal_id}/accept": {
+      "post": {
+        "operationId": "accept_learning_proposal_api_matters__matter_id__learnings_proposals__proposal_id__accept_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LearningReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningProposalResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Accept Learning Proposal"
+      }
+    },
+    "/api/matters/{matter_id}/learnings/proposals/{proposal_id}/promote": {
+      "post": {
+        "operationId": "promote_learning_proposal_api_matters__matter_id__learnings_proposals__proposal_id__promote_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LearningPromotionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningProposalResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Promote Learning Proposal"
+      }
+    },
+    "/api/matters/{matter_id}/learnings/proposals/{proposal_id}/reject": {
+      "post": {
+        "operationId": "reject_learning_proposal_api_matters__matter_id__learnings_proposals__proposal_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LearningReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningProposalResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject Learning Proposal"
+      }
+    },
+    "/api/matters/{matter_id}/learnings/proposals/{proposal_id}/scrub": {
+      "post": {
+        "operationId": "scrub_learning_proposal_api_matters__matter_id__learnings_proposals__proposal_id__scrub_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LearningScrubRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningScrubResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Scrub Learning Proposal"
+      }
+    },
     "/api/matters/{matter_id}/runs": {
       "get": {
         "operationId": "list_runs_api_matters__matter_id__runs_get",
@@ -3067,6 +4004,65 @@
           }
         },
         "summary": "Get Run Integrity"
+      }
+    },
+    "/api/matters/{matter_id}/runs/{run_id}/learnings/import": {
+      "post": {
+        "description": "Import exact edited DOCX bytes; unresolvable anchors remain review-only.",
+        "operationId": "import_learning_docx_api_matters__matter_id__runs__run_id__learnings_import_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LearningImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningImportResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Import Learning Docx"
       }
     },
     "/api/matters/{matter_id}/runs/{run_id}/pause": {

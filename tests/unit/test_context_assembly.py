@@ -50,6 +50,8 @@ def _contribution(
     matter_id: str = "acme-v-widgets",
     task_scope: tuple[str, ...] = (TASK,),
     persona_scope: tuple[PersonaName, ...] = (),
+    sharing_scope: str = "matter",
+    excluded_matter_ids: tuple[str, ...] = (),
 ) -> ContextContribution:
     return ContextContribution(
         contribution_id=contribution_id,
@@ -63,6 +65,8 @@ def _contribution(
         trust="untrusted_data",
         permission="matter_confidential",
         approval_state=approval_state,
+        sharing_scope=sharing_scope,
+        excluded_matter_ids=tuple(MatterId(value) for value in excluded_matter_ids),
     )
 
 
@@ -166,7 +170,7 @@ def test_launch_snapshots_only_allowed_contributions_and_records_exclusions(
     )
     context = load_run_context(vault, run_id)
 
-    assert context.manifest.schema_version == "1.4"
+    assert context.manifest.schema_version == "1.5"
     assert [item.contribution_id for item in context.manifest.context_contributions] == [
         "board-approved",
         "board-partner-only",
@@ -191,6 +195,35 @@ def test_launch_snapshots_only_allowed_contributions_and_records_exclusions(
     assert "partner private tactic" not in prompt
     assert "other matter secret" not in prompt
     assert "secret pending" not in prompt
+
+
+def test_shared_learning_crosses_matters_only_when_not_excluded_by_ethical_wall() -> None:
+    shared = _contribution(
+        "firm-learning-safe",
+        "Prefer direct chronology headings.",
+        kind="learning",
+        approval_state="accepted",
+        matter_id="source-matter",
+        sharing_scope="firm",
+    )
+    walled = _contribution(
+        "firm-learning-walled",
+        "Prefer numbered witness tables.",
+        kind="learning",
+        approval_state="accepted",
+        matter_id="source-matter",
+        sharing_scope="firm",
+        excluded_matter_ids=("target-matter",),
+    )
+
+    accepted, excluded = context_assembly.select_launch_contributions(
+        (shared, walled), matter_id=MatterId("target-matter"), task=TASK
+    )
+
+    assert accepted == (shared,)
+    assert [(item.contribution_id, item.reason) for item in excluded] == [
+        ("firm-learning-walled", "ethical_wall")
+    ]
 
 
 def test_normal_launch_loads_external_firm_and_persisted_contributions(

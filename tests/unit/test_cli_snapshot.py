@@ -19,6 +19,7 @@ _COMMAND_TREE = {
     "facts": ["add", "interview", "list", "propose", "review"],
     "matters": ["list"],
     "judge": ["profile"],
+    "learn": ["accept", "import", "list", "promote", "reject", "scrub", "show"],
     "production": ["generate", "list", "review", "show"],
     "requests": ["parse"],
     "research": ["fulfill", "list"],

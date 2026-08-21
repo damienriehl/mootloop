@@ -153,7 +153,7 @@ def test_start_commits_versioned_manifest_and_task_spec(tmp_path: Path) -> None:
     started = next(event for event in read_events(vault, run_id) if isinstance(event, RunStarted))
     context = load_run_context(vault, run_id)
     assert started.context_manifest_sha256
-    assert context.manifest.schema_version == "1.4"
+    assert context.manifest.schema_version == "1.5"
     assert context.manifest.pipeline.strategy == "thin-full"
     assert context.manifest.task_spec == spec
     assert context.manifest.task_spec_lock is not None

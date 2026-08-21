@@ -41,6 +41,10 @@ class ProductionSuggestionError(MootloopError):
     """An RFP production-suggestion or human-review contract failed closed."""
 
 
+class LearningImportError(MootloopError):
+    """An edited-document import violated its format, integrity, or routing contract."""
+
+
 class TaskConfigError(MootloopError):
     """A task-adapter config failed to load or validate. Message names each bad field."""
 

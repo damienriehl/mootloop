@@ -55,6 +55,7 @@ cite_app = typer.Typer(help="Extract and verify citations.", no_args_is_help=Tru
 research_app = typer.Typer(help="Manage the citation research-request queue.", no_args_is_help=True)
 judge_app = typer.Typer(help="Build and inspect assigned-judge profiles.", no_args_is_help=True)
 production_app = typer.Typer(help="Review RFP document suggestions.", no_args_is_help=True)
+learn_app = typer.Typer(help="Import edits and govern reviewed learnings.", no_args_is_help=True)
 decide_app = typer.Typer(help="Review and resolve attorney-gate decisions.", no_args_is_help=True)
 web_app = typer.Typer(help="Public demo web tier (synthetic matter only).", no_args_is_help=True)
 matters_app = typer.Typer(
@@ -82,6 +83,7 @@ app.add_typer(cite_app, name="cite")
 app.add_typer(research_app, name="research")
 app.add_typer(judge_app, name="judge")
 app.add_typer(production_app, name="production")
+app.add_typer(learn_app, name="learn")
 app.add_typer(decide_app, name="decide")
 app.add_typer(web_app, name="web")
 app.add_typer(matters_app, name="matters")
@@ -128,6 +130,13 @@ class ProductionDispositionArg(StrEnum):
     produce = "produce"
     withhold = "withhold"
     defer = "defer"
+
+
+class LearningPromotionTierArg(StrEnum):
+    """Cross-matter learning destinations; matter acceptance is a separate act."""
+
+    firm = "firm"
+    area = "area"
 
 
 def _now() -> str:

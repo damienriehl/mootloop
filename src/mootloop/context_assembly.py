@@ -62,8 +62,10 @@ def select_launch_contributions(
             )
         seen.add(contribution.contribution_id)
         reason: ContextExclusionReason | None = None
-        if contribution.source_matter_id != matter_id:
+        if contribution.sharing_scope == "matter" and contribution.source_matter_id != matter_id:
             reason = "wrong_matter"
+        elif matter_id in contribution.excluded_matter_ids:
+            reason = "ethical_wall"
         elif contribution.task_scope and task not in contribution.task_scope:
             reason = "wrong_task"
         elif not _is_approved(contribution):
@@ -149,9 +151,16 @@ def _contribution_items(
         if source.kind == "context_contribution"
     }
     for contribution in manifest.context_contributions:
-        if contribution.source_matter_id != manifest.matter_id:
+        if (
+            contribution.sharing_scope == "matter"
+            and contribution.source_matter_id != manifest.matter_id
+        ):
             raise OrchestratorError(
                 f"context contribution {contribution.contribution_id!r} crosses matter boundary"
+            )
+        if manifest.matter_id in contribution.excluded_matter_ids:
+            raise OrchestratorError(
+                f"context contribution {contribution.contribution_id!r} is excluded by ethical wall"
             )
         if contribution.task_scope and manifest.task not in contribution.task_scope:
             raise OrchestratorError(

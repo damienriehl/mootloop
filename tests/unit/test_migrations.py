@@ -230,7 +230,7 @@ def test_run_context_v1_0_migrates_from_captured_fields_without_rewriting(
     migrated = load_run_context(vault, run_id)
 
     assert manifest_path.read_bytes() == legacy_raw
-    assert migrated.manifest.schema_version == "1.4"
+    assert migrated.manifest.schema_version == "1.5"
     assert migrated.manifest.task_spec_lock is None
     assert migrated.manifest.context_contributions == []
     assert migrated.manifest.context_exclusions == []

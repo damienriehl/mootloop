@@ -36,20 +36,20 @@ short label is less detailed.
 | D2-04 | Least-privilege persona/panel/cite-checker tool sets | COMPLETE locally — no persona tools; hosted egress remains D3-H9/D-18 |
 | D2-05 | Persona-body contract and injected excellence standard | COMPLETE |
 | D2-06 | Compact run-skill navigator over durable references | OPEN-AUTO — U-11A |
-| D3-C1 | Fence all untrusted text as data; content never drives tools/control flow | PARTIAL — run context, execution isolation, and ingest visibility complete; hostile reimport U-09 |
-| D3-C2 | Fail-closed OSS scrub plus mandatory rendered human diff; no auto-commit | OPEN-AUTO — U-09 |
+| D3-C1 | Fence all untrusted text as data; content never drives tools/control flow | COMPLETE locally — hostile reimport remains data-only and cannot auto-route ambiguous anchors |
+| D3-C2 | Fail-closed OSS scrub plus mandatory rendered human diff; no auto-commit | PARTIAL — U-09 deterministic/PublicText scrub, exact human diff, and pending-only external staging complete; model scrub, publishable-shape allowlist, second human confirmation, and explicit landing primitive U-11B |
 | D3-C3 | ID/path/filename realpath-containment hardening | COMPLETE |
-| D3-C4 | Google permission read-back and recipient allowlist after export | DECISION-GATED — D-06/U-09 |
+| D3-C4 | Google permission read-back and recipient allowlist after export | DECISION-GATED — D-06 |
 | D3-H5 | Vault/repo separation and no-follow symlink invariants | COMPLETE |
-| D3-H6 | Secrets outside vault/repo, minimal env, runtime redaction | PARTIAL — U-02 |
-| D3-H7 | Ethical walls and cross-matter learning exclusion | OPEN-AUTO — U-09 |
+| D3-H6 | Secrets outside vault/repo, minimal env, runtime redaction | COMPLETE locally — U-02; deployed proof U-17A |
+| D3-H7 | Ethical walls and cross-matter learning exclusion | COMPLETE locally — source matter, sharing scope, and per-matter exclusions are launch-filtered |
 | D3-H8 | Immutable verification source, chained logs/decisions, full attestation tuple | COMPLETE locally — exact-byte v2 commitment and mutation gates |
 | D3-H9 | Fixed legal-host egress allowlist; no content-derived target | PARTIAL — application paths/hosts fixed; hosted proxy expansion D-18 |
-| D3-H10 | Defensive DOCX/ZIP/XXE parsing and pinned model/catalog fetches | PARTIAL — U-04B isolates and pins protected conversion; local edit parsing U-09 and catalog updates U-12 |
-| D3-M11 | Per-matter canaries and fail-closed privacy scanning | COMPLETE locally; runtime path U-02 |
+| D3-H10 | Defensive DOCX/ZIP/XXE parsing and pinned model/catalog fetches | PARTIAL — protected conversion and hostile local DOCX edit parsing complete; catalog updates U-12 |
+| D3-M11 | Per-matter canaries and fail-closed privacy scanning | COMPLETE locally — U-02; deployed proof U-17A |
 | D3-M12 | Shared export controls for every CLI/skill path | COMPLETE for current sealed exports; extensions U-11A |
 | D3-13 | Every confidentiality/attestation error fails closed | PARTIAL — enforced per landing unit |
-| D3-14 | `MatterText`/`PublicText` trust conversion through scrub | PARTIAL — U-02/U-05/U-09 |
+| D3-14 | `MatterText`/`PublicText` trust conversion through scrub | COMPLETE for current sinks — U-09 shared text joins the U-02/U-05 outbound conversion boundary |
 | D4-01 | Flat pointer-plus-summary orchestrator context with scale invariant | OPEN-AUTO — U-16 |
 | D4-02 | Global bounded fan-out and one process-wide citation bucket/chunking | PARTIAL — bucket complete; fan-out U-16 |
 | D4-03 | Byte-stable prompt prefix/cache breakpoint and cache-write sequencing | OPEN-AUTO — U-16 |
@@ -74,11 +74,11 @@ short label is less detailed.
 | D7-05 | Filing document structure and no boilerplate general objections | COMPLETE for current adapter/export |
 | D7-06 | Sanctions authorities encoded as deterministic/rubric penalties | COMPLETE — Fischer/Liguria/Heller gates plus exact proposition-support proof |
 | D8-01 | Court-template DOCX rendering without destructive field rewrites | COMPLETE |
-| D8-02 | Bookmark plus sentinel anchor recovery from raw OOXML | OPEN-AUTO — U-09 |
-| D8-03 | Parse tracked insertions/deletions and revision metadata directly | OPEN-AUTO — U-09 |
-| D8-04 | Google suggestions/comments reimport and large-export handling | DECISION-GATED — D-06/U-09 |
+| D8-02 | Bookmark plus sentinel anchor recovery from raw OOXML | COMPLETE locally |
+| D8-03 | Parse tracked insertions/deletions and revision metadata directly | COMPLETE locally |
+| D8-04 | Google suggestions/comments reimport and large-export handling | DECISION-GATED — D-06 |
 | D8-05 | Clean eyecite text with offset back-mapping and bounded tokenizer choice | COMPLETE — original spans plus explicit Aho–Corasick default |
-| D8-06 | CriticMarkup representation for pending edits | OPEN-AUTO — U-09 |
+| D8-06 | CriticMarkup representation for pending edits | COMPLETE locally |
 | D9-01 | Citation-cache staleness, disclosure, and citator research request | COMPLETE for current clients |
 | D9-02 | Retention/destruction-date/litigation-hold close policy and destruction manifest | OPEN-AUTO — U-11A |
 | D9-03 | Sync-folder/conflicted-copy guard and idle snapshot | COMPLETE |
@@ -86,7 +86,7 @@ short label is less detailed.
 | D9-05 | Attestation binds master, ledgers, export set, actor/time; edit invalidates | COMPLETE locally — remote host-writer resistance remains D-09 |
 | D9-06 | Content-hash document IDs and whole-vault self-check | PARTIAL — stable ingest IDs and launch snapshots complete; whole-vault check U-11A |
 | D9-07 | Append-only fact versions; response and attestation pin fact state | COMPLETE locally — reviewed versions enter immutable launch context and v2 attestation binds its fact commitment |
-| D9-08 | Firm profile as append-only reviewed event log | OPEN-AUTO — U-09 |
+| D9-08 | Firm profile as append-only reviewed event log | COMPLETE locally — immutable ID-keyed reviewed events plus derived conflict-review view |
 | D9-09 | All derived/shared state append-only, content-addressed, timestamped | PARTIAL — enforced per unit |
 | D10-01 | Domain models own types; versions, migrations, strict extras | COMPLETE for current persisted models |
 | D10-02 | Discriminated GateResult union and exhaustive export handling | COMPLETE |
@@ -98,38 +98,38 @@ short label is less detailed.
 | D10-08 | Inject copied-component score sources; no hardcoded deltas | COMPLETE |
 | D10-09 | Deterministic/replayed/invariant/paid-oracle test tiers | PARTIAL — U-10 |
 | D10-10 | Thin Typer adapters and CLI package split as verbs grow | COMPLETE |
-| D10-11 | Six-concern learning package across three trust zones | OPEN-AUTO — U-09 |
-| D10-12 | `MatterText`/`PublicText` types and scrub producer | PARTIAL — U-02/U-09 |
+| D10-11 | Six-concern learning package across three trust zones | COMPLETE locally |
+| D10-12 | `MatterText`/`PublicText` types and scrub producer | COMPLETE for current trust-zone transitions |
 | D11-01 | Every action/human gate has structured read/write primitive | PARTIAL — U-11A/U-11B |
 | D11-02 | Decide/attest/research/facts/manifest/validate CLI verb set | PARTIAL — U-11A |
 | D11-03 | Hard-human versus policy-delegable gate provenance | COMPLETE for current decisions; extensions U-11B |
-| D11-04 | Accepted learnings and attorney decisions read back into later prompts | PARTIAL — approved snapshot/readback seam complete; learning workflow/proof U-09/U-17C |
+| D11-04 | Accepted learnings and attorney decisions read back into later prompts | PARTIAL — workflow and immutable next-run readback complete; beneficial attorney verdict U-17C |
 | D11-05 | Matter `context.md` read at start and updated at end | OPEN-AUTO — U-11A |
 | D11-06 | JSON sidecars beside human turn/score artifacts | OPEN-AUTO — U-11A |
 | D11-07 | Emergent in-domain task proof and structured derailment completion signal | PARTIAL — U-10/U-12 |
 | D12-01 | Canonical source/derived-artifact vocabulary, trace tree, evidence-pack IDs | PARTIAL — U-11A |
-| D12-02 | Canonical IDs including response/passages/facts/citations/decisions/learnings | PARTIAL — current run/gate IDs complete; learning IDs U-09 |
+| D12-02 | Canonical IDs including response/passages/facts/citations/decisions/learnings | PARTIAL — current run/gate/learning IDs complete; trace/evidence completion U-11A |
 | D12-03 | Five-layer config precedence and structural override allowlist | COMPLETE |
 | D12-04 | Gate execution-order column and canonical gate names | COMPLETE |
-| D13-01 | Pre-first-serve professional-responsibility spine | PARTIAL — immutable context complete; U-02–U-04B/U-11A/U-17 |
-| D13-02 | Post-serve learning, breadth, strategy, oracle, and CLI work retained | OPEN/DEFERRED — strategy complete; U-09/U-10/U-11B and successor queue remain |
-| D13-03 | Google/annotated and other explicitly delayed lanes remain visible | DECISION/DEFERRED — D-06/U-03/U-09/successor queue |
+| D13-01 | Pre-first-serve professional-responsibility spine | PARTIAL — immutable context, isolation, integrity, and protected ingest/conversion complete locally; U-11A/U-17 |
+| D13-02 | Post-serve learning, breadth, strategy, oracle, and CLI work retained | OPEN/DEFERRED — local learning and strategy complete; U-10/U-11B and successor queue remain |
+| D13-03 | Google/annotated and other explicitly delayed lanes remain visible | DECISION/DEFERRED — D-06/U-03/successor queue |
 
 ## Hosted cockpit FD-1–FD-10 amendments
 
 | ID | Atomic commitment | Disposition |
 |---|---|---|
 | FD1-01 | Personas have read-only file tools; no shell/web tools | COMPLETE locally |
-| FD1-02 | Per-turn network jail allows only Anthropic endpoint | OPEN-AUTO — U-02 |
-| FD1-03 | Per-matter UID/container filesystem isolation | OPEN-AUTO — U-02 |
+| FD1-02 | Per-turn network jail allows only Anthropic endpoint | COMPLETE locally — U-02; deployed proof U-17A |
+| FD1-03 | Per-matter UID/container filesystem isolation | COMPLETE locally — U-02; deployed proof U-17A |
 | FD1-04 | Driver auth, private API network, no Docker socket | PARTIAL — code/perimeter complete; deployed proof U-17A |
-| FD1-05 | Planted-injection exfiltration gate | OPEN-AUTO — U-02/U-17A |
+| FD1-05 | Planted-injection exfiltration gate | OPEN-AUTO — deployed proof U-17A |
 | FD2-01 | Pin audience/RS256/JWKS behavior; reject service tokens on matter routes | COMPLETE |
 | FD2-02 | Google uses device flow only | DECISION-GATED — D-06/U-14 |
 | FD2-03 | AOP key permissions and non-shared volume | COMPLETE by recorded perimeter evidence |
 | FD2-04 | Backups exclude secrets/config token copy; rotation purges history | PARTIAL — U-11A |
-| FD3-01 | Redact Google/OAuth/exact-secret values at every new sink | PARTIAL — U-02/U-15 |
-| FD3-02 | Runtime canary blocks outbound/notification payloads | OPEN-AUTO — U-02/U-15 |
+| FD3-01 | Redact Google/OAuth/exact-secret values at every current sink | COMPLETE locally — U-02; future notification sinks U-15 |
+| FD3-02 | Runtime canary blocks outbound/notification payloads | PARTIAL — outbound complete locally in U-02; notification path U-15 |
 | FD3-03 | Access audit chained, attestation-bound, fail-closed on downloads, stronger sink | COMPLETE locally — stronger remote sink remains D-09 |
 | FD3-04 | Secret ntfy topic, content-free digest, separate Gmail/Drive credentials | OPEN/DECISION — U-15/D-06 |
 | FD4-01 | Auto-derived board edits are immediately visible and journaled | OPEN-AUTO — U-13 |

@@ -184,20 +184,18 @@ The full choices and recommended defaults are in
 
 ```mermaid
 flowchart TD
-    A[Current repo and plans] --> B[U-00 truth and CI]
-    B --> C[U-01 canonical config and exact run context]
-    C --> D[U-02 isolation and outbound gates]
-    D --> E[U-11A recovery and close safety]
+    A[Current repo and plans] --> B[U-00 through U-09 complete or locally complete]
+    B --> C[U-10 regression oracles]
+    C --> E[U-11A recovery and close safety]
     E --> F[U-17A synthetic deployed gate if authorized]
-    E --> G[U-03 integrity plus U-04A ingest facts]
-    G --> H{Attorney inputs and hosted run authorized?}
+    F --> H{Attorney inputs and hosted run authorized?}
     H -->|yes| I[U-17B clean run review attestation export]
-    H -->|not yet| W[Continue local U-09 edit-learning work]
-    I --> J[U-09 plus U-17C beneficial learning proof]
-    W --> J
+    H -->|not yet| W[Retain deployed proof as a visible gate]
+    I --> J[U-17C beneficial learning proof]
     J --> K{D-10 product-value gate}
-    K -->|expand| L[Post-validation units in dependency order]
+    K -->|expand| L[U-12 through U-16 in dependency order]
     K -->|hold| M[Keep backlog queued]
+    W --> M
     L --> N[Deferred breadth queue]
     M --> N
 ```
@@ -236,8 +234,8 @@ flowchart TD
 | U-05 | Post-validation: gate protocol, remaining ID discipline, and CLI package cleanup | U-01 | D-10 expansion gate |
 | U-06 | Post-validation: persona enable/bypass and pipeline strategies | U-05 | D-10 expansion gate |
 | U-07 | COMPLETE locally: citation proposition checking and remaining panels | U-05 | Hosted legal-source proxy expansion D-18 |
-| U-08 | Post-validation: RFP production-suggestion workflow | U-04A, U-05 | D-10 expansion gate |
-| U-09 | Pre-validation: local DOCX parser proof, edit-learning, and readback | U-01, U-03, U-04A | protected-folder evidence U-04B; Google lane D-06 |
+| U-08 | COMPLETE: RFP production-suggestion workflow | U-04A, U-05 | D-10 expansion gate |
+| U-09 | COMPLETE locally: DOCX parser proof, edit-learning, and next-run readback | U-01, U-03, U-04A | attorney before/after verdict U-17C; Google lane D-06 |
 | U-10 | Post-validation: hidden answer-key and benchmark harness | U-06, U-07 | D-10; human verdict D-02/D-03 |
 | U-11A | Pre-validation: concrete recovery gaps, matter-close safety, parity foundation, required docs | U-01, U-03 | D-14 source binding; publication remains D-13 |
 | U-11B | Post-validation: common durable-job lifecycle extraction and full capability breadth | U-11A, U-12, U-13 | D-10 expansion gate |
@@ -293,10 +291,10 @@ flowchart TD
   use locked, fsync'd append with torn-tail recovery; no-follow stable-descriptor
   hashing fails closed on symlinks or concurrent mutation. Legacy attestations remain
   readable but cannot satisfy the v2 contract. The same read-only integrity status is
-  exposed through service, CLI JSON, API, and UI. Two larger promises remain explicitly
-  queued: U-09 supplies the anchored annotated-draft artifact before it can join the
-  seal, and D-09 still needs a concrete immutable remote signed-head provider before
-  coordinated host-writer resistance can be claimed.
+  exposed through service, CLI JSON, API, and UI. U-09 now supplies the local anchored
+  edit artifact; expanding the attestation/export seal to annotated-draft variants is
+  retained in the successor queue. D-09 still needs a concrete immutable remote
+  signed-head provider before coordinated host-writer resistance can be claimed.
 - **U-04A COMPLETE locally and in CI.** Mixed-format ingest now emits deterministic protected
   actions for OCR, password, corrupt, unsupported, unreadable, oversized, role, and
   privilege work. Original files are captured through stable no-follow descriptors;
@@ -318,9 +316,9 @@ flowchart TD
   accepting substantive drift. Copied convergence mechanics have injected score and
   decision seams plus an exact upstream provenance pin. The Typer surface is split
   into focused modules with exact command/help parity across all 63 command paths.
-  **U-09 through U-17C remain queued** under their stated dependencies and
-  decision gates. **U-18 is COMPLETE for U-01 through U-07; U-08 implementation
-  and local validation are complete on PR #47:**
+  **U-10 through U-17C remain queued** under their stated dependencies and
+  decision gates. **U-18 is COMPLETE for U-01 through U-08; U-09 implementation
+  and local validation are complete on this branch:**
   PR #33 merged as `74dec0a` after backend, invariant, and frontend CI passed on code
   head `acc1e51`; PR #35 merged as `b2ff6c7` after all six push/PR jobs passed on code
   head `96da3c6`; PR #36 merged as `7e9f03e` after the final code head `4c5cd64`
@@ -329,15 +327,15 @@ flowchart TD
   final-head jobs passed on code head `4f7927d`; PR #42 merged as `4907761` after all
   six final-head jobs passed on code head `d9f08e6`; PR #44 merged as `8fcdbcf` after
   all final-head jobs passed on code head `b7dcee6`; PR #46 merged as `c7ae46c`
-  after all six final-head jobs passed on code head `b0aac2e`; PR #47 is the
-  authoritative shipping record for U-08. Every actionable review finding on the
+  after all six final-head jobs passed on code head `b0aac2e`; PR #47 merged as
+  `05e5bd2` after its final-head jobs passed. Every actionable review finding on the
   merged PRs was fixed, regression-tested, replied to, and resolved. Deployment is
   still gated.
   No hosted matter or deployment was accessed during this execution.
 
-Verification at this checkpoint: backend ruff and strict mypy across 116 source files
-pass; 1,053 backend tests pass at 91% coverage; frontend ESLint, TypeScript, 10 Vitest
-files / 39 tests, OpenAPI generation/drift, and the production build pass. U-03's
+Verification at this checkpoint: backend ruff and strict mypy across 126 source files
+pass; 1,088 backend tests pass at 90% coverage; frontend ESLint, TypeScript, 11 Vitest
+files / 41 tests, OpenAPI generation/drift, and the production build pass. U-03's
 structured review covered correctness, security, adversarial behavior, tests,
 maintainability, reliability, project standards, API contracts, agent parity, and
 performance; all material findings were repaired before the full gates. U-01's structured
@@ -651,6 +649,23 @@ retained, and records no material rubric, fact, privilege, privacy, or cross-mat
 regression. Zip-bomb/traversal/XXE, paraphrased-fact leakage, injection-in-learning,
 and ethical-wall tests fail closed.
 
+**Completion evidence (2026-08-21):** local engineering is complete. Raw OOXML
+reimport recovers exact bookmarks, tracked insertions/deletions, and hidden sentinel
+fallbacks without Pandoc normalization; unsafe ZIP/XML/path cases and ambiguous anchors
+fail closed into durable human-review items. The six planned concerns are separated
+under `learn/{reimport,diff,tagging,routing,scrub,merge}.py`. Matter acceptance and
+rejection are append-only human events; only accepted text enters a future immutable
+run. Shared writes pass deterministic matter/fact/filename/date/injection checks and
+the common `PublicText` outbound scrub, bind the exact rendered CriticMarkup review
+hash, carry ethical-wall exclusions, and persist as immutable reviewed firm events.
+Area entries remain pending external candidates and no code path writes or commits the
+OSS playbook tree. The cockpit, typed API, and CLI expose import/list/show/accept/
+reject/scrub/promote; blocked imports remain visible after reload. Final local gates:
+1,088 backend tests, strict mypy over 126 source files, frontend lint/typecheck,
+11 files / 41 tests, OpenAPI drift, and production build. No model call, hosted matter,
+protected-data read, Google access, or deployment occurred. The attorney beneficial
+before/after verdict remains U-17C; Google suggestions/comments remain D-06-gated.
+
 ### U-10 — Add regression oracles and benchmark evidence
 
 **Outcome:** persona regressions are caught without using private matter data, and human
@@ -702,7 +717,12 @@ surfaces, close inventory, and parity/recovery tests.
 **Work:** after U-12 synthesis and U-13 extrapolation prove two consumers, extract the
 common queued/running/paused/needs-attention/completed/cancel/retry/reopen lifecycle
 with idempotency, reconciliation, and attempt history. Complete every matrix row added
-by U-12–U-15.
+by U-12–U-15, and move hosted edited-DOCX import onto that durable lifecycle without
+changing the bounded local primitive. Finish the separately gated public-playbook
+landing path: a pending U-09 area candidate may become publishable only after the
+deterministic scrub, an independent model scrub, an allowlist-of-publishable-shapes
+check, and a second human-confirmed rendered diff; publication remains an explicit
+primitive with no vault-to-repo auto-commit path.
 
 **Acceptance:** each implemented row proves the same result, trusted actor/provenance,
 event, and audit record through CLI and API; its UI consumes that API. Unimplemented

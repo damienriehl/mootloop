@@ -82,6 +82,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/matters/{matter_id}/learnings/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Learning Proposals */
+        get: operations["list_learning_proposals_api_matters__matter_id__learnings_proposals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/matters/{matter_id}/learnings/proposals/{proposal_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Learning Proposal */
+        get: operations["get_learning_proposal_api_matters__matter_id__learnings_proposals__proposal_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/matters/{matter_id}/learnings/proposals/{proposal_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept Learning Proposal */
+        post: operations["accept_learning_proposal_api_matters__matter_id__learnings_proposals__proposal_id__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/matters/{matter_id}/learnings/proposals/{proposal_id}/promote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Promote Learning Proposal */
+        post: operations["promote_learning_proposal_api_matters__matter_id__learnings_proposals__proposal_id__promote_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/matters/{matter_id}/learnings/proposals/{proposal_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject Learning Proposal */
+        post: operations["reject_learning_proposal_api_matters__matter_id__learnings_proposals__proposal_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/matters/{matter_id}/learnings/proposals/{proposal_id}/scrub": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Scrub Learning Proposal */
+        post: operations["scrub_learning_proposal_api_matters__matter_id__learnings_proposals__proposal_id__scrub_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/matters/{matter_id}/runs": {
         parameters: {
             query?: never;
@@ -282,6 +384,26 @@ export interface paths {
         get: operations["get_run_integrity_api_matters__matter_id__runs__run_id__integrity_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/matters/{matter_id}/runs/{run_id}/learnings/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Learning Docx
+         * @description Import exact edited DOCX bytes; unresolvable anchors remain review-only.
+         */
+        post: operations["import_learning_docx_api_matters__matter_id__runs__run_id__learnings_import_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -963,6 +1085,23 @@ export interface components {
             schema_version: string;
         };
         /**
+         * DocxRevision
+         * @description One tracked OOXML insertion or deletion inside a recovered anchor.
+         */
+        DocxRevision: {
+            /** Author */
+            author?: string | null;
+            /** Date */
+            date?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "insertion" | "deletion";
+            /** Text */
+            text: string;
+        };
+        /**
          * ExportSeal
          * @description A deterministic export manifest linked to one attorney attestation.
          */
@@ -1114,6 +1253,257 @@ export interface components {
              * @constant
              */
             status: "queued";
+        };
+        /**
+         * LearningImportRecord
+         * @description One exact edited-document recovery attempt, including blocked imports.
+         */
+        LearningImportRecord: {
+            /**
+             * Anchors
+             * @default []
+             */
+            anchors: components["schemas"]["RecoveredAnchor"][];
+            /** Auto Routable */
+            auto_routable: boolean;
+            /**
+             * Blockers
+             * @default []
+             */
+            blockers: string[];
+            /** Import Id */
+            import_id: string;
+            /** Imported At */
+            imported_at: string;
+            /** Run Id */
+            run_id: string;
+            /** Source Matter Id */
+            source_matter_id: string;
+            /** Source Name */
+            source_name: string;
+            /** Source Sha256 */
+            source_sha256: string;
+        };
+        /** LearningImportRequest */
+        LearningImportRequest: {
+            /** Source Base64 */
+            source_base64: string;
+            /** Source Name */
+            source_name: string;
+        };
+        /** LearningImportResponse */
+        LearningImportResponse: {
+            import_record: components["schemas"]["LearningImportRecord"];
+            /**
+             * Kind
+             * @default learning_import
+             * @constant
+             */
+            kind: "learning_import";
+            /** Proposals */
+            proposals?: components["schemas"]["LearningProposalView"][];
+            /**
+             * Schema Version
+             * @default 1.0
+             */
+            schema_version: string;
+        };
+        /** LearningPromotionRequest */
+        LearningPromotionRequest: {
+            /**
+             * Confirm Scrub Diff
+             * @default false
+             */
+            confirm_scrub_diff: boolean;
+            /**
+             * Excluded Matter Ids
+             * @default []
+             */
+            excluded_matter_ids: string[];
+            /** Reviewed Text */
+            reviewed_text: string;
+            /** Scrub Diff Sha256 */
+            scrub_diff_sha256: string;
+            /**
+             * Target Tier
+             * @enum {string}
+             */
+            target_tier: "matter" | "firm" | "area";
+        };
+        /** LearningProposalResponse */
+        LearningProposalResponse: {
+            /**
+             * Kind
+             * @default learning_proposal
+             * @constant
+             */
+            kind: "learning_proposal";
+            proposal: components["schemas"]["LearningProposalView"];
+            /**
+             * Schema Version
+             * @default 1.0
+             */
+            schema_version: string;
+        };
+        /**
+         * LearningProposalView
+         * @description Current folded state plus immutable proposal and human history.
+         */
+        LearningProposalView: {
+            /** Accepted Text */
+            accepted_text?: string | null;
+            /** Active Tiers */
+            active_tiers?: ("matter" | "firm" | "area")[];
+            /** Anchor Id */
+            anchor_id: string;
+            /** Baseline Sha256 */
+            baseline_sha256: string;
+            /** Baseline Text */
+            baseline_text: string;
+            /** Created At */
+            created_at: string;
+            /** Critic Markup */
+            critic_markup: string;
+            /** Edited Sha256 */
+            edited_sha256: string;
+            /** Edited Text */
+            edited_text: string;
+            /** Import Id */
+            import_id: string;
+            /** Proposal Id */
+            proposal_id: string;
+            /** Proposed Text */
+            proposed_text: string;
+            /**
+             * Proposed Tier
+             * @enum {string}
+             */
+            proposed_tier: "matter" | "firm" | "area";
+            /** Review History */
+            review_history?: components["schemas"]["LearningReview"][];
+            /** Run Id */
+            run_id: string;
+            /** Source Matter Id */
+            source_matter_id: string;
+            /**
+             * Status
+             * @default needs_review
+             * @enum {string}
+             */
+            status: "needs_review" | "accepted" | "rejected";
+            /** Task */
+            task: string;
+            /** Word Changes */
+            word_changes: number;
+        };
+        /** LearningProposalsResponse */
+        LearningProposalsResponse: {
+            /** Imports */
+            imports?: components["schemas"]["LearningImportRecord"][];
+            /**
+             * Kind
+             * @default learning_proposals
+             * @constant
+             */
+            kind: "learning_proposals";
+            /** Proposals */
+            proposals?: components["schemas"]["LearningProposalView"][];
+            /**
+             * Schema Version
+             * @default 1.0
+             */
+            schema_version: string;
+        };
+        /**
+         * LearningReview
+         * @description Append-only human acceptance, rejection, or cross-matter promotion.
+         */
+        LearningReview: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "accept" | "reject" | "promote";
+            /** Actor */
+            actor: string;
+            /**
+             * Channel
+             * @enum {string}
+             */
+            channel: "api" | "cli";
+            /**
+             * Confirm Scrub Diff
+             * @default false
+             */
+            confirm_scrub_diff: boolean;
+            /**
+             * Excluded Matter Ids
+             * @default []
+             */
+            excluded_matter_ids: string[];
+            /** Proposal Id */
+            proposal_id: string;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+            /** Recorded At */
+            recorded_at: string;
+            /** Review Id */
+            review_id: string;
+            /**
+             * Reviewed Text
+             * @default
+             */
+            reviewed_text: string;
+            /**
+             * Schema Version
+             * @default 1.0
+             */
+            schema_version: string;
+            /** Scrub Diff Sha256 */
+            scrub_diff_sha256?: string | null;
+            /** Source Matter Id */
+            source_matter_id: string;
+            /** Target Tier */
+            target_tier?: ("matter" | "firm" | "area") | null;
+        };
+        /** LearningReviewRequest */
+        LearningReviewRequest: {
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+            /**
+             * Reviewed Text
+             * @default
+             */
+            reviewed_text: string;
+        };
+        /** LearningScrubRequest */
+        LearningScrubRequest: {
+            /** Reviewed Text */
+            reviewed_text: string;
+        };
+        /** LearningScrubResponse */
+        LearningScrubResponse: {
+            /**
+             * Kind
+             * @default learning_scrub_preview
+             * @constant
+             */
+            kind: "learning_scrub_preview";
+            /** Rendered Diff */
+            rendered_diff: string;
+            /** Rendered Diff Sha256 */
+            rendered_diff_sha256: string;
+            /**
+             * Schema Version
+             * @default 1.0
+             */
+            schema_version: string;
         };
         /**
          * MatterSummary
@@ -1333,6 +1723,34 @@ export interface components {
             delta_usd?: number | null;
             /** To Usd */
             to_usd?: number | null;
+        };
+        /**
+         * RecoveredAnchor
+         * @description The original/current text views recovered for one expected stable anchor.
+         */
+        RecoveredAnchor: {
+            /** Anchor Id */
+            anchor_id: string;
+            /**
+             * Current Text
+             * @default
+             */
+            current_text: string;
+            /**
+             * Original Text
+             * @default
+             */
+            original_text: string;
+            /**
+             * Revisions
+             * @default []
+             */
+            revisions: components["schemas"]["DocxRevision"][];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "exact" | "sentinel" | "ambiguous" | "missing";
         };
         /**
          * ReopenRunRequest
@@ -1899,6 +2317,213 @@ export interface operations {
             };
         };
     };
+    list_learning_proposals_api_matters__matter_id__learnings_proposals_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matter_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningProposalsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_learning_proposal_api_matters__matter_id__learnings_proposals__proposal_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matter_id: string;
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningProposalResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_learning_proposal_api_matters__matter_id__learnings_proposals__proposal_id__accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matter_id: string;
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LearningReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningProposalResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    promote_learning_proposal_api_matters__matter_id__learnings_proposals__proposal_id__promote_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matter_id: string;
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LearningPromotionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningProposalResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_learning_proposal_api_matters__matter_id__learnings_proposals__proposal_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matter_id: string;
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LearningReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningProposalResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    scrub_learning_proposal_api_matters__matter_id__learnings_proposals__proposal_id__scrub_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matter_id: string;
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LearningScrubRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningScrubResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_runs_api_matters__matter_id__runs_get: {
         parameters: {
             query?: never;
@@ -2278,6 +2903,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReviewIntegrityStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_learning_docx_api_matters__matter_id__runs__run_id__learnings_import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matter_id: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LearningImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningImportResponse"];
                 };
             };
             /** @description Validation Error */
