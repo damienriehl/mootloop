@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Barrier, Lock, local
+from types import TracebackType
+from typing import Self
 
 import pytest
 import yaml
@@ -9,10 +13,12 @@ from typer.testing import CliRunner
 
 from mootloop.cli import app
 from mootloop.context import load_run_context
+from mootloop.context_sources import ContextContributionStore
 from mootloop.discovery_parser import save_requests
 from mootloop.engine.launch import launch_run
 from mootloop.errors import LearningImportError
 from mootloop.facts import FactStore
+from mootloop.learn import routing as learning_routing
 from mootloop.learn.service import (
     FirmLearningStore,
     LearningStore,
@@ -21,7 +27,11 @@ from mootloop.learn.service import (
     review_learning_proposal,
 )
 from mootloop.models.common import DocId, RequestId
-from mootloop.models.learnings import FirmLearningEvent
+from mootloop.models.learnings import (
+    FirmLearningEvent,
+    LearningProposalView,
+    LearningReviewAction,
+)
 from mootloop.models.requests import RequestItem, RequestSet, RequestType
 from mootloop.orchestrator import start_run
 from mootloop.vault import init_vault
@@ -97,6 +107,28 @@ def test_import_builds_anchored_word_diff_and_needs_review_proposal(tmp_path: Pa
     assert "{~~April.~>May.~~}" in proposal.critic_markup
     assert proposal.baseline_sha256 != proposal.edited_sha256
     assert LearningStore(vault).get(proposal.proposal_id) == proposal
+
+
+def test_identical_import_retry_returns_the_original_bundle(tmp_path: Path) -> None:
+    vault, run_id = _vault(tmp_path)
+    edited = _edited_docx(
+        tmp_path,
+        "State when the inspection occurred. RESPONSE: The inspection occurred in May.",
+    )
+
+    first = import_docx_learning(
+        vault, run_id, edited, imported_at=NOW, source_name="first-upload.docx"
+    )
+    retry = import_docx_learning(
+        vault,
+        run_id,
+        edited,
+        imported_at="2026-08-21T22:00:00+00:00",
+        source_name="retry-after-lost-response.docx",
+    )
+
+    assert retry == first
+    assert len(LearningStore(vault).list_bundles()) == 1
 
 
 def test_ambiguous_import_is_durable_human_review_item_without_proposals(
@@ -202,6 +234,84 @@ def test_reject_never_enters_a_later_prompt(tmp_path: Path) -> None:
     assert load_run_context(vault, next_run).manifest.context_contributions == []
 
 
+def test_concurrent_accept_and_reject_commit_only_one_final_review(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    vault, run_id = _vault(tmp_path)
+    proposal = import_docx_learning(
+        vault,
+        run_id,
+        _edited_docx(tmp_path, "State when the inspection occurred. RESPONSE: May."),
+        imported_at=NOW,
+    ).proposals[0]
+    barrier = Barrier(2)
+    serial_lock = Lock()
+    thread_state = local()
+    original_get = LearningStore.get
+
+    class BlockingRunLock:
+        def __init__(self, vault_root: Path | str, run_id: str) -> None:
+            del vault_root, run_id
+
+        def __enter__(self) -> Self:
+            serial_lock.acquire()
+            return self
+
+        def __exit__(
+            self,
+            exc_type: type[BaseException] | None,
+            exc: BaseException | None,
+            traceback: TracebackType | None,
+        ) -> None:
+            del exc_type, exc, traceback
+            serial_lock.release()
+
+    def synchronized_first_get(
+        store: LearningStore, proposal_id: str
+    ) -> LearningProposalView | None:
+        current = original_get(store, proposal_id)
+        if not getattr(thread_state, "reached_barrier", False):
+            thread_state.reached_barrier = True
+            barrier.wait(timeout=5)
+        return current
+
+    monkeypatch.setattr(LearningStore, "get", synchronized_first_get)
+    monkeypatch.setattr(learning_routing, "RunLock", BlockingRunLock)
+
+    def decide(action: LearningReviewAction) -> str:
+        try:
+            review_learning_proposal(
+                vault,
+                proposal.proposal_id,
+                action=action,
+                actor="attorney@example.com",
+                channel="api",
+                recorded_at=NOW,
+                reviewed_text=("Prefer direct timing answers." if action == "accept" else ""),
+                reason=("Case-specific." if action == "reject" else ""),
+            )
+        except LearningImportError as exc:
+            return str(exc)
+        return "committed"
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        outcomes = list(executor.map(decide, ("accept", "reject")))
+
+    assert outcomes.count("committed") == 1
+    assert outcomes.count("learning proposal already has a final review") == 1
+    reviews = LearningStore(vault).review_events()
+    assert len(reviews) == 1
+    stored_contribution = next(
+        (
+            item
+            for item in ContextContributionStore(vault).list_all()
+            if item.contribution_id == f"learning:{proposal.proposal_id}"
+        ),
+        None,
+    )
+    assert (stored_contribution is not None) is (reviews[0].action == "accept")
+
+
 def test_firm_promotion_merges_by_id_and_reads_back_across_matters(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -273,6 +383,48 @@ def test_firm_promotion_merges_by_id_and_reads_back_across_matters(
         for item in load_run_context(other, other_run).manifest.context_contributions
         if item.kind == "learning"
     ] == ["Prefer direct timing answers over hedged timing language."]
+
+
+def test_failed_shared_destination_does_not_record_promotion(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("MOOTLOOP_FIRM_PROFILE_ROOT", raising=False)
+    vault, run_id = _vault(tmp_path)
+    proposal = import_docx_learning(
+        vault,
+        run_id,
+        _edited_docx(tmp_path, "State when the inspection occurred. RESPONSE: May."),
+        imported_at=NOW,
+    ).proposals[0]
+    review_learning_proposal(
+        vault,
+        proposal.proposal_id,
+        action="accept",
+        actor="attorney@example.com",
+        channel="api",
+        recorded_at=NOW,
+        reviewed_text="Matter-only correction.",
+    )
+    shared_text = "Prefer direct timing answers in interrogatory responses."
+    scrub = preview_learning_scrub(vault, proposal.proposal_id, shared_text)
+
+    with pytest.raises(LearningImportError, match="required for shared learning"):
+        review_learning_proposal(
+            vault,
+            proposal.proposal_id,
+            action="promote",
+            target_tier="firm",
+            actor="attorney@example.com",
+            channel="api",
+            recorded_at="2026-08-21T21:01:00+00:00",
+            reviewed_text=shared_text,
+            scrub_diff_sha256=scrub.rendered_diff_sha256,
+        )
+
+    current = LearningStore(vault).get(proposal.proposal_id)
+    assert current is not None
+    assert current.active_tiers == ["matter"]
+    assert [review.action for review in current.review_history] == ["accept"]
 
 
 @pytest.mark.parametrize(

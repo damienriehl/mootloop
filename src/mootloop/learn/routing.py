@@ -217,6 +217,15 @@ def review_learning_proposal(
             )
         if target_tier == "area" and not confirm_scrub_diff:
             raise LearningImportError("area promotion requires confirmed rendered scrub diff")
+    firm_store: FirmLearningStore | None = None
+    if action == "promote":
+        root = Path(firm_root) if firm_root is not None else configured_firm_profile_root()
+        if root is None:
+            raise LearningImportError(
+                f"{FIRM_PROFILE_ROOT_ENV} is required for shared learning promotion"
+            )
+        _validate_profile_separation(vault_root, root)
+        firm_store = FirmLearningStore(root)
     payload = {
         "proposal_id": proposal_id,
         "action": action,
@@ -257,6 +266,27 @@ def review_learning_proposal(
         raise LearningImportError(str(exc)) from exc
     run_id = str(current.run_id)
     with RunLock(vault_root, run_id):
+        locked_current = store.get(proposal_id)
+        if locked_current is None:
+            raise LearningImportError(f"unknown learning proposal {proposal_id!r}")
+        if action in ("accept", "reject") and locked_current.status != "needs_review":
+            raise LearningImportError("learning proposal already has a final review")
+        if action == "promote" and locked_current.status != "accepted":
+            raise LearningImportError("learning proposal must be accepted before promotion")
+        if action == "promote":
+            assert scrubbed_text is not None
+            assert firm_store is not None
+            assert target_tier is not None
+            firm_store.put(
+                shared_contribution(
+                    locked_current,
+                    review,
+                    tier=target_tier,
+                    scrubbed_text=scrubbed_text,
+                ),
+                review,
+                public=target_tier == "area",
+            )
         store.append_review(review)
         if action == "accept":
             contribution = ContextContribution(
@@ -271,25 +301,6 @@ def review_learning_proposal(
                 approval_state="accepted",
             )
             ContextContributionStore(vault_root).put(contribution)
-        elif action == "promote":
-            assert scrubbed_text is not None
-            root = Path(firm_root) if firm_root is not None else configured_firm_profile_root()
-            if root is None:
-                raise LearningImportError(
-                    f"{FIRM_PROFILE_ROOT_ENV} is required for shared learning promotion"
-                )
-            _validate_profile_separation(vault_root, root)
-            assert target_tier is not None
-            FirmLearningStore(root).put(
-                shared_contribution(
-                    current,
-                    review,
-                    tier=target_tier,
-                    scrubbed_text=scrubbed_text,
-                ),
-                review,
-                public=target_tier == "area",
-            )
     updated = store.get(proposal_id)
     assert updated is not None
     return updated
