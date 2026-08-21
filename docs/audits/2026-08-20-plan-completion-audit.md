@@ -41,7 +41,7 @@ missing older source plan.
 ## Current Validation Evidence
 
 - Backend verification: the latest local `make check` passed: ruff clean, mypy strict
-  clean across 98 source files, and 940 tests passed at 92% coverage.
+  clean across 101 source files, and 970 tests passed at 91% coverage.
 - Frontend verification: ESLint clean, TypeScript clean, 9 Vitest files / 37 tests
   passed, backend and generated-client OpenAPI drift checks pass, and the production
   build succeeds.
@@ -49,6 +49,9 @@ missing older source plan.
 - GitHub PR #31, first-class reopen recovery, merged 2026-08-06.
 - GitHub PR #38, synthetic ingest and reviewed-fact preparation, merged 2026-08-21
   after all six final-head CI jobs passed and its review finding was resolved.
+- GitHub PR #40, isolated protected conversion, merged 2026-08-21 as `424fe6f`
+  after all six final-head CI jobs passed and all three actionable review findings
+  were fixed, regression-tested, replied to, and resolved.
 - No GitHub issue was created or updated in the strict window.
 - At audit start, the current feature branch had no unique code commit relative to
   its already-merged result and its file tree matched `origin/main`. U-00 now adds the
@@ -229,9 +232,11 @@ ahead of context reproducibility, isolation, and a clean live run.
 Every discovered task now has one of four durable outcomes:
 
 1. `COMPLETE` with current evidence above.
-2. `OPEN-AUTO` as U-02 through U-17C in the continuation plan; U-00, U-01, and
-   U-01's U-18 publication disposition are complete. Deployment remains a separate
-   gated operation rather than part of that publication closure.
+2. `OPEN-AUTO` as the still-unfinished portions of U-02 through U-17C in the
+   continuation plan; U-00, U-01, U-02's local/reviewed slice, U-03, U-04A, U-04B's
+   local/reviewed slice, and their U-18 publication dispositions are complete.
+   Deployment remains a separate gated operation rather than part of that publication
+   closure.
 3. `DECISION-GATED` as D-01 through D-17 in the Decision Sheet (D-15 through D-17
    have safe defaults and do not block pre-validation work).
 4. `DEFERRED` but retained explicitly in the continuation plan rather than silently dropped.
@@ -289,3 +294,19 @@ was read or changed. Those items remain on the Decision Sheet.
   on head `acc1e51`; its one actionable review finding was fixed, replied to, and
   resolved before merge. U-18 is complete for U-01. Deployment, hosted-vault access,
   and the synthetic/real-matter gates remain unperformed.
+
+## U-04B Publication Record — 2026-08-21
+
+- PR #40 merged as `424fe6f` from reviewed code head `4f7927d`.
+- All six final-head backend, frontend, and invariant jobs passed. Local final evidence
+  was ruff clean, strict mypy clean across 101 source files, 970 pytest tests passed at
+  91% coverage, and frontend ESLint, TypeScript, 9 Vitest files / 37 tests, and OpenAPI
+  drift checks passed.
+- The three actionable review findings were repaired with regressions: ordinary
+  normalized documents cannot be reconverted without an exact receipt, the output
+  byte ceiling applies after newline normalization, and parser format participates in
+  conversion identity and recovery. Each thread has a visible fix reply and is
+  authoritatively resolved.
+- This closes U-18 for U-04B's local converter and synthetic-test slice. It does not
+  claim a deployed sidecar proof, protected-folder review, hosted-matter access, or a
+  real-matter run. Those remain behind U-17A and fresh D-03 authorization.
