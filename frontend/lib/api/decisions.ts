@@ -8,6 +8,7 @@ import { getClient } from "./client";
 import type {
   Attestation,
   DecisionsResponse,
+  ReviewIntegrityStatus,
   ResolutionAction,
   ResolveResponse,
 } from "./types";
@@ -63,4 +64,16 @@ export async function attestRun(
     params: { path: { matter_id: matterId, run_id: runId } },
   });
   return unwrap(res).attestation;
+}
+
+/** Read the current attorney commitment and exact clean-export seal without writing. */
+export async function getReviewIntegrity(
+  { matterId, runId }: Ids,
+  client: ApiClient = getClient(),
+): Promise<ReviewIntegrityStatus> {
+  return unwrap(
+    await client.GET("/api/matters/{matter_id}/runs/{run_id}/integrity", {
+      params: { path: { matter_id: matterId, run_id: runId } },
+    }),
+  );
 }

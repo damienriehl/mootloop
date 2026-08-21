@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from mootloop.attest import AttestationCheck
 from mootloop.errors import AccessAuthError, AuditWriteError
 from mootloop.export.link import LinkSigner
 from mootloop.models.matter import MatterConfig
@@ -177,6 +178,28 @@ def test_mint_clean_file_not_ready_returns_typed_403(
     assert "token" not in body and "url" not in body
 
 
+def test_integrity_status_is_readable_without_mutating_attestation(
+    client: TestClient,
+    matter: MatterConfig,
+) -> None:
+    response = client.get(
+        f"/api/matters/{matter.matter_id}/runs/r1/integrity",
+        headers=_AUTH,
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "schema_version": "1.0",
+        "run_id": "r1",
+        "attestation_status": "missing",
+        "attestation_reason": None,
+        "export_seal_status": "missing",
+        "export_seal_reason": None,
+        "latest_attestation": None,
+        "latest_export_seal": None,
+    }
+
+
 def test_mint_draft_file_is_allowed_when_not_ready(
     client: TestClient,
     registry: MatterRegistry,
@@ -207,6 +230,9 @@ def test_mint_clean_file_when_ready_succeeds(
     vault = registry.resolve(matter.matter_id)
     _seed_deliverables(vault, "r1", "responses.docx")
     monkeypatch.setattr("mootloop.gate_ledger.export_ready", lambda v, r: (True, []))
+    monkeypatch.setattr(
+        "mootloop.attest.sealed_export_state", lambda v, r: AttestationCheck("valid")
+    )
     headers = _csrf(client)
     resp = client.post(
         f"/api/matters/{matter.matter_id}/runs/r1/deliverables/responses.docx/link",

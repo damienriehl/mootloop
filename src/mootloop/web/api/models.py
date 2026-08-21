@@ -120,12 +120,24 @@ class ResolveResponse(VersionedModel):
     decision: Decision
 
 
+class CurrentAttestation(Attestation):
+    """The complete v2 commitment returned by a successful human attest action."""
+
+    schema_version: Literal["2.0"] = "2.0"
+    hash_scope: Literal["run-review-state:v2"] = "run-review-state:v2"
+    journal_sha256: str
+    decisions_sha256: str
+    fact_state_sha256: str
+    access_audit_head_sha256: str
+    commitment_sha256: str
+
+
 class AttestResponse(VersionedModel):
-    """A recorded attestation. ``attestation.valid`` carries the state."""
+    """A recorded complete v2 attorney commitment."""
 
     schema_version: str = SCHEMA_VERSION
     kind: Literal["attested"] = "attested"
-    attestation: Attestation
+    attestation: CurrentAttestation
 
 
 class RunActionResponse(VersionedModel):

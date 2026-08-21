@@ -79,8 +79,13 @@ Repeat until `status` reports `finished`:
 
 - Read the deliverable under `"$VAULT/deliverables/"` and summarize the per-request
   responses for the attorney.
-- Before export, resolve any remaining **policy-delegable** decisions (`decide list`)
-  and attest: `uv run mootloop attest "$VAULT" "$RUN" --by "Name"`.
+- Before clean export, resolve any remaining **policy-delegable** decisions (`decide list`)
+  and build the draft review copy: `uv run mootloop export build "$VAULT" "$RUN" --force-draft`.
+  Ask the attorney to inspect `deliverables/$RUN/master.md`, then attest with
+  `uv run mootloop attest "$VAULT" "$RUN"` (the local OS principal is recorded;
+  agents must not perform this human act).
+- Inspect the complete read-only commitment and export-seal state with
+  `uv run mootloop attest-status "$VAULT" "$RUN" --json`.
 - `uv run mootloop run gates "$VAULT" "$RUN"` is the single source of truth for
   export-readiness (it lists any blockers).
 

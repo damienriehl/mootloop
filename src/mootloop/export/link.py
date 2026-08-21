@@ -9,8 +9,9 @@ in, and resolves the deliverable's on-disk path — all through `safe_vault_path
 Gating rule (the DRAFT-vs-clean decision, single source of truth here):
   * a **clean** deliverable — a ``.docx`` with no ``.DRAFT.`` infix — requires
     ``gate_ledger.export_ready`` at BOTH mint and download time (fail closed);
-  * a **DRAFT** deliverable (``.DRAFT.docx``) and informational artifacts
-    (markdown masters, ``audit-log.json``) are always downloadable.
+  * a **DRAFT** deliverable (``.DRAFT.docx``) is always downloadable;
+  * informational artifacts are freely downloadable until included in a clean export
+    seal, after which the exact sealed artifact set must remain valid.
 
 The download handler MUST record the access audit FIRST and fail closed (a download that
 cannot be recorded is never served) — this module gives it `_resolve_deliverable`; the
@@ -28,8 +29,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from mootloop import gate_ledger
-from mootloop.errors import ExportLinkError, ExportNotReadyError
+from mootloop import attest, gate_ledger
+from mootloop.errors import ExportLinkError, ExportNotReadyError, MootloopError
 from mootloop.export import deliverables_dir
 from mootloop.vault import safe_vault_path
 
@@ -87,10 +88,12 @@ def _resolve_deliverable(vault_root: Path | str, run_id: str, name: str) -> Path
     evaluate the export-ready gate against the wrong run. So reject path-shaped parts
     up front and re-assert containment under the run's own directory.
     """
-    parts = [p for p in name.split("/") if p]
-    if not parts:
-        raise ExportLinkError(f"empty deliverable name for run {run_id!r}")
-    if name.startswith("/") or "\\" in name or any(p in (".", "..") for p in parts):
+    parts = name.split("/")
+    if (
+        name.startswith("/")
+        or "\\" in name
+        or any(part in ("", ".", "..") for part in parts)
+    ):
         raise ExportLinkError(f"invalid deliverable name {name!r} for run {run_id!r}")
     base = safe_vault_path(vault_root, "deliverables", run_id)
     path = safe_vault_path(vault_root, "deliverables", run_id, *parts)
@@ -101,14 +104,31 @@ def _resolve_deliverable(vault_root: Path | str, run_id: str, name: str) -> Path
     return path
 
 
-def _require_ready_if_clean(vault_root: Path | str, run_id: str, name: str) -> None:
-    """Enforce the clean-file export gate; DRAFT/informational files pass through."""
+def _require_downloadable(vault_root: Path | str, run_id: str, name: str) -> None:
+    """Enforce clean-export and existing informational-seal download gates."""
     _is_draft, requires = _gating(name)
-    if not requires:
+    sealed_informational = not requires and attest.latest_seal_contains(
+        vault_root, run_id, name
+    )
+    if not requires and not sealed_informational:
         return
     ready, blockers = gate_ledger.export_ready(vault_root, run_id)
-    if not ready:
+    if requires and not ready:
         raise ExportNotReadyError(name, blockers)
+    seal = attest.sealed_export_state(vault_root, run_id)
+    if seal.status != "valid" and "export_seal" not in blockers:
+        blockers = [*blockers, "export_seal"]
+    if seal.status != "valid":
+        raise ExportNotReadyError(name, blockers)
+
+
+def is_downloadable(vault_root: Path | str, run_id: str, name: str) -> bool:
+    """Return the same fail-closed eligibility used by link mint and download."""
+    try:
+        _require_downloadable(vault_root, run_id, name)
+    except (MootloopError, OSError, ValueError):
+        return False
+    return True
 
 
 # --- token mint / validate --------------------------------------------------
@@ -195,7 +215,7 @@ def mint_link(
     expiry. Raises `ExportNotReadyError` (clean file, run not export-ready) or
     `ExportLinkError` (unknown deliverable) — fail closed before any token is issued."""
     _resolve_deliverable(vault_root, run_id, doc)
-    _require_ready_if_clean(vault_root, run_id, doc)
+    _require_downloadable(vault_root, run_id, doc)
     ttl = min(max(ttl_seconds, 0.0), MAX_TTL_SECONDS)
     issued = datetime.fromisoformat(now)
     expires = issued + timedelta(seconds=ttl)
@@ -237,5 +257,5 @@ def resolve_for_download(vault_root: Path | str, claims: TokenClaims) -> Path:
     Defense in depth: the export-ready gate is re-evaluated at download time, not only
     at mint, so a link minted while clean cannot serve a file the gate would now block.
     """
-    _require_ready_if_clean(vault_root, claims.run_id, claims.doc)
+    _require_downloadable(vault_root, claims.run_id, claims.doc)
     return _resolve_deliverable(vault_root, claims.run_id, claims.doc)

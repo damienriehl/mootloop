@@ -178,8 +178,7 @@ export interface paths {
         };
         /**
          * List Deliverables
-         * @description List a run's deliverables with DRAFT/clean state and per-file downloadability
-         *     (clean files are downloadable only once the run is export-ready; plan P-37).
+         * @description List deliverables with the same seal-aware eligibility enforced at download.
          */
         get: operations["list_deliverables_api_matters__matter_id__runs__run_id__deliverables_get"];
         put?: never;
@@ -221,6 +220,26 @@ export interface paths {
         };
         /** Get Run Gates */
         get: operations["get_run_gates_api_matters__matter_id__runs__run_id__gates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/matters/{matter_id}/runs/{run_id}/integrity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Run Integrity
+         * @description Return current v2 attorney-commitment and linked export-seal integrity.
+         */
+        get: operations["get_run_integrity_api_matters__matter_id__runs__run_id__integrity_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -511,6 +530,18 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * ArtifactDigest
+         * @description Exact bytes and vault-relative identity of one sealed export artifact.
+         */
+        ArtifactDigest: {
+            /** Path */
+            path: string;
+            /** Sha256 */
+            sha256: string;
+            /** Size Bytes */
+            size_bytes: number;
+        };
+        /**
          * AttentionBlocker
          * @description One reason a ``needs_attention`` run may not simply be reopened — a derived
          *     view (folded from the journal), never persisted.
@@ -534,10 +565,10 @@ export interface components {
         };
         /**
          * AttestResponse
-         * @description A recorded attestation. ``attestation.valid`` carries the state.
+         * @description A recorded complete v2 attorney commitment.
          */
         AttestResponse: {
-            attestation: components["schemas"]["Attestation"];
+            attestation: components["schemas"]["CurrentAttestation"];
             /**
              * Kind
              * @default attested
@@ -555,12 +586,22 @@ export interface components {
          * @description One append-only attestation-manifest record (an attest or an invalidation).
          */
         Attestation: {
+            /** Access Audit Head Sha256 */
+            access_audit_head_sha256?: string | null;
             /** Attestation Id */
             attestation_id: string;
             /** Attested At */
             attested_at: string;
+            /** Commitment Sha256 */
+            commitment_sha256?: string | null;
+            /** Decisions Sha256 */
+            decisions_sha256?: string | null;
+            /** Fact State Sha256 */
+            fact_state_sha256?: string | null;
             /** Hash Scope */
             hash_scope?: string | null;
+            /** Journal Sha256 */
+            journal_sha256?: string | null;
             /** Ledger Head Sha256 */
             ledger_head_sha256: string;
             /** Master Sha256 */
@@ -573,7 +614,7 @@ export interface components {
             run_id: string;
             /**
              * Schema Version
-             * @default 1.1
+             * @default 2.0
              */
             schema_version: string;
             /**
@@ -589,6 +630,53 @@ export interface components {
         CsrfToken: {
             /** Csrf Token */
             csrf_token: string;
+        };
+        /**
+         * CurrentAttestation
+         * @description The complete v2 commitment returned by a successful human attest action.
+         */
+        CurrentAttestation: {
+            /** Access Audit Head Sha256 */
+            access_audit_head_sha256: string;
+            /** Attestation Id */
+            attestation_id: string;
+            /** Attested At */
+            attested_at: string;
+            /** Commitment Sha256 */
+            commitment_sha256: string;
+            /** Decisions Sha256 */
+            decisions_sha256: string;
+            /** Fact State Sha256 */
+            fact_state_sha256: string;
+            /**
+             * Hash Scope
+             * @default run-review-state:v2
+             * @constant
+             */
+            hash_scope: "run-review-state:v2";
+            /** Journal Sha256 */
+            journal_sha256: string;
+            /** Ledger Head Sha256 */
+            ledger_head_sha256: string;
+            /** Master Sha256 */
+            master_sha256: string;
+            /** Reason */
+            reason?: string | null;
+            /** Reviewer */
+            reviewer: string;
+            /** Run Id */
+            run_id: string;
+            /**
+             * Schema Version
+             * @default 2.0
+             * @constant
+             */
+            schema_version: "2.0";
+            /**
+             * Valid
+             * @default true
+             */
+            valid: boolean;
         };
         /**
          * Decision
@@ -735,6 +823,31 @@ export interface components {
              * @default 1.0
              */
             schema_version: string;
+        };
+        /**
+         * ExportSeal
+         * @description A deterministic export manifest linked to one attorney attestation.
+         */
+        ExportSeal: {
+            /** Artifacts */
+            artifacts: components["schemas"]["ArtifactDigest"][];
+            /** Attestation Commitment Sha256 */
+            attestation_commitment_sha256: string;
+            /** Attestation Id */
+            attestation_id: string;
+            /** Export Set Sha256 */
+            export_set_sha256: string;
+            /** Run Id */
+            run_id: string;
+            /**
+             * Schema Version
+             * @default 1.0
+             */
+            schema_version: string;
+            /** Seal Id */
+            seal_id: string;
+            /** Sealed At */
+            sealed_at: string;
         };
         /**
          * FreeformTaskRequest
@@ -977,6 +1090,35 @@ export interface components {
              * @constant
              */
             kind: "decision_resolved";
+            /**
+             * Schema Version
+             * @default 1.0
+             */
+            schema_version: string;
+        };
+        /**
+         * ReviewIntegrityStatus
+         * @description Read-only current attorney-commitment and clean-export integrity state.
+         */
+        ReviewIntegrityStatus: {
+            /** Attestation Reason */
+            attestation_reason?: string | null;
+            /**
+             * Attestation Status
+             * @enum {string}
+             */
+            attestation_status: "valid" | "invalidated" | "missing";
+            /** Export Seal Reason */
+            export_seal_reason?: string | null;
+            /**
+             * Export Seal Status
+             * @enum {string}
+             */
+            export_seal_status: "valid" | "invalidated" | "missing";
+            latest_attestation?: components["schemas"]["Attestation"] | null;
+            latest_export_seal?: components["schemas"]["ExportSeal"] | null;
+            /** Run Id */
+            run_id: string;
             /**
              * Schema Version
              * @default 1.0
@@ -1706,6 +1848,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GateLedgerResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_run_integrity_api_matters__matter_id__runs__run_id__integrity_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matter_id: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewIntegrityStatus"];
                 };
             };
             /** @description Validation Error */

@@ -34,6 +34,7 @@ from mootloop.export.memo import build_strategy_memo
 from mootloop.export.privilege_log import build_privilege_log
 from mootloop.models.gates import GateResult
 from mootloop.resources import DEFAULT_REFERENCE_DOC, reference_doc_path
+from mootloop.vault import RunLock
 
 
 @dataclass
@@ -90,12 +91,42 @@ def export_run(
     """Build every deliverable and render per-set DOCX (draft or clean). The markdown
     deliverables are always produced; the DOCX watermark/clean decision is enforced
     here (plan D3 M12)."""
+    with RunLock(vault_root, run_id):
+        return _export_run_locked(
+            vault_root,
+            run_id,
+            now,
+            force_draft=force_draft,
+            reference_doc=reference_doc,
+        )
+
+
+def _export_run_locked(
+    vault_root: Path | str,
+    run_id: str,
+    now: str,
+    *,
+    force_draft: bool,
+    reference_doc: str,
+) -> ExportResult:
+    """Generate and seal one export while the run lock prevents competing writers."""
     run_context = load_run_context(vault_root, run_id)
     load_run_corpus(vault_root, run_context)
-    master = build_court_master(vault_root, run_id, now, run_context=run_context)
-    verification = build_verification_page(
-        vault_root, run_id, now, run_context=run_context
+    if attest.sealed_export_state(vault_root, run_id).status == "valid":
+        existing = _existing_sealed_result(vault_root, run_id)
+        if not force_draft:
+            return existing
+        return _render_draft_from_sealed(existing, reference_doc)
+    prebuild_attestation = attest.attestation_state(vault_root, run_id)
+    attested_master = attest.master_deliverable_path(
+        vault_root, run_id, run_context=run_context
     )
+    master = (
+        attested_master
+        if prebuild_attestation.status == "valid" and attested_master is not None
+        else build_court_master(vault_root, run_id, now, run_context=run_context)
+    )
+    verification = build_verification_page(vault_root, run_id, now, run_context=run_context)
     privilege = build_privilege_log(vault_root, run_id, run_context=run_context)
     memo = build_strategy_memo(vault_root, run_id, now)
     audit = build_audit_log(vault_root, run_id, now)
@@ -155,4 +186,57 @@ def export_run(
             continue
         result.docx.append(out_path)
 
+    if qualifies_clean and not result.residue_clean:
+        _retire_clean_docx(docx_dir)
+        result.is_draft = True
+        result.export_ready = False
+        return result
+
+    if qualifies_clean:
+        attest.record_export_seal_locked(vault_root, run_id, now)
+    return result
+
+
+def _existing_sealed_result(vault_root: Path | str, run_id: str) -> ExportResult:
+    """Return the intact published generation without rewriting its sealed bytes."""
+    root = deliverables_dir(vault_root, run_id)
+    master = attest.master_deliverable_path(vault_root, run_id)
+    if master is None:
+        raise RuntimeError("sealed export is missing its master deliverable")
+    verification_path = root / "verification.md"
+    return ExportResult(
+        run_id=run_id,
+        master=master,
+        verification=verification_path if verification_path.is_file() else None,
+        privilege_log=root / "privilege-log.md",
+        memo=root / "strategy-memo.md",
+        audit_log=root / "audit-log.json",
+        set_masters=sorted((root / "sets").glob("*.md")),
+        docx=sorted(
+            path
+            for path in (root / "docx").glob("*.docx")
+            if ".draft." not in path.name.lower()
+        ),
+        is_draft=False,
+        export_ready=True,
+        attestation_state="valid",
+    )
+
+
+def _render_draft_from_sealed(result: ExportResult, reference_doc: str) -> ExportResult:
+    """Render optional DRAFT copies without changing the current sealed generation."""
+    result.is_draft = True
+    result.docx = []
+    if not docx_render.pandoc_available():
+        result.docx_skipped_reason = "pandoc not installed"
+        return result
+    reference = reference_doc_path(reference_doc, draft=True)
+    docx_dir = result.master.parent / "docx"
+    for source in result.set_masters:
+        label = source.stem
+        out_path = docx_dir / f"{label}.DRAFT.docx"
+        docx_render.render_docx(source, out_path, reference, draft=True)
+        scan = residue.scan_docx(out_path)
+        result.residue_results.append((label, scan))
+        result.docx.append(out_path)
     return result

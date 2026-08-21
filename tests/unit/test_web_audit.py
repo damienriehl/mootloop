@@ -73,3 +73,17 @@ def test_unparseable_line_fails_closed(tmp_path: Path) -> None:
     lines.append("{not valid json")
     _write(tmp_path, lines)
     assert audit.verify_chain(tmp_path) is False
+
+
+def test_torn_terminal_fragment_is_ignored_then_repaired(tmp_path: Path) -> None:
+    _append(tmp_path, 0)
+    path = audit.audit_path(tmp_path)
+    with path.open("ab") as handle:
+        handle.write(b'{"schema_version":"1.0"')
+
+    assert audit.verify_chain(tmp_path) is True
+    _append(tmp_path, 1)
+
+    assert path.read_bytes().endswith(b"\n")
+    assert len(_lines(tmp_path)) == 2
+    assert audit.verify_chain(tmp_path) is True

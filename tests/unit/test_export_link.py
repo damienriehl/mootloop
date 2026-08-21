@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from mootloop.attest import AttestationCheck
 from mootloop.errors import ExportLinkError, ExportNotReadyError
 from mootloop.export import link as link_svc
 from mootloop.export.link import (
@@ -46,6 +47,9 @@ def signer() -> LinkSigner:
 def ready_vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     _seed(tmp_path, "responses.docx", "responses.DRAFT.docx", "master.md")
     monkeypatch.setattr("mootloop.gate_ledger.export_ready", lambda v, r: (True, []))
+    monkeypatch.setattr(
+        "mootloop.attest.sealed_export_state", lambda v, r: AttestationCheck("valid")
+    )
     return tmp_path
 
 
@@ -155,6 +159,20 @@ def test_clean_docx_requires_export_ready_at_mint(
     assert exc.value.blockers == ["attestation", "citations"]
 
 
+def test_clean_docx_requires_export_seal_at_mint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, signer: LinkSigner
+) -> None:
+    _seed(tmp_path, "responses.docx")
+    monkeypatch.setattr("mootloop.gate_ledger.export_ready", lambda v, r: (True, []))
+    monkeypatch.setattr(
+        "mootloop.attest.sealed_export_state",
+        lambda v, r: AttestationCheck("invalidated", "clean export has no export seal"),
+    )
+    with pytest.raises(ExportNotReadyError) as exc:
+        mint_link(tmp_path, MATTER, RUN, "responses.docx", NOW, signer)
+    assert exc.value.blockers == ["export_seal"]
+
+
 def test_draft_docx_is_linkable_when_not_ready(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, signer: LinkSigner
 ) -> None:
@@ -176,12 +194,31 @@ def test_informational_master_is_never_gated(
     assert link.is_draft is False
 
 
+def test_tampered_sealed_informational_artifact_is_gated(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, signer: LinkSigner
+) -> None:
+    _seed(tmp_path, "master.md")
+    monkeypatch.setattr("mootloop.attest.latest_seal_contains", lambda v, r, n: True)
+    monkeypatch.setattr(
+        "mootloop.attest.sealed_export_state",
+        lambda v, r: AttestationCheck("invalidated", "sealed export set changed"),
+    )
+    monkeypatch.setattr("mootloop.gate_ledger.export_ready", lambda v, r: (True, []))
+
+    with pytest.raises(ExportNotReadyError) as exc:
+        mint_link(tmp_path, MATTER, RUN, "master.md", NOW, signer)
+    assert exc.value.blockers == ["export_seal"]
+
+
 def test_download_gate_re_evaluated_after_mint(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, signer: LinkSigner
 ) -> None:
     # Defense in depth: a link minted while ready must not stream if the gate later closes.
     _seed(tmp_path, "responses.docx")
     monkeypatch.setattr("mootloop.gate_ledger.export_ready", lambda v, r: (True, []))
+    monkeypatch.setattr(
+        "mootloop.attest.sealed_export_state", lambda v, r: AttestationCheck("valid")
+    )
     link = mint_link(tmp_path, MATTER, RUN, "responses.docx", NOW, signer)
     claims = validate_token(link.token, NOW, signer)
     monkeypatch.setattr("mootloop.gate_ledger.export_ready", lambda v, r: (False, ["attestation"]))
@@ -192,6 +229,15 @@ def test_download_gate_re_evaluated_after_mint(
 def test_unknown_deliverable_is_rejected(ready_vault: Path, signer: LinkSigner) -> None:
     with pytest.raises(ExportLinkError, match="unknown deliverable"):
         mint_link(ready_vault, MATTER, RUN, "nope.docx", NOW, signer)
+
+
+@pytest.mark.parametrize("name", ["sets//master.md", "master.md/", "//master.md"])
+def test_noncanonical_name_cannot_bypass_a_sealed_artifact_gate(
+    ready_vault: Path, signer: LinkSigner, name: str
+) -> None:
+    _seed(ready_vault, "sets/master.md")
+    with pytest.raises(ExportLinkError, match="invalid deliverable"):
+        mint_link(ready_vault, MATTER, RUN, name, NOW, signer)
 
 
 # --- traversal: the name is confined to THIS run's deliverable dir ------------

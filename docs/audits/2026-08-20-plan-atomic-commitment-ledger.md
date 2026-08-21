@@ -43,11 +43,11 @@ short label is less detailed.
 | D3-H5 | Vault/repo separation and no-follow symlink invariants | COMPLETE |
 | D3-H6 | Secrets outside vault/repo, minimal env, runtime redaction | PARTIAL — U-02 |
 | D3-H7 | Ethical walls and cross-matter learning exclusion | OPEN-AUTO — U-09 |
-| D3-H8 | Immutable verification source, chained logs/decisions, full attestation tuple | PARTIAL — U-03 |
+| D3-H8 | Immutable verification source, chained logs/decisions, full attestation tuple | COMPLETE locally — exact-byte v2 commitment and mutation gates |
 | D3-H9 | Fixed legal-host egress allowlist; no content-derived target | PARTIAL — U-02/U-07 |
 | D3-H10 | Defensive DOCX/ZIP/XXE parsing and pinned model/catalog fetches | OPEN-AUTO — U-09/D-12 |
 | D3-M11 | Per-matter canaries and fail-closed privacy scanning | COMPLETE locally; runtime path U-02 |
-| D3-M12 | Shared export controls for every CLI/skill path | COMPLETE for current exports; extensions U-03/U-11A |
+| D3-M12 | Shared export controls for every CLI/skill path | COMPLETE for current sealed exports; extensions U-11A |
 | D3-13 | Every confidentiality/attestation error fails closed | PARTIAL — enforced per landing unit |
 | D3-14 | `MatterText`/`PublicText` trust conversion through scrub | PARTIAL — U-02/U-05/U-09 |
 | D4-01 | Flat pointer-plus-summary orchestrator context with scale invariant | OPEN-AUTO — U-16 |
@@ -83,9 +83,9 @@ short label is less detailed.
 | D9-02 | Retention/destruction-date/litigation-hold close policy and destruction manifest | OPEN-AUTO — U-11A |
 | D9-03 | Sync-folder/conflicted-copy guard and idle snapshot | COMPLETE |
 | D9-04 | Heartbeating stale-lock takeover protocol | PARTIAL — U-11A |
-| D9-05 | Attestation binds master, ledgers, export set, actor/time; edit invalidates | PARTIAL — U-03/D-09 |
+| D9-05 | Attestation binds master, ledgers, export set, actor/time; edit invalidates | COMPLETE locally — remote host-writer resistance remains D-09 |
 | D9-06 | Content-hash document IDs and whole-vault self-check | PARTIAL — launch snapshots complete; U-04A/U-11A |
-| D9-07 | Append-only fact versions; response and attestation pin fact state | OPEN-AUTO — U-03/U-04A |
+| D9-07 | Append-only fact versions; response and attestation pin fact state | PARTIAL — attestation pins launch facts; version workflow U-04A |
 | D9-08 | Firm profile as append-only reviewed event log | OPEN-AUTO — U-09 |
 | D9-09 | All derived/shared state append-only, content-addressed, timestamped | PARTIAL — enforced per unit |
 | D10-01 | Domain models own types; versions, migrations, strict extras | COMPLETE for current persisted models |
@@ -130,7 +130,7 @@ short label is less detailed.
 | FD2-04 | Backups exclude secrets/config token copy; rotation purges history | PARTIAL — U-11A |
 | FD3-01 | Redact Google/OAuth/exact-secret values at every new sink | PARTIAL — U-02/U-15 |
 | FD3-02 | Runtime canary blocks outbound/notification payloads | OPEN-AUTO — U-02/U-15 |
-| FD3-03 | Access audit chained, attestation-bound, fail-closed on downloads, stronger sink | PARTIAL — U-03/D-09 |
+| FD3-03 | Access audit chained, attestation-bound, fail-closed on downloads, stronger sink | COMPLETE locally — stronger remote sink remains D-09 |
 | FD3-04 | Secret ntfy topic, content-free digest, separate Gmail/Drive credentials | OPEN/DECISION — U-15/D-06 |
 | FD4-01 | Auto-derived board edits are immediately visible and journaled | OPEN-AUTO — U-13 |
 | FD4-02 | Only attorney-approved/curated nodes enter prompts | COMPLETE at injection boundary; board producer U-13 |

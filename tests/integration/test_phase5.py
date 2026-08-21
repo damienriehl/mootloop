@@ -88,6 +88,10 @@ def test_autonomous_batches_then_resolve_attest_exports(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     assert not DecisionStore(vault, run_id).list_open()
 
+    # Build and review the exact draft bytes before attesting.
+    preview = runner.invoke(app, ["export", "build", str(vault), run_id, "--force-draft"])
+    assert preview.exit_code == 0, preview.output
+
     # Attest -> export ready.
     result = runner.invoke(app, ["attest", str(vault), run_id])
     assert result.exit_code == 0, result.output
@@ -118,6 +122,8 @@ def test_post_attestation_edit_invalidates_and_reblocks(tmp_path: Path) -> None:
     for d in DecisionStore(vault, run_id).list_open():
         args = ["decide", "resolve", str(vault), run_id, d.decision_id]
         runner.invoke(app, [*args, "--action", "approve"])
+    preview = runner.invoke(app, ["export", "build", str(vault), run_id, "--force-draft"])
+    assert preview.exit_code == 0, preview.output
     runner.invoke(app, ["attest", str(vault), run_id])
     assert gate_ledger.export_ready(vault, run_id)[0] is True
 
