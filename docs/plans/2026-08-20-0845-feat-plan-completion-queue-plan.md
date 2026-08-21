@@ -279,13 +279,14 @@ flowchart TD
   The complete journal/decision/export commitment, coordinated-rewrite defense,
   migration policy, and D-09 off-vault anchor remain queued.
 - **U-02, U-04A/U-04B, and U-05 through U-17C remain queued** under their stated
-  dependencies and decision gates. U-03 remains partial. **U-18 is active for U-01:**
-  PR #32 is merged and the user has authorized merge of the reviewed U-01 continuation;
-  its remote CI/merge disposition remains to be recorded. Deployment is still gated.
+  dependencies and decision gates. U-03 remains partial. **U-18 is COMPLETE for U-01:**
+  PR #33 merged as `74dec0a` after backend, invariant, and frontend CI passed on code
+  head `acc1e51`; the sole actionable review finding was fixed and resolved. Deployment
+  is still gated.
   No hosted matter or deployment was accessed during this execution.
 
-Verification at this checkpoint: backend ruff and strict mypy across 85 source files
-pass; 737 backend tests pass at 92% coverage; frontend ESLint, TypeScript, 9 Vitest
+Verification at this checkpoint: backend ruff and strict mypy across 92 source files
+pass; 848 backend tests pass at 92% coverage; frontend ESLint, TypeScript, 9 Vitest
 files / 37 tests, OpenAPI generation/drift, and production build pass. The structured
 review completed nine local lenses plus the PR's Codex review. The external Claude
 pass could not run because sending repository code to an external model was not
