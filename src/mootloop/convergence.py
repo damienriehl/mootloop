@@ -22,11 +22,32 @@ reshuffle counts as change) and Jaccard is available as an alternative.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from difflib import SequenceMatcher
+from typing import Protocol
 
 from mootloop.models.common import StrictModel
+from mootloop.models.rubric import Rubric
 from mootloop.models.task import ConvergenceConfig
+
+
+@dataclass(frozen=True)
+class CopiedComponentProvenance:
+    """Exact upstream identity for a locally adapted component structure."""
+
+    component: str
+    source_path: str
+    commit_sha: str
+    license: str
+
+
+CONVERGENCE_PROVENANCE = CopiedComponentProvenance(
+    component="alea-intake ConvergenceEvaluator structure",
+    source_path="backend/app/services/analysis/convergence.py",
+    commit_sha="18d8cf5",
+    license="MIT",
+)
 
 
 @dataclass(frozen=True)
@@ -54,6 +75,40 @@ class ConvergenceDecision(StrictModel):
     converged: bool
     reason: str
     signals: DraftingSignals
+
+
+class ScoreSource(Protocol):
+    """Supplies a round's real rubric-derived score to convergence mechanics."""
+
+    def score(
+        self,
+        rubric: Rubric,
+        scores: Mapping[str, float],
+        request_code: str,
+    ) -> float: ...
+
+
+class RubricScoreSource:
+    """Default score source backed by the launch-snapshotted rubric."""
+
+    def score(
+        self,
+        rubric: Rubric,
+        scores: Mapping[str, float],
+        request_code: str,
+    ) -> float:
+        return rubric.weighted_score(dict(scores), request_code)
+
+
+class ConvergenceSource(Protocol):
+    """Local seam around the provenance-pinned convergence structure."""
+
+    def evaluate(
+        self,
+        history: list[RoundState],
+        max_iterations: int,
+        config: ConvergenceConfig,
+    ) -> ConvergenceDecision: ...
 
 
 def _tokens(text: str) -> list[str]:
@@ -137,3 +192,15 @@ class ConvergenceEvaluator:
         else:
             reason = "improving"
         return ConvergenceDecision(converged=False, reason=reason, signals=signals)
+
+
+class DraftingConvergenceSource:
+    """Injectable adapter for the locally adapted convergence evaluator."""
+
+    def evaluate(
+        self,
+        history: list[RoundState],
+        max_iterations: int,
+        config: ConvergenceConfig,
+    ) -> ConvergenceDecision:
+        return ConvergenceEvaluator(config).evaluate(history, max_iterations)

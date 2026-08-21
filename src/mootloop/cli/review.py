@@ -1,0 +1,202 @@
+"""Citation research and attorney-decision CLI adapters."""
+
+from __future__ import annotations
+
+import json
+import os
+import pwd
+from pathlib import Path
+from typing import Annotated
+
+import typer
+
+from mootloop import decisions as decisions_service
+from mootloop import orchestrator
+from mootloop.citations import verify
+from mootloop.citations.extract import extract_citations
+from mootloop.citations.ledger import ResearchQueue
+from mootloop.context import load_run_context
+from mootloop.errors import CitationError, DecisionError, MootloopError, VaultBoundaryError
+
+from . import DecisionActionArg, _fail, _now, cite_app, decide_app, research_app
+
+
+def _print_verify_summary(summary: verify.VerifySummary) -> None:
+    typer.echo(f"Citations: {len(summary.outcomes)}  {summary.counts()}")
+    for outcome in summary.outcomes:
+        verified = outcome.status.value == "verified"
+        line = f"  [{outcome.status.value}] {outcome.citation.raw_text}"
+        if outcome.source_url:
+            line += f"  <{outcome.source_url}>"
+        typer.secho(line, fg=typer.colors.GREEN if verified else typer.colors.RED)
+    if summary.research_request_ids:
+        typer.echo("Research requests opened: " + ", ".join(summary.research_request_ids))
+    typer.secho(summary.disclosure, fg=typer.colors.YELLOW)
+
+
+@cite_app.command("verify")
+def cite_verify(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str | None, typer.Option("--run", help="Verify a run's drafts")] = None,
+    text_file: Annotated[Path | None, typer.Option("--text", help="Verify a text file")] = None,
+) -> None:
+    """Extract citations (from a run's drafts or a text file) and verify them."""
+    if (run_id is None) == (text_file is None):
+        raise _fail(MootloopError("cite verify needs exactly one of --run or --text")) from None
+    try:
+        if run_id is not None:
+            summary = orchestrator.verify_run_citations(vault_path, run_id, _now())
+        else:
+            assert text_file is not None
+            if not text_file.is_file():
+                raise MootloopError(f"--text file not found: {text_file}")
+            citations = extract_citations(text_file.read_text(encoding="utf-8"))
+            summary = verify.verify_all(vault_path, citations, _now())
+    except (MootloopError, VaultBoundaryError) as exc:
+        raise _fail(exc) from exc
+    _print_verify_summary(summary)
+
+
+@research_app.command("list")
+def research_list(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+) -> None:
+    """List open citation research requests (citations the free stack cannot verify)."""
+    try:
+        open_requests = ResearchQueue(vault_path).open_requests()
+    except VaultBoundaryError as exc:
+        raise _fail(exc) from exc
+    if not open_requests:
+        typer.echo("No open research requests.")
+        return
+    for request in open_requests:
+        typer.echo(f"{request.request_id}  {request.normalized}  ({request.reason})")
+    typer.secho(verify.CITATOR_DISCLOSURE, fg=typer.colors.YELLOW)
+
+
+@research_app.command("fulfill")
+def research_fulfill(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    request_id: Annotated[str, typer.Argument(help="Research request id")],
+    file: Annotated[Path, typer.Option("--file", help="Authority markdown to curate")],
+    url: Annotated[str | None, typer.Option("--url", help="Source URL for the authority")] = None,
+) -> None:
+    """Fulfill a research request: curate the authority and mark its citation verified."""
+    try:
+        record = verify.fulfill_research_request(
+            vault_path, request_id, file=file, now=_now(), url=url
+        )
+    except (CitationError, VaultBoundaryError) as exc:
+        raise _fail(exc) from exc
+    typer.echo(f"fulfilled {request_id}: {record.citation_id} verified (curated)")
+
+
+@decide_app.command("list")
+def decide_list(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+    json_output: Annotated[bool, typer.Option("--json", help="Emit decision JSON")] = False,
+) -> None:
+    """List the run's open attorney-gate decisions."""
+    try:
+        matter = load_run_context(vault_path, run_id).manifest.matter_config
+        open_decisions = decisions_service.DecisionStore(vault_path, run_id).list_open()
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    if json_output:
+        typer.echo(json.dumps([d.model_dump(mode="json") for d in open_decisions]))
+        return
+    if not open_decisions:
+        typer.echo("No open decisions.")
+        return
+    for decision in open_decisions:
+        mode = decisions_service.gate_mode_for(matter, decision.kind)
+        typer.echo(f"{decision.decision_id}  [{mode}]  {decision.kind.value}")
+        typer.echo(f"  {decision.proposal.summary}")
+        typer.echo(f"  recommended: {decision.proposal.recommended}")
+
+
+@decide_app.command("show")
+def decide_show(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+    decision_id: Annotated[str, typer.Argument(help="Decision id")],
+) -> None:
+    """Show a single decision's full proposal (and resolution, if any)."""
+    try:
+        load_run_context(vault_path, run_id)
+        decision = decisions_service.DecisionStore(vault_path, run_id).get(decision_id)
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    if decision is None:
+        raise _fail(DecisionError(f"unknown decision {decision_id!r}")) from None
+    typer.echo(decision.model_dump_json(indent=2))
+
+
+def _resolve_one(
+    vault_path: Path,
+    run_id: str,
+    decision_id: str,
+    action: str,
+    chosen: str | None,
+    note: str,
+    by: str,
+    source: str,
+) -> None:
+    decisions_service.resolve(
+        vault_path,
+        run_id,
+        decision_id,
+        action,  # type: ignore[arg-type]
+        chosen,
+        note,
+        by,
+        source,  # type: ignore[arg-type]
+        _now(),
+    )
+
+
+@decide_app.command("resolve")
+def decide_resolve(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+    decision_id: Annotated[
+        str | None, typer.Argument(help="Decision id (omit with --input)")
+    ] = None,
+    action: Annotated[
+        DecisionActionArg | None, typer.Option("--action", help="approve | modify | deny")
+    ] = None,
+    choose: Annotated[str | None, typer.Option("--choose", help="Chosen option key")] = None,
+    note: Annotated[str, typer.Option("--note", help="Resolution note")] = "",
+    input_file: Annotated[
+        Path | None, typer.Option("--input", help="JSON list of resolutions (batch)")
+    ] = None,
+) -> None:
+    """Resolve one decision, or a batch via ``--input`` as the local OS principal."""
+    try:
+        actor = pwd.getpwuid(os.geteuid()).pw_name
+        if input_file is not None:
+            if not input_file.is_file():
+                raise MootloopError(f"--input file not found: {input_file}")
+            entries = json.loads(input_file.read_text(encoding="utf-8"))
+            if not isinstance(entries, list):
+                raise MootloopError("--input must be a JSON list of resolutions")
+            for entry in entries:
+                _resolve_one(
+                    vault_path,
+                    run_id,
+                    entry["decision_id"],
+                    entry.get("action", "approve"),
+                    entry.get("choose"),
+                    entry.get("note", ""),
+                    actor,
+                    "human",
+                )
+            typer.echo(f"resolved {len(entries)} decision(s)")
+            return
+        if decision_id is None or action is None:
+            raise MootloopError("single resolve needs <decision-id> and --action")
+        _resolve_one(vault_path, run_id, decision_id, action.value, choose, note, actor, "human")
+        typer.echo(f"resolved {decision_id}: {action.value}")
+    except (MootloopError, KeyError) as exc:
+        raise _fail(exc if isinstance(exc, MootloopError) else DecisionError(str(exc))) from exc

@@ -16,6 +16,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import date, datetime
 from pathlib import Path
+from typing import cast
 
 from pydantic import ValidationError
 
@@ -37,7 +38,7 @@ from mootloop.context import (
 )
 from mootloop.context_assembly import assemble_context, select_launch_contributions
 from mootloop.errors import OrchestratorError
-from mootloop.gates import completeness, degeneracy, fabrication
+from mootloop.gates.turn import TurnGateContext, evaluate_turn_gates
 from mootloop.journal import (
     append,
     load_state,
@@ -85,6 +86,7 @@ from mootloop.models.run import (
     DiscardedTurn,
     DraftOutput,
     RubricScoreOutput,
+    TurnOutput,
     TurnRecord,
     TurnSpec,
 )
@@ -576,7 +578,7 @@ def _record_spec(
 ) -> TurnRecord | DiscardedTurn:
     model_cls = OUTPUT_SCHEMAS[spec.output_schema_name]
     try:
-        output = model_cls.model_validate_json(raw_text)
+        output = cast(TurnOutput, model_cls.model_validate_json(raw_text))
     except ValidationError as exc:
         detail = "; ".join(
             f"{'.'.join(str(p) for p in err['loc'])}: {err['msg']}" for err in exc.errors()[:6]
@@ -593,9 +595,14 @@ def _record_spec(
             provider_call_id=provider_call_id,
         )
 
-    gate = degeneracy.evaluate(output)  # type: ignore[arg-type]
-    append(vault_root, run_id, GateEvaluated(turn_id=spec.turn_id, result=gate))
-    if gate.status != "pass":
+    gate_run = evaluate_turn_gates(
+        tuple(binding.config.gates),
+        _turn_gate_context(vault_root, spec, output, binding, units, run_context),
+    )
+    for result in gate_run.results:
+        append(vault_root, run_id, GateEvaluated(turn_id=spec.turn_id, result=result))
+    if gate_run.halted_by is not None:
+        gate = gate_run.results[-1]
         reasons = "; ".join(f.code for f in gate.findings)
         detail = "; ".join(f"{f.code}: {f.message}" for f in gate.findings[:6])
         return _discard(
@@ -606,22 +613,11 @@ def _record_spec(
             max_attempts,
             usage=usage,
             now=now,
-            detail=f"your previous output was discarded by the degeneracy gate — {detail}",
+            detail=f"your previous output was discarded by the {gate.gate} gate — {detail}",
             provider_call_id=provider_call_id,
         )
 
-    gate_results: list[GateResult] = [gate]
-    # Deterministic completeness gate on every draft (presence criteria; plan D7) —
-    # recorded, never fatal, never sent to a judge.
-    if isinstance(output, DraftOutput):
-        comp = _completeness_gate(spec, output, binding, units)
-        append(vault_root, run_id, GateEvaluated(turn_id=spec.turn_id, result=comp))
-        gate_results.append(comp)
-        # Fabrication gate on every draft/bolster turn (plan D12): every assertion must
-        # trace to a fact or corpus. Recorded, non-fatal at turn time; blocks at export.
-        fab = _fabrication_gate(vault_root, output, run_context)
-        append(vault_root, run_id, GateEvaluated(turn_id=spec.turn_id, result=fab))
-        gate_results.append(fab)
+    gate_results = list(gate_run.results)
 
     if spec.stage != state.current_stage:
         append(vault_root, run_id, StageStarted(stage=spec.stage))
@@ -631,7 +627,7 @@ def _record_spec(
         gate_results=gate_results,
         completed_at=now,
     )
-    write_turn_body(vault_root, run_id, record)
+    record = write_turn_body(vault_root, run_id, record)
     append(vault_root, run_id, TurnCompleted(record=record))
     # Attorney-gate decisions (plan P-28): every draft/bolster turn may imply gates.
     if isinstance(output, DraftOutput):
@@ -663,27 +659,30 @@ def _record_spec(
     return record
 
 
-def _completeness_gate(
+def _turn_gate_context(
+    vault_root: Path | str,
     spec: TurnSpec,
-    draft: DraftOutput,
+    output: TurnOutput,
     binding: TaskBinding,
     units: list[RequestItem],
-) -> GateResult:
+    run_context: RunContext,
+) -> TurnGateContext:
     request_id = str(spec.request_id) if spec.request_id else ""
     code = code_from_request_id(request_id)
     unit = next((u for u in units if str(u.request_id) == request_id), None)
     req_text = unit.text if unit else ""
-    return completeness.evaluate(draft, binding.rubric, code, req_text)
-
-
-def _fabrication_gate(
-    vault_root: Path | str, draft: DraftOutput, run_context: RunContext
-) -> GateResult:
-    """Fabrication gate for one draft against its launch-snapshotted evidence."""
-    facts = run_context.manifest.facts
-    snapshot = load_run_corpus(vault_root, run_context)
-    corpus_text = "\n".join(item.text for item in snapshot.documents)
-    return fabrication.check(draft, facts, corpus_text)
+    corpus_text = ""
+    if isinstance(output, DraftOutput):
+        snapshot = load_run_corpus(vault_root, run_context)
+        corpus_text = "\n".join(item.text for item in snapshot.documents)
+    return TurnGateContext(
+        output=output,
+        rubric=binding.rubric,
+        request_code=code,
+        request_text=req_text,
+        facts=tuple(run_context.manifest.facts),
+        corpus_text=corpus_text,
+    )
 
 
 # --- citation verification (plan Phase 4) -----------------------------------

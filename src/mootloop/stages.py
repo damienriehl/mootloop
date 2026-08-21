@@ -17,11 +17,19 @@ inputs carried on the spec — no excellence prose is hard-coded here.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from types import MappingProxyType
 from typing import Any, Protocol
 
 from mootloop.context_assembly import items_for_turn
-from mootloop.convergence import ConvergenceEvaluator, RoundState
+from mootloop.convergence import (
+    ConvergenceSource,
+    DraftingConvergenceSource,
+    RoundState,
+    RubricScoreSource,
+    ScoreSource,
+)
 from mootloop.errors import TaskConfigError
 from mootloop.gates import completeness
 from mootloop.models.common import RunId, TurnId
@@ -132,14 +140,38 @@ class StageContext:
     run_id: str
     req_index: int
     request: RequestItem
-    facts: list[dict[str, str]]
+    facts: Sequence[Mapping[str, str]]
     config: TaskAdapterConfig
     adapter: TaskAdapter
     rubric: Rubric
     state: RunState
     max_attempts: int = 3
-    tier_models: dict[str, str] = field(default_factory=dict)
+    tier_models: Mapping[str, str] = field(default_factory=dict)
     assembled_context: tuple[AssembledContextItem, ...] = ()
+    score_source: ScoreSource = field(default_factory=RubricScoreSource, repr=False, compare=False)
+    convergence_source: ConvergenceSource = field(
+        default_factory=DraftingConvergenceSource,
+        repr=False,
+        compare=False,
+    )
+
+    def __post_init__(self) -> None:
+        """Detach every nested stage input from its mutable caller-owned source."""
+        object.__setattr__(self, "request", self.request.model_copy(deep=True))
+        object.__setattr__(
+            self,
+            "facts",
+            tuple(MappingProxyType(dict(fact)) for fact in self.facts),
+        )
+        object.__setattr__(self, "config", self.config.model_copy(deep=True))
+        object.__setattr__(self, "rubric", self.rubric.model_copy(deep=True))
+        object.__setattr__(self, "state", self.state.model_copy(deep=True))
+        object.__setattr__(self, "tier_models", MappingProxyType(dict(self.tier_models)))
+        object.__setattr__(
+            self,
+            "assembled_context",
+            tuple(item.model_copy(deep=True) for item in self.assembled_context),
+        )
 
     @property
     def layout(self) -> SlotLayout:
@@ -267,7 +299,7 @@ class StageContext:
             cov = completeness.coverage(draft, self.rubric, self.code, self.request.text)
             history.append(
                 RoundState(
-                    score=self.rubric.weighted_score(scores, self.code),
+                    score=self.score_source.score(self.rubric, scores, self.code),
                     coverage=cov,
                     text=draft.response_text,
                 )
@@ -278,8 +310,10 @@ class StageContext:
         """True iff the partner loop has genuinely converged (not merely cap-hit) by
         round ``r`` — stopped improving AND stopped changing AND complete (plan D6)."""
         ap = self.config.loop_caps.associate_partner
-        decision = ConvergenceEvaluator(self.config.convergence).evaluate(
-            self._round_history(r), ap
+        decision = self.convergence_source.evaluate(
+            self._round_history(r),
+            ap,
+            self.config.convergence,
         )
         return decision.converged and decision.reason == "converged"
 

@@ -2,8 +2,9 @@
 
 Events land one-per-line in ``runs/<run-id>/journal.jsonl`` (append + fsync). Turn
 bodies are additionally written write-once to ``runs/<run-id>/turns/<turn-id>.json``
-(skip-if-exists — idempotent under discard/relaunch). `fold` replays events into a
-`RunState` and is a pure function, so resume after a kill is exactly a re-fold.
+(substantively identical replay reuses the original completion timestamp; conflicts
+fail closed). `fold` replays events into a `RunState` and is a pure function, so resume
+after a kill is exactly a re-fold.
 
 `read_events` tolerates a *torn final line* (a crash mid-append): it truncates the
 file back to the last complete line and warns, never crashing. A corrupt line that
@@ -37,6 +38,7 @@ from pathlib import Path
 
 from pydantic import TypeAdapter, ValidationError
 
+from mootloop.errors import JournalIntegrityError
 from mootloop.models.events import (
     CapRaised,
     CheckpointCleared,
@@ -96,17 +98,44 @@ def append(vault_root: Path | str, run_id: str, event: JournalEvent) -> None:
             os.close(parent_fd)
 
 
-def write_turn_body(vault_root: Path | str, run_id: str, record: TurnRecord) -> Path:
-    """Write a completed turn's body write-once (skip if it already exists)."""
-    path = turn_body_path(vault_root, run_id, record.spec.turn_id)
-    if path.exists():
-        return path
-    path.parent.mkdir(parents=True, exist_ok=True)
-    # Same-dir temp + atomic replace keeps a crash from leaving a torn body.
-    from mootloop.vault import atomic_write_text
+def write_turn_body(
+    vault_root: Path | str, run_id: str, record: TurnRecord
+) -> TurnRecord:
+    """Write a turn body once, or recover its canonical record after a crash.
 
-    atomic_write_text(path, record.model_dump_json(indent=2) + "\n")
-    return path
+    A crash can publish the sidecar before ``TurnCompleted`` reaches the journal. A
+    retry reconstructs the same validated result with a later ``completed_at``; in
+    that one case the original persisted record remains authoritative. Every other
+    difference, non-canonical rewrite, or unreadable body fails closed.
+    """
+    path = turn_body_path(vault_root, run_id, record.spec.turn_id)
+    serialized = record.model_dump_json(indent=2) + "\n"
+    from mootloop.vault import atomic_write_once_text
+
+    try:
+        atomic_write_once_text(path, serialized)
+    except FileExistsError:
+        try:
+            existing_text = path.read_text(encoding="utf-8")
+            existing = TurnRecord.model_validate_json(existing_text)
+        except (OSError, UnicodeError) as exc:
+            raise JournalIntegrityError(f"cannot verify write-once turn body {path.name}") from exc
+        except ValidationError as exc:
+            raise JournalIntegrityError(f"invalid write-once turn body {path.name}") from exc
+        canonical_existing = existing.model_dump_json(indent=2) + "\n"
+        if existing_text != canonical_existing:
+            raise JournalIntegrityError(
+                f"non-canonical write-once turn body for {record.spec.turn_id}"
+            ) from None
+        proposed_at_original_time = record.model_copy(
+            update={"completed_at": existing.completed_at}
+        )
+        if existing == proposed_at_original_time:
+            return existing
+        raise JournalIntegrityError(
+            f"conflicting write-once turn body for {record.spec.turn_id}"
+        ) from None
+    return record
 
 
 # --- read (torn-line tolerant, incremental) ---------------------------------

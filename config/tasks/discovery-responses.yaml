@@ -40,6 +40,7 @@ convergence:
 gates:
   - degeneracy
   - completeness
+  - fabrication
   - rubric
 
 rubric_id: discovery-responses-v1.0
