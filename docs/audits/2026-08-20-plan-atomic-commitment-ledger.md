@@ -36,7 +36,7 @@ short label is less detailed.
 | D2-04 | Least-privilege persona/panel/cite-checker tool sets | PARTIAL — U-02/U-07 |
 | D2-05 | Persona-body contract and injected excellence standard | PARTIAL — U-06 |
 | D2-06 | Compact run-skill navigator over durable references | OPEN-AUTO — U-11A |
-| D3-C1 | Fence all untrusted text as data; content never drives tools/control flow | PARTIAL — run context complete; U-02/U-04A/U-09 |
+| D3-C1 | Fence all untrusted text as data; content never drives tools/control flow | PARTIAL — run context, execution isolation, and ingest visibility complete; hostile reimport U-09 |
 | D3-C2 | Fail-closed OSS scrub plus mandatory rendered human diff; no auto-commit | OPEN-AUTO — U-09 |
 | D3-C3 | ID/path/filename realpath-containment hardening | COMPLETE |
 | D3-C4 | Google permission read-back and recipient allowlist after export | DECISION-GATED — D-06/U-09 |
@@ -84,8 +84,8 @@ short label is less detailed.
 | D9-03 | Sync-folder/conflicted-copy guard and idle snapshot | COMPLETE |
 | D9-04 | Heartbeating stale-lock takeover protocol | PARTIAL — U-11A |
 | D9-05 | Attestation binds master, ledgers, export set, actor/time; edit invalidates | COMPLETE locally — remote host-writer resistance remains D-09 |
-| D9-06 | Content-hash document IDs and whole-vault self-check | PARTIAL — launch snapshots complete; U-04A/U-11A |
-| D9-07 | Append-only fact versions; response and attestation pin fact state | PARTIAL — attestation pins launch facts; version workflow U-04A |
+| D9-06 | Content-hash document IDs and whole-vault self-check | PARTIAL — stable ingest IDs and launch snapshots complete; whole-vault check U-11A |
+| D9-07 | Append-only fact versions; response and attestation pin fact state | COMPLETE locally — reviewed versions enter immutable launch context and v2 attestation binds its fact commitment |
 | D9-08 | Firm profile as append-only reviewed event log | OPEN-AUTO — U-09 |
 | D9-09 | All derived/shared state append-only, content-addressed, timestamped | PARTIAL — enforced per unit |
 | D10-01 | Domain models own types; versions, migrations, strict extras | COMPLETE for current persisted models |
@@ -160,7 +160,7 @@ short label is less detailed.
 | FD7-09 | notification feed-list parity row | OPEN-AUTO — U-15 |
 | FD7-10 | suggestions list/accept/dismiss with logged dismissal | OPEN-AUTO — U-08/U-14 |
 | FD7-11 | hard-human/policy-bounded run failover authorization | OPEN-AUTO — U-15 |
-| FD7-12 | needs-triage reuses manifest privilege/role mutation | OPEN-AUTO — U-04A/U-14 |
+| FD7-12 | needs-triage reuses manifest privilege/role mutation | COMPLETE for local ingest — U-14 reuses this primitive for watched uploads |
 | FD7-13 | export-link writes access audit | COMPLETE |
 | FD7-14 | connectors list/add-folder/remove; OAuth consent human-only | DECISION/OPEN — D-06/U-14 |
 | FD7-15 | notification mute and quiet-hours parity rows | OPEN-AUTO — U-15 |

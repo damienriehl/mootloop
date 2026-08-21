@@ -213,7 +213,7 @@ def _validate_corpus_snapshot(
     expected = [
         (str(doc.doc_id), doc.normalized_path)
         for doc in manifest.corpus_manifest.docs
-        if doc.normalized_path is not None
+        if doc.run_visible
     ]
     actual = [(doc.doc_id, doc.locator) for doc in snapshot.documents]
     if actual != expected:
@@ -259,8 +259,17 @@ def _load_request_sets(vault_root: Path | str) -> tuple[list[RequestSet], list[C
 def _load_facts(vault_root: Path | str) -> tuple[list[Fact], bytes]:
     path = safe_vault_path(vault_root, *FACTS_PATH)
     raw = path.read_bytes() if path.is_file() else b""
-    records = [Fact.model_validate_json(line) for line in raw.splitlines() if line.strip()]
-    current = [fact for fact in fold_facts(records).values() if fact.superseded_by is None]
+    records: list[Fact] = []
+    for line in raw.splitlines(keepends=True):
+        if not line.endswith(b"\n"):
+            break
+        if line.strip():
+            records.append(Fact.model_validate_json(line))
+    current = [
+        fact
+        for fact in fold_facts(records).values()
+        if fact.superseded_by is None and fact.review_status == "accepted"
+    ]
     return current, raw
 
 
@@ -273,9 +282,13 @@ def _load_corpus(
     sources = [_source("corpus_manifest", "corpus/manifest.json", manifest_raw)]
     texts: list[CorpusTextSnapshot] = []
     captured_bytes = 0
-    for doc in manifest.docs:
-        if doc.normalized_path is None:
-            continue
+    visible_docs = [doc for doc in manifest.docs if doc.run_visible]
+    if manifest_raw and not visible_docs:
+        raise OrchestratorError(
+            "no reviewed corpus documents are run-visible; confirm role and privilege first"
+        )
+    for doc in visible_docs:
+        assert doc.normalized_path is not None
         path = safe_vault_path(vault_root, *Path(doc.normalized_path).parts)
         if not path.is_file():
             raise OrchestratorError(

@@ -12,11 +12,21 @@ transition and a crash between the two appends cannot leave it ambiguous.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import Field
 
 from mootloop.models.common import DocId, FactId, StrictModel, VersionedModel
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
+
+FactReviewStatus = Literal["pending", "accepted", "rejected"]
+FactQuestionKind = Literal[
+    "review_fact",
+    "missing_provenance",
+    "repair_provenance",
+    "uncovered_document",
+]
 
 
 class Provenance(StrictModel):
@@ -46,3 +56,24 @@ class Fact(VersionedModel):
     version: int = Field(ge=1)
     superseded_by: str | None = None
     supersedes: str | None = None
+    review_status: FactReviewStatus = "accepted"
+    reviewed_by: str | None = None
+    reviewed_at: str | None = None
+    review_note: str | None = None
+
+
+class FactQuestion(StrictModel):
+    """One deterministic fact-preparation question for human review."""
+
+    question_id: str
+    kind: FactQuestionKind
+    prompt: str
+    fact_id: FactId | None = None
+    doc_id: DocId | None = None
+
+
+class FactInterview(StrictModel):
+    """Current fact-preparation readiness and its unresolved questions."""
+
+    run_visible_fact_count: int
+    questions: list[FactQuestion] = Field(default_factory=list)
