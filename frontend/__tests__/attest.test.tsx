@@ -14,11 +14,17 @@ let releaseAttest: (() => void) | null = null;
 let attestGate: Promise<void>;
 
 const attestation = {
-  schema_version: "1.0",
+  schema_version: "2.0",
+  hash_scope: "run-review-state:v2",
   attestation_id: "att-1",
   run_id: "r1",
   master_sha256: "MASTER_HASH_ABC123",
   ledger_head_sha256: "LEDGER_HEAD_DEF456",
+  journal_sha256: "JOURNAL_HASH_123",
+  decisions_sha256: "DECISIONS_HASH_123",
+  fact_state_sha256: "FACT_HASH_123",
+  access_audit_head_sha256: "AUDIT_HASH_123",
+  commitment_sha256: "COMMITMENT_HASH_123",
   reviewer: "attorney@example.com",
   attested_at: "2026-07-12T00:00:00Z",
   valid: true,
@@ -27,6 +33,18 @@ const attestation = {
 
 const server = setupServer(
   http.get(`${ORIGIN}/api/csrf`, () => HttpResponse.json({ csrf_token: "test-token" })),
+  http.get(`${ORIGIN}/api/matters/:m/runs/:r/integrity`, () =>
+    HttpResponse.json({
+      schema_version: "1.0",
+      run_id: "r1",
+      attestation_status: "missing",
+      attestation_reason: null,
+      export_seal_status: "missing",
+      export_seal_reason: null,
+      latest_attestation: null,
+      latest_export_seal: null,
+    }),
+  ),
   http.post(`${ORIGIN}/api/matters/:m/runs/:r/attest`, async () => {
     await attestGate; // block until the test releases it
     return HttpResponse.json({ schema_version: "1.0", kind: "attested", attestation });
@@ -55,6 +73,9 @@ describe("attestation is never optimistic", () => {
 
     const user = userEvent.setup();
     renderWithClient(<AttestPanel matterId="m1" runId="r1" blocked={false} />);
+    await waitFor(() =>
+      expect(screen.getByText(/Attorney commitment: MISSING/i)).toBeInTheDocument(),
+    );
 
     // Open the deliberate certification screen.
     await user.click(screen.getByRole("button", { name: /attest this run/i }));
@@ -75,5 +96,6 @@ describe("attestation is never optimistic", () => {
     await waitFor(() => expect(screen.getByText(/MASTER_HASH_ABC123/)).toBeInTheDocument());
     expect(screen.getByText(/^Certified$/)).toBeInTheDocument();
     expect(screen.getByText(/LEDGER_HEAD_DEF456/)).toBeInTheDocument();
+    expect(screen.getByText(/COMMITMENT_HASH_123/)).toBeInTheDocument();
   });
 });

@@ -19,7 +19,8 @@ from pathlib import Path
 
 from mootloop.errors import AuditWriteError
 from mootloop.models.audit import GENESIS_PREV_HASH, AccessAuditEntry
-from mootloop.vault import safe_vault_path
+from mootloop.persistence import complete_jsonl_lines, repair_torn_jsonl
+from mootloop.vault import fsync_file_and_parent, safe_vault_path
 
 # The one audit store, resolved only via `safe_vault_path`.
 AUDIT_SUBPATH: tuple[str, ...] = ("audit", "access.jsonl")
@@ -60,6 +61,7 @@ def append(
     stamp = ts or _utcnow_iso()
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
+        repair_torn_jsonl(path)
         fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
         with os.fdopen(fd, "r+", encoding="utf-8") as handle:
             fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
@@ -76,6 +78,7 @@ def append(
             handle.write(entry.model_dump_json() + "\n")
             handle.flush()
             os.fsync(handle.fileno())
+        fsync_file_and_parent(path)
         return entry
     except OSError as exc:
         raise AuditWriteError(
@@ -90,21 +93,47 @@ def verify_chain(vault_root: Path | str) -> bool:
     matches the recomputation (an empty/absent log is intact). Any tamper — a reorder,
     an edited field, a broken link, or an unparseable line — returns False.
     """
+    try:
+        _validated_chain(vault_root)
+    except ValueError:
+        return False
+    return True
+
+
+def _validated_chain(
+    vault_root: Path | str, *, expected_head: str | None = None
+) -> tuple[str, bool]:
+    """Stream and verify the chain, returning its head and prefix-match result."""
     path = audit_path(vault_root)
     if not path.is_file():
-        return True
+        return GENESIS_PREV_HASH, expected_head == GENESIS_PREV_HASH
     prev = GENESIS_PREV_HASH
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        try:
-            entry = AccessAuditEntry.model_validate_json(line)
-        except ValueError:
-            return False
+    found = expected_head == GENESIS_PREV_HASH
+    for line in complete_jsonl_lines(path):
+        entry = AccessAuditEntry.model_validate_json(line)
         if entry.prev_hash != prev or entry.entry_hash != entry.expected_hash():
-            return False
+            raise ValueError("access-audit chain is corrupt")
         prev = entry.entry_hash
-    return True
+        found = found or prev == expected_head
+    return prev, found
+
+
+def head_sha256(vault_root: Path | str) -> str:
+    """Return the verified chain head, or fail closed when the chain is corrupt."""
+    try:
+        head, _ = _validated_chain(vault_root)
+    except ValueError as exc:
+        raise AuditWriteError("access-audit chain is corrupt") from exc
+    return head
+
+
+def contains_intact_head(vault_root: Path | str, expected_head: str) -> bool:
+    """True when ``expected_head`` is an intact prefix head of the current chain."""
+    try:
+        _, found = _validated_chain(vault_root, expected_head=expected_head)
+    except ValueError:
+        return False
+    return found
 
 
 def record_download_audit(

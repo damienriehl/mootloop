@@ -1094,16 +1094,26 @@ def export_link_cmd(
 def attest_status(
     vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
     run_id: Annotated[str, typer.Argument(help="Run id")],
+    as_json: Annotated[
+        bool, typer.Option("--json", help="Emit the complete machine-readable integrity state")
+    ] = False,
 ) -> None:
-    """Report attestation state (Valid | Invalidated | Missing), logging invalidation."""
-    check = attest_service.check_attestation(vault_path, run_id, _now())
+    """Report the read-only attorney commitment and linked export-seal state."""
+    status = attest_service.review_integrity_status(vault_path, run_id)
+    if as_json:
+        typer.echo(status.model_dump_json())
+        return
     color = {"valid": typer.colors.GREEN, "invalidated": typer.colors.RED}.get(
-        check.status, typer.colors.YELLOW
+        status.attestation_status, typer.colors.YELLOW
     )
-    line = check.status.upper()
-    if check.reason:
-        line += f" — {check.reason}"
-    typer.secho(line, fg=color)
+    attorney = status.attestation_status.upper()
+    if status.attestation_reason:
+        attorney += f" — {status.attestation_reason}"
+    typer.secho(f"ATTESTATION: {attorney}", fg=color)
+    seal = status.export_seal_status.upper()
+    if status.export_seal_reason:
+        seal += f" — {status.export_seal_reason}"
+    typer.secho(f"EXPORT SEAL: {seal}", fg=color)
 
 
 # --- driver verbs (hosted worker loop, plan FE-1) ---------------------------

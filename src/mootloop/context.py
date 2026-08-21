@@ -40,6 +40,7 @@ from mootloop.models.requests import RequestItem, RequestSet
 from mootloop.models.rubric import Rubric, sha256_hex
 from mootloop.models.task import TaskAdapterConfig
 from mootloop.models.taskspec import TaskSpec, TaskSpecLock
+from mootloop.persistence import sha256_file as _sha256_path
 from mootloop.resources import REPO_ROOT, load_persona_bodies, rubric_path, task_config_path
 from mootloop.tasks import TaskBinding
 from mootloop.taskspec import TaskSpecStore, require_current_lock
@@ -85,14 +86,6 @@ def corpus_snapshot_path(vault_root: Path | str, run_id: str) -> Path:
 
 def _sha256(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
-
-
-def _sha256_path(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _canonical_model_bytes(model: ResolvedRunConfig) -> bytes:

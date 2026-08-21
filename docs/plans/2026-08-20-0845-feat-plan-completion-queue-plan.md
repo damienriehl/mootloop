@@ -284,24 +284,32 @@ flowchart TD
   non-root image probe, Compose validation, review gates, and remote CI passed. U-17A's
   deployed network/direct-egress/ACL/kill/cross-matter proof remains D-03-gated and is
   not claimed by U-02.
-- **U-03 PARTIAL.** Decision resolution now repairs an interrupted matching journal
-  append idempotently. Decision and attestation CLI actors come from the local OS
-  principal. Attestation hashes the launch matter chrome actually rendered by export,
-  and live matter drift invalidates and blocks re-attestation until a new run. Court
-  exports replay launch requests/matter.
-  The complete journal/decision/export commitment, coordinated-rewrite defense,
-  migration policy, and D-09 off-vault anchor remain queued.
+- **U-03 local integrity core COMPLETE.** The human v2 attestation commits the exact
+  court master, citation ledger, run journal and turn evidence, decision log and
+  sidecars, launch fact state, intact access-audit prefix, reviewer, and timestamp.
+  Clean export appends a linked exact-byte artifact seal; every download/list path
+  revalidates it, and any single-byte bound-state drift re-imposes DRAFT. JSONL stores
+  use locked, fsync'd append with torn-tail recovery; no-follow stable-descriptor
+  hashing fails closed on symlinks or concurrent mutation. Legacy attestations remain
+  readable but cannot satisfy the v2 contract. The same read-only integrity status is
+  exposed through service, CLI JSON, API, and UI. Two larger promises remain explicitly
+  queued: U-09 supplies the anchored annotated-draft artifact before it can join the
+  seal, and D-09 still needs a concrete immutable remote signed-head provider before
+  coordinated host-writer resistance can be claimed.
 - **U-04A/U-04B and U-05 through U-17C remain queued** under their stated dependencies
-  and decision gates. U-03 remains partial. **U-18 is COMPLETE for U-01 and U-02:**
+  and decision gates. **U-18 is COMPLETE for U-01 and U-02:**
   PR #33 merged as `74dec0a` after backend, invariant, and frontend CI passed on code
   head `acc1e51`; PR #35 merged as `b2ff6c7` after all six push/PR jobs passed on code
   head `96da3c6`. Every actionable review finding on both PRs was fixed, replied to, and
   resolved. Deployment is still gated.
   No hosted matter or deployment was accessed during this execution.
 
-Verification at this checkpoint: backend ruff and strict mypy across 97 source files
-pass; 902 backend tests pass at 91% coverage; frontend ESLint, TypeScript, 9 Vitest
-files / 37 tests, OpenAPI generation/drift, and production build pass. U-01's structured
+Verification at this checkpoint: backend ruff and strict mypy across 98 source files
+pass; 919 backend tests pass at 91% coverage; frontend ESLint, TypeScript, 9 Vitest
+files / 37 tests, OpenAPI generation/drift, and the production build pass. U-03's
+structured review covered correctness, security, adversarial behavior, tests,
+maintainability, reliability, project standards, API contracts, agent parity, and
+performance; all material findings were repaired before the full gates. U-01's structured
 review completed nine local lenses plus the PR's Codex review. Its external Claude pass
 could not run because sending repository code to an external model was not authorized;
 no egress workaround was attempted, and a local adversarial reviewer substituted. Eight

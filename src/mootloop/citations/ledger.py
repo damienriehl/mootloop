@@ -11,7 +11,6 @@ can never assert "verified"; only a recorded client outcome can.
 
 from __future__ import annotations
 
-import os
 from datetime import datetime
 from pathlib import Path
 
@@ -20,19 +19,13 @@ from mootloop.models.citations import (
     VerificationRecord,
     fold_ledger,
 )
+from mootloop.persistence import append_fsync_line as _append_line
+from mootloop.persistence import complete_jsonl_lines
 from mootloop.vault import safe_vault_path
 
 LEDGER_PATH = ("law", "verifications.jsonl")
 QUEUE_PATH = ("research-requests", "queue.jsonl")
 DEFAULT_MAX_CACHE_AGE_DAYS = 30
-
-
-def _append_line(path: Path, line: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(line + "\n")
-        handle.flush()
-        os.fsync(handle.fileno())
 
 
 class VerificationLedger:
@@ -43,12 +36,9 @@ class VerificationLedger:
         self._path = safe_vault_path(vault_root, *LEDGER_PATH)
 
     def _records(self) -> list[VerificationRecord]:
-        if not self._path.is_file():
-            return []
         records: list[VerificationRecord] = []
-        for line in self._path.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                records.append(VerificationRecord.model_validate_json(line))
+        for line in complete_jsonl_lines(self._path):
+            records.append(VerificationRecord.model_validate_json(line))
         return records
 
     def folded(
@@ -73,12 +63,9 @@ class ResearchQueue:
         self._path = safe_vault_path(vault_root, *QUEUE_PATH)
 
     def _records(self) -> list[ResearchRequest]:
-        if not self._path.is_file():
-            return []
         records: list[ResearchRequest] = []
-        for line in self._path.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                records.append(ResearchRequest.model_validate_json(line))
+        for line in complete_jsonl_lines(self._path):
+            records.append(ResearchRequest.model_validate_json(line))
         return records
 
     def folded(self) -> dict[str, ResearchRequest]:

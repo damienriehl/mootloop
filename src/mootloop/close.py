@@ -24,7 +24,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from mootloop.errors import CloseError, LockHeldError, MatterNotFoundError
-from mootloop.models.attestations import Attestation
+from mootloop.models.attestations import Attestation, ExportSeal, ReviewIntegrityStatus
 from mootloop.models.audit import GENESIS_PREV_HASH, AccessAuditEntry
 from mootloop.models.citations import ResearchRequest, VerificationRecord
 from mootloop.models.common import MatterId, VersionedModel
@@ -172,6 +172,12 @@ MATTER_SCOPED_STORES: tuple[MatterScopedStore, ...] = (
         model=Attestation,
     ),
     MatterScopedStore(
+        name="run-export-seals",
+        glob="runs/*/export-seals.jsonl",
+        description="Exact artifact manifests linked to reviewer attestations.",
+        model=ExportSeal,
+    ),
+    MatterScopedStore(
         name="run-decisions",
         glob="runs/*/decisions/decisions.jsonl",
         description="Per-run attorney-gate decisions.",
@@ -234,9 +240,12 @@ EXEMPT_MODELS: dict[type[VersionedModel], str] = {
         "Derived registry view built on the fly from matter.yaml; never persisted "
         "per-matter, so nothing to purge."
     ),
+    ReviewIntegrityStatus: (
+        "Derived read-only view of registered attestation and export-seal stores; "
+        "never persisted independently."
+    ),
     TaskAdapterConfig: (
-        "Repo config loaded from config/tasks/<task>.yaml; ships with the code, not "
-        "matter data."
+        "Repo config loaded from config/tasks/<task>.yaml; ships with the code, not matter data."
     ),
     CloseRecord: (
         "The close log itself — written to the matters-root level so it survives the "

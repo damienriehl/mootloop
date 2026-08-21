@@ -148,11 +148,20 @@ def test_attest_happy_path_returns_envelope_and_audits(
     record = Attestation(
         attestation_id="att-r1-0000",
         run_id="r1",
+        hash_scope="run-review-state:v2",
         master_sha256="a" * 64,
         ledger_head_sha256="b" * 64,
+        journal_sha256="c" * 64,
+        decisions_sha256="d" * 64,
+        fact_state_sha256="e" * 64,
+        access_audit_head_sha256="f" * 64,
+        commitment_sha256="",
         reviewer=_PRINCIPAL.email,
         attested_at=_NOW_ISO,
         valid=True,
+    )
+    record = record.model_copy(
+        update={"commitment_sha256": record.expected_commitment_sha256()}
     )
     monkeypatch.setattr(routes.attest_svc, "attest", lambda *a, **k: record)
     headers = _with_csrf(client)

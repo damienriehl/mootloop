@@ -18,11 +18,13 @@ run the preflight gate check, invoke export, and surface blockers to the attorne
 
 ```
 uv run mootloop run gates "$VAULT" "$RUN"
+uv run mootloop attest-status "$VAULT" "$RUN" --json
 ```
 
 - `export_ready: True` → a clean export is possible; go to step 2.
 - `export_ready: False` → note the **blockers** (open decisions, missing/invalidated
-  attestation, unverified citations, a failed fabrication/rubric gate). Surface them
+  attestation, unverified citations, a failed fabrication/rubric gate). The integrity
+  status separately reports the attorney commitment and exact export seal. Surface them
   to the attorney. A draft export is still valuable; continue to step 2 (the DOCX will
   carry the DRAFT watermark).
 
@@ -39,8 +41,9 @@ This always writes the markdown deliverables under `deliverables/<run-id>/`:
 `master.md`, `verification.md` (rog sets only), `privilege-log.md`,
 `strategy-memo.md`, `audit-log.json`, and per-set masters under `sets/`. It renders a
 DOCX per served set under `docx/` — clean only when the run is attested AND the gate
-ledger is green AND the residue scan passes; otherwise `.DRAFT.docx` with the
-DRAFT-watermark template.
+ledger is green AND the residue scan passes. A successful clean build appends a seal
+over the exact artifact bytes; any later sealed-artifact drift blocks download.
+Otherwise export emits `.DRAFT.docx` with the DRAFT-watermark template.
 
 If pandoc is not installed the DOCX step is skipped with a clear notice; the markdown
 deliverables are still produced.

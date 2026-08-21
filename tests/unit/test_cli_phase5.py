@@ -174,3 +174,9 @@ def test_attest_status_missing_then_attest(tmp_path: Path) -> None:
     assert result.exit_code == 0
     result = runner.invoke(app, ["attest-status", str(vault), "cli-att"])
     assert "VALID" in result.output
+    status = runner.invoke(app, ["attest-status", str(vault), "cli-att", "--json"])
+    assert status.exit_code == 0
+    document = json.loads(status.output)
+    assert document["attestation_status"] == "valid"
+    assert document["export_seal_status"] == "invalidated"
+    assert document["latest_attestation"]["hash_scope"] == "run-review-state:v2"

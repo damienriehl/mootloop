@@ -28,6 +28,7 @@ from mootloop.engine.queue import WorkItem
 from mootloop.errors import OrchestratorError
 from mootloop.export import link as link_svc
 from mootloop.journal import load_state
+from mootloop.models.attestations import ReviewIntegrityStatus
 from mootloop.models.common import MatterId
 from mootloop.models.matters import MatterSummary
 from mootloop.registry import MatterRegistry
@@ -224,6 +225,18 @@ def get_run_requests(
     return readers.requests_response(vault, run_id)
 
 
+@router.get("/api/matters/{matter_id}/runs/{run_id}/integrity")
+def get_run_integrity(
+    matter_id: str,
+    run_id: str,
+    _principal: Principal,
+    vault: Vault,
+    _audited: Annotated[None, Depends(_audit_dep("run_integrity"))],
+) -> ReviewIntegrityStatus:
+    """Return current v2 attorney-commitment and linked export-seal integrity."""
+    return attest_svc.review_integrity_status(vault, run_id)
+
+
 # --- run lifecycle writes (start / continue / raise-cap; Access + CSRF) ------
 
 
@@ -370,7 +383,9 @@ def attest_run(
     _audited: Annotated[None, Depends(_audit_dep("attest"))],
 ) -> models.AttestResponse:
     attestation = attest_svc.attest(vault, run_id, principal.email, _now_iso())
-    return models.AttestResponse(attestation=attestation)
+    return models.AttestResponse(
+        attestation=models.CurrentAttestation.model_validate(attestation.model_dump(mode="json"))
+    )
 
 
 # --- begin-task on-ramp: freeform lane + TaskSpec listing -------------------
@@ -489,8 +504,7 @@ def list_deliverables(
     vault: Vault,
     _audited: Annotated[None, Depends(_audit_dep("deliverables_list"))],
 ) -> models.DeliverablesResponse:
-    """List a run's deliverables with DRAFT/clean state and per-file downloadability
-    (clean files are downloadable only once the run is export-ready; plan P-37)."""
+    """List deliverables with the same seal-aware eligibility enforced at download."""
     from mootloop import gate_ledger
 
     ready, _blockers = gate_ledger.export_ready(vault, run_id)
@@ -501,7 +515,7 @@ def list_deliverables(
             size_bytes=e.size_bytes,
             is_draft=e.is_draft,
             requires_export_ready=e.requires_export_ready,
-            downloadable=(ready if e.requires_export_ready else True),
+            downloadable=link_svc.is_downloadable(vault, run_id, e.name),
         )
         for e in entries
     ]

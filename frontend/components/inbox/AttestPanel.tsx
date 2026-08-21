@@ -1,14 +1,14 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { attestRun } from "@/lib/api/decisions";
+import { attestRun, getReviewIntegrity } from "@/lib/api/decisions";
 import { keys } from "@/lib/api/keys";
 import type { Attestation } from "@/lib/api/types";
 
 /**
  * Attestation — a DISTINCT, deliberate full-screen act that is NEVER optimistic
- * (FD-8/FD-9). The colophon (run id, master + ledger-head hashes, reviewer, timestamp)
+ * (FD-8/FD-9). The colophon (run id, commitment hashes, reviewer, timestamp)
  * is shown ONLY after the server records the attestation; nothing in the UI reflects
  * a completed attestation until `attestRun` resolves.
  */
@@ -27,6 +27,11 @@ export function AttestPanel({
   const [open, setOpen] = useState(false);
   const [result, setResult] = useState<Attestation | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const integrityKey = keys.matter(matterId).run(runId).integrity();
+  const integrity = useQuery({
+    queryKey: integrityKey,
+    queryFn: () => getReviewIntegrity({ matterId, runId }),
+  });
 
   const mutation = useMutation({
     mutationFn: () => attestRun({ matterId, runId }),
@@ -34,6 +39,7 @@ export function AttestPanel({
       // Only NOW does anything reflect the attestation — never optimistic.
       setResult(attestation);
       void client.invalidateQueries({ queryKey: keys.matter(matterId).run(runId).detail() });
+      void client.invalidateQueries({ queryKey: integrityKey });
     },
     onError: (err) => setError((err as Error).message),
   });
@@ -43,9 +49,15 @@ export function AttestPanel({
       <div className="border border-rule border-l-4 border-l-accent bg-paper-raised p-5 shadow-ledger">
         <h2 className="font-bold [font-variant:small-caps]">Certify &amp; release</h2>
         <p className="mt-1 text-sm text-ink-soft">
-          Attestation binds the work product to its ledger. This is a deliberate act — it
-          is recorded only when you confirm on the certification screen.
+          Attestation binds the exact court master, evidence journals, decisions, facts,
+          citation ledger, and access-audit prefix. Clean exports receive a linked artifact seal.
         </p>
+        {integrity.data && (
+          <p className="mt-2 font-mono text-[0.72rem] text-ink-faint" aria-live="polite">
+            Attorney commitment: {integrity.data.attestation_status.toUpperCase()} · Clean export
+            seal: {integrity.data.export_seal_status.toUpperCase()}
+          </p>
+        )}
         <button
           type="button"
           onClick={() => {
@@ -80,8 +92,10 @@ export function AttestPanel({
                 </h3>
                 <p className="mt-3 text-sm text-ink-soft">
                   You are certifying run <span className="font-mono text-ink">{runId}</span>. The
-                  attestation records the current master and ledger-head hashes against your
-                  identity and is logged to the access audit. This cannot be undone from here.
+                  attestation commits the exact master, citation ledger, journal, decisions,
+                  launch fact state, and access-audit prefix to your identity and timestamp. A
+                  later clean export is separately sealed byte-for-byte. This cannot be undone
+                  from here.
                 </p>
                 {error && (
                   <p role="alert" aria-live="assertive" className="mt-3 font-mono text-sm text-fail">
@@ -120,6 +134,8 @@ export function AttestPanel({
                   <dd className="break-all">{result.master_sha256}</dd>
                   <dt className="text-ink-faint">ledger head</dt>
                   <dd className="break-all">{result.ledger_head_sha256}</dd>
+                  <dt className="text-ink-faint">commitment</dt>
+                  <dd className="break-all">{result.commitment_sha256}</dd>
                   <dt className="text-ink-faint">reviewer</dt>
                   <dd className="break-all">{result.reviewer}</dd>
                   <dt className="text-ink-faint">attested</dt>

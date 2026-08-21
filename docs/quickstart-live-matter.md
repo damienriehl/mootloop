@@ -157,10 +157,13 @@ rejects the proposal.
 uv run mootloop cite verify ~/Matters/<matter-id> --run <run-id>
 uv run mootloop research list ~/Matters/<matter-id>    # anything needing human research
 uv run mootloop run gates ~/Matters/<matter-id> <run-id>   # the export predicate
-uv run mootloop attest ~/Matters/<matter-id> <run-id> --by "Your Name"
+uv run mootloop attest ~/Matters/<matter-id> <run-id>  # records the local OS principal
+uv run mootloop attest-status ~/Matters/<matter-id> <run-id> --json
 ```
 
-Attestation hashes the master; any later edit re-imposes DRAFT. The citation
+Attestation commits the exact master, citation ledger, journal, decisions, launch facts,
+and access-audit prefix. Clean export then seals the exact artifact bytes; later drift
+re-imposes DRAFT and blocks download. The citation
 check carries a standing disclosure: currency is **not** checked against a
 citator — confirm good-law status yourself.
 
