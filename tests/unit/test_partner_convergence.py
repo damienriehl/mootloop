@@ -6,11 +6,14 @@ settle the loop at round 2 — *before* the iteration cap."""
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
+from mootloop.convergence import ConvergenceDecision, DraftingSignals, RoundState
 from mootloop.models.common import DocId
 from mootloop.models.events import RunState
 from mootloop.models.requests import RequestItem
+from mootloop.models.rubric import Rubric
 from mootloop.models.run import (
     SCHEMA_CRITIQUE,
     SCHEMA_DRAFT,
@@ -19,6 +22,7 @@ from mootloop.models.run import (
     TurnRecord,
     TurnSpec,
 )
+from mootloop.models.task import ConvergenceConfig
 from mootloop.stages import PartnerLoopStage, SlotLayout, StageContext
 from mootloop.tasks import get_binding
 
@@ -51,7 +55,12 @@ def _critique_output(verdict: str) -> dict[str, Any]:
     return {"verdict": verdict, "critiques": ["x"], "instructions": ["y"], "self_assessment": "z"}
 
 
-def _ctx(round2_text: str) -> StageContext:
+def _ctx(
+    round2_text: str,
+    *,
+    score_source: Any = None,
+    convergence_source: Any = None,
+) -> StageContext:
     binding = get_binding("discovery-responses")
     caps = binding.config.loop_caps.model_copy(update={"associate_partner": 3})
     config = binding.config.model_copy(update={"loop_caps": caps})
@@ -92,6 +101,11 @@ def _ctx(round2_text: str) -> StageContext:
             layout.rubric_loop(r), PersonaName.RUBRIC_JUDGE, SCHEMA_RUBRIC, _rubric_output(ids, 4)
         )
     state = RunState(run_id="conv", status="running", completed_turns=completed)
+    kwargs: dict[str, Any] = {}
+    if score_source is not None:
+        kwargs["score_source"] = score_source
+    if convergence_source is not None:
+        kwargs["convergence_source"] = convergence_source
     return StageContext(
         run_id="conv",
         req_index=0,
@@ -101,6 +115,7 @@ def _ctx(round2_text: str) -> StageContext:
         adapter=binding.adapter,
         rubric=binding.rubric,
         state=state,
+        **kwargs,
     )
 
 
@@ -123,3 +138,57 @@ def test_churning_loop_runs_to_the_next_round() -> None:
     assert len(specs) == 1
     assert specs[0].stage == "partner_loop"
     assert specs[0].persona == PersonaName.ASSOCIATE  # the round-3 redraft
+
+
+def test_stage_injects_real_round_scores_and_convergence_source() -> None:
+    class RecordingScoreSource:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, float]] = []
+
+        def score(
+            self,
+            rubric: Rubric,
+            scores: Mapping[str, float],
+            request_code: str,
+        ) -> float:
+            assert rubric.rubric_id == "discovery-responses-v1.0"
+            assert request_code == "rog"
+            self.calls.append(dict(scores))
+            return 0.25 * len(self.calls)
+
+    class RecordingConvergenceSource:
+        def __init__(self) -> None:
+            self.history: list[RoundState] = []
+
+        def evaluate(
+            self,
+            history: list[RoundState],
+            max_iterations: int,
+            config: ConvergenceConfig,
+        ) -> ConvergenceDecision:
+            assert max_iterations == 3
+            assert config.score_delta_floor == 0.02
+            self.history = history
+            return ConvergenceDecision(
+                converged=True,
+                reason="converged",
+                signals=DraftingSignals(
+                    score_delta=history[-1].score - history[-2].score,
+                    coverage=history[-1].coverage,
+                    material_change=0.0,
+                    iteration_number=len(history),
+                    max_iterations=max_iterations,
+                ),
+            )
+
+    score_source = RecordingScoreSource()
+    convergence_source = RecordingConvergenceSource()
+    context = _ctx(
+        _COMPLIANT,
+        score_source=score_source,
+        convergence_source=convergence_source,
+    )
+
+    assert context.converged_at(2) is True
+    assert len(score_source.calls) == 2
+    assert [round_state.score for round_state in convergence_source.history] == [0.25, 0.5]

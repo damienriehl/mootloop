@@ -23,7 +23,13 @@ from types import MappingProxyType
 from typing import Any, Protocol
 
 from mootloop.context_assembly import items_for_turn
-from mootloop.convergence import ConvergenceEvaluator, RoundState
+from mootloop.convergence import (
+    ConvergenceSource,
+    DraftingConvergenceSource,
+    RoundState,
+    RubricScoreSource,
+    ScoreSource,
+)
 from mootloop.errors import TaskConfigError
 from mootloop.gates import completeness
 from mootloop.models.common import RunId, TurnId
@@ -142,6 +148,12 @@ class StageContext:
     max_attempts: int = 3
     tier_models: Mapping[str, str] = field(default_factory=dict)
     assembled_context: tuple[AssembledContextItem, ...] = ()
+    score_source: ScoreSource = field(default_factory=RubricScoreSource, repr=False, compare=False)
+    convergence_source: ConvergenceSource = field(
+        default_factory=DraftingConvergenceSource,
+        repr=False,
+        compare=False,
+    )
 
     def __post_init__(self) -> None:
         """Detach every nested stage input from its mutable caller-owned source."""
@@ -287,7 +299,7 @@ class StageContext:
             cov = completeness.coverage(draft, self.rubric, self.code, self.request.text)
             history.append(
                 RoundState(
-                    score=self.rubric.weighted_score(scores, self.code),
+                    score=self.score_source.score(self.rubric, scores, self.code),
                     coverage=cov,
                     text=draft.response_text,
                 )
@@ -298,8 +310,10 @@ class StageContext:
         """True iff the partner loop has genuinely converged (not merely cap-hit) by
         round ``r`` — stopped improving AND stopped changing AND complete (plan D6)."""
         ap = self.config.loop_caps.associate_partner
-        decision = ConvergenceEvaluator(self.config.convergence).evaluate(
-            self._round_history(r), ap
+        decision = self.convergence_source.evaluate(
+            self._round_history(r),
+            ap,
+            self.config.convergence,
         )
         return decision.converged and decision.reason == "converged"
 
