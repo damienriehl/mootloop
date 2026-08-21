@@ -317,7 +317,7 @@ flowchart TD
   No hosted matter or deployment was accessed during this execution.
 
 Verification at this checkpoint: backend ruff and strict mypy across 98 source files
-pass; 937 backend tests pass at 92% coverage; frontend ESLint, TypeScript, 9 Vitest
+pass; 940 backend tests pass at 92% coverage; frontend ESLint, TypeScript, 9 Vitest
 files / 37 tests, OpenAPI generation/drift, and the production build pass. U-03's
 structured review covered correctness, security, adversarial behavior, tests,
 maintainability, reliability, project standards, API contracts, agent parity, and

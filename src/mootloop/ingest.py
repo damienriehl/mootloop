@@ -525,6 +525,12 @@ _ACTION_REASONS: dict[IngestActionKind, str] = {
     "too_large": "split or explicitly authorize handling of the oversized file",
     "unreadable": "repair permissions or replace the unreadable source",
 }
+_LEGACY_ISSUE_BY_STATUS: dict[IngestStatus, TriageIssue | None] = {
+    "ok": None,
+    "needs_conversion": "unsupported_format",
+    "too_large": "too_large",
+    "unreadable": "unreadable",
+}
 
 
 def _action(doc: CorpusDoc, kind: IngestActionKind) -> IngestAction:
@@ -545,8 +551,11 @@ def _actions_for_manifest(manifest: Manifest) -> list[IngestAction]:
             actions.append(_action(doc, "confirm_role"))
         if doc.privileged is None:
             actions.append(_action(doc, "confirm_privilege"))
-        if doc.triage_issue is not None:
-            actions.append(_action(doc, doc.triage_issue))
+        issue = doc.triage_issue
+        if issue is None:
+            issue = _LEGACY_ISSUE_BY_STATUS[doc.ingest_status]
+        if issue is not None:
+            actions.append(_action(doc, issue))
     return actions
 
 

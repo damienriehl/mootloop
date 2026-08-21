@@ -16,7 +16,7 @@ from mootloop.errors import FactError, IngestError, OrchestratorError
 from mootloop.facts import FactStore, build_fact_interview
 from mootloop.ingest import ingest_actions, ingest_folder, set_doc_tag
 from mootloop.models.common import DocId
-from mootloop.models.corpus import DocRole, Manifest
+from mootloop.models.corpus import CorpusDoc, DocRole, Manifest
 from mootloop.models.facts import Provenance
 from mootloop.models.requests import RequestItem, RequestSet, RequestType, make_request_id
 from mootloop.orchestrator import start_run
@@ -114,6 +114,44 @@ def test_unsupported_files_receive_precise_deterministic_actions(tmp_path: Path)
         ("record.bin", "unsupported_format"),
     }
     assert all(action.action_id.startswith("ingest-action-") for action in first)
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [
+        ("needs_conversion", "unsupported_format"),
+        ("too_large", "too_large"),
+        ("unreadable", "unreadable"),
+    ],
+)
+def test_legacy_manifest_terminal_status_still_yields_a_remedy(
+    tmp_path: Path,
+    status: str,
+    expected: str,
+) -> None:
+    vault = _vault(tmp_path)
+    legacy = Manifest(
+        schema_version="1.0",
+        docs=[
+            CorpusDoc.model_validate(
+                {
+                    "doc_id": f"doc-legacy{status[:10]:0<10}",
+                    "original_name": "legacy.pdf",
+                    "media_type": "application/pdf",
+                    "role": "client-doc",
+                    "privileged": False,
+                    "ingest_status": status,
+                    "normalized_path": None,
+                    "ingested_at": NOW,
+                }
+            )
+        ],
+    )
+    legacy.save(vault)
+
+    actions = ingest_actions(vault)
+
+    assert [action.kind for action in actions] == [expected]
 
 
 def test_symlinked_directory_is_reported_instead_of_silently_skipped(tmp_path: Path) -> None:

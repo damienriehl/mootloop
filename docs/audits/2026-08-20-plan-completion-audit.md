@@ -41,7 +41,7 @@ missing older source plan.
 ## Current Validation Evidence
 
 - Backend verification: the latest local `make check` passed: ruff clean, mypy strict
-  clean across 98 source files, and 937 tests passed at 92% coverage.
+  clean across 98 source files, and 940 tests passed at 92% coverage.
 - Frontend verification: ESLint clean, TypeScript clean, 9 Vitest files / 37 tests
   passed, backend and generated-client OpenAPI drift checks pass, and the production
   build succeeds.
