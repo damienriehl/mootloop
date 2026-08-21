@@ -47,6 +47,8 @@ missing older source plan.
   build succeeds.
 - GitHub PR #30, execution/evidence/export hardening, merged 2026-08-06.
 - GitHub PR #31, first-class reopen recovery, merged 2026-08-06.
+- GitHub PR #38, synthetic ingest and reviewed-fact preparation, merged 2026-08-21
+  after all six final-head CI jobs passed and its review finding was resolved.
 - No GitHub issue was created or updated in the strict window.
 - At audit start, the current feature branch had no unique code commit relative to
   its already-merged result and its file tree matched `origin/main`. U-00 now adds the
