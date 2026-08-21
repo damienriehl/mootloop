@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from mootloop import journal
+from mootloop.errors import JournalIntegrityError
 from mootloop.journal import (
     _EVENT_ADAPTER,
     append,
@@ -165,9 +166,14 @@ def test_write_turn_body_is_idempotent(tmp_path: Path) -> None:
     path = write_turn_body(tmp_path, RUN, record)
     assert path == turn_body_path(tmp_path, RUN, f"{RUN}-t0000")
     original = path.read_text(encoding="utf-8")
-    # A second write with different content must NOT clobber the first.
+    write_turn_body(tmp_path, RUN, record)
+    assert path.read_text(encoding="utf-8") == original
+
+    # A different result for the same turn id must fail instead of silently leaving
+    # the sidecar and the journal with two competing versions.
     mutated = record.model_copy(update={"completed_at": "2099-01-01T00:00:00+00:00"})
-    write_turn_body(tmp_path, RUN, mutated)
+    with pytest.raises(JournalIntegrityError, match="conflicting write-once turn body"):
+        write_turn_body(tmp_path, RUN, mutated)
     assert path.read_text(encoding="utf-8") == original
 
 

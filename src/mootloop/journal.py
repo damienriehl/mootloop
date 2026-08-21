@@ -2,8 +2,8 @@
 
 Events land one-per-line in ``runs/<run-id>/journal.jsonl`` (append + fsync). Turn
 bodies are additionally written write-once to ``runs/<run-id>/turns/<turn-id>.json``
-(skip-if-exists — idempotent under discard/relaunch). `fold` replays events into a
-`RunState` and is a pure function, so resume after a kill is exactly a re-fold.
+(exact-content replay is idempotent; conflicts fail closed). `fold` replays events
+into a `RunState` and is a pure function, so resume after a kill is exactly a re-fold.
 
 `read_events` tolerates a *torn final line* (a crash mid-append): it truncates the
 file back to the last complete line and warns, never crashing. A corrupt line that
@@ -37,6 +37,7 @@ from pathlib import Path
 
 from pydantic import TypeAdapter, ValidationError
 
+from mootloop.errors import JournalIntegrityError
 from mootloop.models.events import (
     CapRaised,
     CheckpointCleared,
@@ -97,15 +98,23 @@ def append(vault_root: Path | str, run_id: str, event: JournalEvent) -> None:
 
 
 def write_turn_body(vault_root: Path | str, run_id: str, record: TurnRecord) -> Path:
-    """Write a completed turn's body write-once (skip if it already exists)."""
+    """Write a completed turn body once; accept only an exact idempotent replay."""
     path = turn_body_path(vault_root, run_id, record.spec.turn_id)
-    if path.exists():
-        return path
-    path.parent.mkdir(parents=True, exist_ok=True)
-    # Same-dir temp + atomic replace keeps a crash from leaving a torn body.
-    from mootloop.vault import atomic_write_text
+    serialized = record.model_dump_json(indent=2) + "\n"
+    from mootloop.vault import atomic_write_once_text
 
-    atomic_write_text(path, record.model_dump_json(indent=2) + "\n")
+    try:
+        atomic_write_once_text(path, serialized)
+    except FileExistsError:
+        try:
+            existing = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as exc:
+            raise JournalIntegrityError(f"cannot verify write-once turn body {path.name}") from exc
+        if existing == serialized:
+            return path
+        raise JournalIntegrityError(
+            f"conflicting write-once turn body for {record.spec.turn_id}"
+        ) from None
     return path
 
 

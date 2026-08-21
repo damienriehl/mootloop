@@ -17,7 +17,9 @@ inputs carried on the spec — no excellence prose is hard-coded here.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from types import MappingProxyType
 from typing import Any, Protocol
 
 from mootloop.context_assembly import items_for_turn
@@ -132,14 +134,32 @@ class StageContext:
     run_id: str
     req_index: int
     request: RequestItem
-    facts: list[dict[str, str]]
+    facts: Sequence[Mapping[str, str]]
     config: TaskAdapterConfig
     adapter: TaskAdapter
     rubric: Rubric
     state: RunState
     max_attempts: int = 3
-    tier_models: dict[str, str] = field(default_factory=dict)
+    tier_models: Mapping[str, str] = field(default_factory=dict)
     assembled_context: tuple[AssembledContextItem, ...] = ()
+
+    def __post_init__(self) -> None:
+        """Detach every nested stage input from its mutable caller-owned source."""
+        object.__setattr__(self, "request", self.request.model_copy(deep=True))
+        object.__setattr__(
+            self,
+            "facts",
+            tuple(MappingProxyType(dict(fact)) for fact in self.facts),
+        )
+        object.__setattr__(self, "config", self.config.model_copy(deep=True))
+        object.__setattr__(self, "rubric", self.rubric.model_copy(deep=True))
+        object.__setattr__(self, "state", self.state.model_copy(deep=True))
+        object.__setattr__(self, "tier_models", MappingProxyType(dict(self.tier_models)))
+        object.__setattr__(
+            self,
+            "assembled_context",
+            tuple(item.model_copy(deep=True) for item in self.assembled_context),
+        )
 
     @property
     def layout(self) -> SlotLayout:

@@ -57,6 +57,10 @@ class OrchestratorError(MootloopError):
     """An orchestrator precondition failed (unknown run, unschedulable turn, …)."""
 
 
+class JournalIntegrityError(MootloopError):
+    """A persisted journal sidecar conflicts with the immutable run history."""
+
+
 class RunNotFoundError(MootloopError):
     """No journaled run exists with the requested id in the resolved matter vault."""
 
