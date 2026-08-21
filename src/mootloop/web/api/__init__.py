@@ -27,6 +27,7 @@ from mootloop.errors import (
     ExportLinkError,
     ExportNotReadyError,
     InternalAuthError,
+    LearningImportError,
     LockHeldError,
     MatterNotFoundError,
     OrchestratorError,
@@ -73,6 +74,13 @@ def _install_error_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=400,
             content={"error": "production_suggestion", "detail": str(exc)},
+        )
+
+    @app.exception_handler(LearningImportError)
+    async def _learning(request: Request, exc: LearningImportError) -> JSONResponse:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "learning_import", "detail": str(exc)},
         )
 
     @app.exception_handler(OrchestratorError)

@@ -6,6 +6,8 @@ import json
 
 from mootloop.models.common import (
     DocId,
+    LearningImportId,
+    LearningProposalId,
     MatterId,
     RubricId,
     RunId,
@@ -21,6 +23,7 @@ from mootloop.models.events import (
     TurnDiscarded,
     TurnIntent,
 )
+from mootloop.models.learnings import LearningImportRecord, LearningProposal, LearningReview
 from mootloop.models.rubric import Rubric
 from mootloop.models.run import TurnSpec
 from mootloop.models.task import TaskAdapterConfig
@@ -42,6 +45,10 @@ def test_persisted_models_expose_canonical_id_annotations() -> None:
 
     assert TaskAdapterConfig.model_fields["rubric_id"].annotation is RubricId
     assert Rubric.model_fields["rubric_id"].annotation is RubricId
+    assert LearningImportRecord.model_fields["import_id"].annotation is LearningImportId
+    assert LearningProposal.model_fields["proposal_id"].annotation is LearningProposalId
+    assert LearningProposal.model_fields["import_id"].annotation is LearningImportId
+    assert LearningReview.model_fields["proposal_id"].annotation is LearningProposalId
 
 
 def test_id_newtypes_are_static_boundaries_with_string_wire_format() -> None:
@@ -49,6 +56,7 @@ def test_id_newtypes_are_static_boundaries_with_string_wire_format() -> None:
     # runtime/wire representation deliberately remains a plain string.
     assert TurnId is not RunId
     assert RubricId is not TaskSpecId
+    assert LearningImportId is not LearningProposalId
 
     historical = {
         "kind": "run_started",

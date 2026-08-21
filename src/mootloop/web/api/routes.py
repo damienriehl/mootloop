@@ -9,6 +9,8 @@ as typed HTTP responses via the app's exception handlers — the route bodies st
 
 from __future__ import annotations
 
+import base64
+import binascii
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -26,9 +28,15 @@ from mootloop.citations.check_runner import require_completed_draft_set
 from mootloop.engine.launch import launch_run as launch_run_service
 from mootloop.engine.queue import Queue as WorkQueue
 from mootloop.engine.queue import WorkItem
-from mootloop.errors import OrchestratorError
+from mootloop.errors import LearningImportError, OrchestratorError
 from mootloop.export import link as link_svc
 from mootloop.journal import load_state
+from mootloop.learn.service import (
+    LearningStore,
+    import_docx_learning_bytes,
+    preview_learning_scrub,
+    review_learning_proposal,
+)
 from mootloop.models.attestations import ReviewIntegrityStatus
 from mootloop.models.common import MatterId
 from mootloop.models.matters import MatterSummary
@@ -490,6 +498,154 @@ def review_production_suggestion_route(
         reason=body.reason,
     )
     return models.ProductionSuggestionResponse(suggestion=item)
+
+
+@router.post("/api/matters/{matter_id}/runs/{run_id}/learnings/import")
+def import_learning_docx(
+    matter_id: str,
+    run_id: str,
+    body: models.LearningImportRequest,
+    principal: Principal,
+    vault: Vault,
+    _csrf: Csrf,
+    _audited: Annotated[None, Depends(_audit_dep("learning_import"))],
+) -> models.LearningImportResponse:
+    """Import exact edited DOCX bytes; unresolvable anchors remain review-only."""
+    del matter_id, principal
+    try:
+        source = base64.b64decode(body.source_base64, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise LearningImportError("source_base64 is not valid base64") from exc
+    result = import_docx_learning_bytes(
+        vault,
+        run_id,
+        source,
+        imported_at=_now_iso(),
+        source_name=body.source_name,
+    )
+    return models.LearningImportResponse(
+        import_record=result.import_record,
+        proposals=result.proposals,
+    )
+
+
+@router.get("/api/matters/{matter_id}/learnings/proposals")
+def list_learning_proposals(
+    matter_id: str,
+    principal: Principal,
+    vault: Vault,
+    _audited: Annotated[None, Depends(_audit_dep("learning_proposals_list"))],
+) -> models.LearningProposalsResponse:
+    del matter_id, principal
+    store = LearningStore(vault)
+    return models.LearningProposalsResponse(
+        imports=store.list_imports(),
+        proposals=store.list_all(),
+    )
+
+
+@router.get("/api/matters/{matter_id}/learnings/proposals/{proposal_id}")
+def get_learning_proposal(
+    matter_id: str,
+    proposal_id: str,
+    principal: Principal,
+    vault: Vault,
+    _audited: Annotated[None, Depends(_audit_dep("learning_proposal_show"))],
+) -> models.LearningProposalResponse:
+    del matter_id, principal
+    item = LearningStore(vault).get(proposal_id)
+    if item is None:
+        raise OrchestratorError(f"unknown learning proposal {proposal_id!r}")
+    return models.LearningProposalResponse(proposal=item)
+
+
+@router.post("/api/matters/{matter_id}/learnings/proposals/{proposal_id}/accept")
+def accept_learning_proposal(
+    matter_id: str,
+    proposal_id: str,
+    body: models.LearningReviewRequest,
+    principal: Principal,
+    vault: Vault,
+    _csrf: Csrf,
+    _audited: Annotated[None, Depends(_audit_dep("learning_proposal_accept"))],
+) -> models.LearningProposalResponse:
+    del matter_id
+    item = review_learning_proposal(
+        vault,
+        proposal_id,
+        action="accept",
+        actor=principal.email,
+        channel="api",
+        recorded_at=_now_iso(),
+        reviewed_text=body.reviewed_text,
+        reason=body.reason,
+    )
+    return models.LearningProposalResponse(proposal=item)
+
+
+@router.post("/api/matters/{matter_id}/learnings/proposals/{proposal_id}/reject")
+def reject_learning_proposal(
+    matter_id: str,
+    proposal_id: str,
+    body: models.LearningReviewRequest,
+    principal: Principal,
+    vault: Vault,
+    _csrf: Csrf,
+    _audited: Annotated[None, Depends(_audit_dep("learning_proposal_reject"))],
+) -> models.LearningProposalResponse:
+    del matter_id
+    item = review_learning_proposal(
+        vault,
+        proposal_id,
+        action="reject",
+        actor=principal.email,
+        channel="api",
+        recorded_at=_now_iso(),
+        reason=body.reason,
+    )
+    return models.LearningProposalResponse(proposal=item)
+
+
+@router.post("/api/matters/{matter_id}/learnings/proposals/{proposal_id}/scrub")
+def scrub_learning_proposal(
+    matter_id: str,
+    proposal_id: str,
+    body: models.LearningScrubRequest,
+    principal: Principal,
+    vault: Vault,
+    _csrf: Csrf,
+    _audited: Annotated[None, Depends(_audit_dep("learning_proposal_scrub"))],
+) -> models.LearningScrubResponse:
+    del matter_id, principal
+    preview = preview_learning_scrub(vault, proposal_id, body.reviewed_text)
+    return models.LearningScrubResponse(**preview.model_dump())
+
+
+@router.post("/api/matters/{matter_id}/learnings/proposals/{proposal_id}/promote")
+def promote_learning_proposal(
+    matter_id: str,
+    proposal_id: str,
+    body: models.LearningPromotionRequest,
+    principal: Principal,
+    vault: Vault,
+    _csrf: Csrf,
+    _audited: Annotated[None, Depends(_audit_dep("learning_proposal_promote"))],
+) -> models.LearningProposalResponse:
+    del matter_id
+    item = review_learning_proposal(
+        vault,
+        proposal_id,
+        action="promote",
+        target_tier=body.target_tier,
+        actor=principal.email,
+        channel="api",
+        recorded_at=_now_iso(),
+        reviewed_text=body.reviewed_text,
+        confirm_scrub_diff=body.confirm_scrub_diff,
+        scrub_diff_sha256=body.scrub_diff_sha256,
+        excluded_matter_ids=body.excluded_matter_ids,
+    )
+    return models.LearningProposalResponse(proposal=item)
 
 
 # --- decision resolve (write; typed 409 on lock contention) -----------------

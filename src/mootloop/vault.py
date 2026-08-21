@@ -165,6 +165,26 @@ def atomic_write_once_text(path: Path, text: str, *, encoding: str = "utf-8") ->
             os.unlink(tmp)
 
 
+def atomic_write_once_bytes(path: Path, data: bytes) -> None:
+    """Durably publish exact bytes once using the same link-based claim protocol."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".tmp-", suffix=path.suffix)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.link(tmp, path)
+        parent_fd = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(parent_fd)
+        finally:
+            os.close(parent_fd)
+    finally:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+
+
 def fsync_file_and_parent(path: Path) -> None:
     """Reassert durability for an existing file and its directory entry."""
     file_fd = os.open(path, os.O_RDONLY)

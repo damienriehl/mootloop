@@ -25,6 +25,7 @@ export const keys = {
       runs: () => [...key, "runs"] as const,
       // On-ramp TaskSpecs recorded for this matter (FE-2.5 freeform lane).
       tasks: () => [...key, "tasks"] as const,
+      learnings: () => [...key, "learnings"] as const,
       run: (runId: string) => {
         const runKey = [...key, "runs", runId] as const;
         return {

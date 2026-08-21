@@ -25,6 +25,12 @@ from mootloop.engine.launch import classify_vault_for_queue
 from mootloop.engine.queue import Queue, WorkItem
 from mootloop.errors import CitationError, DecisionError, MootloopError, VaultBoundaryError
 from mootloop.judge_profiles import build_assigned_judge_profile
+from mootloop.learn.service import (
+    LearningStore,
+    import_docx_learning,
+    preview_learning_scrub,
+    review_learning_proposal,
+)
 from mootloop.llm import FakeLLMProvider
 from mootloop.production_suggestions import (
     ProductionSuggestionStore,
@@ -37,6 +43,7 @@ from mootloop.vault import load_matter
 
 from . import (
     DecisionActionArg,
+    LearningPromotionTierArg,
     ProductionDispositionArg,
     ProductionReviewActionArg,
     _fail,
@@ -44,6 +51,7 @@ from . import (
     cite_app,
     decide_app,
     judge_app,
+    learn_app,
     production_app,
     research_app,
 )
@@ -295,6 +303,176 @@ def production_review(
     except MootloopError as exc:
         raise _fail(exc) from exc
     typer.echo(result.model_dump_json())
+
+
+@learn_app.command("import")
+def learn_import(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Option("--run", help="Run whose DOCX was edited")],
+    source: Annotated[Path, typer.Argument(help="Attorney-edited DOCX")],
+) -> None:
+    """Defensively import one local DOCX and create review-only anchored proposals."""
+    try:
+        result = import_docx_learning(vault_path, run_id, source, imported_at=_now())
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    typer.echo(result.model_dump_json())
+
+
+@learn_app.command("list")
+def learn_list(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """List the folded learning-review queue across runs in this matter."""
+    try:
+        store = LearningStore(vault_path)
+        items = store.list_all()
+        imports = store.list_imports()
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    if json_output:
+        typer.echo(
+            json.dumps(
+                {
+                    "imports": [record.model_dump(mode="json") for record in imports],
+                    "proposals": [proposal.model_dump(mode="json") for proposal in items],
+                }
+            )
+        )
+        return
+    blocked = [record for record in imports if not record.auto_routable]
+    for record in blocked:
+        typer.echo(
+            f"{record.import_id}  [needs_anchor_review]  "
+            + "; ".join(record.blockers)
+        )
+    if not items and not blocked:
+        typer.echo("No learning proposals.")
+        return
+    for proposal in items:
+        tiers = ",".join(proposal.active_tiers) or "none"
+        typer.echo(
+            f"{proposal.proposal_id}  {proposal.anchor_id}  "
+            f"[{proposal.status}]  tiers={tiers}"
+        )
+
+
+@learn_app.command("show")
+def learn_show(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    proposal_id: Annotated[str, typer.Argument(help="Learning proposal or import id")],
+) -> None:
+    store = LearningStore(vault_path)
+    item = store.get(proposal_id)
+    if item is None:
+        bundle = store.load_bundle(proposal_id)
+        if bundle is None:
+            raise _fail(MootloopError(f"unknown learning item {proposal_id!r}")) from None
+        typer.echo(bundle.import_record.model_dump_json(indent=2))
+        return
+    typer.echo(item.model_dump_json(indent=2))
+
+
+@learn_app.command("accept")
+def learn_accept(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    proposal_id: Annotated[str, typer.Argument(help="Learning proposal id")],
+    text: Annotated[str, typer.Option("--text", help="Attorney-reviewed learning text")],
+) -> None:
+    """Accept a reviewed correction for this matter only."""
+    try:
+        item = review_learning_proposal(
+            vault_path,
+            proposal_id,
+            action="accept",
+            actor=pwd.getpwuid(os.geteuid()).pw_name,
+            channel="cli",
+            recorded_at=_now(),
+            reviewed_text=text,
+        )
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    typer.echo(item.model_dump_json())
+
+
+@learn_app.command("reject")
+def learn_reject(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    proposal_id: Annotated[str, typer.Argument(help="Learning proposal id")],
+    reason: Annotated[str, typer.Option("--reason")] = "",
+) -> None:
+    """Reject a proposal; rejected text can never enter a later prompt."""
+    try:
+        item = review_learning_proposal(
+            vault_path,
+            proposal_id,
+            action="reject",
+            actor=pwd.getpwuid(os.geteuid()).pw_name,
+            channel="cli",
+            recorded_at=_now(),
+            reason=reason,
+        )
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    typer.echo(item.model_dump_json())
+
+
+@learn_app.command("scrub")
+def learn_scrub(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    proposal_id: Annotated[str, typer.Argument(help="Learning proposal id")],
+    text: Annotated[str, typer.Option("--text", help="Proposed shared text")],
+) -> None:
+    """Fail closed on matter leakage and render the mandatory human promotion diff."""
+    try:
+        typer.echo(preview_learning_scrub(vault_path, proposal_id, text).model_dump_json())
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+
+
+@learn_app.command("promote")
+def learn_promote(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    proposal_id: Annotated[str, typer.Argument(help="Accepted learning proposal id")],
+    tier: Annotated[LearningPromotionTierArg, typer.Option("--tier")],
+    text: Annotated[str, typer.Option("--text", help="Scrubbed shared learning text")],
+    confirm_scrub_diff: Annotated[
+        bool,
+        typer.Option("--confirm-scrub-diff", help="Confirm the rendered public scrub diff"),
+    ] = False,
+    scrub_diff_sha256: Annotated[
+        str,
+        typer.Option("--scrub-diff-sha256", help="Exact SHA printed by `learn scrub`"),
+    ] = "",
+    exclude_matters: Annotated[
+        str,
+        typer.Option(
+            "--exclude-matters",
+            help="Comma-separated matter IDs barred by an ethical wall",
+        ),
+    ] = "",
+) -> None:
+    """Promote an accepted learning to firm or staged area candidate storage."""
+    try:
+        item = review_learning_proposal(
+            vault_path,
+            proposal_id,
+            action="promote",
+            target_tier=tier.value,
+            actor=pwd.getpwuid(os.geteuid()).pw_name,
+            channel="cli",
+            recorded_at=_now(),
+            reviewed_text=text,
+            confirm_scrub_diff=confirm_scrub_diff,
+            scrub_diff_sha256=scrub_diff_sha256 or None,
+            excluded_matter_ids=tuple(
+                value.strip() for value in exclude_matters.split(",") if value.strip()
+            ),
+        )
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    typer.echo(item.model_dump_json())
 
 
 @decide_app.command("list")

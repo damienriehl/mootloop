@@ -9,6 +9,9 @@ real-cryptography verifier path lives in ``test_api_real_verifier.py``.
 
 from __future__ import annotations
 
+import base64
+import io
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -111,6 +114,20 @@ def _seed_rfp(vault: Path) -> None:
             ],
         ),
     )
+
+
+def _edited_docx_bytes(text: str) -> bytes:
+    namespace = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    document = (
+        f'<w:document xmlns:w="{namespace}"><w:body><w:p>'
+        '<w:bookmarkStart w:id="1" w:name="resp-ROG-1"/>'
+        f"<w:r><w:t>{text}</w:t></w:r>"
+        '<w:bookmarkEnd w:id="1"/></w:p></w:body></w:document>'
+    )
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("word/document.xml", document.encode())
+    return output.getvalue()
 
 
 def _seed_production_corpus(vault: Path) -> None:
@@ -458,6 +475,52 @@ def test_production_suggestion_api_records_actor_and_separates_production_decisi
     assert produced.status_code == 200
     assert produced.json()["suggestion"]["review_status"] == "accepted"
     assert produced.json()["suggestion"]["production_disposition"] == "produce"
+
+
+def test_learning_import_accept_and_read_contract_use_verified_human_actor(
+    client: TestClient,
+    registry: MatterRegistry,
+    matter: MatterConfig,
+) -> None:
+    vault = registry.resolve(matter.matter_id)
+    _seed_request(vault)
+    run_id = orchestrator.start_run(vault, "discovery-responses", _NOW_ISO, run_id="api-learn")
+    master = vault / "deliverables" / run_id / "master.md"
+    master.parent.mkdir(parents=True, exist_ok=True)
+    master.write_text(
+        "::: {#resp-ROG-1}\nIdentify each witness. RESPONSE: Alice Smith.\n:::\n",
+        encoding="utf-8",
+    )
+    edited = _edited_docx_bytes("Identify each witness. RESPONSE: Alice Smith and Bob Jones.")
+    headers = _with_csrf(client)
+
+    imported = client.post(
+        f"/api/matters/{matter.matter_id}/runs/{run_id}/learnings/import",
+        headers=headers,
+        json={
+            "source_name": "attorney-edited.docx",
+            "source_base64": base64.b64encode(edited).decode(),
+        },
+    )
+    assert imported.status_code == 200
+    proposal_id = imported.json()["proposals"][0]["proposal_id"]
+
+    accepted = client.post(
+        f"/api/matters/{matter.matter_id}/learnings/proposals/{proposal_id}/accept",
+        headers=headers,
+        json={"reviewed_text": "Prefer complete witness identifications.", "reason": ""},
+    )
+    assert accepted.status_code == 200
+    assert accepted.json()["proposal"]["status"] == "accepted"
+    assert accepted.json()["proposal"]["review_history"][-1]["actor"] == _PRINCIPAL.email
+
+    listed = client.get(
+        f"/api/matters/{matter.matter_id}/learnings/proposals",
+        headers=_AUTH,
+    )
+    assert listed.status_code == 200
+    assert listed.json()["imports"][0]["source_name"] == "attorney-edited.docx"
+    assert listed.json()["proposals"][0]["active_tiers"] == ["matter"]
 
 
 def test_runs_unknown_matter_returns_404(client: TestClient) -> None:

@@ -17,6 +17,7 @@ from mootloop.judge_profiles import (
     profile_context_contribution,
     profile_matches_matter,
 )
+from mootloop.learn.service import FirmLearningStore, configured_firm_profile_root
 from mootloop.models.common import MatterId
 from mootloop.models.events import QueueIntent, RunMode
 from mootloop.models.matter import MatterConfig
@@ -50,6 +51,9 @@ def _commit_launch(
     )
     matter = load_matter(vault_root)
     contributions = list(ContextContributionStore(vault_root).list_all())
+    firm_root = configured_firm_profile_root()
+    if firm_root is not None:
+        contributions.extend(FirmLearningStore(firm_root).list_all())
     judge_profile = JudgeProfileStore(vault_root).latest_or_none()
     if (
         judge_profile is not None

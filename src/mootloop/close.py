@@ -44,6 +44,7 @@ from mootloop.models.corpus import Manifest
 from mootloop.models.decisions import Decision
 from mootloop.models.facts import Fact
 from mootloop.models.judge_profiles import JudgeProfile
+from mootloop.models.learnings import FirmLearningEvent, LearningImportBundle, LearningReview
 from mootloop.models.lifecycle import CloseRecord
 from mootloop.models.matter import MatterConfig
 from mootloop.models.matters import MatterSummary
@@ -253,6 +254,18 @@ MATTER_SCOPED_STORES: tuple[MatterScopedStore, ...] = (
         model=None,
     ),
     MatterScopedStore(
+        name="learning-imports",
+        glob="learnings/imports/*.json",
+        description="Write-once edited-document recovery and proposal bundles.",
+        model=LearningImportBundle,
+    ),
+    MatterScopedStore(
+        name="learning-reviews",
+        glob="learnings/reviews.jsonl",
+        description="Append-only human learning acceptance and promotion events.",
+        model=LearningReview,
+    ),
+    MatterScopedStore(
         name="context-contributions",
         glob="context/contributions/*.json",
         description="Write-once board, learning, note, and firm-playbook launch candidates.",
@@ -300,6 +313,11 @@ EXEMPT_MODELS: dict[type[VersionedModel], str] = {
         "The close log itself — written to the matters-root level so it survives the "
         "purge it records; carries no confidential content (opaque id + counts + "
         "anonymized tombstone) and is MatterProvenanced."
+    ),
+    FirmLearningEvent: (
+        "Human-reviewed generalized learning stored in the configured private firm profile "
+        "outside all matter vaults and the OSS repo; shared-profile lifecycle is governed "
+        "separately from one-matter close."
     ),
 }
 

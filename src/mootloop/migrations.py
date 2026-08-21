@@ -317,6 +317,27 @@ DEFAULT_MIGRATIONS.register(
 )
 
 
+def _migrate_run_context_1_4_to_1_5(payload: MigrationPayload) -> MigrationPayload:
+    """Keep historical prompt contributions matter-scoped with no wall exclusions."""
+    migrated = deepcopy(payload)
+    migrated["schema_version"] = "1.5"
+    contributions = migrated.get("context_contributions")
+    if isinstance(contributions, list):
+        for contribution in contributions:
+            if isinstance(contribution, dict):
+                contribution.setdefault("sharing_scope", "matter")
+                contribution.setdefault("excluded_matter_ids", [])
+    return migrated
+
+
+DEFAULT_MIGRATIONS.register(
+    RunContextManifest,
+    "1.4",
+    "1.5",
+    _migrate_run_context_1_4_to_1_5,
+)
+
+
 def load_versioned_json[JsonModelT: VersionedModel](
     raw: bytes,
     model_type: type[JsonModelT],

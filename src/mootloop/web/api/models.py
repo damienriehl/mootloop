@@ -14,10 +14,15 @@ from typing import Literal
 from pydantic import Field, model_validator
 
 from mootloop.models.attestations import Attestation
-from mootloop.models.common import StrictModel, VersionedModel
+from mootloop.models.common import MatterId, StrictModel, VersionedModel
 from mootloop.models.decisions import Decision, ResolutionAction
 from mootloop.models.events import RunMode, RunStatus
 from mootloop.models.gates import GateResult
+from mootloop.models.learnings import (
+    LearningImportRecord,
+    LearningProposalView,
+    LearningTier,
+)
 from mootloop.models.production import (
     ProductionDisposition,
     ProductionSuggestionExclusion,
@@ -200,6 +205,61 @@ class ProductionSuggestionReviewRequest(StrictModel):
     action: SuggestionReviewAction
     production_disposition: ProductionDisposition | None = None
     reason: str = Field(default="", max_length=2000)
+
+
+class LearningImportRequest(StrictModel):
+    source_name: str = Field(min_length=1, max_length=255)
+    source_base64: str = Field(min_length=1, max_length=90_000_000)
+
+
+class LearningReviewRequest(StrictModel):
+    reviewed_text: str = Field(default="", max_length=131_072)
+    reason: str = Field(default="", max_length=2_000)
+
+
+class LearningPromotionRequest(StrictModel):
+    target_tier: LearningTier
+    reviewed_text: str = Field(min_length=1, max_length=131_072)
+    confirm_scrub_diff: bool = False
+    scrub_diff_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    excluded_matter_ids: tuple[MatterId, ...] = ()
+
+    @model_validator(mode="after")
+    def validate_shared_tier(self) -> LearningPromotionRequest:
+        if self.target_tier not in ("firm", "area"):
+            raise ValueError("target_tier must be firm or area")
+        return self
+
+
+class LearningScrubRequest(StrictModel):
+    reviewed_text: str = Field(min_length=1, max_length=131_072)
+
+
+class LearningImportResponse(VersionedModel):
+    schema_version: str = SCHEMA_VERSION
+    kind: Literal["learning_import"] = "learning_import"
+    import_record: LearningImportRecord
+    proposals: list[LearningProposalView] = Field(default_factory=list)
+
+
+class LearningProposalsResponse(VersionedModel):
+    schema_version: str = SCHEMA_VERSION
+    kind: Literal["learning_proposals"] = "learning_proposals"
+    imports: list[LearningImportRecord] = Field(default_factory=list)
+    proposals: list[LearningProposalView] = Field(default_factory=list)
+
+
+class LearningProposalResponse(VersionedModel):
+    schema_version: str = SCHEMA_VERSION
+    kind: Literal["learning_proposal"] = "learning_proposal"
+    proposal: LearningProposalView
+
+
+class LearningScrubResponse(VersionedModel):
+    schema_version: str = SCHEMA_VERSION
+    kind: Literal["learning_scrub_preview"] = "learning_scrub_preview"
+    rendered_diff: str
+    rendered_diff_sha256: str
 
 
 class RunStatusSummary(VersionedModel):

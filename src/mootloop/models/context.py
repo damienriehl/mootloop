@@ -20,7 +20,7 @@ from mootloop.models.run import PersonaName
 from mootloop.models.task import TaskAdapterConfig
 from mootloop.models.taskspec import TaskSpec, TaskSpecLock
 
-SCHEMA_VERSION = "1.4"
+SCHEMA_VERSION = "1.5"
 CORPUS_SNAPSHOT_SCHEMA_VERSION = "1.0"
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _CONTRIBUTION_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._:-]{0,127}$")
@@ -42,7 +42,13 @@ ContextContributionKind = Literal["board", "learning", "context_note", "firm_pla
 ContextApprovalState = Literal["approved", "accepted", "pending", "rejected"]
 ContextPermission = Literal["matter_confidential", "privileged"]
 ContextTrust = Literal["untrusted_data"]
-ContextExclusionReason = Literal["not_approved", "wrong_matter", "wrong_task"]
+ContextSharingScope = Literal["matter", "firm", "public_area"]
+ContextExclusionReason = Literal[
+    "not_approved",
+    "wrong_matter",
+    "wrong_task",
+    "ethical_wall",
+]
 AssembledContextKind = Literal[
     "fact",
     "corpus_passage",
@@ -101,6 +107,8 @@ class ContextContribution(StrictModel):
     trust: ContextTrust = "untrusted_data"
     permission: ContextPermission
     approval_state: ContextApprovalState
+    sharing_scope: ContextSharingScope = "matter"
+    excluded_matter_ids: tuple[MatterId, ...] = ()
 
     @model_validator(mode="after")
     def validate_identity_and_digest(self) -> ContextContribution:
@@ -117,6 +125,10 @@ class ContextContribution(StrictModel):
             raise ValueError("task_scope may not contain duplicates")
         if len(set(self.persona_scope)) != len(self.persona_scope):
             raise ValueError("persona_scope may not contain duplicates")
+        if len(set(self.excluded_matter_ids)) != len(self.excluded_matter_ids):
+            raise ValueError("excluded_matter_ids may not contain duplicates")
+        if self.sharing_scope == "matter" and self.excluded_matter_ids:
+            raise ValueError("matter-scoped contributions cannot declare ethical-wall exclusions")
         return self
 
 
