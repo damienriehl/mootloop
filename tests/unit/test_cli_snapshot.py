@@ -11,13 +11,14 @@ from mootloop.cli import app
 
 _COMMAND_TREE = {
     "api": ["export-openapi"],
-    "cite": ["verify"],
+    "cite": ["check", "verify"],
     "corpus": ["actions", "convert", "tag"],
     "decide": ["list", "resolve", "show"],
     "driver": ["run-once", "serve", "start-matter-worker"],
     "export": ["build", "link"],
     "facts": ["add", "interview", "list", "propose", "review"],
     "matters": ["list"],
+    "judge": ["profile"],
     "requests": ["parse"],
     "research": ["fulfill", "list"],
     "run": [
@@ -88,6 +89,7 @@ def test_large_command_families_are_registered_from_focused_modules() -> None:
         "cite": "mootloop.cli.review",
         "research": "mootloop.cli.review",
         "decide": "mootloop.cli.review",
+        "judge": "mootloop.cli.review",
         "driver": "mootloop.cli.operations",
         "api": "mootloop.cli.operations",
     }

@@ -20,7 +20,9 @@ from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import Literal
 
-from mootloop.models.common import CitationId, StrictModel, VersionedModel
+from pydantic import Field, model_validator
+
+from mootloop.models.common import CitationId, PropositionId, RunId, StrictModel, VersionedModel
 
 SCHEMA_VERSION = "1.0"
 
@@ -50,6 +52,16 @@ class VerificationStatus(StrEnum):
     NEEDS_RESEARCH = "needs_research"
 
 
+class PropositionVerificationStatus(StrEnum):
+    """Whether exact authority text supports the proposition attributed to it."""
+
+    SUPPORTED = "supported"
+    UNSUPPORTED = "unsupported"
+    AMBIGUOUS = "ambiguous"
+    PENDING = "pending"
+    NEEDS_RESEARCH = "needs_research"
+
+
 # Where a VerificationRecord came from. ``manual`` covers research-queue routing.
 VerificationSource = Literal["courtlistener", "mn_revisor", "curated", "manual"]
 
@@ -65,10 +77,77 @@ class Citation(StrictModel):
     source_turn_id: str | None = None
 
 
+class CitationProposition(StrictModel):
+    """One citation occurrence and the exact original-text paragraph asserting it."""
+
+    proposition_id: PropositionId
+    citation_id: CitationId
+    normalized_citation: str
+    proposition_text: str = Field(min_length=1)
+    proposition_start: int = Field(ge=0)
+    proposition_end: int = Field(ge=0)
+    citation_start: int = Field(ge=0)
+    citation_end: int = Field(ge=0)
+    source_text_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_turn_id: str | None = None
+
+    @model_validator(mode="after")
+    def validate_offsets(self) -> CitationProposition:
+        if self.proposition_start >= self.proposition_end:
+            raise ValueError("proposition offsets must describe a non-empty span")
+        if self.citation_start >= self.citation_end:
+            raise ValueError("citation offsets must describe a non-empty span")
+        if not (
+            self.proposition_start <= self.citation_start
+            and self.citation_end <= self.proposition_end
+        ):
+            raise ValueError("citation offsets must lie inside the proposition span")
+        return self
+
+
+class AuthorityPassage(StrictModel):
+    """One bounded, exact excerpt from a content-addressed public authority."""
+
+    passage_id: str = Field(pattern=r"^passage-[0-9a-f]{16}$")
+    text: str = Field(min_length=1, max_length=4096)
+    start: int = Field(ge=0)
+    end: int = Field(gt=0)
+    text_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    authority_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_url: str
+
+    @model_validator(mode="after")
+    def validate_span(self) -> AuthorityPassage:
+        if self.start >= self.end:
+            raise ValueError("authority passage offsets must describe a non-empty span")
+        return self
+
+
+class OpinionAuthorityStoreRecord(VersionedModel):
+    """Exact normalized public opinion text captured from fixed CourtListener IDs."""
+
+    schema_version: str = SCHEMA_VERSION
+    citation_id: CitationId
+    cluster_id: int = Field(gt=0)
+    opinion_ids: list[int] = Field(min_length=1, max_length=8)
+    source_url: str
+    fetched_at: str
+    content_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    text: str = Field(min_length=1, max_length=2_000_000)
+
+
 def make_citation_id(normalized: str) -> CitationId:
     """``cit-<sha256[:12]>`` of the normalized cite string (content-addressed)."""
     digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:12]
     return CitationId(f"cit-{digest}")
+
+
+def make_proposition_id(citation_id: CitationId, proposition_text: str) -> PropositionId:
+    """Content address an authority/proposition pair independent of run or whitespace."""
+    normalized = " ".join(proposition_text.split())
+    identity = f"{citation_id}\n{normalized}"
+    digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:16]
+    return PropositionId(f"prop-{digest}")
 
 
 class VerificationRecord(VersionedModel):
@@ -82,6 +161,32 @@ class VerificationRecord(VersionedModel):
     verified_at: str
     content_sha256: str | None = None
     notes: str = ""
+
+
+class PropositionVerificationRecord(VersionedModel):
+    """One append-only cite-checker result bound to exact public authority bytes."""
+
+    schema_version: str = SCHEMA_VERSION
+    run_id: RunId
+    proposition_id: PropositionId
+    citation_id: CitationId
+    source_text_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    status: PropositionVerificationStatus
+    source: Literal["cite_checker", "manual"]
+    checked_at: str
+    authority_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    authority_source_url: str
+    evidence_passage_ids: list[str] = Field(default_factory=list)
+    notes: str = ""
+
+    @model_validator(mode="after")
+    def validate_supported_evidence(self) -> PropositionVerificationRecord:
+        if (
+            self.status == PropositionVerificationStatus.SUPPORTED
+            and not self.evidence_passage_ids
+        ):
+            raise ValueError("supported proposition verification requires evidence passages")
+        return self
 
 
 class ResearchRequest(VersionedModel):

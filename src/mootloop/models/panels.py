@@ -11,6 +11,8 @@ restructure pass (plan Phase 6).
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import Field
 
 from mootloop.models.common import RequestId, StrictModel, VersionedModel
@@ -31,12 +33,26 @@ class PanelResult(StrictModel):
     reasoning_samples: list[str] = Field(default_factory=list)
 
 
+class JurySignal(StrictModel):
+    """Aggregate directional lay-reader signal; never a correctness gate."""
+
+    run_id: str
+    request_id: RequestId
+    total_readers: int = Field(ge=0)
+    mean_comprehension: float = Field(ge=1.0, le=5.0)
+    mean_persuasion: float = Field(ge=1.0, le=5.0)
+    confusion_samples: list[str] = Field(default_factory=list)
+    credibility_samples: list[str] = Field(default_factory=list)
+    directional_only: Literal[True] = True
+
+
 class PanelReport(VersionedModel):
     """The run's objection-survival distribution report (a derived view)."""
 
     schema_version: str = SCHEMA_VERSION
     run_id: str
     results: list[PanelResult] = Field(default_factory=list)
+    jury_signals: list[JurySignal] = Field(default_factory=list)
 
     def for_request(self, request_id: str) -> list[PanelResult]:
         return [r for r in self.results if str(r.request_id) == request_id]

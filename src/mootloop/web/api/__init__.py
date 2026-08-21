@@ -22,6 +22,7 @@ from mootloop.errors import (
     AttestationBlockedError,
     AuditWriteError,
     BackupError,
+    CitationError,
     DecisionError,
     ExportLinkError,
     ExportNotReadyError,
@@ -61,6 +62,10 @@ def _install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(DecisionError)
     async def _decision(request: Request, exc: DecisionError) -> JSONResponse:
         return JSONResponse(status_code=400, content={"error": "decision", "detail": str(exc)})
+
+    @app.exception_handler(CitationError)
+    async def _citation(request: Request, exc: CitationError) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"error": "citation", "detail": str(exc)})
 
     @app.exception_handler(OrchestratorError)
     async def _orchestrator(request: Request, exc: OrchestratorError) -> JSONResponse:

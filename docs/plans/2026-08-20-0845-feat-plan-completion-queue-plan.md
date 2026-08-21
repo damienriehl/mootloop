@@ -235,7 +235,7 @@ flowchart TD
 | U-04B | Pre-validation: isolated converter and protected-folder closure | U-02, U-04A | private review D-04; converter D-05 |
 | U-05 | Post-validation: gate protocol, remaining ID discipline, and CLI package cleanup | U-01 | D-10 expansion gate |
 | U-06 | Post-validation: persona enable/bypass and pipeline strategies | U-05 | D-10 expansion gate |
-| U-07 | Post-validation: citation proposition checking and remaining panels | U-05 | D-10; live judge corpus later |
+| U-07 | COMPLETE locally: citation proposition checking and remaining panels | U-05 | Hosted legal-source proxy expansion D-18 |
 | U-08 | Post-validation: RFP production-suggestion workflow | U-04A, U-05 | D-10 expansion gate |
 | U-09 | Pre-validation: local DOCX parser proof, edit-learning, and readback | U-01, U-03, U-04A | protected-folder evidence U-04B; Google lane D-06 |
 | U-10 | Post-validation: hidden answer-key and benchmark harness | U-06, U-07 | D-10; human verdict D-02/D-03 |
@@ -318,7 +318,7 @@ flowchart TD
   accepting substantive drift. Copied convergence mechanics have injected score and
   decision seams plus an exact upstream provenance pin. The Typer surface is split
   into focused modules with exact command/help parity across all 63 command paths.
-  **U-07 through U-17C remain queued** under their stated dependencies and
+  **U-08 through U-17C remain queued** under their stated dependencies and
   decision gates. **U-18 is COMPLETE for U-01, U-02, U-03, U-04A, U-04B, U-05, and U-06:**
   PR #33 merged as `74dec0a` after backend, invariant, and frontend CI passed on code
   head `acc1e51`; PR #35 merged as `b2ff6c7` after all six push/PR jobs passed on code
@@ -332,8 +332,8 @@ flowchart TD
   is still gated.
   No hosted matter or deployment was accessed during this execution.
 
-Verification at this checkpoint: backend ruff and strict mypy across 108 source files
-pass; 1,005 backend tests pass at 91% coverage; frontend ESLint, TypeScript, 9 Vitest
+Verification at this checkpoint: backend ruff and strict mypy across 114 source files
+pass; 1,043 backend tests pass at 91% coverage; frontend ESLint, TypeScript, 9 Vitest
 files / 37 tests, OpenAPI generation/drift, and the production build pass. U-03's
 structured review covered correctness, security, adversarial behavior, tests,
 maintainability, reliability, project standards, API contracts, agent parity, and
@@ -564,6 +564,26 @@ eCFR/GovInfo/Federal Register as research requests until separately promoted.
 **Acceptance:** planted real-but-irrelevant authority fails; panel inputs are bounded
 and provenance-tagged; calibration error and limits are recorded; unavailable/non-US
 sources degrade to explicit human research requests, never fabricated certainty.
+
+**Completion evidence (2026-08-21):** complete locally. Case-citation extraction uses
+cleaned text with exact original-offset back-mapping and an explicitly pinned Aho–
+Corasick tokenizer. Completed drafts can queue durable cite-checker jobs through the
+service, CLI, API, and typed cockpit path. Checks use only fixed numeric CourtListener
+endpoints, content-addressed opinion snapshots, bounded provenance-tagged passages,
+source-text and authority hashes, journaled model turns/spend, and an export-blocking
+proposition gate. The planted real-but-irrelevant case fails. The optional jury stage
+is off by default, bounded to five directional lay-reading lenses, records exact draft
+provenance, and never contributes a correctness gate. The assigned-judge builder uses
+exact normalized judge identity, a fixed fielded public-opinion query, write-once
+evidence, deterministic train/holdout splitting, an explicit measured-error threshold,
+and Judge-only next-run DATA injection only when calibrated. Missing/non-US/unavailable
+or uncalibrated evidence opens a human research request. Queue leases renew across
+public retrieval and provider calls; repeated identical builds remain content-addressed;
+the current profile must match its write-once archive; malformed hosted-vault identity
+fails closed. eCFR, GovInfo, and Federal Register remain research requests. D-18 is the
+sole hosted-operability tail: deployment's proxy still permits only the model endpoint,
+so no hosted legal-source call is attempted until its exact three-host expansion is
+authorized. No hosted matter or deployment was accessed.
 
 ### U-08 — Add RFP production assistance
 

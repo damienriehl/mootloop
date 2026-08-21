@@ -8,11 +8,11 @@ uncommitted code change: the only pre-existing dirty file was the timer-managed
 `.claude/RESUME.md`. Both recent feature PRs are merged, and the backend and frontend
 validation suites are green.
 
-Execution update through 2026-08-21: U-01 through U-06 are now complete locally,
-remotely reviewed, and merged. U-06 landed in PR #44 as merge commit `8fcdbcf`; its
-final code head `b7dcee6` passed every required backend, invariant, and frontend job.
-Both actionable review findings were fixed with regressions, replied to, and resolved.
-U-07 is the next autonomous unit.
+Execution update through 2026-08-21: U-01 through U-06 are complete locally,
+remotely reviewed, and merged. U-07 is complete locally; its hosted public-legal-source
+operability tail is isolated behind D-18 because the deployed proxy still allows only
+the model endpoint. No hosted call or deployment change was attempted. U-08 is the next
+autonomous unit.
 
 The broader repository audit nevertheless found genuine unfinished work in the two
 legacy plans still marked `active`. This document is the completion ledger for every
@@ -47,7 +47,7 @@ missing older source plan.
 ## Current Validation Evidence
 
 - Backend verification: the latest local `make check` passed: ruff clean, mypy strict
-  clean across 101 source files, and 970 tests passed at 91% coverage.
+  clean across 114 source files, and 1,043 tests passed at 91% coverage.
 - Frontend verification: ESLint clean, TypeScript clean, 9 Vitest files / 37 tests
   passed, backend and generated-client OpenAPI drift checks pass, and the production
   build succeeds.
@@ -104,7 +104,7 @@ Source: `docs/plans/2026-07-11-001-feat-mootloop-v1-agentic-litigation-pipeline-
 | V1-4 | Citation clients/cache, fabrication gate, and research-request queue | COMPLETE for current routes | Gate framework and current legal-source clients exist. OpenLaws consolidation remains intentionally deferred. |
 | V1-5 | Decisions, gated/observed/autonomous modes, configurable attorney gates | COMPLETE | Durable decision and attestation primitives exist across CLI/API for current actions. |
 | V1-6a | Discovery judge panel and costed restructure pass | COMPLETE | Implemented and exercised by synthetic/demo tests. |
-| V1-6b | Optional jury panel and calibrated-judge builder | PARTIAL / DEFERRED | Generic panel support exists; assigned-judge corpus builder remains post-first-serve work. U-07. |
+| V1-6b | Optional jury panel and calibrated-judge builder | COMPLETE locally | U-07 adds a directional-only non-gating jury and exact-evidence judge profiles that enter Judge DATA only after held-out calibration. Hosted public-source use remains D-18-gated. |
 | V1-7a | Stable anchors, DOCX, memo, privilege log, attestation, audit, watermark/residue gate | COMPLETE | Current export and attestation modules/tests cover the core court-usable lane. |
 | V1-7b | Google Doc export, annotated draft, Google comment reimport | DECISION-GATED | Explicitly deferred by D13; local DOCX learning should be proven first. D-06 and U-09. |
 | V1-8 | Edited DOCX/GDoc reimport, anchored diffs, reviewed tier routing, scrubbed learning promotion/readback | OPEN-AUTO, with external lane gated | No edit-learning service exists. Local DOCX/core lifecycle is U-09; Google access is D-06. |
@@ -135,8 +135,8 @@ delivery now share the same immutable commitment and recovery boundary.
 | D3 Adversarial security | PARTIAL | Path/vault/privacy/redaction/type controls exist. Enforced egress and isolation are U-02; complete integrity is U-03; hostile reimport/learning and Google ACL controls are U-09/D-06. |
 | D4 Performance and scale | OPEN-AUTO | Flat-context proof, bounded fan-out, prompt caching, objection batching, cache metrics, and calibrated retry/concurrency are U-16. The process-wide CourtListener bucket already exists. |
 | D5 Cost and budget | PARTIAL | Tiered models, dated pricing, cache-aware metering, estimates, labels, and caps exist. Output-cap, batching, cache, and self-calibration refinements remain U-16. |
-| D6 Loop calibration | PARTIAL | Score delta + material-change + completeness convergence is implemented. Jury-directionality and assigned-judge calibration constraints land with the optional panels in U-07. |
-| D7 Discovery-practice gates | PARTIAL | Current discovery shapes, RFA decisions, rubric, privilege log, and structural export are implemented. Opinion-to-proposition support and remaining panel/legal-source work are U-07. |
+| D6 Loop calibration | PARTIAL | Score delta + material-change + completeness convergence, directional-only jury signals, and held-out assigned-judge calibration are implemented. Remaining measurement-driven tuning is U-16. |
+| D7 Discovery-practice gates | COMPLETE for the current adapter | Current discovery shapes, RFA decisions, sanctions-linked rubric penalties, privilege log, structural export, and exact opinion-to-proposition support are implemented. |
 | D8 Export round trip | PARTIAL | DOCX rendering and attested local exports exist. Bookmark/revision reimport, defensive OOXML, CriticMarkup learning state, and optional Google suggestions/comments are U-09/D-06. |
 | D9 Lifecycle and integrity | PARTIAL | Cache staleness, close inventory, sync guard, locks, backups, and basic attestation exist. Full commitment, fact versions/state digest, close-policy enforcement, learning-event state, and stronger signed heads are U-03/U-09/U-11A and D-09/D-14. |
 | D10 Python foundations | PARTIAL | Domain models, strict schemas, migrations, five-layer frozen config, unions, protocols, sync-core boundaries, folds, typed trust zones, gate ordering, write-once turn results, copied-component seams, and the CLI split exist. The learning package split is U-09. |

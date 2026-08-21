@@ -10,6 +10,7 @@ stages:
   - bolster
   - judge_panel
   - restructure
+  - jury_panel
   - rubric_gate
   - assemble
 
@@ -25,6 +26,7 @@ loop_caps:
 panels:
   judges: 3
   jury: false
+  jurors: 5
   # Decorrelated rubric panel at the final gate (plan D6 — stays at N≈3).
   rubric_judges: 3
 
@@ -53,6 +55,11 @@ restructure_threshold: 0.5
 deliverables:
   - draft-discovery-responses.md
 
+# A matter may opt into a bounded directional lay-reader panel and choose its size.
+overridable:
+  - panels.jury
+  - panels.jurors
+
 # User-selectable graphs. The adapter owns exact ordering; the core only filters
 # stages whose persona owner is deliberately bypassed.
 pipeline_strategies:
@@ -64,6 +71,7 @@ pipeline_strategies:
       - bolster
       - judge_panel
       - restructure
+      - jury_panel
       - rubric_gate
       - assemble
     associate_partner_cap: 2
@@ -75,6 +83,7 @@ pipeline_strategies:
       - bolster
       - judge_panel
       - restructure
+      - jury_panel
       - rubric_gate
       - assemble
     associate_partner_cap: 3
@@ -86,6 +95,7 @@ pipeline_strategies:
       - partner_loop
       - judge_panel
       - restructure
+      - jury_panel
       - rubric_gate
       - assemble
     associate_partner_cap: 2

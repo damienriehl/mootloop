@@ -46,7 +46,7 @@ from pathlib import Path
 from mootloop import budget, orchestrator
 from mootloop.engine.outbox import drain_pending_run_outboxes, drain_pending_vault_outboxes
 from mootloop.engine.queue import Queue, WorkItem
-from mootloop.errors import AuthError, MootloopError, SeatLimitError, TurnError
+from mootloop.errors import AuthError, LockHeldError, MootloopError, SeatLimitError, TurnError
 from mootloop.llm import LLMProvider, RawTurnResult
 from mootloop.models.common import MatterId
 from mootloop.models.events import TurnIntent
@@ -260,9 +260,60 @@ class Worker:
     def _drain(self, item: WorkItem, now: datetime) -> bool:
         vault = self._resolve_vault(item.matter_id)
         run_id = validate_id(item.run_id, kind="run_id")
+        if item.kind == "judge_profile":
+            from mootloop.judge_profiles import build_assigned_judge_profile
+            from mootloop.vault import load_matter
+
+            try:
+                build_assigned_judge_profile(
+                    vault,
+                    load_matter(vault),
+                    now.isoformat(),
+                    heartbeat=lambda: self._require_item_lease(item),
+                )
+            except _LeaseLostError:
+                logger.warning(
+                    "worker %s: lost the lease on judge-profile item %s; stopping",
+                    self.worker_id,
+                    item.item_id,
+                )
+                return True
+            self.queue.complete(item.item_id, self.worker_id)
+            return True
         run_dir = vault / "runs" / run_id
         provider = self.provider_factory(vault, run_dir, self.billing_mode)
         now_iso = now.isoformat()
+        if item.kind == "citation_propositions":
+            from mootloop.citations.check_runner import (
+                CitationLeaseLostError,
+                run_proposition_checks,
+            )
+
+            try:
+                run_proposition_checks(
+                    vault,
+                    run_id,
+                    provider,
+                    now_iso,
+                    billing_mode=self.billing_mode,  # type: ignore[arg-type]
+                    extra_heartbeat=lambda: self.queue.heartbeat(
+                        item.item_id,
+                        self.worker_id,
+                        self.now_fn(),
+                        visibility_timeout_s=self.visibility_timeout_s,
+                    ),
+                )
+            except (CitationLeaseLostError, LockHeldError):
+                logger.warning(
+                    "worker %s: lost the lease on citation item %s; stopping",
+                    self.worker_id,
+                    item.item_id,
+                )
+                return True
+            self.queue.complete(item.item_id, self.worker_id)
+            return True
+        if item.kind != "run_turn":
+            raise TurnError(f"unknown work item kind: {item.kind}")
         while True:
             if self.should_stop():
                 # The safe boundary: the previous turn is journaled, no provider call
@@ -276,6 +327,7 @@ class Worker:
                 )
                 self.queue.release(item.item_id, self.worker_id)
                 return True
+
             specs = orchestrator.plan_next(vault, run_id)
             if not specs:
                 # Nothing schedulable: the run is finished / paused / blocked.
@@ -352,6 +404,15 @@ class Worker:
                     item.item_id,
                 )
                 return True
+
+    def _require_item_lease(self, item: WorkItem) -> None:
+        if not self.queue.heartbeat(
+            item.item_id,
+            self.worker_id,
+            self.now_fn(),
+            visibility_timeout_s=self.visibility_timeout_s,
+        ):
+            raise _LeaseLostError
 
     def _run_turn_with_lease(
         self,

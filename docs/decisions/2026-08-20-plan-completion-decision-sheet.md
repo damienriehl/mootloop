@@ -261,6 +261,23 @@ detached record self-identifying.
 - B — Create a successor plan for selected items after U-17C; name them in notes.
 - C — Create that successor scope now, without moving it ahead of the safety queue.
 
+### D-18 — May hosted workers reach the three fixed public legal-source hosts? — UNANSWERED
+
+**Why this matters:** U-07's application layer accepts only fixed paths on
+`www.courtlistener.com`, `api.courtlistener.com`, and `www.revisor.mn.gov`; no ingested
+text can choose a destination. The deployed authenticated proxy still permits only the
+model endpoint, so hosted citation checks and judge-profile builds will fail closed
+until this separate network policy is expanded.
+
+- **A — Authorize exactly those three public legal-source hosts in the hosted CONNECT
+  allowlist (recommended).** Keep the application fixed-path checks, proxy authentication,
+  outbound privacy gate, and all other destinations denied.
+- B — Keep the hosted proxy model-only. Citation checks and judge profiles remain
+  local-only or explicit human research tasks.
+
+**Never implied by this choice:** deployment, a live hosted run, protected-data access,
+or permission to add any content-derived or broader internet destination.
+
 ## Copy/paste response
 
 ```text

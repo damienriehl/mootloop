@@ -12,6 +12,8 @@ from typing import Any
 import httpx
 import yaml
 
+from mootloop import gate_ledger
+from mootloop.citations.check_runner import run_proposition_checks
 from mootloop.citations.extract import extract_citations
 from mootloop.citations.ledger import ResearchQueue
 from mootloop.discovery_parser import parse_discovery_document, save_requests
@@ -24,6 +26,7 @@ from mootloop.models.common import DocId
 from mootloop.models.events import GateEvaluated
 from mootloop.models.matter import MatterConfig
 from mootloop.models.requests import RequestType
+from mootloop.models.run import PersonaName
 from mootloop.orchestrator import (
     citation_export_gate,
     run_with_provider,
@@ -203,3 +206,73 @@ def test_verification_cache_prevents_duplicate_http(tmp_path: Path) -> None:
     calls.clear()
     verify_run_citations(vault, run_id, NOW, transport=_combined_transport(200, calls))
     assert calls == [], "second pass must be served entirely from the ledger cache"
+
+
+def test_real_but_irrelevant_case_fails_proposition_gate_with_journaled_checks(
+    tmp_path: Path,
+) -> None:
+    vault = _build_vault(tmp_path)
+    run_id = start_run(vault, "discovery-responses", NOW, run_id="ph4-proposition")
+    drafting = FakeLLMProvider(script=_script([FAKE_CASE]))
+    assert run_with_provider(vault, run_id, drafting, NOW).status == "finished"
+    verify_run_citations(vault, run_id, NOW, transport=_combined_transport(200))
+    calls: list[httpx.Request] = []
+
+    def authority_transport(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        if request.url.path == "/api/rest/v4/clusters/1/":
+            return httpx.Response(
+                200,
+                json={"sub_opinions": ["/api/rest/v4/opinions/11/"]},
+            )
+        if request.url.path == "/api/rest/v4/opinions/11/":
+            return httpx.Response(
+                200,
+                json={"plain_text": "The court decides venue only and says nothing else."},
+            )
+        raise AssertionError(f"unexpected authority request {request.url}")
+
+    def irrelevant(spec: Any, prompt: str) -> dict[str, Any]:
+        del prompt
+        passage_id = spec.prompt_context["passages"][0]["passage_id"]
+        return {
+            "status": "unsupported",
+            "evidence_passage_ids": [passage_id],
+            "reasoning": "The opinion addresses venue, not the attributed proposition.",
+            "self_assessment": "Only the bounded excerpt was evaluated.",
+        }
+
+    checker = FakeLLMProvider(script={"citation_proposition": irrelevant})
+    prepared = run_proposition_checks(
+        vault,
+        run_id,
+        checker,
+        NOW,
+        transport=httpx.MockTransport(authority_transport),
+    )
+
+    assert prepared.bundles
+    assert citation_export_gate(vault, run_id, NOW).status == "fail"
+    assert "citations" in gate_ledger.build_ledger(vault, run_id).blockers
+    assert [request.url.path for request in calls] == [
+        "/api/rest/v4/clusters/1/",
+        "/api/rest/v4/opinions/11/",
+    ]
+    events = read_events(vault, run_id)
+    proposition_gate = next(
+        event.result
+        for event in reversed(events)
+        if isinstance(event, GateEvaluated) and event.result.gate == "citation_propositions"
+    )
+    assert proposition_gate.status == "fail"
+    combined_gate = next(
+        event.result
+        for event in reversed(events)
+        if isinstance(event, GateEvaluated) and event.result.gate == "citation"
+    )
+    assert combined_gate.status == "fail"
+    assert any(
+        event.record.spec.persona == PersonaName.CITE_CHECKER
+        for event in events
+        if event.kind == "turn_completed"
+    )

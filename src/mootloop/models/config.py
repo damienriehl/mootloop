@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, model_validator
 
 from mootloop.models.common import StrictModel, VersionedModel
 
@@ -29,6 +29,7 @@ STRUCTURAL_LEAF_PATHS: frozenset[str] = frozenset(
         "stages",
         "panels.judges",
         "panels.jury",
+        "panels.jurors",
         "panels.rubric_judges",
         "gates",
         "deliverables",
@@ -49,6 +50,7 @@ class LoopCapsOverlay(StrictModel):
 class PanelOverlay(StrictModel):
     judges: int | None = Field(default=None, ge=1)
     jury: bool | None = None
+    jurors: int | None = Field(default=None, ge=0)
     rubric_judges: int | None = Field(default=None, ge=1)
 
 
@@ -101,7 +103,14 @@ class ResolvedLoopCaps(_FrozenModel):
 class ResolvedPanels(_FrozenModel):
     judges: int = Field(ge=1)
     jury: bool
+    jurors: int = Field(default=0, ge=0)
     rubric_judges: int = Field(ge=1)
+
+    @model_validator(mode="after")
+    def validate_jury_size(self) -> ResolvedPanels:
+        if self.jury and self.jurors < 1:
+            raise ValueError("panels.jurors must be at least 1 when jury is enabled")
+        return self
 
 
 class ResolvedConvergence(_FrozenModel):

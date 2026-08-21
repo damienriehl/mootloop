@@ -12,10 +12,14 @@ preserved.
 from __future__ import annotations
 
 import re
+from bisect import bisect_left, bisect_right
+from dataclasses import dataclass
 from typing import Any
 
 from eyecite import clean_text, get_citations
+from eyecite.annotate import SpanUpdater
 from eyecite.models import FullCaseCitation, FullLawCitation
+from eyecite.tokenizers import AhocorasickTokenizer
 
 from mootloop.models.citations import AuthorityType, Citation, make_citation_id
 
@@ -34,6 +38,7 @@ _RULE_RE = re.compile(
 # Belt-and-suspenders fallback for the statute shape in case eyecite ever misses it.
 # Trailing punctuation is excluded so it dedupes with eyecite's own normalized form.
 _STATUTE_RE = re.compile(r"\bMinn\.\s*Stat\.\s*§+\s*\d+(?:[.\-][0-9A-Za-z]+)*")
+_TOKENIZER = AhocorasickTokenizer()
 
 
 def _norm_ws(text: str) -> str:
@@ -83,34 +88,67 @@ def _mk(raw_text: str, normalized: str, authority: AuthorityType, turn_id: str |
     )
 
 
-def extract_citations(text: str, *, source_turn_id: str | None = None) -> list[Citation]:
-    """Extract citations from ``text``, deduped by normalized form (first-seen order).
+@dataclass(frozen=True)
+class CitationOccurrence:
+    citation: Citation
+    start: int
+    end: int
 
-    eyecite runs over ``clean_text(['all_whitespace'])`` (plan D8); a regex pass
-    backfills MN court-rule (and, defensively, statute) shapes eyecite does not
-    tokenize.
+
+def extract_citation_occurrences(
+    text: str, *, source_turn_id: str | None = None
+) -> list[CitationOccurrence]:
+    """Extract every citation occurrence with offsets mapped into original ``text``.
+
+    eyecite spans refer to cleaned text. ``SpanUpdater`` maps both ends back to the
+    exact original text, preserving the D8 offset contract across whitespace cleanup.
     """
     cleaned = clean_text(text, ["all_whitespace"])
-    found: list[Citation] = []
-    seen: set[str] = set()
+    updater = SpanUpdater(cleaned, text)  # type: ignore[no-untyped-call]
+    found: list[CitationOccurrence] = []
+    seen: set[tuple[str, int, int]] = set()
 
-    def _add(citation: Citation) -> None:
-        if citation.normalized not in seen:
-            seen.add(citation.normalized)
-            found.append(citation)
+    def _add(citation: Citation, start: int, end: int) -> None:
+        original_start = int(updater.update(start, bisect_right))  # type: ignore[no-untyped-call]
+        original_end = int(updater.update(end, bisect_left))  # type: ignore[no-untyped-call]
+        key = (str(citation.citation_id), original_start, original_end)
+        if key not in seen:
+            seen.add(key)
+            found.append(CitationOccurrence(citation, original_start, original_end))
 
-    for cite in get_citations(cleaned):
+    for cite in get_citations(cleaned, tokenizer=_TOKENIZER):
         if isinstance(cite, FullCaseCitation):
             corrected = _corrected(cite)
             raw = _case_raw_text(cite, corrected)
-            _add(_mk(raw, corrected, AuthorityType.CASE, source_turn_id))
+            start, end = cite.full_span()
+            _add(_mk(raw, corrected, AuthorityType.CASE, source_turn_id), start, end)
         elif isinstance(cite, FullLawCitation):
             corrected = _corrected(cite)
-            _add(_mk(corrected, corrected, _law_authority(cite), source_turn_id))
+            start, end = cite.full_span()
+            _add(_mk(corrected, corrected, _law_authority(cite), source_turn_id), start, end)
 
     for match in _RULE_RE.finditer(cleaned):
-        _add(_mk(match.group(0), match.group(0), AuthorityType.COURT_RULE, source_turn_id))
+        _add(
+            _mk(match.group(0), match.group(0), AuthorityType.COURT_RULE, source_turn_id),
+            match.start(),
+            match.end(),
+        )
     for match in _STATUTE_RE.finditer(cleaned):
-        _add(_mk(match.group(0), match.group(0), AuthorityType.STATE_STATUTE, source_turn_id))
+        _add(
+            _mk(match.group(0), match.group(0), AuthorityType.STATE_STATUTE, source_turn_id),
+            match.start(),
+            match.end(),
+        )
 
+    return found
+
+
+def extract_citations(text: str, *, source_turn_id: str | None = None) -> list[Citation]:
+    """Extract citations from ``text``, deduped by normalized form (first-seen order)."""
+    found: list[Citation] = []
+    seen: set[str] = set()
+    for occurrence in extract_citation_occurrences(text, source_turn_id=source_turn_id):
+        if occurrence.citation.normalized not in seen:
+            seen.add(occurrence.citation.normalized)
+            found.append(occurrence.citation)
     return found

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -30,19 +31,28 @@ logger = logging.getLogger("mootloop.provider_driver")
 
 
 def _run_turn_with_lock_renewal(
-    lock: RunLock, provider: LLMProvider, spec: TurnSpec, prompt: str
+    lock: RunLock,
+    provider: LLMProvider,
+    spec: TurnSpec,
+    prompt: str,
+    *,
+    extra_heartbeat: Callable[[], bool] | None = None,
 ) -> RawTurnResult:
     """Keep ``lock`` live across a blocking provider call and fence its result."""
     stop = threading.Event()
     lost = threading.Event()
     interval = max(0.01, min(lock.heartbeat_threshold.total_seconds() / 3.0, 30.0))
 
-    if not lock.heartbeat(best_effort=True):
+    if not lock.heartbeat(best_effort=True) or (
+        extra_heartbeat is not None and not extra_heartbeat()
+    ):
         raise LockHeldError("run lock ownership was lost before provider call")
 
     def renew() -> None:
         while not stop.wait(interval):
-            if not lock.heartbeat(best_effort=True):
+            if not lock.heartbeat(best_effort=True) or (
+                extra_heartbeat is not None and not extra_heartbeat()
+            ):
                 lost.set()
                 return
 
@@ -62,7 +72,11 @@ def _run_turn_with_lock_renewal(
         stop.set()
         keeper.join()
 
-    still_owned = not lost.is_set() and lock.heartbeat(best_effort=True)
+    still_owned = (
+        not lost.is_set()
+        and lock.heartbeat(best_effort=True)
+        and (extra_heartbeat is None or extra_heartbeat())
+    )
     if not still_owned:
         logger.warning("discarding provider result after run lock ownership was lost")
         raise LockHeldError("run lock ownership was lost during provider call")

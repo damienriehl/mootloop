@@ -17,6 +17,8 @@ inputs carried on the spec — no excellence prose is hard-coded here.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from types import MappingProxyType
@@ -44,6 +46,7 @@ from mootloop.models.run import (
     SCHEMA_CRITIQUE,
     SCHEMA_DRAFT,
     SCHEMA_JUDGE,
+    SCHEMA_JUROR,
     SCHEMA_RUBRIC,
     DraftOutput,
     JudgeOutput,
@@ -59,9 +62,12 @@ from mootloop.tasks import TaskAdapter
 ASSEMBLE_STAGE = "assemble"
 RUBRIC_GATE_STAGE = "rubric_gate"
 RESTRUCTURE_STAGE = "restructure"
+JURY_PANEL_STAGE = "jury_panel"
 
 # The final-panel judging lenses (plan D6 — attempt-diverse prompts, one lens each).
 _JUDGE_LENSES = ("correctness", "strategy", "grounding")
+_JUROR_LENSES = ("clarity", "chronology", "credibility", "persuasion", "practicality")
+_MAX_JURY_DRAFT_BYTES = 32 * 1024
 
 
 # --- deterministic slot layout ----------------------------------------------
@@ -84,6 +90,7 @@ class SlotLayout:
     judges: int
     rubric_panel: int  # decorrelated final rubric panel
     restructure: int = 0  # costed post-panel restructure turns (plan Phase 6)
+    jurors: int = 0  # directional lay readers; slots follow all correctness work
 
     @property
     def _block(self) -> int:
@@ -95,6 +102,7 @@ class SlotLayout:
             + self.ap
             + self.rubric_panel
             + self.restructure
+            + self.jurors
         )
 
     @property
@@ -127,6 +135,9 @@ class SlotLayout:
 
     def restructure_slot(self, k: int) -> int:  # k in 1..restructure (plan Phase 6)
         return self._rubric_base() + self.ap + self.rubric_panel + (k - 1)
+
+    def jury_slot(self, j: int) -> int:  # j in 1..jurors
+        return self._rubric_base() + self.ap + self.rubric_panel + self.restructure + (j - 1)
 
     def turn_id(self, seq: int) -> str:
         return f"{self.run_id}-t{seq:04d}"
@@ -190,6 +201,7 @@ class StageContext:
             judges=self.config.panels.judges,
             rubric_panel=self.config.panels.rubric_judges,
             restructure=self.config.loop_caps.restructure,
+            jurors=self.config.panels.jurors if self.config.panels.jury else 0,
         )
 
     @property
@@ -657,6 +669,66 @@ class RestructureStage:
         return []
 
 
+class JuryPanelStage:
+    """Optional directional lay-reader panel; its outputs never enter a gate."""
+
+    name = JURY_PANEL_STAGE
+
+    def is_complete(self, ctx: StageContext) -> bool:
+        if not ctx.config.panels.jury:
+            return True
+        return all(
+            ctx.done(ctx.layout.jury_slot(j))
+            for j in range(1, ctx.config.panels.jurors + 1)
+        )
+
+    def plan(self, ctx: StageContext) -> list[TurnSpec]:
+        if not ctx.config.panels.jury:
+            return []
+        draft = ctx.operative_draft()
+        if draft is None:
+            raise TaskConfigError("jury panel cannot read a missing operative draft")
+        draft_payload = draft.output
+        encoded = json.dumps(
+            draft_payload,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+        if len(encoded) > _MAX_JURY_DRAFT_BYTES:
+            raise TaskConfigError("jury panel draft exceeds the 32 KiB prompt boundary")
+        digest = hashlib.sha256(encoded).hexdigest()
+        specs: list[TurnSpec] = []
+        for j in range(1, ctx.config.panels.jurors + 1):
+            seq = ctx.layout.jury_slot(j)
+            if not ctx.done(seq):
+                specs.append(
+                    ctx._spec(
+                        seq,
+                        PersonaName.JUROR,
+                        self.name,
+                        SCHEMA_JUROR,
+                        {
+                            "directive": (
+                                "Read as a layperson. Report only directional clarity, "
+                                "persuasion, confusion, and credibility signals. Do not "
+                                "predict a verdict or make a legal conclusion."
+                            ),
+                            "draft": draft_payload,
+                            "draft_provenance": {
+                                "turn_id": draft.spec.turn_id,
+                                "sha256": digest,
+                                "trust": "model_output_data",
+                            },
+                            "panel_seat": j,
+                            "lens": _JUROR_LENSES[(j - 1) % len(_JUROR_LENSES)],
+                            "directional_only": True,
+                        },
+                    )
+                )
+        return specs
+
+
 class RubricGateStage:
     """The final rubric gate: a decorrelated panel of rubric judges (plan D6), each
     with a distinct lens, scores the operative draft. The orchestrator aggregates the
@@ -700,6 +772,7 @@ _STAGES: dict[str, Stage] = {
         BolsterStage(),
         JudgePanelStage(),
         RestructureStage(),
+        JuryPanelStage(),
         RubricGateStage(),
     )
 }

@@ -22,6 +22,7 @@ from mootloop import attest as attest_svc
 from mootloop import decisions as decisions_svc
 from mootloop import orchestrator
 from mootloop import taskspec as taskspec_svc
+from mootloop.citations.check_runner import require_completed_draft_set
 from mootloop.engine.launch import launch_run as launch_run_service
 from mootloop.engine.queue import Queue as WorkQueue
 from mootloop.engine.queue import WorkItem
@@ -340,6 +341,57 @@ def reopen_run(
         )
     )
     return _run_action(vault, run_id, "run_reopened")
+
+
+@router.post("/api/matters/{matter_id}/runs/{run_id}/citations/check")
+def queue_citation_checks(
+    matter_id: str,
+    run_id: str,
+    principal: Principal,
+    vault: Vault,
+    queue: QueueDep,
+    _csrf: Csrf,
+    _audited: Annotated[None, Depends(_audit_dep("citation_check_queue"))],
+) -> models.CitationCheckQueuedResponse:
+    """Queue durable opinion/proposition checks through the matter-bound driver."""
+    require_completed_draft_set(vault, run_id)
+    item_id = f"cite:{matter_id}:{run_id}"
+    queue.ensure_enqueued(
+        WorkItem.create(
+            lane="interactive",
+            matter_id=matter_id,
+            run_id=run_id,
+            kind="citation_propositions",
+            now=datetime.now(UTC),
+            item_id=item_id,
+        )
+    )
+    return models.CitationCheckQueuedResponse(run_id=run_id, item_id=item_id)
+
+
+@router.post("/api/matters/{matter_id}/judge-profile")
+def queue_judge_profile(
+    matter_id: str,
+    principal: Principal,
+    vault: Vault,
+    queue: QueueDep,
+    _csrf: Csrf,
+    _audited: Annotated[None, Depends(_audit_dep("judge_profile_queue"))],
+) -> models.JudgeProfileQueuedResponse:
+    """Queue the public-opinion profile builder for this matter's assigned judge."""
+    del principal, vault
+    item_id = f"judge-profile:{matter_id}"
+    queue.ensure_enqueued(
+        WorkItem.create(
+            lane="interactive",
+            matter_id=matter_id,
+            run_id="judge-profile",
+            kind="judge_profile",
+            now=datetime.now(UTC),
+            item_id=item_id,
+        )
+    )
+    return models.JudgeProfileQueuedResponse(item_id=item_id)
 
 
 # --- decision resolve (write; typed 409 on lock contention) -----------------
