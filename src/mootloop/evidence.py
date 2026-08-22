@@ -178,7 +178,7 @@ def build_evidence_pack(
 
 
 def list_evidence_packs(vault_root: Path | str, run_id: str) -> list[RunEvidencePack]:
-    load_run_context(vault_root, run_id)
+    context = load_run_context(vault_root, run_id)
     root = safe_vault_path(vault_root, "runs", run_id, *PACKS_SUBPATH)
     if not root.is_dir():
         return []
@@ -199,8 +199,13 @@ def list_evidence_packs(vault_root: Path | str, run_id: str) -> list[RunEvidence
         if (
             path.name != expected_name
             or pack.run_id != run_id
+            or pack.source_matter_id != context.manifest.matter_id
             or pack.pack_sha256 != pack.expected_pack_sha256()
         ):
+            if pack.source_matter_id != context.manifest.matter_id:
+                raise OrchestratorError(
+                    f"evidence pack {path.name!r} belongs to another matter"
+                )
             raise OrchestratorError(f"evidence pack {path.name!r} failed its commitment")
         packs.append(pack)
     return packs

@@ -5,9 +5,11 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from mootloop.cli import app
+from mootloop.errors import OrchestratorError
 from mootloop.evidence import (
     build_evidence_pack,
     evidence_pack_path,
@@ -25,9 +27,9 @@ from tests.conftest import make_matter
 NOW = "2026-08-21T00:00:00+00:00"
 
 
-def _run(tmp_path: Path) -> Path:
+def _run(tmp_path: Path, *, matter_id: str = "acme-v-widgets") -> Path:
     vault = tmp_path / "vault"
-    init_vault(vault, make_matter(), registry_path=tmp_path / "canaries.json")
+    init_vault(vault, make_matter(matter_id), registry_path=tmp_path / "canaries.json")
     start_run(vault, "discovery-responses", NOW, run_id="trace-run-0001")
     append(vault, "trace-run-0001", RunPaused(reason="operator checkpoint"))
     return vault
@@ -99,3 +101,18 @@ def test_cli_builds_lists_and_reads_trace(tmp_path: Path) -> None:
     assert "EP-mootloop-trace-run-0001-001" in built.output
     assert listed.exit_code == 0 and "EP-mootloop-trace-run-0001-001" in listed.output
     assert traced.exit_code == 0 and '"tree_sha256"' in traced.output
+
+
+def test_list_rejects_self_consistent_pack_copied_from_another_matter(tmp_path: Path) -> None:
+    source = _run(tmp_path / "source", matter_id="source-matter")
+    target = _run(tmp_path / "target", matter_id="target-matter")
+    build_evidence_pack(
+        source, "trace-run-0001", NOW, generated_by="Attorney", channel="cli"
+    )
+    source_pack = evidence_pack_path(source, "trace-run-0001", 1)
+    target_pack = evidence_pack_path(target, "trace-run-0001", 1)
+    target_pack.parent.mkdir(parents=True, exist_ok=True)
+    target_pack.write_bytes(source_pack.read_bytes())
+
+    with pytest.raises(OrchestratorError, match="another matter"):
+        list_evidence_packs(target, "trace-run-0001")

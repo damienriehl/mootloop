@@ -20,6 +20,7 @@ from mootloop.models.events import (
     SpendRecorded,
     TurnIntent,
 )
+from mootloop.models.evidence import RunStatusSidecar
 from mootloop.models.matter import MatterConfig
 from mootloop.models.requests import RequestItem, RequestSet, RequestType
 from mootloop.models.run import TurnSpec
@@ -89,6 +90,22 @@ def test_pause_then_resume_reopens_run(tmp_path: Path) -> None:
     resume_run(vault, run_id)
     assert status_summary(vault, run_id)["status"] == "running"
     assert plan_next(vault, run_id)  # schedulable again
+
+
+def test_observed_status_sidecar_tracks_pause_and_resume(tmp_path: Path) -> None:
+    vault = _build_vault(tmp_path)
+    run_id = start_run(
+        vault, "discovery-responses", NOW, run_id="pause-observed", mode="observed"
+    )
+    sidecar_path = vault / "runs" / run_id / "STATUS.json"
+
+    pause_run(vault, run_id, reason="manual")
+    paused = RunStatusSidecar.model_validate_json(sidecar_path.read_text(encoding="utf-8"))
+    assert paused.status == "paused"
+
+    resume_run(vault, run_id)
+    resumed = RunStatusSidecar.model_validate_json(sidecar_path.read_text(encoding="utf-8"))
+    assert resumed.status == "running"
 
 
 def test_pause_rejects_terminal_run(tmp_path: Path) -> None:

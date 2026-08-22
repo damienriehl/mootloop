@@ -16,6 +16,7 @@ from mootloop.errors import OrchestratorError
 from mootloop.journal import append, load_state, read_events
 from mootloop.models.common import DocId
 from mootloop.models.events import JournalEvent, RunFinished, RunReopened
+from mootloop.models.evidence import RunStatusSidecar
 from mootloop.models.requests import RequestItem, RequestSet, RequestType
 from mootloop.models.run import DiscardedTurn
 from mootloop.orchestrator import (
@@ -114,6 +115,21 @@ def test_driver_halted_run_has_no_blockers(tmp_path: Path) -> None:
     state = reopen_run(vault, "reopen-0003", reason="rotated the provider credential")
     assert state.status == "running"
     assert plan_next(vault, "reopen-0003")  # schedulable again
+
+
+def test_observed_status_sidecar_tracks_reopen(tmp_path: Path) -> None:
+    vault = _build_vault(tmp_path)
+    run_id = start_run(
+        vault, "discovery-responses", NOW, run_id="reopen-observed", mode="observed"
+    )
+    append(vault, run_id, RunFinished(status="needs_attention"))
+
+    reopen_run(vault, run_id, reason="restored provider access")
+
+    sidecar = RunStatusSidecar.model_validate_json(
+        (vault / "runs" / run_id / "STATUS.json").read_text(encoding="utf-8")
+    )
+    assert sidecar.status == "running"
 
 
 # --- the transition ---------------------------------------------------------
