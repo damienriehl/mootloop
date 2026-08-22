@@ -9,15 +9,19 @@ import stat
 from pathlib import Path
 
 from mootloop import secrets
-from mootloop.engine.isolation import PROXY_PASSWORD_FILE_ENV
+from mootloop.engine.isolation import (
+    LEGAL_PROXY_PASSWORD_FILE_ENV,
+    PROXY_PASSWORD_FILE_ENV,
+    ProxyIdentity,
+)
 
 PASSWORD_FILE = "/tmp/mootloop-squid-passwords"
 
 
-def main() -> None:
-    password_path = os.environ.get(PROXY_PASSWORD_FILE_ENV)
+def _read_password(env_name: str) -> str:
+    password_path = os.environ.get(env_name)
     if not password_path:
-        raise SystemExit(f"{PROXY_PASSWORD_FILE_ENV} is not configured")
+        raise SystemExit(f"{env_name} is not configured")
     path = Path(password_path)
     try:
         mode = path.lstat().st_mode
@@ -29,10 +33,23 @@ def main() -> None:
     if not password:
         raise SystemExit("egress proxy password file is empty")
     secrets.register_secret(password)
+    return password
+
+
+def _password_line(identity: ProxyIdentity, password: str) -> str:
     digest = base64.b64encode(hashlib.sha1(password.encode("utf-8")).digest()).decode("ascii")
+    return f"{identity}:{{SHA}}{digest}\n"
+
+
+def main() -> None:
+    model_password = _read_password(PROXY_PASSWORD_FILE_ENV)
+    legal_password = _read_password(LEGAL_PROXY_PASSWORD_FILE_ENV)
+    if model_password == legal_password:
+        raise SystemExit("model and legal egress proxy passwords must differ")
     fd = os.open(PASSWORD_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
-        handle.write(f"mootloop:{{SHA}}{digest}\n")
+        handle.write(_password_line(ProxyIdentity.MODEL, model_password))
+        handle.write(_password_line(ProxyIdentity.LEGAL, legal_password))
     os.execvp("squid", ["squid", "-NYCd", "1"])
 
 

@@ -123,8 +123,10 @@ services:
     environment:
       MOOTLOOP_RUNTIME_MODE: hosted
       MOOTLOOP_EGRESS_PROXY_PASSWORD_FILE: /run/secrets/egress_proxy_password
+      MOOTLOOP_LEGAL_EGRESS_PROXY_PASSWORD_FILE: /run/secrets/legal_egress_proxy_password
     secrets:
       - egress_proxy_password
+      - legal_egress_proxy_password
     networks:
       - driver-egress
       - proxy-outbound
@@ -177,3 +179,5 @@ networks:
 secrets:
   egress_proxy_password:
     file: ${MOOTLOOP_EGRESS_PROXY_PASSWORD_FILE:?dedicated proxy password file required}
+  legal_egress_proxy_password:
+    file: ${MOOTLOOP_LEGAL_EGRESS_PROXY_PASSWORD_FILE:?dedicated legal proxy password file required}

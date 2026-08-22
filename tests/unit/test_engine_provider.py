@@ -356,7 +356,9 @@ def test_hosted_env_routes_model_traffic_only_to_authenticated_proxy(
     env = provider.build_env()
 
     assert env["HTTP_PROXY"] == env["HTTPS_PROXY"]
-    assert env["HTTPS_PROXY"] == "http://mootloop:proxy%20pass@egress-proxy:3128"
+    assert env["HTTPS_PROXY"] == (
+        "http://mootloop-model:proxy%20pass@egress-proxy:3128"
+    )
     assert env["NO_PROXY"] == ""
     assert env["MOOTLOOP_CANARY_REGISTRY"] == str(canary_registry)
     assert validate_isolated_command(["claude", "-p"], env) == ["claude", "-p"]
@@ -395,8 +397,8 @@ def test_hosted_wrapper_landlock_hides_matter_control_and_secrets(tmp_path: Path
         path.mkdir(parents=True, exist_ok=True)
     canary_registry.write_text("{}", encoding="utf-8")
     env = {
-        "HTTP_PROXY": "http://mootloop:secret@egress-proxy:3128",
-        "HTTPS_PROXY": "http://mootloop:secret@egress-proxy:3128",
+        "HTTP_PROXY": "http://mootloop-model:secret@egress-proxy:3128",
+        "HTTPS_PROXY": "http://mootloop-model:secret@egress-proxy:3128",
         "MOOTLOOP_PROVIDER_VAULT": str(vault),
         "MOOTLOOP_PROVIDER_CONFIG_DIR": str(config),
         "MOOTLOOP_CONTROL_DIR": str(queue),
@@ -440,6 +442,11 @@ def test_hosted_wrapper_landlock_hides_matter_control_and_secrets(tmp_path: Path
     [
         ("HTTP_PROXY", "http://egress-proxy:3128", "proxy"),
         ("HTTPS_PROXY", "http://mootloop:secret@other-proxy:3128", "proxy"),
+        (
+            "HTTPS_PROXY",
+            "http://mootloop-legal:secret@egress-proxy:3128",
+            "proxy",
+        ),
         ("MOOTLOOP_PROVIDER_VAULT", "relative/vault", "paths"),
         ("MOOTLOOP_CANARY_REGISTRY", "", "paths"),
     ],
@@ -456,8 +463,8 @@ def test_hosted_wrapper_rejects_incomplete_or_untrusted_boundary(
     }
     env = {
         **paths,
-        "HTTP_PROXY": "http://mootloop:secret@egress-proxy:3128",
-        "HTTPS_PROXY": "http://mootloop:secret@egress-proxy:3128",
+        "HTTP_PROXY": "http://mootloop-model:secret@egress-proxy:3128",
+        "HTTPS_PROXY": "http://mootloop-model:secret@egress-proxy:3128",
     }
     env[key] = value
 
@@ -478,9 +485,12 @@ def test_proxy_service_prepares_auth_file_before_exec(
     password_file = tmp_path / "squid-passwords"
     source_password = tmp_path / "proxy-password"
     source_password.write_text("proxy-secret\n", encoding="utf-8")
+    legal_password = tmp_path / "legal-proxy-password"
+    legal_password.write_text("legal-proxy-secret\n", encoding="utf-8")
     executed: list[str] = []
     monkeypatch.setattr(proxy_service, "PASSWORD_FILE", str(password_file))
     monkeypatch.setenv(proxy_service.PROXY_PASSWORD_FILE_ENV, str(source_password))
+    monkeypatch.setenv(proxy_service.LEGAL_PROXY_PASSWORD_FILE_ENV, str(legal_password))
     monkeypatch.setattr(
         proxy_service.os,
         "execvp",
@@ -489,7 +499,9 @@ def test_proxy_service_prepares_auth_file_before_exec(
 
     proxy_service.main()
 
-    assert password_file.read_text(encoding="utf-8").startswith("mootloop:{SHA}")
+    password_lines = password_file.read_text(encoding="utf-8").splitlines()
+    assert password_lines[0].startswith("mootloop-model:{SHA}")
+    assert password_lines[1].startswith("mootloop-legal:{SHA}")
     assert password_file.stat().st_mode & 0o777 == 0o600
     assert executed == ["squid", "squid", "-NYCd", "1"]
 
@@ -503,6 +515,8 @@ def test_proxy_service_fails_closed_on_invalid_password_source(
     from mootloop.engine import proxy_service
 
     source = tmp_path / "proxy-password"
+    legal_source = tmp_path / "legal-proxy-password"
+    legal_source.write_text("legal-proxy-secret\n", encoding="utf-8")
     if password_kind == "directory":
         source.mkdir()
     elif password_kind == "symlink":
@@ -512,6 +526,7 @@ def test_proxy_service_fails_closed_on_invalid_password_source(
     elif password_kind == "empty":
         source.write_text("", encoding="utf-8")
     monkeypatch.setenv(proxy_service.PROXY_PASSWORD_FILE_ENV, str(source))
+    monkeypatch.setenv(proxy_service.LEGAL_PROXY_PASSWORD_FILE_ENV, str(legal_source))
     monkeypatch.setattr(
         proxy_service.os,
         "execvp",
@@ -519,6 +534,27 @@ def test_proxy_service_fails_closed_on_invalid_password_source(
     )
 
     with pytest.raises(SystemExit, match="regular|unreadable|empty"):
+        proxy_service.main()
+
+
+def test_proxy_service_rejects_shared_model_and_legal_password(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from mootloop.engine import proxy_service
+
+    model_source = tmp_path / "model-password"
+    legal_source = tmp_path / "legal-password"
+    model_source.write_text("shared-secret\n", encoding="utf-8")
+    legal_source.write_text("shared-secret\n", encoding="utf-8")
+    monkeypatch.setenv(proxy_service.PROXY_PASSWORD_FILE_ENV, str(model_source))
+    monkeypatch.setenv(proxy_service.LEGAL_PROXY_PASSWORD_FILE_ENV, str(legal_source))
+    monkeypatch.setattr(
+        proxy_service.os,
+        "execvp",
+        lambda executable, argv: pytest.fail("Squid must not start"),
+    )
+
+    with pytest.raises(SystemExit, match="must differ"):
         proxy_service.main()
 
 

@@ -11,7 +11,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from mootloop.citations import courtlistener, mn_revisor
+from mootloop.citations import courtlistener, http, mn_revisor
 from mootloop.citations.extract import extract_citations
 from mootloop.citations.http import HttpRequest, fetch
 from mootloop.citations.ledger import ResearchQueue
@@ -28,7 +28,7 @@ from mootloop.citations.verify import (
     fulfill_research_request,
     verify_all,
 )
-from mootloop.errors import CitationError, EgressError
+from mootloop.errors import CitationError, EgressError, OutboundPrivacyError
 from mootloop.models.citations import (
     AuthorityType,
     VerificationRecord,
@@ -92,6 +92,191 @@ def test_fetch_rejects_off_allowlist_host() -> None:
 def test_fetch_rejects_non_absolute_path() -> None:
     with pytest.raises(EgressError):
         fetch(HttpRequest("GET", "www.courtlistener.com", "relative"))
+
+
+@pytest.mark.parametrize(
+    "outbound_request",
+    [
+        HttpRequest("GET", "www.courtlistener.com", "/"),
+        HttpRequest("POST", "www.courtlistener.com", "/api/rest/v4/opinions/1/"),
+        HttpRequest("GET", "www.revisor.mn.gov", "/statutes/search"),
+        HttpRequest("POST", "www.revisor.mn.gov", "/statutes/cite/336.2-207"),
+    ],
+)
+def test_fetch_rejects_allowed_host_with_unapproved_method_or_path(
+    outbound_request: HttpRequest,
+) -> None:
+    with pytest.raises(EgressError, match="route"):
+        fetch(outbound_request)
+
+
+def test_hosted_legal_fetch_uses_only_authenticated_proxy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registry = tmp_path / "canaries.json"
+    registry.write_text('{"canaries":{},"denylist":[]}', encoding="utf-8")
+    monkeypatch.setenv("MOOTLOOP_RUNTIME_MODE", "hosted")
+    monkeypatch.setenv("MOOTLOOP_CANARY_REGISTRY", str(registry))
+    monkeypatch.setenv("MOOTLOOP_EGRESS_PROXY_URL", "http://egress-proxy:3128")
+    monkeypatch.setenv("HTTPS_PROXY", "http://ambient-proxy.invalid:8080")
+    monkeypatch.setattr(
+        "mootloop.engine.isolation.secrets.load_secret",
+        lambda key: "legal pass" if "LEGAL" in key else "model pass",
+    )
+    observed: dict[str, object] = {}
+    async_client = httpx.AsyncClient
+
+    def capture_client(**kwargs: object) -> httpx.AsyncClient:
+        observed.update(kwargs)
+        return async_client(
+            timeout=kwargs["timeout"],
+            transport=httpx.MockTransport(lambda request: httpx.Response(200, json=[])),
+            trust_env=kwargs["trust_env"],
+        )
+
+    monkeypatch.setattr(http.httpx, "AsyncClient", capture_client)
+
+    response = fetch(
+        HttpRequest("GET", "api.courtlistener.com", "/api/rest/v4/search/"),
+    )
+
+    assert response.status_code == 200
+    assert observed["proxy"] == (
+        "http://mootloop-legal:legal%20pass@egress-proxy:3128"
+    )
+    assert observed["trust_env"] is False
+    assert observed["follow_redirects"] is False
+
+
+def test_local_legal_fetch_preserves_ambient_proxy_support(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registry = tmp_path / "canaries.json"
+    registry.write_text('{"canaries":{},"denylist":[]}', encoding="utf-8")
+    monkeypatch.setenv("MOOTLOOP_RUNTIME_MODE", "local")
+    monkeypatch.setenv("MOOTLOOP_CANARY_REGISTRY", str(registry))
+    monkeypatch.setenv("HTTPS_PROXY", "http://corporate-proxy.example:8080")
+    observed: dict[str, object] = {}
+    async_client = httpx.AsyncClient
+
+    def capture_client(**kwargs: object) -> httpx.AsyncClient:
+        observed.update(kwargs)
+        return async_client(
+            timeout=kwargs["timeout"],
+            transport=httpx.MockTransport(lambda request: httpx.Response(200, json=[])),
+            trust_env=False,
+        )
+
+    monkeypatch.setattr(http.httpx, "AsyncClient", capture_client)
+
+    response = fetch(
+        HttpRequest("GET", "api.courtlistener.com", "/api/rest/v4/search/"),
+    )
+
+    assert response.status_code == 200
+    assert observed["proxy"] is None
+    assert observed["trust_env"] is True
+    assert observed["follow_redirects"] is False
+
+
+@pytest.mark.parametrize(
+    "outbound_request",
+    [
+        HttpRequest(
+            "GET",
+            "api.courtlistener.com",
+            "/api/rest/v4/search/",
+            auth_token_env="UNAPPROVED_SECRET",
+        ),
+        HttpRequest(
+            "GET",
+            "www.revisor.mn.gov",
+            "/statutes/cite/336.2-207",
+            auth_token_env="COURTLISTENER_TOKEN",
+        ),
+    ],
+)
+def test_legal_fetch_rejects_unapproved_secret_routing(outbound_request: HttpRequest) -> None:
+    with pytest.raises(EgressError):
+        fetch(outbound_request)
+
+
+def test_hosted_legal_fetch_requires_dedicated_proxy_secret(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registry = tmp_path / "canaries.json"
+    registry.write_text('{"canaries":{},"denylist":[]}', encoding="utf-8")
+    monkeypatch.setenv("MOOTLOOP_RUNTIME_MODE", "hosted")
+    monkeypatch.setenv("MOOTLOOP_CANARY_REGISTRY", str(registry))
+    monkeypatch.setenv("MOOTLOOP_EGRESS_PROXY_URL", "http://egress-proxy:3128")
+    monkeypatch.setattr("mootloop.engine.isolation.secrets.load_secret", lambda key: None)
+
+    with pytest.raises(EgressError, match="LEGAL_EGRESS_PROXY_PASSWORD"):
+        fetch(HttpRequest("GET", "api.courtlistener.com", "/api/rest/v4/search/"))
+
+
+def test_outbound_legal_request_blocks_registered_canary_before_transport(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registry = tmp_path / "canaries.json"
+    registry.write_text(
+        '{"canaries":{"MOOTLOOP-CANARY-sibling":"sibling"},"denylist":[]}',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("MOOTLOOP_CANARY_REGISTRY", str(registry))
+    called = False
+
+    def transport(request: httpx.Request) -> httpx.Response:
+        nonlocal called
+        called = True
+        return httpx.Response(200, json=[])
+
+    with pytest.raises(OutboundPrivacyError, match="canary"):
+        fetch(
+            HttpRequest(
+                "POST",
+                "www.courtlistener.com",
+                "/api/rest/v4/citation-lookup/",
+                json_body={"text": "MOOTLOOP-CANARY-sibling"},
+            ),
+            transport=httpx.MockTransport(transport),
+        )
+    assert called is False
+
+
+@pytest.mark.parametrize(
+    "outbound_request",
+    [
+        HttpRequest(
+            "GET",
+            "api.courtlistener.com",
+            "/api/rest/v4/search/",
+            params={"q": "authorization Bearer shaped-token"},
+        ),
+        HttpRequest(
+            "POST",
+            "www.courtlistener.com",
+            "/api/rest/v4/citation-lookup/",
+            json_body={"text": "sk-abcdefgh"},
+        ),
+    ],
+)
+def test_outbound_legal_request_blocks_redactable_secret_shape_before_transport(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    outbound_request: HttpRequest,
+) -> None:
+    monkeypatch.setenv("MOOTLOOP_CANARY_REGISTRY", str(tmp_path / "missing-canaries.json"))
+    called = False
+
+    def transport(request: httpx.Request) -> httpx.Response:
+        nonlocal called
+        called = True
+        return httpx.Response(200, json=[])
+
+    with pytest.raises(OutboundPrivacyError, match="redaction"):
+        fetch(outbound_request, transport=httpx.MockTransport(transport))
+    assert called is False
 
 
 # --- CourtListener status semantics -----------------------------------------

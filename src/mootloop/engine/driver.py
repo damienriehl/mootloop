@@ -15,7 +15,12 @@ from mootloop.conversion_client import (
     validate_folio_enrich_image,
 )
 from mootloop.engine.claude_provider import HeadlessClaudeProvider
-from mootloop.engine.isolation import PROXY_PASSWORD_ENV, hosted_wrapper
+from mootloop.engine.isolation import (
+    LEGAL_PROXY_PASSWORD_ENV,
+    LEGAL_PROXY_PASSWORD_FILE_ENV,
+    PROXY_PASSWORD_ENV,
+    hosted_wrapper,
+)
 from mootloop.engine.queue import Queue
 from mootloop.engine.worker import ProviderFactory, Worker
 from mootloop.errors import DriverError, VaultBoundaryError
@@ -143,12 +148,35 @@ def build_driver_worker(
     )
 
 
+def _validated_proxy_password(path: Path, secret_env: str) -> str:
+    try:
+        password_mode = path.lstat().st_mode
+    except OSError as exc:
+        raise DriverError("egress proxy password file is missing or unreadable") from exc
+    if not stat.S_ISREG(password_mode):
+        raise DriverError("egress proxy password path must be a regular file")
+    if password_mode & 0o077:
+        raise DriverError("egress proxy password file must not be group/world accessible")
+    try:
+        password = path.read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        raise DriverError("egress proxy password file is missing or unreadable") from exc
+    if not password:
+        raise DriverError("egress proxy password file is empty")
+    configured_password = secrets.load_secret(secret_env)
+    if not configured_password or configured_password != password:
+        raise DriverError("egress proxy password file does not match the driver secret")
+    secrets.register_secret(password)
+    return password
+
+
 def start_matter_worker(
     matters_root: Path,
     matter_id: str,
     *,
     compose_file: Path,
     proxy_password_file: Path,
+    legal_proxy_password_file: Path,
     engine_config_root: Path,
     folio_enrich_image: str,
     folio_enrich_commit: str,
@@ -160,24 +188,13 @@ def start_matter_worker(
     binding = resolve_driver_binding(matters_root, RuntimeMode.HOSTED, matter_id)
     if binding.vault is None or binding.matter_id is None:  # pragma: no cover
         raise DriverError("hosted matter binding did not resolve a vault")
-    try:
-        password_mode = proxy_password_file.lstat().st_mode
-    except OSError as exc:
-        raise DriverError("egress proxy password file is missing or unreadable") from exc
-    if not stat.S_ISREG(password_mode):
-        raise DriverError("egress proxy password path must be a regular file")
-    if password_mode & 0o077:
-        raise DriverError("egress proxy password file must not be group/world accessible")
-    try:
-        proxy_password = proxy_password_file.read_text(encoding="utf-8").strip()
-    except OSError as exc:
-        raise DriverError("egress proxy password file is missing or unreadable") from exc
-    if not proxy_password:
-        raise DriverError("egress proxy password file is empty")
-    configured_password = secrets.load_secret(PROXY_PASSWORD_ENV)
-    if not configured_password or configured_password != proxy_password:
-        raise DriverError("egress proxy password file does not match the driver secret")
-    secrets.register_secret(proxy_password)
+    proxy_password = _validated_proxy_password(proxy_password_file, PROXY_PASSWORD_ENV)
+    legal_proxy_password = _validated_proxy_password(
+        legal_proxy_password_file,
+        LEGAL_PROXY_PASSWORD_ENV,
+    )
+    if proxy_password == legal_proxy_password:
+        raise DriverError("model and legal egress proxy passwords must differ")
     if not compose_file.is_file():
         raise DriverError("matter-worker compose file is missing")
     engine_config_source = _prepare_engine_config_source(
@@ -192,6 +209,7 @@ def start_matter_worker(
             "MOOTLOOP_MATTER_SOURCE": str(binding.vault),
             "MOOTLOOP_ENGINE_CONFIG_SOURCE": str(engine_config_source),
             "MOOTLOOP_EGRESS_PROXY_PASSWORD_FILE": str(proxy_password_file.resolve()),
+            LEGAL_PROXY_PASSWORD_FILE_ENV: str(legal_proxy_password_file.resolve()),
             "MOOTLOOP_FOLIO_ENRICH_IMAGE": folio_enrich_image,
             "MOOTLOOP_FOLIO_ENRICH_COMMIT": folio_enrich_commit,
         }

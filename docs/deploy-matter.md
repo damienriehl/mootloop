@@ -20,8 +20,14 @@ The core has two services, plus one isolated worker project per active matter
   It mounts one matter plus queue control metadata and is available only under the
   `matter-worker` compose profile.
 - `egress-proxy` — one per worker project. The driver can reach only this internal
-  proxy; authenticated Squid ACLs allow model traffic to `api.anthropic.com:443` and
-  deny every other destination.
+  proxy; authenticated Squid ACLs allow model traffic to `api.anthropic.com:443` plus
+  D-18-A public legal-source traffic to `www.courtlistener.com:443`,
+  `api.courtlistener.com:443`, and `www.revisor.mn.gov:443`, and deny every other
+  destination. Independent proxy identities prevent the model subprocess from using
+  the legal-source destinations and prevent deterministic application traffic from
+  using the model destination. Legal-source requests are additionally constrained to
+  fixed methods and paths in `mootloop.citations.http` and pass the outbound privacy
+  gate.
 - `folio-enrich` — one per worker project. It extracts text on a separate private
   `driver-conversion` network, has no outbound network or vault mount, and is selected
   only by an exact image digest plus reviewed source commit.
@@ -87,13 +93,16 @@ The `MOOTLOOP_INTERNAL_SECRET` and the download signing key also resolve on `api
 - `/srv/mootloop-matters` — owned `mootloop:mootloop`, mode **0700**. Every vault lives under it, outside every repo tree.
 - `~mootloop/.mootloop/` — dir mode **0700**; `~mootloop/.mootloop/secrets.env` mode **0600**, owned `mootloop:mootloop`.
 - Populate the secrets file (`KEY=VALUE` lines): `MOOTLOOP_INTERNAL_SECRET`, **`MOOTLOOP_DOWNLOAD_SIGNING_KEY`** and **`MOOTLOOP_BACKUP_KEY`** (pre-seed both on the host — the containers mount `~/.mootloop` read-only, so first-use auto-derivation would fail closed), and the subscription token via `claude setup-token` → `CLAUDE_CODE_OAUTH_TOKEN`.
-- Add `MOOTLOOP_EGRESS_PROXY_PASSWORD` to the same secrets file. The deterministic
-  driver loads and registers it for exact-value blocking.
+- Add distinct `MOOTLOOP_EGRESS_PROXY_PASSWORD` and
+  `MOOTLOOP_LEGAL_EGRESS_PROXY_PASSWORD` values to the same secrets file. The
+  deterministic driver loads and registers both for exact-value blocking.
 - Create `~mootloop/.mootloop/egress-proxy-password`, mode **0600**, containing only
-  the exact same password value (plus an optional trailing newline). The host launcher
-  verifies its type, permissions, content, and equality with the driver secret. Compose
-  mounts only this dedicated file into Squid; the proxy never receives the full secrets
-  directory.
+  the exact model password value, and `~mootloop/.mootloop/legal-egress-proxy-password`,
+  mode **0600**, containing only the exact legal-source password value (either may have
+  one trailing newline). The host launcher verifies each file's type, permissions,
+  content, equality with its driver secret, and inequality with the other password.
+  Compose mounts only these dedicated files into Squid; the proxy never receives the
+  full secrets directory.
 - **`MOOTLOOP_BACKUP_KEY`** is the AES-256 key that encrypts vault backups at rest (see `docs/backup.md`). Escrow it separately and **never** back it up alongside the archives it seals.
 - Run `claude setup-token` as the `mootloop` user so the token lands in that user's secrets file (the crown-jewel asset; never printed, never committed).
 
@@ -133,6 +142,7 @@ uv run mootloop driver start-matter-worker 2025-10-16-riehl-fence \
   --matters-root /srv/mootloop-matters \
   --engine-config-root /srv/mootloop-engine-config \
   --proxy-password-file /home/mootloop/.mootloop/egress-proxy-password \
+  --legal-proxy-password-file /home/mootloop/.mootloop/legal-egress-proxy-password \
   --folio-enrich-image ghcr.io/alea-institute/folio-enrich@sha256:<64-hex-digest> \
   --folio-enrich-commit f5364365346d93a3aa01fd5fecf219090afe5410 \
   --compose-file docker-compose.matter.yaml

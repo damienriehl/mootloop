@@ -15,6 +15,7 @@ from mootloop.engine.isolation import (
     PROVIDER_CONFIG_DIR_ENV,
     PROVIDER_VAULT_ENV,
     SECRETS_DIR_ENV,
+    ProxyIdentity,
 )
 from mootloop.privacy import CANARY_REGISTRY_ENV
 
@@ -79,9 +80,14 @@ def _validated_paths(env: dict[str, str]) -> tuple[Path, Path, Path, Path, Path]
     if (
         not https_proxy
         or https_proxy != http_proxy
+        or parsed.scheme != "http"
         or parsed.hostname != HOSTED_PROXY_HOST
-        or not parsed.username
+        or parsed.port != 3128
+        or parsed.username != ProxyIdentity.MODEL
         or not parsed.password
+        or parsed.path not in {"", "/"}
+        or parsed.query
+        or parsed.fragment
     ):
         raise SystemExit("hosted egress proxy is missing or unauthenticated")
     raw_paths = (

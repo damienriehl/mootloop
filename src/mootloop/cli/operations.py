@@ -96,7 +96,14 @@ def driver_start_matter_worker(
     matters_root: Annotated[Path, typer.Option("--matters-root", help="Host matters root")],
     proxy_password_file: Annotated[
         Path,
-        typer.Option("--proxy-password-file", help="Dedicated proxy-password file"),
+        typer.Option("--proxy-password-file", help="Dedicated model-proxy password file"),
+    ],
+    legal_proxy_password_file: Annotated[
+        Path,
+        typer.Option(
+            "--legal-proxy-password-file",
+            help="Dedicated legal-source proxy password file",
+        ),
     ],
     engine_config_root: Annotated[
         Path,
@@ -125,6 +132,7 @@ def driver_start_matter_worker(
             matter_id,
             compose_file=compose_file,
             proxy_password_file=proxy_password_file,
+            legal_proxy_password_file=legal_proxy_password_file,
             engine_config_root=engine_config_root,
             folio_enrich_image=folio_enrich_image,
             folio_enrich_commit=folio_enrich_commit,

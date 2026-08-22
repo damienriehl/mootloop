@@ -36,6 +36,7 @@ uv run mootloop driver start-matter-worker <synthetic-matter-id> \
   --matters-root /srv/mootloop-matters \
   --engine-config-root /srv/mootloop-engine-config \
   --proxy-password-file /home/mootloop/.mootloop/egress-proxy-password \
+  --legal-proxy-password-file /home/mootloop/.mootloop/legal-egress-proxy-password \
   --folio-enrich-image ghcr.io/alea-institute/folio-enrich@sha256:<64-hex-digest> \
   --folio-enrich-commit f5364365346d93a3aa01fd5fecf219090afe5410 \
   --compose-file docker-compose.matter.yaml
