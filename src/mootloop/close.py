@@ -26,6 +26,7 @@ from pydantic import BaseModel
 from mootloop.errors import CloseError, LockHeldError, MatterNotFoundError
 from mootloop.models.attestations import Attestation, ExportSeal, ReviewIntegrityStatus
 from mootloop.models.audit import GENESIS_PREV_HASH, AccessAuditEntry
+from mootloop.models.benchmarks import BenchmarkEvidencePack, BenchmarkVerdict
 from mootloop.models.citations import (
     OpinionAuthorityStoreRecord,
     PropositionVerificationRecord,
@@ -48,6 +49,7 @@ from mootloop.models.learnings import FirmLearningEvent, LearningImportBundle, L
 from mootloop.models.lifecycle import CloseRecord
 from mootloop.models.matter import MatterConfig
 from mootloop.models.matters import MatterSummary
+from mootloop.models.oracles import PersonaOracleAnswerKey
 from mootloop.models.panels import PanelReport
 from mootloop.models.pipeline import ResolvedPipeline
 from mootloop.models.production import ProductionSuggestionBundle, ProductionSuggestionReview
@@ -236,6 +238,18 @@ MATTER_SCOPED_STORES: tuple[MatterScopedStore, ...] = (
         model=ProductionSuggestionReview,
     ),
     MatterScopedStore(
+        name="run-benchmark-evidence",
+        glob="runs/*/benchmarks/evidence/*.json",
+        description="Content-free exact commitments for protected benchmark comparisons.",
+        model=BenchmarkEvidencePack,
+    ),
+    MatterScopedStore(
+        name="run-benchmark-verdicts",
+        glob="runs/*/benchmarks/verdicts.jsonl",
+        description="Append-only hard-human benchmark verdicts.",
+        model=BenchmarkVerdict,
+    ),
+    MatterScopedStore(
         name="run-artifacts",
         glob="runs/**/*",
         description="Turns, gate ledgers, STATUS.md, provider sessions and settings.",
@@ -283,6 +297,10 @@ MATTER_SCOPED_STORES: tuple[MatterScopedStore, ...] = (
 # Concrete `VersionedModel`s that are deliberately NOT matter-scoped-purgeable, each
 # with the reason the invariant records instead of demanding a store.
 EXEMPT_MODELS: dict[type[VersionedModel], str] = {
+    PersonaOracleAnswerKey: (
+        "Synthetic answer keys are versioned test-only repo fixtures, never matter data or "
+        "runtime prompt context."
+    ),
     DefaultRunConfig: (
         "Repo config loaded from config/defaults.yaml; ships with the code, not matter data."
     ),

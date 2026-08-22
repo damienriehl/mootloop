@@ -45,6 +45,10 @@ class LearningImportError(MootloopError):
     """An edited-document import violated its format, integrity, or routing contract."""
 
 
+class OracleError(MootloopError):
+    """A synthetic regression key or candidate violated the deterministic oracle contract."""
+
+
 class TaskConfigError(MootloopError):
     """A task-adapter config failed to load or validate. Message names each bad field."""
 

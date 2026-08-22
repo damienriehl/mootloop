@@ -90,6 +90,9 @@ addopts = "--strict-markers"
 testpaths = ["tests"]
 markers = [
     "invariant: repo-hygiene and structural invariants",
+    "deterministic: zero-provider-call unit and deterministic oracle tests",
+    "replayed: fixture-replayed pipelines using deterministic fake providers",
+    "paid_oracle: explicit opt-in oracle tests that may spend model tokens",
 ]
 
 [tool.coverage.run]
