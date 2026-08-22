@@ -146,11 +146,12 @@ async def _afetch(
     transport: httpx.MockTransport | None,
 ) -> HttpResponse:
     url = f"https://{request.host}{request.path}"
+    proxy = _hosted_proxy_url()
     async with httpx.AsyncClient(
         timeout=timeout,
         transport=transport,
-        proxy=_hosted_proxy_url(),
-        trust_env=False,
+        proxy=proxy,
+        trust_env=proxy is None,
         follow_redirects=False,
     ) as client:
         response = await client.request(

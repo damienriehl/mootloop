@@ -148,6 +148,37 @@ def test_hosted_legal_fetch_uses_only_authenticated_proxy(
     assert observed["follow_redirects"] is False
 
 
+def test_local_legal_fetch_preserves_ambient_proxy_support(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registry = tmp_path / "canaries.json"
+    registry.write_text('{"canaries":{},"denylist":[]}', encoding="utf-8")
+    monkeypatch.setenv("MOOTLOOP_RUNTIME_MODE", "local")
+    monkeypatch.setenv("MOOTLOOP_CANARY_REGISTRY", str(registry))
+    monkeypatch.setenv("HTTPS_PROXY", "http://corporate-proxy.example:8080")
+    observed: dict[str, object] = {}
+    async_client = httpx.AsyncClient
+
+    def capture_client(**kwargs: object) -> httpx.AsyncClient:
+        observed.update(kwargs)
+        return async_client(
+            timeout=kwargs["timeout"],
+            transport=httpx.MockTransport(lambda request: httpx.Response(200, json=[])),
+            trust_env=False,
+        )
+
+    monkeypatch.setattr(http.httpx, "AsyncClient", capture_client)
+
+    response = fetch(
+        HttpRequest("GET", "api.courtlistener.com", "/api/rest/v4/search/"),
+    )
+
+    assert response.status_code == 200
+    assert observed["proxy"] is None
+    assert observed["trust_env"] is True
+    assert observed["follow_redirects"] is False
+
+
 @pytest.mark.parametrize(
     "outbound_request",
     [
