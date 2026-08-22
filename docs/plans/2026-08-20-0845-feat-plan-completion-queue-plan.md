@@ -236,7 +236,7 @@ flowchart TD
 | U-08 | COMPLETE: RFP production-suggestion workflow | U-04A, U-05 | D-10 expansion gate |
 | U-09 | COMPLETE and merged: DOCX parser proof, edit-learning, and next-run readback | U-01, U-03, U-04A | attorney before/after verdict U-17C; Google lane D-06 |
 | U-10 | COMPLETE and merged: hidden answer-key and benchmark evidence contracts | U-06, U-07 | real human verdict D-02/D-03 |
-| U-11A | COMPLETE locally: recovery gaps, matter-close safety, parity foundation, required docs | U-01, U-03 | publication/review remains U-18; deployment remains unauthorized |
+| U-11A | COMPLETE, remotely reviewed, and merged: recovery gaps, matter-close safety, parity foundation, required docs | U-01, U-03 | deployment remains unauthorized |
 | U-11B | Post-validation: common durable-job lifecycle extraction and full capability breadth | U-11A, U-12, U-13 | D-10 expansion gate |
 | U-12 | Post-validation: FE-3 catalog, on-ramps, synthesis, rubric lock | U-01, U-11A | D-10; FOLIO acquisition D-12 |
 | U-13 | Post-validation: FE-4 durable strategy board and approve-then-inject | U-12 | D-10 expansion gate |

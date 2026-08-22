@@ -260,8 +260,8 @@ ahead of context reproducibility, isolation, and a clean live run.
 Every discovered task now has one of four durable outcomes:
 
 1. `COMPLETE` with current evidence above.
-2. `OPEN-AUTO` as U-11B through U-17C in the continuation plan; U-00 through U-10
-   are merged and U-11A is complete locally pending publication review.
+2. `OPEN-AUTO` as U-11B through U-17C in the continuation plan; U-00 through U-11A
+   are remotely reviewed and merged.
    Their completed U-18 publication dispositions are recorded with each unit.
    Deployment remains a separate gated operation rather than part of that publication
    closure.
