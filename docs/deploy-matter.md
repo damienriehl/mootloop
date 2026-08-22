@@ -182,8 +182,13 @@ uv run mootloop driver stop-matter-worker 2025-10-16-riehl-fence
 uv run mootloop driver remove-matter-worker 2025-10-16-riehl-fence
 ```
 
-Both lifecycle commands derive the same collision-resistant project name and worker
-Compose file used at startup. They intentionally do not require the vault, engine
+All lifecycle commands preserve the historical project name for conventional hyphen-only
+matter IDs. Dotted IDs use a collision-resistant suffix; before acting, the launcher checks
+for an old project whose dot-to-hyphen normalization would collide and fails closed if one
+exists. Drain and remove such a dotted-ID project with the previous MootLoop release before
+retrying the upgrade, using the Compose file from the release that created it. The commands
+otherwise derive the same project name and worker Compose file used at startup. They
+intentionally do not require the vault, engine
 state, proxy credentials, or converter image to remain available, so emergency drain
 cannot be blocked by a damaged startup asset. Teardown interpolation uses fixed,
 non-secret placeholders and never runs `up`. Removal runs `down` without `--volumes`;

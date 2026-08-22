@@ -43,14 +43,53 @@ class DriverBinding:
 
 @dataclass(frozen=True)
 class MatterWorkerComposeContext:
+    matter_id: MatterId
     command_prefix: tuple[str, ...]
     environment: dict[str, str]
 
 
+def _legacy_matter_worker_project_name(matter_id: MatterId) -> str:
+    return f"mootloop-worker-{str(matter_id).replace('.', '-')}"
+
+
 def _matter_worker_project_name(matter_id: MatterId) -> str:
-    slug = str(matter_id).replace(".", "-")
+    legacy_name = _legacy_matter_worker_project_name(matter_id)
+    if "." not in str(matter_id):
+        return legacy_name
     identity = sha256(str(matter_id).encode()).hexdigest()[:12]
-    return f"mootloop-worker-{slug}-{identity}"
+    return f"{legacy_name}-{identity}"
+
+
+def _assert_no_legacy_matter_worker_project(
+    matter_id: MatterId,
+    runner: ComposeRunner,
+) -> None:
+    legacy_name = _legacy_matter_worker_project_name(matter_id)
+    if legacy_name == _matter_worker_project_name(matter_id):
+        return
+    try:
+        result = runner(
+            [
+                "docker",
+                "ps",
+                "--all",
+                "--quiet",
+                "--filter",
+                f"label=com.docker.compose.project={legacy_name}",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise DriverError(
+            "could not verify that the legacy matter-worker project is absent"
+        ) from exc
+    if result.stdout.strip():
+        raise DriverError(
+            f"legacy matter-worker project '{legacy_name}' exists; drain and remove it "
+            "with the Compose file from the release that created it before retrying"
+        )
 
 
 def _prepare_engine_config_source(root: Path, matter_id: MatterId, matters_root: Path) -> Path:
@@ -136,6 +175,7 @@ def _matter_worker_compose_context(
         }
     )
     return MatterWorkerComposeContext(
+        matter_id=binding.matter_id,
         command_prefix=(
             "docker",
             "compose",
@@ -166,13 +206,12 @@ def _matter_worker_teardown_context(
             "MOOTLOOP_ENGINE_CONFIG_SOURCE": os.devnull,
             "MOOTLOOP_EGRESS_PROXY_PASSWORD_FILE": os.devnull,
             LEGAL_PROXY_PASSWORD_FILE_ENV: os.devnull,
-            "MOOTLOOP_FOLIO_ENRICH_IMAGE": (
-                "mootloop-teardown-placeholder@sha256:" + "0" * 64
-            ),
+            "MOOTLOOP_FOLIO_ENRICH_IMAGE": ("mootloop-teardown-placeholder@sha256:" + "0" * 64),
             "MOOTLOOP_FOLIO_ENRICH_COMMIT": "0" * 40,
         }
     )
     return MatterWorkerComposeContext(
+        matter_id=bound_id,
         command_prefix=(
             "docker",
             "compose",
@@ -300,6 +339,7 @@ def start_matter_worker(
         folio_enrich_image=folio_enrich_image,
         folio_enrich_commit=folio_enrich_commit,
     )
+    _assert_no_legacy_matter_worker_project(context.matter_id, runner)
     command = [
         *context.command_prefix,
         "up",
@@ -325,6 +365,7 @@ def stop_matter_worker(
     if timeout_seconds < 1:
         raise DriverError("matter-worker stop timeout must be positive")
     context = _matter_worker_teardown_context(matter_id, compose_file)
+    _assert_no_legacy_matter_worker_project(context.matter_id, runner)
     try:
         runner(
             [*context.command_prefix, "stop", "-t", str(timeout_seconds), "driver"],
@@ -344,6 +385,7 @@ def remove_matter_worker(
 ) -> None:
     """Target one exact project and remove only its containers and networks."""
     context = _matter_worker_teardown_context(matter_id, compose_file)
+    _assert_no_legacy_matter_worker_project(context.matter_id, runner)
     try:
         runner(
             [*context.command_prefix, "down"],

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import subprocess
-from hashlib import sha256
 from pathlib import Path
 
 import pytest
@@ -102,13 +101,10 @@ def test_start_matter_worker_validates_then_uses_fixed_mount_source(
     )
     assert environment["MOOTLOOP_MATTER_ID"] == "2026-08-21-acme-test"
     assert environment["MOOTLOOP_EGRESS_PROXY_PASSWORD_FILE"] == str(password.resolve())
-    assert environment["MOOTLOOP_LEGAL_EGRESS_PROXY_PASSWORD_FILE"] == str(
-        legal_password.resolve()
-    )
+    assert environment["MOOTLOOP_LEGAL_EGRESS_PROXY_PASSWORD_FILE"] == str(legal_password.resolve())
     assert environment["MOOTLOOP_FOLIO_ENRICH_IMAGE"] == IMAGE
     assert environment["MOOTLOOP_FOLIO_ENRICH_COMMIT"] == FOLIO_ENRICH_COMMIT
-    digest = sha256(b"2026-08-21-acme-test").hexdigest()[:12]
-    assert command[5] == f"mootloop-worker-2026-08-21-acme-test-{digest}"
+    assert command[5] == "mootloop-worker-2026-08-21-acme-test"
     assert command[-5:] == ["up", "-d", "driver", "egress-proxy", "folio-enrich"]
     assert kwargs["check"] is True and kwargs["text"] is True
     assert (engine_config_root / "2026-08-21-acme-test").stat().st_mode & 0o077 == 0
@@ -172,14 +168,13 @@ def test_worker_lifecycle_reuses_validated_compose_context(tmp_path: Path) -> No
     )
 
     [(stop_command, stop_kwargs), (remove_command, remove_kwargs)] = calls
-    digest = sha256(b"2026-08-21-acme-test").hexdigest()[:12]
     expected_prefix = [
         "docker",
         "compose",
         "-f",
         str(compose),
         "-p",
-        f"mootloop-worker-2026-08-21-acme-test-{digest}",
+        "mootloop-worker-2026-08-21-acme-test",
         "--profile",
         "matter-worker",
     ]
@@ -225,7 +220,57 @@ def test_matter_worker_project_names_do_not_collapse_dots_and_hyphens() -> None:
 
     assert dotted != hyphenated
     assert dotted.startswith("mootloop-worker-2026-08-21-acme-foo-test-")
-    assert hyphenated.startswith("mootloop-worker-2026-08-21-acme-foo-test-")
+    assert hyphenated == "mootloop-worker-2026-08-21-acme-foo-test"
+
+
+@pytest.mark.parametrize("operation", ["start", "stop", "remove"])
+def test_dotted_matter_worker_lifecycle_rejects_existing_legacy_project(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    operation: str,
+) -> None:
+    matter_id = "2026-08-21-acme.foo-test"
+    compose = tmp_path / "compose.yaml"
+    compose.write_text("services: {}\n", encoding="utf-8")
+    calls: list[list[str]] = []
+
+    def runner(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, "legacy-container-id\n", "")
+
+    with pytest.raises(DriverError, match="legacy matter-worker project.*release that created it"):
+        if operation == "start":
+            root, _vault = _hosted_matter(tmp_path, matter_id)
+            password, legal_password = _proxy_files(tmp_path)
+            engine_config_root = tmp_path / "engine-config"
+            engine_config_root.mkdir(mode=0o700)
+            monkeypatch.setattr(driver.secrets, "load_secret", _proxy_secret)
+            driver.start_matter_worker(
+                root,
+                matter_id,
+                compose_file=compose,
+                proxy_password_file=password,
+                legal_proxy_password_file=legal_password,
+                engine_config_root=engine_config_root,
+                folio_enrich_image=IMAGE,
+                folio_enrich_commit=FOLIO_ENRICH_COMMIT,
+                runner=runner,
+            )
+        elif operation == "stop":
+            driver.stop_matter_worker(matter_id, compose_file=compose, runner=runner)
+        else:
+            driver.remove_matter_worker(matter_id, compose_file=compose, runner=runner)
+
+    assert calls == [
+        [
+            "docker",
+            "ps",
+            "--all",
+            "--quiet",
+            "--filter",
+            "label=com.docker.compose.project=mootloop-worker-2026-08-21-acme-foo-test",
+        ]
+    ]
 
 
 def test_start_matter_worker_rejects_invalid_id_before_runner(
