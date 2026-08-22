@@ -7,6 +7,7 @@ import stat
 import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass
+from hashlib import sha256
 from pathlib import Path
 
 from mootloop import secrets
@@ -38,6 +39,57 @@ ComposeRunner = Callable[..., subprocess.CompletedProcess[str]]
 class DriverBinding:
     matter_id: MatterId | None
     vault: Path | None
+
+
+@dataclass(frozen=True)
+class MatterWorkerComposeContext:
+    matter_id: MatterId
+    command_prefix: tuple[str, ...]
+    environment: dict[str, str]
+
+
+def _legacy_matter_worker_project_name(matter_id: MatterId) -> str:
+    return f"mootloop-worker-{str(matter_id).replace('.', '-')}"
+
+
+def _matter_worker_project_name(matter_id: MatterId) -> str:
+    legacy_name = _legacy_matter_worker_project_name(matter_id)
+    if "." not in str(matter_id):
+        return legacy_name
+    identity = sha256(str(matter_id).encode()).hexdigest()[:12]
+    return f"{legacy_name}-{identity}"
+
+
+def _assert_no_legacy_matter_worker_project(
+    matter_id: MatterId,
+    runner: ComposeRunner,
+) -> None:
+    legacy_name = _legacy_matter_worker_project_name(matter_id)
+    if legacy_name == _matter_worker_project_name(matter_id):
+        return
+    try:
+        result = runner(
+            [
+                "docker",
+                "ps",
+                "--all",
+                "--quiet",
+                "--filter",
+                f"label=com.docker.compose.project={legacy_name}",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise DriverError(
+            "could not verify that the legacy matter-worker project is absent"
+        ) from exc
+    if result.stdout.strip():
+        raise DriverError(
+            f"legacy matter-worker project '{legacy_name}' exists; drain and remove it "
+            "with the Compose file from the release that created it before retrying"
+        )
 
 
 def _prepare_engine_config_source(root: Path, matter_id: MatterId, matters_root: Path) -> Path:
@@ -78,6 +130,100 @@ def _prepare_engine_config_source(root: Path, matter_id: MatterId, matters_root:
     if source_real.parent != root_real:
         raise DriverError("matter engine config directory escapes its root")
     return source_real
+
+
+def _matter_worker_compose_context(
+    matters_root: Path,
+    matter_id: str,
+    *,
+    compose_file: Path,
+    proxy_password_file: Path,
+    legal_proxy_password_file: Path,
+    engine_config_root: Path,
+    folio_enrich_image: str,
+    folio_enrich_commit: str,
+) -> MatterWorkerComposeContext:
+    validate_folio_enrich_image(folio_enrich_image)
+    validate_folio_enrich_commit(folio_enrich_commit)
+    binding = resolve_driver_binding(matters_root, RuntimeMode.HOSTED, matter_id)
+    if binding.vault is None or binding.matter_id is None:  # pragma: no cover
+        raise DriverError("hosted matter binding did not resolve a vault")
+    proxy_password = _validated_proxy_password(proxy_password_file, PROXY_PASSWORD_ENV)
+    legal_proxy_password = _validated_proxy_password(
+        legal_proxy_password_file,
+        LEGAL_PROXY_PASSWORD_ENV,
+    )
+    if proxy_password == legal_proxy_password:
+        raise DriverError("model and legal egress proxy passwords must differ")
+    if not compose_file.is_file():
+        raise DriverError("matter-worker compose file is missing")
+    engine_config_source = _prepare_engine_config_source(
+        engine_config_root,
+        binding.matter_id,
+        matters_root,
+    )
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "MOOTLOOP_MATTER_ID": str(binding.matter_id),
+            "MOOTLOOP_MATTER_SOURCE": str(binding.vault),
+            "MOOTLOOP_ENGINE_CONFIG_SOURCE": str(engine_config_source),
+            "MOOTLOOP_EGRESS_PROXY_PASSWORD_FILE": str(proxy_password_file.resolve()),
+            LEGAL_PROXY_PASSWORD_FILE_ENV: str(legal_proxy_password_file.resolve()),
+            "MOOTLOOP_FOLIO_ENRICH_IMAGE": folio_enrich_image,
+            "MOOTLOOP_FOLIO_ENRICH_COMMIT": folio_enrich_commit,
+        }
+    )
+    return MatterWorkerComposeContext(
+        matter_id=binding.matter_id,
+        command_prefix=(
+            "docker",
+            "compose",
+            "-f",
+            str(compose_file),
+            "-p",
+            _matter_worker_project_name(binding.matter_id),
+            "--profile",
+            "matter-worker",
+        ),
+        environment=environment,
+    )
+
+
+def _matter_worker_teardown_context(
+    matter_id: str,
+    compose_file: Path,
+) -> MatterWorkerComposeContext:
+    bound_id = MatterId(validate_id(matter_id, kind="matter_id"))
+    if not compose_file.is_file():
+        raise DriverError("matter-worker compose file is missing")
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "MOOTLOOP_WORKER_ID": "teardown",
+            "MOOTLOOP_MATTER_ID": str(bound_id),
+            "MOOTLOOP_MATTER_SOURCE": os.devnull,
+            "MOOTLOOP_ENGINE_CONFIG_SOURCE": os.devnull,
+            "MOOTLOOP_EGRESS_PROXY_PASSWORD_FILE": os.devnull,
+            LEGAL_PROXY_PASSWORD_FILE_ENV: os.devnull,
+            "MOOTLOOP_FOLIO_ENRICH_IMAGE": ("mootloop-teardown-placeholder@sha256:" + "0" * 64),
+            "MOOTLOOP_FOLIO_ENRICH_COMMIT": "0" * 40,
+        }
+    )
+    return MatterWorkerComposeContext(
+        matter_id=bound_id,
+        command_prefix=(
+            "docker",
+            "compose",
+            "-f",
+            str(compose_file),
+            "-p",
+            _matter_worker_project_name(bound_id),
+            "--profile",
+            "matter-worker",
+        ),
+        environment=environment,
+    )
 
 
 def resolve_driver_binding(
@@ -183,47 +329,19 @@ def start_matter_worker(
     runner: ComposeRunner = subprocess.run,
 ) -> None:
     """Validate host inputs, then start one fixed-target Compose worker project."""
-    validate_folio_enrich_image(folio_enrich_image)
-    validate_folio_enrich_commit(folio_enrich_commit)
-    binding = resolve_driver_binding(matters_root, RuntimeMode.HOSTED, matter_id)
-    if binding.vault is None or binding.matter_id is None:  # pragma: no cover
-        raise DriverError("hosted matter binding did not resolve a vault")
-    proxy_password = _validated_proxy_password(proxy_password_file, PROXY_PASSWORD_ENV)
-    legal_proxy_password = _validated_proxy_password(
-        legal_proxy_password_file,
-        LEGAL_PROXY_PASSWORD_ENV,
-    )
-    if proxy_password == legal_proxy_password:
-        raise DriverError("model and legal egress proxy passwords must differ")
-    if not compose_file.is_file():
-        raise DriverError("matter-worker compose file is missing")
-    engine_config_source = _prepare_engine_config_source(
-        engine_config_root,
-        binding.matter_id,
+    context = _matter_worker_compose_context(
         matters_root,
+        matter_id,
+        compose_file=compose_file,
+        proxy_password_file=proxy_password_file,
+        legal_proxy_password_file=legal_proxy_password_file,
+        engine_config_root=engine_config_root,
+        folio_enrich_image=folio_enrich_image,
+        folio_enrich_commit=folio_enrich_commit,
     )
-    environment = os.environ.copy()
-    environment.update(
-        {
-            "MOOTLOOP_MATTER_ID": str(binding.matter_id),
-            "MOOTLOOP_MATTER_SOURCE": str(binding.vault),
-            "MOOTLOOP_ENGINE_CONFIG_SOURCE": str(engine_config_source),
-            "MOOTLOOP_EGRESS_PROXY_PASSWORD_FILE": str(proxy_password_file.resolve()),
-            LEGAL_PROXY_PASSWORD_FILE_ENV: str(legal_proxy_password_file.resolve()),
-            "MOOTLOOP_FOLIO_ENRICH_IMAGE": folio_enrich_image,
-            "MOOTLOOP_FOLIO_ENRICH_COMMIT": folio_enrich_commit,
-        }
-    )
-    project_id = str(binding.matter_id).replace(".", "-")
+    _assert_no_legacy_matter_worker_project(context.matter_id, runner)
     command = [
-        "docker",
-        "compose",
-        "-f",
-        str(compose_file),
-        "-p",
-        f"mootloop-worker-{project_id}",
-        "--profile",
-        "matter-worker",
+        *context.command_prefix,
         "up",
         "-d",
         "driver",
@@ -231,6 +349,49 @@ def start_matter_worker(
         "folio-enrich",
     ]
     try:
-        runner(command, check=True, env=environment, text=True)
+        runner(command, check=True, env=context.environment, text=True)
     except (OSError, subprocess.CalledProcessError) as exc:
         raise DriverError("matter-worker Compose startup failed") from exc
+
+
+def stop_matter_worker(
+    matter_id: str,
+    *,
+    compose_file: Path,
+    timeout_seconds: int = 630,
+    runner: ComposeRunner = subprocess.run,
+) -> None:
+    """Target one exact Compose project and drain its driver at a durable boundary."""
+    if timeout_seconds < 1:
+        raise DriverError("matter-worker stop timeout must be positive")
+    context = _matter_worker_teardown_context(matter_id, compose_file)
+    _assert_no_legacy_matter_worker_project(context.matter_id, runner)
+    try:
+        runner(
+            [*context.command_prefix, "stop", "-t", str(timeout_seconds), "driver"],
+            check=True,
+            env=context.environment,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise DriverError("matter-worker Compose stop failed") from exc
+
+
+def remove_matter_worker(
+    matter_id: str,
+    *,
+    compose_file: Path,
+    runner: ComposeRunner = subprocess.run,
+) -> None:
+    """Target one exact project and remove only its containers and networks."""
+    context = _matter_worker_teardown_context(matter_id, compose_file)
+    _assert_no_legacy_matter_worker_project(context.matter_id, runner)
+    try:
+        runner(
+            [*context.command_prefix, "down"],
+            check=True,
+            env=context.environment,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise DriverError("matter-worker Compose removal failed") from exc

@@ -11,8 +11,8 @@ Cloudflare Access-gated, driven by headless Claude. It is governed by this runbo
 
 ## Topology (FD-5)
 
-The core has two services, plus one isolated worker project per active matter
-(`docker-compose.matter.yaml`):
+The core has two services in `docker-compose.matter.yaml`, plus one isolated worker
+project per active matter from `docker-compose.worker.yaml`:
 
 - `web` — the Next.js BFF; the **only** publicly routable service (Cloudflare Access at the edge, JWT mirror in `middleware.ts`). It proxies to `api` and holds no vault access.
 - `api` — the write-tier FastAPI over the live vaults; **internal only**, no published ports, reachable on the compose network as `http://api:8000`.
@@ -69,23 +69,23 @@ Create it as a **Docker Compose application from this git repo** (not a raw-comp
 Coolify's `SERVICE_FQDN_*` magic env vars are read only on first parse and editing them later does **not** regenerate Traefik labels (verified — see `websites/docs/solutions/coolify-compose-service-fqdn.md`). Set the domain on the **web sub-service's** application row, stored **with scheme** (`https://…`), which is what triggers the `tls.certresolver=letsencrypt` labels; then redeploy.
 
 - `web` gets the fqdn (e.g. `https://mootloop-matter.dev.openlegalstandard.org`).
-- `api` and `driver` get **no** fqdn — leaving them internal is the intended state, not an oversight.
+- `api` gets **no** fqdn — leaving it internal is the intended state, not an oversight.
 
 ## Required Coolify env vars (names only — NEVER values)
 
 Set in Coolify, never in the repo:
 
-- `MOOTLOOP_INTERNAL_SECRET` — driver/BFF internal secret (also present in the host secrets file so `api` can verify it).
+- `MOOTLOOP_INTERNAL_SECRET` — BFF/API internal secret (also present in the host secrets
+  file so `api` can verify it).
 - `CF_ACCESS_TEAM_DOMAIN`
 - `CF_ACCESS_AUD`
 - `CF_ACCESS_ALLOWED_EMAIL`
-- `MOOTLOOP_WORKER_ID` — the driver's worker id (e.g. `driver-1`).
-- `MOOTLOOP_MATTER_ID` and `MOOTLOOP_MATTER_SOURCE` are supplied only by the validated
-  host launcher; do not configure them globally in Coolify.
 
 Set inside the compose (not Coolify): `MOOTLOOP_API_URL=http://api:8000`, `MOOTLOOP_MATTERS_ROOT=/srv/mootloop-matters`.
 
-The `MOOTLOOP_INTERNAL_SECRET` and the download signing key also resolve on `api`/`driver` through the read-only `~/.mootloop/secrets.env` mount (`mootloop.secrets`); the container never needs the OAuth token in its environment.
+The `MOOTLOOP_INTERNAL_SECRET` and download signing key also resolve on `api` through
+the read-only `~/.mootloop/secrets.env` mount (`mootloop.secrets`). The API never needs
+the OAuth token in its environment.
 
 ## Host prerequisites (on the box, hand-applied)
 
@@ -132,10 +132,14 @@ internal-secret + rate-limit + audit assertions). No vault touches the box until
 
 ## Create / drain / remove / recover workers
 
-Core deployment does not activate the `matter-worker` profile. For an already-created
+The Coolify core application contains no worker services. For an already-created
 matter, use the host launcher as the `mootloop` service user. It validates the ID, exact
 registry vault, matter identity, vault location, compose file, proxy credential, and
-private engine-state root before deriving the bind sources and project name:
+private engine-state root before deriving the bind sources and project name and
+activating the `matter-worker` profile in `docker-compose.worker.yaml`. Set
+`MOOTLOOP_WORKER_ID` in the launcher environment when a stable non-default worker ID is
+required; otherwise the driver image uses `driver-1`. The launcher alone supplies
+`MOOTLOOP_MATTER_ID`, `MOOTLOOP_MATTER_SOURCE`, and the engine-state source.
 
 ```bash
 uv run mootloop driver start-matter-worker 2025-10-16-riehl-fence \
@@ -145,7 +149,7 @@ uv run mootloop driver start-matter-worker 2025-10-16-riehl-fence \
   --legal-proxy-password-file /home/mootloop/.mootloop/legal-egress-proxy-password \
   --folio-enrich-image ghcr.io/alea-institute/folio-enrich@sha256:<64-hex-digest> \
   --folio-enrich-commit f5364365346d93a3aa01fd5fecf219090afe5410 \
-  --compose-file docker-compose.matter.yaml
+  --compose-file docker-compose.worker.yaml
 ```
 
 Do not invoke the profile with a hand-authored `MOOTLOOP_MATTER_SOURCE`: the launcher is
@@ -174,11 +178,21 @@ observed at the next durable turn boundary; the worker releases its claim for re
 Never use `kill -9` for routine maintenance.
 
 ```bash
-docker compose -p mootloop-worker-2025-10-16-riehl-fence stop -t 630 driver
-docker compose -p mootloop-worker-2025-10-16-riehl-fence down
+uv run mootloop driver stop-matter-worker 2025-10-16-riehl-fence
+uv run mootloop driver remove-matter-worker 2025-10-16-riehl-fence
 ```
 
-`down` removes only containers/networks. It must never remove volumes or any path under
+All lifecycle commands preserve the historical project name for conventional hyphen-only
+matter IDs. Dotted IDs use a collision-resistant suffix; before acting, the launcher checks
+for an old project whose dot-to-hyphen normalization would collide and fails closed if one
+exists. Drain and remove such a dotted-ID project with the previous MootLoop release before
+retrying the upgrade, using the Compose file from the release that created it. The commands
+otherwise derive the same project name and worker Compose file used at startup. They
+intentionally do not require the vault, engine
+state, proxy credentials, or converter image to remain available, so emergency drain
+cannot be blocked by a damaged startup asset. Teardown interpolation uses fixed,
+non-secret placeholders and never runs `up`. Removal runs `down` without `--volumes`;
+it removes only containers/networks and must never remove any path under
 `/srv/mootloop-matters`. Recovery recreates the same project and matter binding. Queue
 visibility leases plus stale-worker heartbeat reclaim make the last unjournaled turn
 eligible again; completed journaled turns are not repeated.

@@ -10,6 +10,7 @@ import pytest
 from mootloop.conversion import FOLIO_ENRICH_COMMIT
 from mootloop.engine import driver
 from mootloop.errors import ConversionError, DriverError, VaultBoundaryError
+from mootloop.models.common import MatterId
 from mootloop.registry import MatterRegistry
 from mootloop.runtime import RuntimeMode
 from tests.conftest import make_matter
@@ -100,11 +101,10 @@ def test_start_matter_worker_validates_then_uses_fixed_mount_source(
     )
     assert environment["MOOTLOOP_MATTER_ID"] == "2026-08-21-acme-test"
     assert environment["MOOTLOOP_EGRESS_PROXY_PASSWORD_FILE"] == str(password.resolve())
-    assert environment["MOOTLOOP_LEGAL_EGRESS_PROXY_PASSWORD_FILE"] == str(
-        legal_password.resolve()
-    )
+    assert environment["MOOTLOOP_LEGAL_EGRESS_PROXY_PASSWORD_FILE"] == str(legal_password.resolve())
     assert environment["MOOTLOOP_FOLIO_ENRICH_IMAGE"] == IMAGE
     assert environment["MOOTLOOP_FOLIO_ENRICH_COMMIT"] == FOLIO_ENRICH_COMMIT
+    assert command[5] == "mootloop-worker-2026-08-21-acme-test"
     assert command[-5:] == ["up", "-d", "driver", "egress-proxy", "folio-enrich"]
     assert kwargs["check"] is True and kwargs["text"] is True
     assert (engine_config_root / "2026-08-21-acme-test").stat().st_mode & 0o077 == 0
@@ -144,6 +144,133 @@ def test_start_matter_worker_reuses_durable_per_matter_engine_config(
     expected = engine_config_root / "2026-08-21-acme-test"
     assert sources == [str(expected), str(expected)]
     assert expected.is_dir()
+
+
+def test_worker_lifecycle_reuses_validated_compose_context(tmp_path: Path) -> None:
+    compose = tmp_path / "compose.yaml"
+    compose.write_text("services: {}\n", encoding="utf-8")
+    calls: list[tuple[list[str], dict[str, object]]] = []
+
+    def runner(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append((command, kwargs))
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    driver.stop_matter_worker(
+        "2026-08-21-acme-test",
+        compose_file=compose,
+        timeout_seconds=630,
+        runner=runner,
+    )
+    driver.remove_matter_worker(
+        "2026-08-21-acme-test",
+        compose_file=compose,
+        runner=runner,
+    )
+
+    [(stop_command, stop_kwargs), (remove_command, remove_kwargs)] = calls
+    expected_prefix = [
+        "docker",
+        "compose",
+        "-f",
+        str(compose),
+        "-p",
+        "mootloop-worker-2026-08-21-acme-test",
+        "--profile",
+        "matter-worker",
+    ]
+    assert stop_command == [*expected_prefix, "stop", "-t", "630", "driver"]
+    assert remove_command == [*expected_prefix, "down"]
+    for kwargs in (stop_kwargs, remove_kwargs):
+        environment = kwargs["env"]
+        assert isinstance(environment, dict)
+        assert environment["MOOTLOOP_MATTER_SOURCE"] == "/dev/null"
+        assert environment["MOOTLOOP_ENGINE_CONFIG_SOURCE"] == "/dev/null"
+        assert environment["MOOTLOOP_EGRESS_PROXY_PASSWORD_FILE"] == "/dev/null"
+        assert environment["MOOTLOOP_LEGAL_EGRESS_PROXY_PASSWORD_FILE"] == "/dev/null"
+        assert environment["MOOTLOOP_WORKER_ID"] == "teardown"
+        assert environment["MOOTLOOP_MATTER_ID"] == "2026-08-21-acme-test"
+        assert environment["MOOTLOOP_FOLIO_ENRICH_IMAGE"] == (
+            "mootloop-teardown-placeholder@sha256:" + "0" * 64
+        )
+        assert environment["MOOTLOOP_FOLIO_ENRICH_COMMIT"] == "0" * 40
+        assert kwargs["check"] is True and kwargs["text"] is True
+
+
+def test_stop_matter_worker_works_without_mutable_startup_assets(tmp_path: Path) -> None:
+    compose = tmp_path / "compose.yaml"
+    compose.write_text("services: {}\n", encoding="utf-8")
+    calls: list[list[str]] = []
+
+    def runner(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    driver.stop_matter_worker(
+        "2026-08-21-acme-test",
+        compose_file=compose,
+        runner=runner,
+    )
+
+    assert calls and calls[0][-4:] == ["stop", "-t", "630", "driver"]
+
+
+def test_matter_worker_project_names_do_not_collapse_dots_and_hyphens() -> None:
+    dotted = driver._matter_worker_project_name(MatterId("2026-08-21-acme.foo-test"))
+    hyphenated = driver._matter_worker_project_name(MatterId("2026-08-21-acme-foo-test"))
+
+    assert dotted != hyphenated
+    assert dotted.startswith("mootloop-worker-2026-08-21-acme-foo-test-")
+    assert hyphenated == "mootloop-worker-2026-08-21-acme-foo-test"
+
+
+@pytest.mark.parametrize("operation", ["start", "stop", "remove"])
+def test_dotted_matter_worker_lifecycle_rejects_existing_legacy_project(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    operation: str,
+) -> None:
+    matter_id = "2026-08-21-acme.foo-test"
+    compose = tmp_path / "compose.yaml"
+    compose.write_text("services: {}\n", encoding="utf-8")
+    calls: list[list[str]] = []
+
+    def runner(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, "legacy-container-id\n", "")
+
+    with pytest.raises(DriverError, match="legacy matter-worker project.*release that created it"):
+        if operation == "start":
+            root, _vault = _hosted_matter(tmp_path, matter_id)
+            password, legal_password = _proxy_files(tmp_path)
+            engine_config_root = tmp_path / "engine-config"
+            engine_config_root.mkdir(mode=0o700)
+            monkeypatch.setattr(driver.secrets, "load_secret", _proxy_secret)
+            driver.start_matter_worker(
+                root,
+                matter_id,
+                compose_file=compose,
+                proxy_password_file=password,
+                legal_proxy_password_file=legal_password,
+                engine_config_root=engine_config_root,
+                folio_enrich_image=IMAGE,
+                folio_enrich_commit=FOLIO_ENRICH_COMMIT,
+                runner=runner,
+            )
+        elif operation == "stop":
+            driver.stop_matter_worker(matter_id, compose_file=compose, runner=runner)
+        else:
+            driver.remove_matter_worker(matter_id, compose_file=compose, runner=runner)
+
+    assert calls == [
+        [
+            "docker",
+            "ps",
+            "--all",
+            "--quiet",
+            "--filter",
+            "label=com.docker.compose.project=mootloop-worker-2026-08-21-acme-foo-test",
+        ]
+    ]
 
 
 def test_start_matter_worker_rejects_invalid_id_before_runner(
