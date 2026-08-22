@@ -15,15 +15,47 @@ from mootloop.models.oracles import (
     PersonaOracleAnswerKey,
     PersonaOracleCase,
 )
-from mootloop.models.run import OUTPUT_SCHEMAS
+from mootloop.models.run import OUTPUT_SCHEMAS, TurnSpec
 
 
 def load_answer_key(raw: bytes) -> PersonaOracleAnswerKey:
     """Validate an explicitly supplied key; no product path is known or searched."""
     try:
-        return PersonaOracleAnswerKey.model_validate_json(raw)
+        key = PersonaOracleAnswerKey.model_validate_json(raw)
     except ValidationError as exc:
         raise OracleError(f"synthetic oracle key is invalid: {exc}") from exc
+    for case in key.cases:
+        schema = OUTPUT_SCHEMAS.get(case.output_schema_name)
+        if schema is None:
+            raise OracleError(f"oracle case {case.case_id!r} names an unknown output schema")
+        referenced = {*case.text_fields, *case.expected_values}
+        missing = sorted(referenced - schema.model_fields.keys())
+        if missing:
+            raise OracleError(
+                f"oracle case {case.case_id!r} references unknown output field(s): "
+                + ", ".join(missing)
+            )
+    return key
+
+
+def candidate_from_raw_turn(spec: TurnSpec, raw_text: str) -> OracleCandidate:
+    """Parse one provider result through its planned output schema before evaluation."""
+    schema = OUTPUT_SCHEMAS.get(spec.output_schema_name)
+    if schema is None:
+        raise OracleError(f"turn {spec.turn_id!s} names an unknown output schema")
+    try:
+        output = schema.model_validate_json(raw_text).model_dump(mode="json")
+    except ValidationError as exc:
+        raise OracleError(f"turn {spec.turn_id!s} output is schema-invalid: {exc}") from exc
+    if spec.request_id is None:
+        raise OracleError(f"turn {spec.turn_id!s} has no request identity")
+    return OracleCandidate(
+        persona=spec.persona,
+        stage=spec.stage,
+        request_id=str(spec.request_id),
+        output_schema_name=spec.output_schema_name,
+        output=output,
+    )
 
 
 def _candidate_identity(candidate: OracleCandidate) -> tuple[str, str, str, str]:

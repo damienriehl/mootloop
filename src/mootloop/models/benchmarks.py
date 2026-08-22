@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import Field, model_validator
 
 from mootloop.models.common import (
+    MATTER_ID_PATTERN,
     EvidencePackId,
     MatterId,
     RunId,
@@ -45,8 +46,8 @@ class BenchmarkEvidencePack(VersionedModel):
     evidence_pack_id: EvidencePackId = Field(
         pattern=r"^EP-mootloop-[a-z0-9][a-z0-9._-]{0,63}-[0-9]{3}$"
     )
-    source_matter_id: MatterId
-    run_id: RunId
+    source_matter_id: MatterId = Field(pattern=MATTER_ID_PATTERN)
+    run_id: RunId = Field(pattern=MATTER_ID_PATTERN)
     task: str = Field(min_length=1, max_length=128)
     created_at: str
     context_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
@@ -63,8 +64,8 @@ class BenchmarkVerdict(VersionedModel):
     verdict_id: str = Field(pattern=r"^benchmark-verdict-[0-9a-f]{16}$")
     evidence_pack_id: EvidencePackId
     evidence_pack_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
-    source_matter_id: MatterId
-    run_id: RunId
+    source_matter_id: MatterId = Field(pattern=MATTER_ID_PATTERN)
+    run_id: RunId = Field(pattern=MATTER_ID_PATTERN)
     reviewer: str = Field(min_length=1, max_length=320)
     source: Literal["human"] = "human"
     channel: BenchmarkChannel

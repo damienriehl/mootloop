@@ -338,7 +338,7 @@ flowchart TD
   during this execution.
 
 Verification at this checkpoint: backend ruff and strict mypy across 129 source files
-pass; 1,100 zero-spend backend tests pass at 90% coverage, and the explicit paid-lane
+pass; 1,106 zero-spend backend tests pass at 90% coverage, and the explicit paid-lane
 self-test passes separately; frontend ESLint, TypeScript, 11 Vitest
 files / 41 tests, OpenAPI generation/drift, and the production build pass. U-03's
 structured review covered correctness, security, adversarial behavior, tests,

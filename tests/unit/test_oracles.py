@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from mootloop.errors import OracleError
 from mootloop.models.benchmarks import (
     BenchmarkArtifactCommitment,
     BenchmarkDimensionVerdict,
@@ -64,7 +65,7 @@ def test_hidden_answer_key_accepts_domain_correct_outputs() -> None:
     assert result.failures == ()
 
 
-def test_seeded_persona_domain_regression_fails() -> None:
+def test_evaluator_rejects_seeded_persona_domain_regression() -> None:
     key = load_answer_key(ANSWER_KEY.read_bytes())
     result = evaluate_answer_key(
         key,
@@ -116,6 +117,17 @@ def test_answer_key_rejects_unknown_candidate_output_fields() -> None:
 
     assert not result.passed
     assert any(failure.code == "invalid_output_schema" for failure in result.failures)
+
+
+@pytest.mark.parametrize("field", ["text_fields", "expected_values"])
+def test_answer_key_rejects_unknown_referenced_schema_fields(field: str) -> None:
+    payload = json.loads(ANSWER_KEY.read_text(encoding="utf-8"))
+    payload["cases"][0][field] = (
+        ["response_typo"] if field == "text_fields" else {"response_typo": None}
+    )
+
+    with pytest.raises(OracleError, match="unknown output field"):
+        load_answer_key(json.dumps(payload).encode("utf-8"))
 
 
 def test_benchmark_models_commit_hashes_not_private_content() -> None:
@@ -188,3 +200,43 @@ def test_benchmark_verdict_requires_human_identity_and_complete_dimensions() -> 
                 BenchmarkDimensionVerdict(dimension="grounding", verdict="better"),
             ),
         )
+
+
+@pytest.mark.parametrize("unsafe_id", ["../other-matter", "UPPERCASE", "a/b"])
+def test_benchmark_records_reject_unsafe_matter_and_run_ids(unsafe_id: str) -> None:
+    evidence = {
+        "schema_version": "1.0",
+        "evidence_pack_id": "EP-mootloop-benchmark-run-0001-001",
+        "source_matter_id": "synthetic-matter",
+        "run_id": "benchmark-run-0001",
+        "task": "discovery-responses",
+        "created_at": "2026-08-21T00:00:00+00:00",
+        "context_manifest_sha256": SHA_A,
+        "rubric_id": "discovery-responses-v1",
+        "rubric_version": "1.0",
+        "candidate": {"sha256": SHA_A, "size_bytes": 1200},
+        "baseline": {"sha256": SHA_B, "size_bytes": 1100},
+    }
+    with pytest.raises(ValueError, match="source_matter_id"):
+        BenchmarkEvidencePack.model_validate({**evidence, "source_matter_id": unsafe_id})
+    with pytest.raises(ValueError, match="run_id"):
+        BenchmarkEvidencePack.model_validate({**evidence, "run_id": unsafe_id})
+
+    verdict = {
+        "schema_version": "1.0",
+        "verdict_id": "benchmark-verdict-0123456789abcdef",
+        "evidence_pack_id": "EP-mootloop-benchmark-run-0001-001",
+        "evidence_pack_sha256": SHA_A,
+        "source_matter_id": "synthetic-matter",
+        "run_id": "benchmark-run-0001",
+        "reviewer": "Attorney Example",
+        "source": "human",
+        "channel": "api",
+        "recorded_at": "2026-08-21T01:00:00+00:00",
+        "overall": "equal",
+        "dimensions": [{"dimension": "grounding", "verdict": "equal"}],
+    }
+    with pytest.raises(ValueError, match="source_matter_id"):
+        BenchmarkVerdict.model_validate({**verdict, "source_matter_id": unsafe_id})
+    with pytest.raises(ValueError, match="run_id"):
+        BenchmarkVerdict.model_validate({**verdict, "run_id": unsafe_id})
