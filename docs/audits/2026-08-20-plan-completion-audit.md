@@ -8,9 +8,8 @@ uncommitted code change: the only pre-existing dirty file was the timer-managed
 `.claude/RESUME.md`. Both recent feature PRs are merged, and the backend and frontend
 validation suites are green.
 
-Execution update through 2026-08-21: U-01 through U-10 are complete, remotely reviewed,
-and merged. U-11A implementation and local validation are complete on its feature
-branch. U-09's defensive raw-OOXML recovery, durable human review, tier routing, shared scrub,
+Execution update through 2026-08-22: U-01 through U-11A are complete, remotely reviewed,
+and merged. U-09's defensive raw-OOXML recovery, durable human review, tier routing, shared scrub,
 ethical-wall exclusion, and future-run-only prompt readback are complete across
 service, CLI, API, and cockpit surfaces. The beneficial attorney before/after verdict
 remains U-17C and the Google lane remains D-06-gated. U-08's
@@ -22,8 +21,8 @@ protected-data read, model call, Google access, or deployment change was attempt
 U-10 provides hidden synthetic answer-key evaluation, explicit zero-spend/paid test
 lanes, and a content-free durable benchmark evidence shape. U-11A now closes the
 concrete recovery, close-policy, trace/evidence, plugin, context/sidecar, capability-
-matrix, ethics, and frontend-direction gaps. Publication review remains; deployment
-and protected-data validation remain separately gated.
+matrix, ethics, and frontend-direction gaps. Deployment and protected-data validation
+remain separately gated.
 
 The broader repository audit nevertheless found genuine unfinished work in the two
 legacy plans still marked `active`. This document is the completion ledger for every
@@ -77,8 +76,10 @@ missing older source plan.
   resolved.
 - GitHub PR #49, zero-spend regression oracles and benchmark evidence, merged
   2026-08-21 as `f97082e` after all final-head CI and review gates passed.
-- U-11A is locally complete on `feat/close-recovery-u11a`; its shipping PR/merge
-  evidence is intentionally not claimed until that branch is published and reviewed.
+- GitHub PR #50, U-11A close/recovery/parity completion, merged 2026-08-22 as
+  `ec75d9e` from final code head `3152bfb` after all six final-head CI jobs passed;
+  both actionable review findings were fixed, regression-tested, replied to, and
+  resolved.
 - No GitHub issue was created or updated in the strict window.
 - At audit start, the current feature branch had no unique code commit relative to
   its already-merged result and its file tree matched `origin/main`. U-00 now adds the
@@ -324,10 +325,10 @@ record attorney approvals, consent to OAuth, spend uncapped funds, or deploy pro
 No hosted matter data, deployment, attorney approval, OAuth grant, or production state
 was read or changed. Those items remain on the Decision Sheet.
 
-## U-11A Local Verification — 2026-08-21
+## U-11A Publication Record — 2026-08-22
 
-- `make check`: passed — ruff, strict mypy across 132 source files, and 1,132 zero-spend
-  pytest tests at 90% coverage (one existing Starlette deprecation warning).
+- Final `make check`: passed — ruff, strict mypy across 132 source files, and 1,135
+  zero-spend pytest tests at 90% coverage (one existing Starlette deprecation warning).
 - Frontend: ESLint, TypeScript, 12 Vitest files / 42 tests, backend/client OpenAPI
   drift checks, and the production build passed. Next.js emitted only its existing
   middleware-to-proxy deprecation warning.
@@ -336,8 +337,12 @@ was read or changed. Those items remain on the Decision Sheet.
 - The first full backend attempt exposed only the intentionally changed CLI-tree
   snapshot: 1,131 tests passed and that one snapshot failed. The snapshot was updated,
   its focused four-test suite passed, and the full authoritative gate above then passed.
-- U-11A remote PR/CI/merge evidence is not claimed here. Deployment, hosted-vault
-  access, and the synthetic/real-matter gates remain unperformed.
+- PR #50 merged as `ec75d9e` from final code head `3152bfb`. Both push/PR backend,
+  invariant, and frontend jobs passed. Two review findings were fixed before merge:
+  copied evidence packs are bound to the current matter manifest, and observed
+  lifecycle transitions refresh `STATUS.md`/`STATUS.json` immediately.
+- Deployment, hosted-vault access, and the synthetic/real-matter gates remain
+  unperformed.
 
 ## U-04B Publication Record — 2026-08-21
 
