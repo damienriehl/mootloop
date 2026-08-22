@@ -184,9 +184,8 @@ The full choices and recommended defaults are in
 
 ```mermaid
 flowchart TD
-    A[Current repo and plans] --> B[U-00 through U-09 complete or locally complete]
-    B --> C[U-10 regression oracles]
-    C --> E[U-11A recovery and close safety]
+    A[Current repo and plans] --> B[U-00 through U-10 complete or locally complete]
+    B --> E[U-11A recovery and close safety]
     E --> F[U-17A synthetic deployed gate if authorized]
     F --> H{Attorney inputs and hosted run authorized?}
     H -->|yes| I[U-17B clean run review attestation export]
@@ -235,8 +234,8 @@ flowchart TD
 | U-06 | Post-validation: persona enable/bypass and pipeline strategies | U-05 | D-10 expansion gate |
 | U-07 | COMPLETE locally: citation proposition checking and remaining panels | U-05 | Hosted legal-source proxy expansion D-18 |
 | U-08 | COMPLETE: RFP production-suggestion workflow | U-04A, U-05 | D-10 expansion gate |
-| U-09 | COMPLETE locally: DOCX parser proof, edit-learning, and next-run readback | U-01, U-03, U-04A | attorney before/after verdict U-17C; Google lane D-06 |
-| U-10 | Post-validation: hidden answer-key and benchmark harness | U-06, U-07 | D-10; human verdict D-02/D-03 |
+| U-09 | COMPLETE and merged: DOCX parser proof, edit-learning, and next-run readback | U-01, U-03, U-04A | attorney before/after verdict U-17C; Google lane D-06 |
+| U-10 | COMPLETE locally: hidden answer-key and benchmark evidence contracts | U-06, U-07 | real human verdict D-02/D-03 |
 | U-11A | Pre-validation: concrete recovery gaps, matter-close safety, parity foundation, required docs | U-01, U-03 | D-14 source binding; publication remains D-13 |
 | U-11B | Post-validation: common durable-job lifecycle extraction and full capability breadth | U-11A, U-12, U-13 | D-10 expansion gate |
 | U-12 | Post-validation: FE-3 catalog, on-ramps, synthesis, rubric lock | U-01, U-11A | D-10; FOLIO acquisition D-12 |
@@ -316,9 +315,9 @@ flowchart TD
   accepting substantive drift. Copied convergence mechanics have injected score and
   decision seams plus an exact upstream provenance pin. The Typer surface is split
   into focused modules with exact command/help parity across all 63 command paths.
-  **U-10 through U-17C remain queued** under their stated dependencies and
-  decision gates. **U-18 is COMPLETE for U-01 through U-08; U-09 implementation
-  and local validation are complete on this branch:**
+  **U-11A through U-17C remain queued** under their stated dependencies and
+  decision gates. **U-09 is merged, and U-10 implementation and local validation
+  are complete on this branch. U-18 is COMPLETE for U-01 through U-09:**
   PR #33 merged as `74dec0a` after backend, invariant, and frontend CI passed on code
   head `acc1e51`; PR #35 merged as `b2ff6c7` after all six push/PR jobs passed on code
   head `96da3c6`; PR #36 merged as `7e9f03e` after the final code head `4c5cd64`
@@ -328,13 +327,19 @@ flowchart TD
   six final-head jobs passed on code head `d9f08e6`; PR #44 merged as `8fcdbcf` after
   all final-head jobs passed on code head `b7dcee6`; PR #46 merged as `c7ae46c`
   after all six final-head jobs passed on code head `b0aac2e`; PR #47 merged as
-  `05e5bd2` after its final-head jobs passed. Every actionable review finding on the
+  `05e5bd2` after its final-head jobs passed; PR #48 merged as `42bc33c` after all
+  final-head checks and its actionable review fixes passed. Every actionable review finding on the
   merged PRs was fixed, regression-tested, replied to, and resolved. Deployment is
   still gated.
-  No hosted matter or deployment was accessed during this execution.
+  U-10 adds test-only hidden synthetic keys, deterministic post-output evaluation,
+  an explicit marker-gated paid lane excluded from `make check`, and close-registered,
+  content-free benchmark evidence/verdict models. The actual protected benchmark and
+  attorney verdict remain U-17B/U-17C work. No hosted matter or deployment was accessed
+  during this execution.
 
-Verification at this checkpoint: backend ruff and strict mypy across 126 source files
-pass; 1,088 backend tests pass at 90% coverage; frontend ESLint, TypeScript, 11 Vitest
+Verification at this checkpoint: backend ruff and strict mypy across 129 source files
+pass; 1,100 zero-spend backend tests pass at 90% coverage, and the explicit paid-lane
+self-test passes separately; frontend ESLint, TypeScript, 11 Vitest
 files / 41 tests, OpenAPI generation/drift, and the production build pass. U-03's
 structured review covered correctness, security, adversarial behavior, tests,
 maintainability, reliability, project standards, API contracts, agent parity, and

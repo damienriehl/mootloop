@@ -12,6 +12,39 @@ from mootloop.models.matter import MatterConfig
 NOW_ISO = "2026-07-11T00:00:00+00:00"
 
 
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--run-paid-oracles",
+        action="store_true",
+        default=False,
+        help="authorize tests marked paid_oracle; never enabled by make check or CI",
+    )
+
+
+def pytest_collection_modifyitems(
+    config: pytest.Config, items: list[pytest.Item]
+) -> None:
+    """Classify the suite and fail closed on paid tests without explicit opt-in."""
+    run_paid = bool(config.getoption("--run-paid-oracles"))
+    skip_paid = pytest.mark.skip(reason="paid oracle requires --run-paid-oracles")
+    for item in items:
+        if item.get_closest_marker("paid_oracle") is not None:
+            if not run_paid:
+                item.add_marker(skip_paid)
+            continue
+        if item.get_closest_marker("invariant") is not None:
+            continue
+        if "/integration/" in str(item.path):
+            item.add_marker(pytest.mark.replayed)
+        else:
+            item.add_marker(pytest.mark.deterministic)
+
+
+@pytest.fixture
+def paid_oracles_authorized(request: pytest.FixtureRequest) -> bool:
+    return bool(request.config.getoption("--run-paid-oracles"))
+
+
 @pytest.fixture(autouse=True)
 def _ephemeral_backup_key(monkeypatch: pytest.MonkeyPatch) -> None:
     """Never let a test mint/persist a real backup key into ``~/.mootloop/secrets.env``.

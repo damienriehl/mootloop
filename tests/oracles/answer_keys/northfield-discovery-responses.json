@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0",
+  "key_id": "northfield-discovery-responses-v1",
+  "synthetic_matter_id": "northfield-widgets-v-granite-supply",
+  "task": "discovery-responses",
+  "isolation_sentinel": "HIDDEN-ORACLE-NORTHFIELD-7d8f40a3",
+  "cases": [
+    {
+      "case_id": "associate-rog-3-tender-date",
+      "persona": "associate",
+      "stage": "associate_draft",
+      "request_id": "ROG-3",
+      "output_schema_name": "draft",
+      "text_fields": ["response_text"],
+      "required_any": [["march 14, 2026", "march 14"]],
+      "forbidden": ["$148,500", "120 assemblies"],
+      "expected_values": {}
+    },
+    {
+      "case_id": "associate-rfa-3-tender-admission",
+      "persona": "associate",
+      "stage": "associate_draft",
+      "request_id": "RFA-3",
+      "output_schema_name": "draft",
+      "text_fields": ["response_text"],
+      "required_any": [["admit", "admits"], ["march 14, 2026", "march 14"]],
+      "forbidden": ["deny", "lack of knowledge"],
+      "expected_values": {"rfa_disposition": "admit"}
+    }
+  ]
+}

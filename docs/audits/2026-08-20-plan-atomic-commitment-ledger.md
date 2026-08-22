@@ -96,7 +96,7 @@ short label is less detailed.
 | D10-06 | Pure journal fold | COMPLETE |
 | D10-07 | One five-layer frozen resolved configuration | COMPLETE |
 | D10-08 | Inject copied-component score sources; no hardcoded deltas | COMPLETE |
-| D10-09 | Deterministic/replayed/invariant/paid-oracle test tiers | PARTIAL — U-10 |
+| D10-09 | Deterministic/replayed/invariant/paid-oracle test tiers | COMPLETE locally — paid lane requires explicit flag and fast CI excludes it |
 | D10-10 | Thin Typer adapters and CLI package split as verbs grow | COMPLETE |
 | D10-11 | Six-concern learning package across three trust zones | COMPLETE locally |
 | D10-12 | `MatterText`/`PublicText` types and scrub producer | COMPLETE for current trust-zone transitions |
@@ -106,13 +106,13 @@ short label is less detailed.
 | D11-04 | Accepted learnings and attorney decisions read back into later prompts | PARTIAL — workflow and immutable next-run readback complete; beneficial attorney verdict U-17C |
 | D11-05 | Matter `context.md` read at start and updated at end | OPEN-AUTO — U-11A |
 | D11-06 | JSON sidecars beside human turn/score artifacts | OPEN-AUTO — U-11A |
-| D11-07 | Emergent in-domain task proof and structured derailment completion signal | PARTIAL — U-10/U-12 |
+| D11-07 | Emergent in-domain task proof and structured derailment completion signal | PARTIAL — seeded persona-domain regression oracle complete; emergent task proof U-12 |
 | D12-01 | Canonical source/derived-artifact vocabulary, trace tree, evidence-pack IDs | PARTIAL — U-11A |
 | D12-02 | Canonical IDs including response/passages/facts/citations/decisions/learnings | PARTIAL — current run/gate/learning IDs complete; trace/evidence completion U-11A |
 | D12-03 | Five-layer config precedence and structural override allowlist | COMPLETE |
 | D12-04 | Gate execution-order column and canonical gate names | COMPLETE |
 | D13-01 | Pre-first-serve professional-responsibility spine | PARTIAL — immutable context, isolation, integrity, and protected ingest/conversion complete locally; U-11A/U-17 |
-| D13-02 | Post-serve learning, breadth, strategy, oracle, and CLI work retained | OPEN/DEFERRED — local learning and strategy complete; U-10/U-11B and successor queue remain |
+| D13-02 | Post-serve learning, breadth, strategy, oracle, and CLI work retained | OPEN/DEFERRED — local learning, strategy, and oracle complete; U-11B and successor queue remain |
 | D13-03 | Google/annotated and other explicitly delayed lanes remain visible | DECISION/DEFERRED — D-06/U-03/successor queue |
 
 ## Hosted cockpit FD-1–FD-10 amendments

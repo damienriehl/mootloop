@@ -8,9 +8,9 @@ uncommitted code change: the only pre-existing dirty file was the timer-managed
 `.claude/RESUME.md`. Both recent feature PRs are merged, and the backend and frontend
 validation suites are green.
 
-Execution update through 2026-08-21: U-01 through U-08 are complete, remotely reviewed,
-and merged. U-09 implementation and local validation are complete on its feature
-branch. Its defensive raw-OOXML recovery, durable human review, tier routing, shared scrub,
+Execution update through 2026-08-21: U-01 through U-09 are complete, remotely reviewed,
+and merged. U-10 implementation and local validation are complete on its feature
+branch. U-09's defensive raw-OOXML recovery, durable human review, tier routing, shared scrub,
 ethical-wall exclusion, and future-run-only prompt readback are complete across
 service, CLI, API, and cockpit surfaces. The beneficial attorney before/after verdict
 remains U-17C and the Google lane remains D-06-gated. U-08's
@@ -19,7 +19,9 @@ and cockpit surfaces, while the attorney's production disposition remains a sepa
 human action. U-07's hosted public-legal-source operability tail remains isolated behind
 D-18 because the deployed proxy still allows only the model endpoint. No hosted call,
 protected-data read, model call, Google access, or deployment change was attempted.
-U-10 is the next autonomous unit.
+U-10 now provides hidden synthetic answer-key evaluation, explicit zero-spend/paid
+test lanes, and a content-free durable benchmark evidence shape. U-11A is the next
+autonomous unit.
 
 The broader repository audit nevertheless found genuine unfinished work in the two
 legacy plans still marked `active`. This document is the completion ledger for every
@@ -54,7 +56,8 @@ missing older source plan.
 ## Current Validation Evidence
 
 - Backend verification: the latest local `make check` passed: ruff clean, mypy strict
-  clean across 126 source files, and 1,088 tests passed at 90% coverage.
+  clean across 129 source files, and 1,100 zero-spend tests passed at 90% coverage;
+  the explicit paid-oracle lane self-test also passed separately.
 - Frontend verification: ESLint clean, TypeScript clean, 11 Vitest files / 41 tests
   passed, backend and generated-client OpenAPI drift checks pass, and the production
   build succeeds.
@@ -67,8 +70,11 @@ missing older source plan.
   were fixed, regression-tested, replied to, and resolved.
 - GitHub PR #47, review-only RFP production suggestions, merged 2026-08-21 as
   `05e5bd2` after final-head CI and review passed.
-- U-09 is locally complete on `feat/edit-learning`; its shipping PR/merge evidence is
-  intentionally not claimed until that branch is published and reviewed.
+- GitHub PR #48, local edit-learning and next-run readback, merged 2026-08-21 as
+  `42bc33c` after all final-head checks passed and its actionable review fixes were
+  resolved.
+- U-10 is locally complete on `feat/regression-oracles-u10`; its shipping PR/merge
+  evidence is intentionally not claimed until that branch is published and reviewed.
 - No GitHub issue was created or updated in the strict window.
 - At audit start, the current feature branch had no unique code commit relative to
   its already-merged result and its file tree matched `origin/main`. U-00 now adds the
@@ -119,7 +125,7 @@ Source: `docs/plans/2026-07-11-001-feat-mootloop-v1-agentic-litigation-pipeline-
 | V1-7a | Stable anchors, DOCX, memo, privilege log, attestation, audit, watermark/residue gate | COMPLETE | Current export and attestation modules/tests cover the core court-usable lane. |
 | V1-7b | Google Doc export, annotated draft, Google comment reimport | DECISION-GATED | Local DOCX learning is proven; the external Google lane remains D-06. |
 | V1-8 | Edited DOCX/GDoc reimport, anchored diffs, reviewed tier routing, scrubbed learning promotion/readback | COMPLETE locally / external lane gated | U-09 supplies defensive DOCX recovery, durable blocked-import review, CriticMarkup diffs, human tier actions, firm merge/conflict view, ethical walls, and next-run readback. Google access remains D-06 and the attorney benefit verdict remains U-17C. |
-| V1-9a | Hidden answer-key persona regression oracle in CI | OPEN-AUTO | No answer-key oracle exists. U-10. |
+| V1-9a | Hidden answer-key persona regression oracle in CI | COMPLETE locally | Test-only keys are outside normal prompt/matter sources; the evaluator rejects seeded wrong-domain output, and fast CI excludes the explicit paid lane. |
 | V1-9b | Hand-draft benchmark, judged live run, first compounding-loop cycle | DECISION-GATED | Requires attorney benchmark verdict and private matter access. D-01 through D-03. |
 | V1-X1 | RFP responsive/non-responsive light-production suggestions | COMPLETE locally / PR #47 | U-08 adds ranked immutable-snapshot candidates with exact provenance, privilege/triage exclusions, append-only human review, and a separate explicit production disposition across service, CLI, API, worker, and cockpit surfaces. |
 | V1-X2 | `folio-enrich` localhost-only ingest lane, allowlist preflight, no matter web search | COMPLETE locally / DEPLOYMENT-GATED | U-04B binds extraction to the fixed local/private endpoint, a digest-pinned reviewed source, bounded fixed-schema I/O, and a converter container with no egress, mounts, or public port. Synthetic deployed proof remains U-17A; real-folder evidence remains behind fresh D-03 authorization. |
@@ -150,10 +156,10 @@ delivery now share the same immutable commitment and recovery boundary.
 | D7 Discovery-practice gates | COMPLETE for the current adapter | Current discovery shapes, RFA decisions, sanctions-linked rubric penalties, privilege log, structural export, and exact opinion-to-proposition support are implemented. |
 | D8 Export round trip | PARTIAL | DOCX rendering, attested local exports, bookmark/sentinel/revision reimport, defensive OOXML, and CriticMarkup learning state exist. Optional Google suggestions/comments remain D-06. |
 | D9 Lifecycle and integrity | PARTIAL | Cache staleness, close inventory, sync guard, locks, backups, full local attestation commitments, fact versions, and learning-event state exist. Close-policy enforcement and stronger remote signed heads remain U-11A and D-09/D-14. |
-| D10 Python foundations | PARTIAL | Domain models, strict schemas, migrations, five-layer frozen config, unions, protocols, sync-core boundaries, folds, typed trust zones, gate ordering, write-once turn results, copied-component seams, CLI split, and six-concern learning package exist. Oracle tiers remain U-10. |
+| D10 Python foundations | COMPLETE for the current suite | Domain models, strict schemas, migrations, five-layer frozen config, unions, protocols, sync-core boundaries, folds, typed trust zones, gate ordering, write-once turn results, copied-component seams, CLI split, learning package, and deterministic/replayed/invariant/explicit-paid test tiers exist. |
 | D11 Agent-native parity | PARTIAL | Current run/decision/attestation/export, TaskSpec-lock, and learning primitives have CLI/API paths. Sidecars, `context.md`, emergent-task proof, durable-job breadth, and the complete capability matrix remain U-11A/U-11B. |
 | D12 Vocabulary, IDs, config | PARTIAL | Five-layer resolution, structural override controls, canonical gate names/order, and IDs consumed by current immutable run/gate/learning context are complete. Trace/evidence vocabulary remains U-11A. |
-| D13 Sequencing | PARTIAL / DEFERRED | The pre-serve core and local edit-learning exist, but clean validation is U-17. Oracle, CLI breadth, and benchmark remain U-10/U-11A/U-11B; Google/non-discovery breadth remains D-06/deferred. |
+| D13 Sequencing | PARTIAL / DEFERRED | The pre-serve core, local edit-learning, and synthetic oracle exist, but clean validation is U-17. CLI breadth and generic evidence tooling remain U-11A/U-11B; Google/non-discovery breadth remains D-06/deferred. |
 
 ## Plan 2 — Demo Server and Deployment
 
@@ -249,8 +255,8 @@ ahead of context reproducibility, isolation, and a clean live run.
 Every discovered task now has one of four durable outcomes:
 
 1. `COMPLETE` with current evidence above.
-2. `OPEN-AUTO` as the still-unfinished portions of U-10 through U-17C in the
-   continuation plan; U-00 through U-08 are merged and U-09 is complete locally.
+2. `OPEN-AUTO` as the still-unfinished portions of U-11A through U-17C in the
+   continuation plan; U-00 through U-09 are merged and U-10 is complete locally.
    Their completed U-18 publication dispositions are recorded with each unit.
    Deployment remains a separate gated operation rather than part of that publication
    closure.
@@ -295,6 +301,11 @@ record attorney approvals, consent to OAuth, spend uncapped funds, or deploy pro
   start retries, non-replayable UI controls, BFF semantic drift, and unknown-run 404s.
 - Resolved the PR review's P1 persona drift finding by snapshotting every authored
   persona body with provenance and rendering prompts/provider calls from launch context.
+- Completed U-10 locally: hidden synthetic keys live outside normal matter/prompt
+  sources; deterministic evaluation proves a seeded persona-domain regression fails;
+  `make check` explicitly excludes marker-gated paid oracles; and content-free,
+  close-registered evidence-pack and hard-human verdict models bind exact digests
+  without placing protected work product in Git.
 
 No hosted matter data, deployment, attorney approval, OAuth grant, or production state
 was read or changed. Those items remain on the Decision Sheet.

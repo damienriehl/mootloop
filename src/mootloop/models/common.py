@@ -30,6 +30,7 @@ TaskSpecId = NewType("TaskSpecId", str)
 TaskSpecLockId = NewType("TaskSpecLockId", str)
 TurnId = NewType("TurnId", str)
 RubricId = NewType("RubricId", str)
+EvidencePackId = NewType("EvidencePackId", str)
 
 # --- Confidentiality-typed text --------------------------------------------
 # MatterText is confidential matter data; PublicText is publishable. The sanctioned
