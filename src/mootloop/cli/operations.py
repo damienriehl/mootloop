@@ -123,7 +123,7 @@ def driver_start_matter_worker(
     compose_file: Annotated[
         Path,
         typer.Option("--compose-file", help="Matter-worker Compose file"),
-    ] = Path("docker-compose.matter.yaml"),
+    ] = Path("docker-compose.worker.yaml"),
 ) -> None:
     """Validate host paths, then start one isolated matter-worker project."""
     try:
@@ -136,6 +136,47 @@ def driver_start_matter_worker(
             engine_config_root=engine_config_root,
             folio_enrich_image=folio_enrich_image,
             folio_enrich_commit=folio_enrich_commit,
+        )
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+
+
+@driver_app.command("stop-matter-worker")
+def driver_stop_matter_worker(
+    matter_id: Annotated[str, typer.Argument(help="Validated hosted matter id")],
+    compose_file: Annotated[
+        Path,
+        typer.Option("--compose-file", help="Matter-worker Compose file"),
+    ] = Path("docker-compose.worker.yaml"),
+    timeout_seconds: Annotated[
+        int,
+        typer.Option("--timeout", min=1, help="Graceful stop timeout in seconds"),
+    ] = 630,
+) -> None:
+    """Validate the binding, then drain one matter worker."""
+    try:
+        driver_service.stop_matter_worker(
+            matter_id,
+            compose_file=compose_file,
+            timeout_seconds=timeout_seconds,
+        )
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+
+
+@driver_app.command("remove-matter-worker")
+def driver_remove_matter_worker(
+    matter_id: Annotated[str, typer.Argument(help="Validated hosted matter id")],
+    compose_file: Annotated[
+        Path,
+        typer.Option("--compose-file", help="Matter-worker Compose file"),
+    ] = Path("docker-compose.worker.yaml"),
+) -> None:
+    """Validate the binding, then remove its containers and networks."""
+    try:
+        driver_service.remove_matter_worker(
+            matter_id,
+            compose_file=compose_file,
         )
     except MootloopError as exc:
         raise _fail(exc) from exc

@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_driver_mounts_one_matter_and_reaches_network_only_through_proxy() -> None:
-    compose = yaml.safe_load((ROOT / "docker-compose.matter.yaml").read_text(encoding="utf-8"))
+    compose = yaml.safe_load((ROOT / "docker-compose.worker.yaml").read_text(encoding="utf-8"))
     services = compose["services"]
     driver = services["driver"]
     proxy = services["egress-proxy"]
@@ -70,6 +70,16 @@ def test_driver_mounts_one_matter_and_reaches_network_only_through_proxy() -> No
     assert "USER mootloop" in dockerfile
     assert "bubblewrap" not in dockerfile
     assert "cap_add" not in driver and "privileged" not in driver
+
+
+def test_coolify_compose_excludes_dynamic_worker_mounts() -> None:
+    compose = yaml.safe_load((ROOT / "docker-compose.matter.yaml").read_text(encoding="utf-8"))
+
+    assert set(compose["services"]) == {"web", "api"}
+    for service in compose["services"].values():
+        for mount in service.get("volumes", []):
+            source = mount.split(":", maxsplit=1)[0] if isinstance(mount, str) else mount["source"]
+            assert "${" not in source
 
 
 def test_proxy_config_is_destination_allowlisted_and_authenticated() -> None:

@@ -39,7 +39,7 @@ uv run mootloop driver start-matter-worker <synthetic-matter-id> \
   --legal-proxy-password-file /home/mootloop/.mootloop/legal-egress-proxy-password \
   --folio-enrich-image ghcr.io/alea-institute/folio-enrich@sha256:<64-hex-digest> \
   --folio-enrich-commit f5364365346d93a3aa01fd5fecf219090afe5410 \
-  --compose-file docker-compose.matter.yaml
+  --compose-file docker-compose.worker.yaml
 ```
 
 The launcher supplies the image/commit commitment to both the driver and Compose. The

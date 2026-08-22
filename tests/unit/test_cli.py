@@ -27,6 +27,7 @@ from mootloop.models.events import RunEnqueued, RunReopened, RunStarted
 runner = CliRunner()
 
 FIXTURE = Path(__file__).resolve().parents[2] / "fixtures" / "synthetic-matter"
+WORKER_IMAGE = "ghcr.io/alea-institute/folio-enrich@sha256:" + "a" * 64
 
 
 def _init_from_fixture(vault: Path) -> None:
@@ -43,6 +44,47 @@ def _init_from_fixture(vault: Path) -> None:
         ],
     )
     assert result.exit_code == 0, result.output
+
+
+@pytest.mark.parametrize(
+    ("command", "service_name"),
+    [
+        ("start-matter-worker", "start_matter_worker"),
+        ("stop-matter-worker", "stop_matter_worker"),
+        ("remove-matter-worker", "remove_matter_worker"),
+    ],
+)
+def test_matter_worker_cli_uses_worker_compose_default(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    command: str,
+    service_name: str,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_service(*args: object, **kwargs: object) -> None:
+        captured["args"] = args
+        captured.update(kwargs)
+
+    monkeypatch.setattr(f"mootloop.cli.operations.driver_service.{service_name}", fake_service)
+    args = ["driver", command, "2026-08-21-acme-test"]
+    if command == "start-matter-worker":
+        args.extend(
+            [
+                "--matters-root",
+                str(tmp_path / "matters"),
+                "--proxy-password-file",
+                str(tmp_path / "proxy-password"),
+                "--legal-proxy-password-file",
+                str(tmp_path / "legal-proxy-password"),
+                "--folio-enrich-image",
+                WORKER_IMAGE,
+            ]
+        )
+    result = runner.invoke(app, args)
+
+    assert result.exit_code == 0, result.output
+    assert captured["compose_file"] == Path("docker-compose.worker.yaml")
 
 
 def test_close_uses_trusted_local_os_actor(
