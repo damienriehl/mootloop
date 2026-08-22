@@ -1,0 +1,180 @@
+schema_version: "1.0"
+
+actor_policies:
+  authenticated-read: Authenticated principals may inspect; every matter-scoped API read is audited.
+  authenticated-human: A trusted OS or Access principal is derived by the adapter and recorded.
+  hard-human: An agent may prepare the action, but only a trusted human principal may authorize it.
+  policy-delegable: Automation is allowed only inside a recorded matter policy and bounded cap.
+
+capabilities:
+  - id: FD7-01
+    capability: matters list
+    status: implemented
+    actor_policy: authenticated-read
+    service: src/mootloop/registry.py:MatterRegistry.list_matters
+    cli: matters list
+    api: {method: GET, path: "/api/matters"}
+    ui: frontend/app/page.tsx
+    durable_effect: none
+    evidence: [tests/unit/test_registry.py, tests/unit/test_api_endpoints.py, tests/unit/test_cli.py]
+
+  - id: FD7-02
+    capability: tasks synthesize
+    status: planned
+    actor_policy: authenticated-human
+    owner: U-12
+
+  - id: FD7-03
+    capability: tasks lock
+    status: implemented
+    actor_policy: hard-human
+    service: src/mootloop/taskspec.py:lock_task_spec
+    cli: tasks lock
+    api: {method: POST, path: "/api/matters/{matter_id}/tasks/{task_spec_id}/lock"}
+    ui: null
+    durable_effect: tasks/locks.jsonl and access-audit entry
+    evidence: [tests/unit/test_taskspec_lock.py, tests/unit/test_api_endpoints.py, tests/unit/test_cli.py]
+
+  - id: FD7-04
+    capability: tasks rubric edit
+    status: planned
+    actor_policy: policy-delegable
+    owner: U-12
+
+  - id: FD7-05
+    capability: board add, edit, remove, and show
+    status: planned
+    actor_policy: authenticated-human
+    owner: U-13
+
+  - id: FD7-06
+    capability: board curate
+    status: planned
+    actor_policy: hard-human
+    owner: U-13
+
+  - id: FD7-07
+    capability: board revert
+    status: planned
+    actor_policy: authenticated-human
+    owner: U-13
+
+  - id: FD7-08
+    capability: board changelog list
+    status: planned
+    actor_policy: authenticated-read
+    owner: U-13
+
+  - id: FD7-09
+    capability: notification feed list
+    status: planned
+    actor_policy: authenticated-read
+    owner: U-15
+
+  - id: FD7-10
+    capability: production suggestions list, accept, and dismiss
+    status: implemented
+    actor_policy: authenticated-human
+    service: src/mootloop/production_suggestions.py:review_production_suggestion
+    cli: production review
+    api: {method: POST, path: "/api/matters/{matter_id}/runs/{run_id}/production/suggestions/{suggestion_id}/review"}
+    ui: frontend/components/cockpit/ProductionReviewQueue.tsx
+    durable_effect: runs/{run_id}/production/reviews.jsonl and access-audit entry
+    evidence: [tests/unit/test_production_suggestions.py, tests/unit/test_api_endpoints.py, frontend/__tests__/productionReview.test.tsx]
+
+  - id: FD7-11
+    capability: run failover authorize
+    status: planned
+    actor_policy: hard-human
+    owner: U-15
+
+  - id: FD7-12
+    capability: manifest privilege and role triage
+    status: planned
+    actor_policy: authenticated-human
+    owner: U-14
+    note: The local corpus tag primitive exists; hosted CLI/API/UI parity does not yet.
+
+  - id: FD7-13
+    capability: export link
+    status: implemented
+    actor_policy: authenticated-human
+    service: src/mootloop/export/link.py:mint_link
+    cli: export link
+    api: {method: POST, path: "/api/matters/{matter_id}/runs/{run_id}/deliverables/{name:path}/link"}
+    ui: frontend/components/export/DeliverableRow.tsx
+    durable_effect: access-audit entry
+    evidence: [tests/unit/test_export_link.py, tests/unit/test_api_endpoints.py, frontend/__tests__/exportRoom.test.tsx]
+
+  - id: FD7-14
+    capability: connectors list, add-folder, and remove
+    status: planned
+    actor_policy: hard-human
+    owner: U-14
+    note: OAuth consent is always human-only.
+
+  - id: FD7-15
+    capability: notifications mute and quiet-hours
+    status: planned
+    actor_policy: authenticated-human
+    owner: U-15
+
+  - id: FD7-16
+    capability: durable store registration and list/show coverage
+    status: planned
+    actor_policy: authenticated-read
+    owner: U-11B
+
+  - id: FD7-17
+    capability: BFF thinness
+    status: implemented
+    actor_policy: authenticated-read
+    service: tests/invariants/test_frontend_bff_thin.py:test_every_http_method_delegates_to_the_single_proxy
+    invariant: tests/invariants/test_frontend_bff_thin.py
+    ui: frontend/app/api/[...path]/route.ts
+    durable_effect: none
+    evidence: [tests/invariants/test_frontend_bff_thin.py, frontend/__tests__/bffThin.test.ts]
+
+  - id: U11A-01
+    capability: matter close
+    status: implemented
+    actor_policy: hard-human
+    service: src/mootloop/close.py:close_matter
+    cli: close
+    api: {method: POST, path: "/api/matters/{matter_id}/close"}
+    ui: null
+    durable_effect: encrypted backup, complete destruction tombstone, and access-audit entry
+    evidence: [tests/unit/test_close.py, tests/unit/test_api_endpoints.py, tests/unit/test_cli.py]
+
+  - id: U11A-02
+    capability: run reopen and queue repair
+    status: implemented
+    actor_policy: authenticated-human
+    service: src/mootloop/orchestrator.py:reopen_run
+    cli: run reopen
+    api: {method: POST, path: "/api/matters/{matter_id}/runs/{run_id}/reopen"}
+    ui: frontend/components/cockpit/RunControls.tsx
+    durable_effect: RunReopened journal event, queue item, and access-audit entry
+    evidence: [tests/unit/test_run_reopen.py, tests/unit/test_api_endpoints.py, frontend/__tests__/runControls.test.tsx]
+
+  - id: U11A-03
+    capability: matter context show and set
+    status: implemented
+    actor_policy: hard-human
+    service: src/mootloop/context_memory.py:set_context_memory
+    cli: context set
+    api: {method: POST, path: "/api/matters/{matter_id}/context"}
+    ui: null
+    durable_effect: context.md, exact human-provenance sidecar, and access-audit entry
+    evidence: [tests/unit/test_context_memory.py, tests/unit/test_api_endpoints.py]
+
+  - id: U11A-04
+    capability: run trace and evidence pack generation
+    status: implemented
+    actor_policy: authenticated-human
+    service: src/mootloop/evidence.py:build_evidence_pack
+    cli: run evidence-build
+    api: {method: POST, path: "/api/matters/{matter_id}/runs/{run_id}/evidence"}
+    ui: null
+    durable_effect: content-free trace tree, immutable numbered evidence pack, and access-audit entry
+    evidence: [tests/unit/test_evidence.py, tests/unit/test_api_endpoints.py]

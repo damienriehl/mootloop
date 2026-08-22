@@ -20,6 +20,7 @@ from mootloop.llm import FakeLLMProvider
 from mootloop.models.common import DocId, MatterId, TaskSpecId
 from mootloop.models.corpus import CorpusDoc, Manifest
 from mootloop.models.events import JournalEvent, RunStarted
+from mootloop.models.evidence import RunStatusSidecar
 from mootloop.models.requests import RequestItem, RequestSet, RequestType
 from mootloop.models.run import PersonaName
 from mootloop.models.taskspec import TaskSpec
@@ -939,6 +940,11 @@ def test_observed_status_and_panel_report_replay_launch_inputs(tmp_path: Path) -
     status = (vault / "runs" / run_id / "STATUS.md").read_text(encoding="utf-8")
     assert "`ROG-1`" in status
     assert "`ROG-2`" not in status
+    status_sidecar = RunStatusSidecar.model_validate_json(
+        (vault / "runs" / run_id / "STATUS.json").read_text(encoding="utf-8")
+    )
+    assert status_sidecar.run_id == run_id
+    assert status_sidecar.human_view_sha256 == hashlib.sha256(status.encode()).hexdigest()
     report = build_panel_report(vault, run_id)
     assert {str(result.request_id) for result in report.results} == {"ROG-1"}
 

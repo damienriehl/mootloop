@@ -23,6 +23,7 @@ from mootloop.errors import (
     AuditWriteError,
     BackupError,
     CitationError,
+    CloseError,
     DecisionError,
     ExportLinkError,
     ExportNotReadyError,
@@ -98,6 +99,10 @@ def _install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(BackupError)
     async def _backup(request: Request, exc: BackupError) -> JSONResponse:
         return JSONResponse(status_code=400, content={"error": "backup", "detail": str(exc)})
+
+    @app.exception_handler(CloseError)
+    async def _close(request: Request, exc: CloseError) -> JSONResponse:
+        return JSONResponse(status_code=409, content={"error": "close", "detail": str(exc)})
 
     @app.exception_handler(MatterNotFoundError)
     async def _not_found(request: Request, exc: MatterNotFoundError) -> JSONResponse:

@@ -19,11 +19,12 @@ load-bearing guarantee is registration in this inventory, which the invariant en
 from __future__ import annotations
 
 import shutil
+from datetime import datetime
 from pathlib import Path
 
 from pydantic import BaseModel
 
-from mootloop.errors import CloseError, LockHeldError, MatterNotFoundError
+from mootloop.errors import CloseError, LockHeldError, MatterNotFoundError, MootloopError
 from mootloop.models.attestations import Attestation, ExportSeal, ReviewIntegrityStatus
 from mootloop.models.audit import GENESIS_PREV_HASH, AccessAuditEntry
 from mootloop.models.benchmarks import BenchmarkEvidencePack, BenchmarkVerdict
@@ -37,17 +38,19 @@ from mootloop.models.common import MatterId, VersionedModel
 from mootloop.models.config import DefaultRunConfig, FirmPreferences, ResolvedRunConfig
 from mootloop.models.context import (
     CorpusSnapshot,
+    MatterContextMemory,
     RunContextManifest,
     StoredContextContribution,
 )
 from mootloop.models.conversion import ConversionReceipt
 from mootloop.models.corpus import Manifest
 from mootloop.models.decisions import Decision
+from mootloop.models.evidence import RunEvidencePack, RunStatusSidecar, TraceTree
 from mootloop.models.facts import Fact
 from mootloop.models.judge_profiles import JudgeProfile
 from mootloop.models.learnings import FirmLearningEvent, LearningImportBundle, LearningReview
-from mootloop.models.lifecycle import CloseRecord
-from mootloop.models.matter import MatterConfig
+from mootloop.models.lifecycle import CloseRecord, DestructionLimitation, DestructionStore
+from mootloop.models.matter import MatterConfig, Retention
 from mootloop.models.matters import MatterSummary
 from mootloop.models.oracles import PersonaOracleAnswerKey
 from mootloop.models.panels import PanelReport
@@ -56,12 +59,14 @@ from mootloop.models.production import ProductionSuggestionBundle, ProductionSug
 from mootloop.models.requests import RequestSet
 from mootloop.models.task import TaskAdapterConfig
 from mootloop.models.taskspec import TaskSpec, TaskSpecLock
+from mootloop.persistence import append_fsync_line
 from mootloop.registry import MatterRegistry
 from mootloop.vault import (
     RunLock,
     _is_within,
     _real,
     atomic_write_text,
+    load_matter,
     safe_vault_path,
     validate_id,
 )
@@ -250,6 +255,24 @@ MATTER_SCOPED_STORES: tuple[MatterScopedStore, ...] = (
         model=BenchmarkVerdict,
     ),
     MatterScopedStore(
+        name="run-trace-trees",
+        glob="runs/*/evidence/trace-tree.json",
+        description="Content-free derived run trace trees.",
+        model=TraceTree,
+    ),
+    MatterScopedStore(
+        name="run-evidence-packs",
+        glob="runs/*/evidence/packs/*.json",
+        description="Immutable numbered exact-source run evidence commitments.",
+        model=RunEvidencePack,
+    ),
+    MatterScopedStore(
+        name="run-status-sidecars",
+        glob="runs/*/STATUS.json",
+        description="Machine-readable observed status bound to the human STATUS.md bytes.",
+        model=RunStatusSidecar,
+    ),
+    MatterScopedStore(
         name="run-artifacts",
         glob="runs/**/*",
         description="Turns, gate ledgers, STATUS.md, provider sessions and settings.",
@@ -284,6 +307,18 @@ MATTER_SCOPED_STORES: tuple[MatterScopedStore, ...] = (
         glob="context/contributions/*.json",
         description="Write-once board, learning, note, and firm-playbook launch candidates.",
         model=StoredContextContribution,
+    ),
+    MatterScopedStore(
+        name="matter-context-markdown",
+        glob="context.md",
+        description="Human-readable approved matter memory.",
+        model=None,
+    ),
+    MatterScopedStore(
+        name="matter-context-sidecar",
+        glob="context.json",
+        description="Human actor and exact digest for context.md.",
+        model=MatterContextMemory,
     ),
     MatterScopedStore(
         name="canary",
@@ -440,17 +475,52 @@ def _inventory_counts(vault_root: Path) -> dict[str, int]:
     return counts
 
 
-def _assert_idle(vault_root: Path) -> None:
-    """Refuse if a live run holds the per-matter lock (idle-only, like backup).
-
-    Acquiring and immediately releasing the lock proves no live process holds it; a
-    stale/dead lock is taken over and released harmlessly.
-    """
+def _enforce_retention_policy(vault_root: Path, now: str) -> Retention:
+    retention = load_matter(vault_root).retention
+    if retention.litigation_hold:
+        raise CloseError("cannot close a matter under litigation hold")
+    if retention.destruction_date is None:
+        raise CloseError("cannot close without a configured destruction date")
     try:
-        with RunLock(vault_root, _CLOSE_LOCK_RUN_ID):
-            pass
-    except LockHeldError as exc:
-        raise CloseError(f"cannot close: a live run holds the matter lock ({exc})") from exc
+        close_date = datetime.fromisoformat(now).date()
+    except ValueError as exc:
+        raise CloseError(f"invalid close timestamp: {now!r}") from exc
+    if close_date < retention.destruction_date:
+        raise CloseError(
+            "matter is not eligible for destruction until "
+            f"{retention.destruction_date.isoformat()}"
+        )
+    return retention
+
+
+def _destruction_stores(counts: dict[str, int]) -> tuple[DestructionStore, ...]:
+    return tuple(
+        DestructionStore(
+            name=store.name,
+            glob=store.glob,
+            description=store.description,
+            files_removed=counts[store.name],
+        )
+        for store in MATTER_SCOPED_STORES
+    )
+
+
+DESTRUCTION_LIMITATIONS: tuple[DestructionLimitation, ...] = (
+    DestructionLimitation(
+        kind="solid_state_media",
+        detail=(
+            "Logical deletion does not guarantee physical erasure from SSD flash cells, "
+            "controller remapping, snapshots, or device backups."
+        ),
+    ),
+    DestructionLimitation(
+        kind="synchronized_storage",
+        detail=(
+            "Synchronized or versioned storage can retain remote versions and replicated "
+            "copies after the local tree is deleted."
+        ),
+    ),
+)
 
 
 def _purge_vault(matters_root: Path, matter_id: str) -> Path:
@@ -473,8 +543,7 @@ def _append_tombstone(matters_root: Path, tombstone: AccessAuditEntry) -> None:
     closed_dir = safe_vault_path(matters_root, CLOSED_DIRNAME)
     closed_dir.mkdir(parents=True, exist_ok=True)
     path = safe_vault_path(matters_root, CLOSED_DIRNAME, TOMBSTONES_FILE)
-    existing = path.read_text(encoding="utf-8") if path.is_file() else ""
-    atomic_write_text(path, existing + tombstone.model_dump_json() + "\n")
+    append_fsync_line(path, tombstone.model_dump_json())
 
 
 def _write_close_record(matters_root: Path, record: CloseRecord) -> Path:
@@ -511,27 +580,43 @@ def close_matter(
     except MatterNotFoundError as exc:
         raise CloseError(f"cannot close unknown matter {matter_id!r}: {exc}") from exc
 
-    _assert_idle(vault)
+    try:
+        with RunLock(vault, _CLOSE_LOCK_RUN_ID) as close_lock:
+            retention = _enforce_retention_policy(vault, now)
+            assert retention.destruction_date is not None
 
-    backup_ref: str | None = None
-    if skip_backup:
-        if not acknowledge_skip_backup:
-            raise CloseError(
-                "refusing to close without a fresh backup; pass acknowledge_skip_backup "
-                "to override (data will be unrecoverable)"
-            )
-    else:
-        if backup_dir is None:
-            raise CloseError("a backup destination is required unless the backup is acknowledged")
-        from mootloop.engine.backup import backup_matter
+            backup_ref: str | None = None
+            if skip_backup:
+                if not acknowledge_skip_backup:
+                    raise CloseError(
+                        "refusing to close without a fresh backup; pass "
+                        "acknowledge_skip_backup to override (data will be unrecoverable)"
+                    )
+            else:
+                if backup_dir is None:
+                    raise CloseError(
+                        "a backup destination is required unless the backup is acknowledged"
+                    )
+                if _is_within(_real(Path(backup_dir)), _real(matters_root_path)):
+                    raise CloseError(
+                        "the close backup destination must be outside the matters root"
+                    )
+                from mootloop.engine.backup import backup_matter
 
-        backup_ref = str(backup_matter(vault, backup_dir, now))
+                try:
+                    backup_ref = str(
+                        backup_matter(vault, backup_dir, now, _held_lock=close_lock)
+                    )
+                except (MootloopError, OSError) as exc:
+                    raise CloseError(
+                        f"cannot close because the required backup failed: {exc}"
+                    ) from exc
 
-    prev_hash = _audit_head(vault)
-    removed_counts = _inventory_counts(vault)
-
-    with RunLock(vault, _CLOSE_LOCK_RUN_ID):
-        _purge_vault(matters_root_path, matter_id)
+            prev_hash = _audit_head(vault)
+            removed_counts = _inventory_counts(vault)
+            _purge_vault(matters_root_path, matter_id)
+    except LockHeldError as exc:
+        raise CloseError(f"cannot close: a live run holds the matter lock ({exc})") from exc
 
     if _real(matters_root_path).joinpath(matter_id).exists():
         raise CloseError(
@@ -551,6 +636,10 @@ def close_matter(
         closed_at=now,
         closed_by=actor,
         backup_ref=backup_ref,
+        retention_class=retention.retention_class,
+        destruction_date=retention.destruction_date,
+        limitations=DESTRUCTION_LIMITATIONS,
+        stores=_destruction_stores(removed_counts),
         removed_counts=removed_counts,
         tombstone=tombstone,
     )

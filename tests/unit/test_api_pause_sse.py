@@ -133,6 +133,9 @@ def test_human_pause_then_resume(client: TestClient, registry: MatterRegistry) -
     paused = client.post(f"/api/matters/{matter_id}/runs/{run_id}/pause", headers=headers)
     assert paused.status_code == 200
     assert paused.json()["status"] == "paused"
+    summary = client.get(f"/api/matters/{matter_id}/runs/{run_id}", headers=_AUTH)
+    assert summary.status_code == 200
+    assert summary.json()["pause_reason"] == "manual"
 
     resumed = client.post(f"/api/matters/{matter_id}/runs/{run_id}/resume", headers=headers)
     assert resumed.status_code == 200

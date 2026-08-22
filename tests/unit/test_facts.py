@@ -134,6 +134,24 @@ def test_revise_survives_a_crash_between_the_two_appends(
         reopened.revise_fact(v1.fact_id, "The fence was installed in 2005.", confidence=0.9)
 
 
+def test_torn_terminal_fact_record_is_ignored_then_repaired_on_append(tmp_path: Path) -> None:
+    vault = _vault(tmp_path)
+    store = FactStore(vault)
+    first = store.add_fact("The first supported fact.", confidence=0.8)
+    path = vault / "facts" / "facts.jsonl"
+    with path.open("ab") as handle:
+        handle.write(b'{"schema_version":"1.0","fact_id":"fact-torn"')
+
+    reopened = FactStore(vault)
+    assert [fact.fact_id for fact in reopened.get_current()] == [first.fact_id]
+
+    second = reopened.add_fact("The second supported fact.", confidence=0.9)
+    raw = path.read_bytes()
+    assert raw.endswith(b"\n")
+    assert b"fact-torn" not in raw
+    assert [fact.fact_id for fact in reopened.get_current()] == [first.fact_id, second.fact_id]
+
+
 def test_fold_is_pure_last_write_wins() -> None:
     a1 = Fact(fact_id=DocId("fact-a"), statement="a", confidence=0.5, version=1)  # type: ignore[arg-type]
     a2 = Fact(  # re-emission of same id with supersession pointer

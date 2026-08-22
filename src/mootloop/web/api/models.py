@@ -14,7 +14,8 @@ from typing import Literal
 from pydantic import Field, model_validator
 
 from mootloop.models.attestations import Attestation
-from mootloop.models.common import MatterId, StrictModel, VersionedModel
+from mootloop.models.common import MATTER_ID_PATTERN, MatterId, StrictModel, VersionedModel
+from mootloop.models.context import MatterContextMemory
 from mootloop.models.decisions import Decision, ResolutionAction
 from mootloop.models.events import RunMode, RunStatus
 from mootloop.models.gates import GateResult
@@ -102,6 +103,19 @@ class ReopenRunRequest(StrictModel):
         return self
 
 
+class CloseMatterRequest(StrictModel):
+    """Hard-human close confirmation; actor, time, and backup path are server-derived."""
+
+    confirm_matter_id: str = Field(pattern=MATTER_ID_PATTERN)
+    acknowledge_not_assured_destruction: Literal[True]
+
+
+class MatterContextRequest(StrictModel):
+    """Human-reviewed matter context; actor and time are server-derived."""
+
+    text: str = Field(min_length=1, max_length=256 * 1024)
+
+
 # --- responses --------------------------------------------------------------
 
 
@@ -109,6 +123,13 @@ class CsrfToken(StrictModel):
     """The CSRF token returned alongside the double-submit cookie."""
 
     csrf_token: str
+
+
+class MatterContextResponse(VersionedModel):
+    schema_version: str = SCHEMA_VERSION
+    kind: Literal["matter_context"] = "matter_context"
+    text: str
+    metadata: MatterContextMemory
 
 
 class RunSummary(VersionedModel):
@@ -277,6 +298,7 @@ class RunStatusSummary(VersionedModel):
     hard_cap_usd: float | None = None
     replayable: bool
     context_blocker: str | None = None
+    pause_reason: str | None = None
     completed_turns: int = 0
     discarded_turns: int = 0
     open_decisions: list[str] = Field(default_factory=list)

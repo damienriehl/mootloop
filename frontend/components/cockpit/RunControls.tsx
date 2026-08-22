@@ -8,34 +8,39 @@ import {
   queueCitationChecks,
   queueJudgeProfile,
   raiseCap,
+  reopenRun,
   resumeRun,
 } from "@/lib/api/runs";
 import { keys } from "@/lib/api/keys";
 import { LockContentionError } from "@/lib/api/errors";
-import type { RunStatus, RunStatusSummary } from "@/lib/api/types";
+import type { AttentionBlocker, RunStatus, RunStatusSummary } from "@/lib/api/types";
 import { cn } from "@/lib/utils/cn";
 
 interface Props {
   matterId: string;
   runId: string;
   status: RunStatus;
+  attentionBlockers?: AttentionBlocker[];
 }
 
 type Action =
   | "pause"
   | "resume"
   | "continue"
+  | "reopen"
   | "raise-cap"
   | "check-citations"
   | "judge-profile";
 
 /** Run controls with OPTIMISTIC mutations + typed-409 conflict handling (FD-8/FD-9). */
-export function RunControls({ matterId, runId, status }: Props) {
+export function RunControls({ matterId, runId, status, attentionBlockers = [] }: Props) {
   const client = useQueryClient();
   const detailKey = keys.matter(matterId).run(runId).detail();
   const [error, setError] = useState<string | null>(null);
   const [capInput, setCapInput] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
+  const [reopenReason, setReopenReason] = useState("");
+  const [grantAttempts, setGrantAttempts] = useState("0");
 
   /** Optimistically patch the cached run status, snapshot for rollback. */
   async function optimisticStatus(next: RunStatus) {
@@ -103,6 +108,30 @@ export function RunControls({ matterId, runId, status }: Props) {
     onSettled: () => client.invalidateQueries({ queryKey: detailKey }),
   });
 
+  const reopen = useMutation({
+    mutationFn: () => {
+      const grant = Number(grantAttempts);
+      if (!Number.isInteger(grant) || grant < 0) {
+        throw new Error("Retry grant must be a whole number of zero or more.");
+      }
+      return reopenRun(
+        { matterId, runId },
+        { reason: reopenReason.trim(), grant_attempts: grant },
+      );
+    },
+    onMutate: () => {
+      setError(null);
+      setNotice(null);
+    },
+    onError: (err) => onError(err, undefined),
+    onSuccess: () => {
+      setReopenReason("");
+      setGrantAttempts("0");
+      setNotice("Run reopened and its canonical queue work item is ready.");
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: detailKey }),
+  });
+
   const checkCitations = useMutation({
     mutationFn: () => queueCitationChecks({ matterId, runId }),
     onMutate: () => {
@@ -128,6 +157,7 @@ export function RunControls({ matterId, runId, status }: Props) {
     pause.isPending ||
     resume.isPending ||
     cont.isPending ||
+    reopen.isPending ||
     bumpCap.isPending ||
     checkCitations.isPending ||
     judgeProfile.isPending;
@@ -135,6 +165,7 @@ export function RunControls({ matterId, runId, status }: Props) {
     (a === "pause" && pause.isPending) ||
     (a === "resume" && resume.isPending) ||
     (a === "continue" && cont.isPending) ||
+    (a === "reopen" && reopen.isPending) ||
     (a === "raise-cap" && bumpCap.isPending) ||
     (a === "check-citations" && checkCitations.isPending) ||
     (a === "judge-profile" && judgeProfile.isPending);
@@ -205,6 +236,61 @@ export function RunControls({ matterId, runId, status }: Props) {
         </ControlButton>
       </div>
 
+      {status === "needs_attention" && (
+        <section className="mt-4 border-t border-rule pt-4" aria-labelledby="reopen-heading">
+          <h3 id="reopen-heading" className="font-mono text-sm font-bold text-fail">
+            Operator repair required
+          </h3>
+          {attentionBlockers.length > 0 ? (
+            <ul className="mt-2 list-disc space-y-1 pl-5 font-mono text-sm text-ink-soft">
+              {attentionBlockers.map((blocker) => (
+                <li key={`${blocker.kind}:${blocker.ref}`}>{blocker.detail}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2 text-sm text-ink-soft">
+              Fix the provider, credential, or runtime problem that stopped this run before
+              reopening it.
+            </p>
+          )}
+          <div className="mt-3 grid max-w-xl gap-3 sm:grid-cols-[1fr_9rem]">
+            <label className="grid gap-1 font-mono text-xs text-ink-soft">
+              Repair performed
+              <input
+                value={reopenReason}
+                onChange={(event) => setReopenReason(event.target.value)}
+                placeholder="Rotated provider credential"
+                className="min-h-11 border border-rule-strong bg-paper px-3 text-sm text-ink"
+              />
+            </label>
+            <label className="grid gap-1 font-mono text-xs text-ink-soft">
+              Extra attempts
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={grantAttempts}
+                onChange={(event) => setGrantAttempts(event.target.value)}
+                className="min-h-11 border border-rule-strong bg-paper px-3 text-sm text-ink"
+              />
+            </label>
+          </div>
+          <p className="mt-2 text-xs text-ink-faint">
+            Reopen records your reason and attempt grant, then repairs the canonical queue item.
+            A retried request repairs queue delivery without recording a second reopen.
+          </p>
+          <div className="mt-3">
+            <ControlButton
+              onClick={() => reopen.mutate()}
+              disabled={busy || reopenReason.trim() === ""}
+              pending={pending("reopen")}
+            >
+              Reopen and queue
+            </ControlButton>
+          </div>
+        </section>
+      )}
+
       {error && (
         <p role="alert" aria-live="assertive" className="mt-3 font-mono text-sm text-fail">
           {error}
@@ -236,7 +322,7 @@ function ControlButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "border border-rule-strong bg-paper px-3 py-1.5 font-mono text-sm text-ink transition-colors",
+        "min-h-11 border border-rule-strong bg-paper px-3 py-1.5 font-mono text-sm text-ink transition-colors",
         "hover:border-accent hover:text-accent",
         "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-rule-strong disabled:hover:text-ink",
       )}

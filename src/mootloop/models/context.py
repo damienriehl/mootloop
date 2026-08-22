@@ -8,7 +8,14 @@ from typing import Literal
 
 from pydantic import ConfigDict, Field, model_validator
 
-from mootloop.models.common import DocId, MatterId, RunId, StrictModel, VersionedModel
+from mootloop.models.common import (
+    MATTER_ID_PATTERN,
+    DocId,
+    MatterId,
+    RunId,
+    StrictModel,
+    VersionedModel,
+)
 from mootloop.models.config import ResolvedRunConfig
 from mootloop.models.corpus import Manifest
 from mootloop.models.facts import Fact
@@ -89,6 +96,24 @@ class CorpusSnapshot(VersionedModel):
 
     schema_version: str = CORPUS_SNAPSHOT_SCHEMA_VERSION
     documents: list[CorpusTextSnapshot] = Field(default_factory=list)
+
+
+class MatterContextMemory(VersionedModel):
+    """Trusted human provenance sidecar for the matter's bounded context.md memory."""
+
+    schema_version: Literal["1.0"] = "1.0"
+    source_matter_id: MatterId = Field(pattern=MATTER_ID_PATTERN)
+    content_sha256: str
+    approved_by: str = Field(min_length=1, max_length=320)
+    approved_at: str
+
+    @model_validator(mode="after")
+    def validate_digest_and_actor(self) -> MatterContextMemory:
+        if not _SHA256_RE.fullmatch(self.content_sha256):
+            raise ValueError("content_sha256 must be lowercase SHA-256")
+        if not self.approved_by.strip():
+            raise ValueError("approved_by must identify the human actor")
+        return self
 
 
 class ContextContribution(StrictModel):

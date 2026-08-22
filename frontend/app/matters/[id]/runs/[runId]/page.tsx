@@ -102,11 +102,18 @@ export default function CockpitPage() {
         capUsd={capUsd}
         completedTurns={completedTurns}
         discardedTurns={discardedTurns}
-        pauseReason={stream.pauseReason}
+        pauseReason={stream.pauseReason ?? run?.pause_reason ?? null}
         stage={stage}
       />
 
-      {replayable && <RunControls matterId={matterId} runId={runId} status={status} />}
+      {replayable && (
+        <RunControls
+          matterId={matterId}
+          runId={runId}
+          status={status}
+          attentionBlockers={run?.attention_blockers ?? []}
+        />
+      )}
 
       {replayable && <ProductionReviewQueue matterId={matterId} runId={runId} />}
 

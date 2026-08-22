@@ -11,12 +11,18 @@ from __future__ import annotations
 import io
 import os
 import tarfile
+import threading
 from pathlib import Path
 
 import pytest
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-from mootloop.engine.backup import _NONCE_LEN, backup_matter, restore_matter
+from mootloop.engine.backup import (
+    _NONCE_LEN,
+    _heartbeating_backup_lock,
+    backup_matter,
+    restore_matter,
+)
 from mootloop.errors import BackupError
 from mootloop.vault import init_vault
 
@@ -92,6 +98,54 @@ def test_backup_plaintext_opt_in_still_works(tmp_path: Path) -> None:
         names = tar.getnames()
     assert any(n.endswith("/matter.yaml") for n in names)
     assert not any("/staging/" in n for n in names)
+
+
+def test_backup_lock_heartbeats_in_background(tmp_path: Path) -> None:
+    vault = _make_vault(tmp_path)
+    heartbeat_seen = threading.Event()
+
+    with _heartbeating_backup_lock(
+        vault,
+        heartbeat_interval_s=0.001,
+        heartbeat_observer=heartbeat_seen.set,
+    ):
+        assert heartbeat_seen.wait(1)
+
+
+def test_backup_fails_when_background_lock_heartbeat_is_lost(tmp_path: Path) -> None:
+    vault = _make_vault(tmp_path)
+    heartbeat_seen = threading.Event()
+
+    with (
+        pytest.raises(BackupError, match="lost the matter lock"),
+        _heartbeating_backup_lock(
+            vault,
+            heartbeat_interval_s=0.001,
+            heartbeat=lambda: False,
+            heartbeat_observer=heartbeat_seen.set,
+        ),
+    ):
+        assert heartbeat_seen.wait(1)
+
+
+def test_backup_fails_when_heartbeat_observer_crashes(tmp_path: Path) -> None:
+    vault = _make_vault(tmp_path)
+    observer_called = threading.Event()
+
+    def broken_observer() -> None:
+        observer_called.set()
+        raise RuntimeError("observer failed")
+
+    with (
+        pytest.raises(BackupError, match="lost the matter lock"),
+        _heartbeating_backup_lock(
+            vault,
+            heartbeat_interval_s=0.001,
+            heartbeat=lambda: True,
+            heartbeat_observer=broken_observer,
+        ),
+    ):
+        assert observer_called.wait(1)
 
 
 def test_backup_refuses_destination_inside_git_repo(tmp_path: Path) -> None:

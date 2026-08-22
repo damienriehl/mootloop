@@ -78,6 +78,18 @@ def test_release_makes_item_immediately_claimable(tmp_path: Path) -> None:
     assert reclaimed is not None and reclaimed.claimed_by == "w2"
 
 
+def test_control_plane_release_refunds_claim_attempt(tmp_path: Path) -> None:
+    queue = Queue(tmp_path)
+    queue.enqueue(_item("run", "run-1"))
+
+    for index in range(5):
+        worker_id = f"w{index}"
+        claimed = queue.claim(worker_id, NOW, visibility_timeout_s=600)
+        assert claimed is not None and claimed.attempts == 1
+        assert queue.release("run-1", worker_id, refund_attempt=True) is True
+        assert queue.snapshot()[0].attempts == 0
+
+
 def test_release_all_claimed_by_frees_stale_worker(tmp_path: Path) -> None:
     queue = Queue(tmp_path)
     queue.enqueue(_item("run", "run-1"))

@@ -30,12 +30,12 @@ short label is less detailed.
 | D1-04 | Agent/persona/task-binding layering contract | COMPLETE |
 | D1-05 | Local protocol seams and pinned provenance for copied components | COMPLETE |
 | D1-06 | Drafting-specific convergence signals and real rubric deltas | COMPLETE |
-| D2-01 | Namespaced `mootloop` Claude Code plugin and verbs | OPEN-AUTO — U-11A |
-| D2-02 | Disable model invocation for every side-effecting skill | OPEN-AUTO — U-11A |
-| D2-03 | One parameterized judge/juror persona rather than forks | PARTIAL — runtime complete in U-07; plugin packaging U-11A |
+| D2-01 | Namespaced `mootloop` Claude Code plugin and verbs | COMPLETE locally — U-11A |
+| D2-02 | Disable model invocation for every side-effecting skill | COMPLETE locally — U-11A invariant checks every packaged skill |
+| D2-03 | One parameterized judge/juror persona rather than forks | COMPLETE locally — runtime U-07 plus plugin packaging U-11A |
 | D2-04 | Least-privilege persona/panel/cite-checker tool sets | COMPLETE locally — no persona tools; hosted egress remains D3-H9/D-18 |
 | D2-05 | Persona-body contract and injected excellence standard | COMPLETE |
-| D2-06 | Compact run-skill navigator over durable references | OPEN-AUTO — U-11A |
+| D2-06 | Compact run-skill navigator over durable references | COMPLETE locally — U-11A |
 | D3-C1 | Fence all untrusted text as data; content never drives tools/control flow | COMPLETE locally — hostile reimport remains data-only and cannot auto-route ambiguous anchors |
 | D3-C2 | Fail-closed OSS scrub plus mandatory rendered human diff; no auto-commit | PARTIAL — U-09 deterministic/PublicText scrub, exact human diff, and pending-only external staging complete; model scrub, publishable-shape allowlist, second human confirmation, and explicit landing primitive U-11B |
 | D3-C3 | ID/path/filename realpath-containment hardening | COMPLETE |
@@ -80,11 +80,11 @@ short label is less detailed.
 | D8-05 | Clean eyecite text with offset back-mapping and bounded tokenizer choice | COMPLETE — original spans plus explicit Aho–Corasick default |
 | D8-06 | CriticMarkup representation for pending edits | COMPLETE locally |
 | D9-01 | Citation-cache staleness, disclosure, and citator research request | COMPLETE for current clients |
-| D9-02 | Retention/destruction-date/litigation-hold close policy and destruction manifest | OPEN-AUTO — U-11A |
+| D9-02 | Retention/destruction-date/litigation-hold close policy and destruction manifest | COMPLETE locally — U-11A |
 | D9-03 | Sync-folder/conflicted-copy guard and idle snapshot | COMPLETE |
-| D9-04 | Heartbeating stale-lock takeover protocol | PARTIAL — U-11A |
+| D9-04 | Heartbeating stale-lock takeover protocol | COMPLETE locally — turn and backup ownership are renewed and lost ownership fails closed |
 | D9-05 | Attestation binds master, ledgers, export set, actor/time; edit invalidates | COMPLETE locally — remote host-writer resistance remains D-09 |
-| D9-06 | Content-hash document IDs and whole-vault self-check | PARTIAL — stable ingest IDs and launch snapshots complete; whole-vault check U-11A |
+| D9-06 | Content-hash document IDs and whole-vault self-check | PARTIAL — stable ingest IDs and launch snapshots complete; `mootloop verify` reconciliation remains U-11B |
 | D9-07 | Append-only fact versions; response and attestation pin fact state | COMPLETE locally — reviewed versions enter immutable launch context and v2 attestation binds its fact commitment |
 | D9-08 | Firm profile as append-only reviewed event log | COMPLETE locally — immutable ID-keyed reviewed events plus derived conflict-review view |
 | D9-09 | All derived/shared state append-only, content-addressed, timestamped | PARTIAL — enforced per unit |
@@ -100,15 +100,15 @@ short label is less detailed.
 | D10-10 | Thin Typer adapters and CLI package split as verbs grow | COMPLETE |
 | D10-11 | Six-concern learning package across three trust zones | COMPLETE locally |
 | D10-12 | `MatterText`/`PublicText` types and scrub producer | COMPLETE for current trust-zone transitions |
-| D11-01 | Every action/human gate has structured read/write primitive | PARTIAL — U-11A/U-11B |
-| D11-02 | Decide/attest/research/facts/manifest/validate CLI verb set | PARTIAL — U-11A |
+| D11-01 | Every action/human gate has structured read/write primitive | PARTIAL — U-11A matrix makes every current/missing row explicit; remaining implementations U-11B/U-12–U-15 |
+| D11-02 | Decide/attest/research/facts/manifest/validate CLI verb set | PARTIAL — current verbs are checked; planned capability breadth and whole-vault verify remain U-11B/U-12–U-15 |
 | D11-03 | Hard-human versus policy-delegable gate provenance | COMPLETE for current decisions; extensions U-11B |
 | D11-04 | Accepted learnings and attorney decisions read back into later prompts | PARTIAL — workflow and immutable next-run readback complete; beneficial attorney verdict U-17C |
-| D11-05 | Matter `context.md` read at start and updated at end | OPEN-AUTO — U-11A |
-| D11-06 | JSON sidecars beside human turn/score artifacts | OPEN-AUTO — U-11A |
+| D11-05 | Matter `context.md` read at start and updated at end | COMPLETE locally — exact human-approved sidecar, next-run snapshot, and end-of-run skill prompt |
+| D11-06 | JSON sidecars beside human turn/score artifacts | COMPLETE for current artifacts — turn/panel JSON plus exact STATUS/context sidecars; future rooms inherit FD7-16 |
 | D11-07 | Emergent in-domain task proof and structured derailment completion signal | PARTIAL — seeded persona-domain regression oracle complete; emergent task proof U-12 |
-| D12-01 | Canonical source/derived-artifact vocabulary, trace tree, evidence-pack IDs | PARTIAL — U-11A |
-| D12-02 | Canonical IDs including response/passages/facts/citations/decisions/learnings | PARTIAL — current run/gate/learning IDs complete; trace/evidence completion U-11A |
+| D12-01 | Canonical source/derived-artifact vocabulary, trace tree, evidence-pack IDs | COMPLETE locally — U-11A |
+| D12-02 | Canonical IDs including response/passages/facts/citations/decisions/learnings | COMPLETE for current models — U-11A adds trace/evidence identity; future stores extend this contract |
 | D12-03 | Five-layer config precedence and structural override allowlist | COMPLETE |
 | D12-04 | Gate execution-order column and canonical gate names | COMPLETE |
 | D13-01 | Pre-first-serve professional-responsibility spine | PARTIAL — immutable context, isolation, integrity, and protected ingest/conversion complete locally; U-11A/U-17 |
@@ -127,7 +127,7 @@ short label is less detailed.
 | FD2-01 | Pin audience/RS256/JWKS behavior; reject service tokens on matter routes | COMPLETE |
 | FD2-02 | Google uses device flow only | DECISION-GATED — D-06/U-14 |
 | FD2-03 | AOP key permissions and non-shared volume | COMPLETE by recorded perimeter evidence |
-| FD2-04 | Backups exclude secrets/config token copy; rotation purges history | PARTIAL — U-11A |
+| FD2-04 | Backups exclude secrets/config token copy; rotation purges history | PARTIAL — vault-only backup excludes external secrets/config; deployed rotation/purge drill U-17A |
 | FD3-01 | Redact Google/OAuth/exact-secret values at every current sink | COMPLETE locally — U-02; future notification sinks U-15 |
 | FD3-02 | Runtime canary blocks outbound/notification payloads | PARTIAL — outbound complete locally in U-02; notification path U-15 |
 | FD3-03 | Access audit chained, attestation-bound, fail-closed on downloads, stronger sink | COMPLETE locally — stronger remote sink remains D-09 |
@@ -139,12 +139,12 @@ short label is less detailed.
 | FD5-01 | Synthesis limited honestly to discovery-family pipeline shape | OPEN-AUTO — U-12; broad shape deferred |
 | FD5-02 | Generic synthesized adapter, vault-aware binding, hash/lineage sidecars | PARTIAL — immutable vault binding complete; synthesis U-12 |
 | FD5-03 | First-class pause/resume status/events | COMPLETE |
-| FD5-04 | Priority queue, slot release, heartbeat/visibility reclaim | COMPLETE; recovery hardening U-11A |
+| FD5-04 | Priority queue, slot release, heartbeat/visibility reclaim | COMPLETE locally — U-11A closes shutdown/capacity attempt accounting |
 | FD5-05 | SSE read-only tail and stepwise driver loop | COMPLETE |
 | FD5-06 | Thin Next BFF as sole verified surface | COMPLETE locally; deployed proof U-17A |
-| FD5-07 | Stateless web redeploy; driver drain/reclaim contract | PARTIAL — U-11A/U-15 |
+| FD5-07 | Stateless web redeploy; driver drain/reclaim contract | COMPLETE locally for current workers — deployed drain proof U-17A; failover extension U-15 |
 | FD6-01 | Driver-coordinated encrypted off-box backup and restore drill | PARTIAL — backup exists; proof U-17A |
-| FD6-02 | Close inventory/source binding/anonymized audit retention | PARTIAL — U-11A/D-14 |
+| FD6-02 | Close inventory/source binding/anonymized audit retention | COMPLETE locally — U-11A implements D-14 for its new stores and a complete close manifest |
 | FD6-03 | Atomic board edit/changelog fold and typed optimistic conflict | OPEN-AUTO — U-13 |
 | FD6-04 | Write-ahead idempotent spend intent with billing tag and conservative cap | COMPLETE |
 | FD6-05 | Watcher token/cursor/reconcile/idempotent-notification recovery | OPEN/DECISION — U-14/D-06 |
@@ -164,7 +164,7 @@ short label is less detailed.
 | FD7-13 | export-link writes access audit | COMPLETE |
 | FD7-14 | connectors list/add-folder/remove; OAuth consent human-only | DECISION/OPEN — D-06/U-14 |
 | FD7-15 | notification mute and quiet-hours parity rows | OPEN-AUTO — U-15 |
-| FD7-16 | Every new store is durable, close-registered, listable/showable | OPEN-AUTO — enforced U-11B–U-15 |
+| FD7-16 | Every new store is durable, close-registered, listable/showable | PARTIAL — U-11A registrations/invariant complete; each U-11B–U-15 store must add its own surfaces |
 | FD7-17 | Automated BFF-thin invariant | COMPLETE locally |
 | FD8-01 | OpenAPI-generated TypeScript plus CI drift gate | COMPLETE locally |
 | FD8-02 | `openapi-fetch` and bounded domain modules | COMPLETE for FE-2; extend U-12–U-15 |
@@ -188,7 +188,7 @@ short label is less detailed.
 | FD9-07 | Certify-and-release download colophon | COMPLETE |
 | FD9-08 | Linearized accessible mobile board | OPEN-AUTO — U-13 |
 | FD9-09 | Avoid banned SaaS/legal-cliché visual patterns | PARTIAL — enforce in U-12–U-15 |
-| FD9-10 | Durable room-by-room frontend direction document | OPEN-AUTO — U-11A |
+| FD9-10 | Durable room-by-room frontend direction document | COMPLETE locally — U-11A |
 | FD10-01 | First-live sequence FE-0 → FE-2.5 → protected seed/run | PARTIAL — clean proof U-17 |
 | FD10-02 | Post-live FE-3 → FE-6 sequence | OPEN-AUTO — U-12–U-15 under D-10 |
 | FD10-03 | Dropbox/OneDrive/Web Push/pipeline-shape/multiplayer stay deferred | DEFERRED — successor queue |

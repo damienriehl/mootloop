@@ -48,6 +48,9 @@ requests_app = typer.Typer(
 )
 facts_app = typer.Typer(help="Manage the fact repository.", no_args_is_help=True)
 corpus_app = typer.Typer(help="Review corpus triage and run visibility.", no_args_is_help=True)
+context_app = typer.Typer(
+    help="Review and update approved matter context.md.", no_args_is_help=True
+)
 run_app = typer.Typer(
     help="Drive an orchestrator run (stepwise state machine).", no_args_is_help=True
 )
@@ -78,6 +81,7 @@ export_app = typer.Typer(
 app.add_typer(requests_app, name="requests")
 app.add_typer(facts_app, name="facts")
 app.add_typer(corpus_app, name="corpus")
+app.add_typer(context_app, name="context")
 app.add_typer(run_app, name="run")
 app.add_typer(cite_app, name="cite")
 app.add_typer(research_app, name="research")

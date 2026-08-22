@@ -68,6 +68,14 @@ def test_invalid_matter_id_rejected() -> None:
         MatterConfig.model_validate(data)
 
 
+def test_empty_retention_class_rejected() -> None:
+    data = _minimal_dict()
+    data["retention"]["retention_class"] = ""
+    with pytest.raises(ValidationError) as exc:
+        MatterConfig.model_validate(data)
+    assert "retention_class" in str(exc.value)
+
+
 def test_invalid_forum_literal_rejected() -> None:
     data = _minimal_dict()
     data["jurisdiction"]["forum"] = "municipal"

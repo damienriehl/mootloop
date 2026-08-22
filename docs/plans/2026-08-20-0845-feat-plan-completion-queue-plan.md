@@ -235,8 +235,8 @@ flowchart TD
 | U-07 | COMPLETE locally: citation proposition checking and remaining panels | U-05 | Hosted legal-source proxy expansion D-18 |
 | U-08 | COMPLETE: RFP production-suggestion workflow | U-04A, U-05 | D-10 expansion gate |
 | U-09 | COMPLETE and merged: DOCX parser proof, edit-learning, and next-run readback | U-01, U-03, U-04A | attorney before/after verdict U-17C; Google lane D-06 |
-| U-10 | COMPLETE locally: hidden answer-key and benchmark evidence contracts | U-06, U-07 | real human verdict D-02/D-03 |
-| U-11A | Pre-validation: concrete recovery gaps, matter-close safety, parity foundation, required docs | U-01, U-03 | D-14 source binding; publication remains D-13 |
+| U-10 | COMPLETE and merged: hidden answer-key and benchmark evidence contracts | U-06, U-07 | real human verdict D-02/D-03 |
+| U-11A | COMPLETE locally: recovery gaps, matter-close safety, parity foundation, required docs | U-01, U-03 | publication/review remains U-18; deployment remains unauthorized |
 | U-11B | Post-validation: common durable-job lifecycle extraction and full capability breadth | U-11A, U-12, U-13 | D-10 expansion gate |
 | U-12 | Post-validation: FE-3 catalog, on-ramps, synthesis, rubric lock | U-01, U-11A | D-10; FOLIO acquisition D-12 |
 | U-13 | Post-validation: FE-4 durable strategy board and approve-then-inject | U-12 | D-10 expansion gate |
@@ -315,9 +315,9 @@ flowchart TD
   accepting substantive drift. Copied convergence mechanics have injected score and
   decision seams plus an exact upstream provenance pin. The Typer surface is split
   into focused modules with exact command/help parity across all 63 command paths.
-  **U-11A through U-17C remain queued** under their stated dependencies and
-  decision gates. **U-09 is merged, and U-10 implementation and local validation
-  are complete on this branch. U-18 is COMPLETE for U-01 through U-09:**
+  **U-11B through U-17C remain queued** under their stated dependencies and
+  decision gates. **U-10 is merged, and U-11A implementation and local validation
+  are complete on its feature branch. U-18 is COMPLETE for U-01 through U-10:**
   PR #33 merged as `74dec0a` after backend, invariant, and frontend CI passed on code
   head `acc1e51`; PR #35 merged as `b2ff6c7` after all six push/PR jobs passed on code
   head `96da3c6`; PR #36 merged as `7e9f03e` after the final code head `4c5cd64`
@@ -328,19 +328,20 @@ flowchart TD
   all final-head jobs passed on code head `b7dcee6`; PR #46 merged as `c7ae46c`
   after all six final-head jobs passed on code head `b0aac2e`; PR #47 merged as
   `05e5bd2` after its final-head jobs passed; PR #48 merged as `42bc33c` after all
-  final-head checks and its actionable review fixes passed. Every actionable review finding on the
-  merged PRs was fixed, regression-tested, replied to, and resolved. Deployment is
-  still gated.
+  final-head checks and its actionable review fixes passed; PR #49 merged as
+  `f97082e` from reviewed code head `5b1813c` after all final-head gates passed. Every
+  actionable review finding on the merged PRs was fixed, regression-tested, replied
+  to, and resolved. Deployment is still gated.
   U-10 adds test-only hidden synthetic keys, deterministic post-output evaluation,
   an explicit marker-gated paid lane excluded from `make check`, and close-registered,
   content-free benchmark evidence/verdict models. The actual protected benchmark and
   attorney verdict remain U-17B/U-17C work. No hosted matter or deployment was accessed
   during this execution.
 
-Verification at this checkpoint: backend ruff and strict mypy across 129 source files
-pass; 1,106 zero-spend backend tests pass at 90% coverage, and the explicit paid-lane
-self-test passes separately; frontend ESLint, TypeScript, 11 Vitest
-files / 41 tests, OpenAPI generation/drift, and the production build pass. U-03's
+Verification at this checkpoint: backend ruff and strict mypy across 132 source files
+pass; 1,132 zero-spend backend tests pass at 90% coverage; frontend ESLint,
+TypeScript, 12 Vitest files / 42 tests, OpenAPI generation/drift, and the production
+build pass; and `claude plugin validate .` passes. U-03's
 structured review covered correctness, security, adversarial behavior, tests,
 maintainability, reliability, project standards, API contracts, agent parity, and
 performance; all material findings were repaired before the full gates. U-01's structured
@@ -686,6 +687,13 @@ content in the repo.
 **Acceptance:** a seeded persona-domain regression fails; fast CI never spends model
 tokens; paid tests are explicit; human verdict remains D-02/D-03 gated.
 
+**Completion evidence (2026-08-21):** PR #49 merged as `f97082e` from reviewed code
+head `5b1813c`. Hidden keys remain outside normal prompt and matter sources; the seeded
+wrong-domain regression fails deterministically; the paid lane is marker-gated and
+excluded from `make check`; content-free benchmark packs and hard-human verdicts are
+close-registered. All final-head CI and review gates passed. No protected data, model
+call, hosted mutation, or deployment was used.
+
 ### U-11A — Close recovery, matter-lifecycle, and parity-foundation gaps
 
 **Outcome:** the smallest clean validation path has tested recovery, fail-closed matter
@@ -711,6 +719,20 @@ expanding cockpit rooms.
 event, and audit behavior through CLI/API and UI where present. Torn-tail, heartbeat,
 shutdown, attempt-accounting, close-policy, trace, evidence-pack, and reopen tests pass.
 
+**Completion evidence (2026-08-21, local):** the checked capability matrix now keeps
+all FD-7 rows either `implemented` with live service/CLI/API/UI evidence or `planned`
+with an owning unit. Fact torn tails repair safely; blocking backups heartbeat and fail
+closed on lost ownership; control-plane releases refund attempts; capacity pauses
+resume deterministically; and the cockpit exposes blocker detail, reason, attempt
+grant, and canonical queue repair. Matter close holds one lock across retention check,
+backup, inventory, and purge; requires an eligible destruction date and no hold; emits
+the complete registered-store manifest and explicit SSD/sync limitations; and derives
+actors at CLI/API boundaries. Namespaced guarded skills, approved `context.md` plus
+exact provenance, machine status sidecars, content-free trace trees, immutable
+`EP-mootloop-<run-id>-NNN` packs, ethics guidance, and durable frontend direction are
+implemented and close-registered. The local shipping gate is recorded in the audit;
+remote PR/CI/merge evidence remains U-18 and does not authorize deployment.
+
 ### U-11B — Extract the proven durable-job lifecycle and finish capability breadth
 
 **Outcome:** remaining actions cannot ship as UI-only rooms, and common job machinery
@@ -728,6 +750,9 @@ landing path: a pending U-09 area candidate may become publishable only after th
 deterministic scrub, an independent model scrub, an allowlist-of-publishable-shapes
 check, and a second human-confirmed rendered diff; publication remains an explicit
 primitive with no vault-to-repo auto-commit path.
+Add the still-missing `mootloop verify` whole-vault reconciliation across manifest,
+corpus, facts, journals, and locks; trace/evidence commitments do not substitute for
+that startup self-check.
 
 **Acceptance:** each implemented row proves the same result, trusted actor/provenance,
 event, and audit record through CLI and API; its UI consumes that API. Unimplemented
@@ -873,7 +898,10 @@ journey claims have synthetic evidence rather than “mock green.”
 
 **Work:** after D-03 authorization, execute planted-injection sibling-path and outbound
 gates, backup/restore drill, Access perimeter checks, queue/reopen recovery, and the
-synthetic phone flow. Start the redacted PR #30/#31 monitoring ledger.
+synthetic phone flow. Exercise the operator backup-key rotation runbook and prove that
+archives encrypted under the retired key are purged according to policy without ever
+copying `secrets.env` or `CLAUDE_CONFIG_DIR`. Start the redacted PR #30/#31 monitoring
+ledger.
 
 **Acceptance:** the evidence report records environment, versions, manifest digest,
 expected/actual outcomes, human actor boundaries, and remaining risk.

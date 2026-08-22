@@ -13,9 +13,11 @@ import type {
   ReopenRunRequest,
   RequestsResponse,
   RunActionResponse,
+  RunEvidencePack,
   RunStatusSummary,
   RunSummary,
   StartRunRequest,
+  TraceTree,
 } from "./types";
 
 type Ids = { matterId: string; runId: string };
@@ -60,6 +62,38 @@ export async function getRunRequests(
 ): Promise<RequestsResponse> {
   return unwrap(
     await client.GET("/api/matters/{matter_id}/runs/{run_id}/requests", {
+      params: { path: { matter_id: matterId, run_id: runId } },
+    }),
+  );
+}
+
+export async function getRunTrace(
+  { matterId, runId }: Ids,
+  client: ApiClient = getClient(),
+): Promise<TraceTree> {
+  return unwrap(
+    await client.GET("/api/matters/{matter_id}/runs/{run_id}/trace", {
+      params: { path: { matter_id: matterId, run_id: runId } },
+    }),
+  );
+}
+
+export async function listRunEvidence(
+  { matterId, runId }: Ids,
+  client: ApiClient = getClient(),
+): Promise<RunEvidencePack[]> {
+  const { data } = await client.GET("/api/matters/{matter_id}/runs/{run_id}/evidence", {
+    params: { path: { matter_id: matterId, run_id: runId } },
+  });
+  return data ?? [];
+}
+
+export async function buildRunEvidence(
+  { matterId, runId }: Ids,
+  client: ApiClient = getClient(),
+): Promise<RunEvidencePack> {
+  return unwrap(
+    await client.POST("/api/matters/{matter_id}/runs/{run_id}/evidence", {
       params: { path: { matter_id: matterId, run_id: runId } },
     }),
   );

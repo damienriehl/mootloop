@@ -234,16 +234,27 @@ class Queue:
             self._write(kept)
             return True
 
-    def release(self, item_id: str, worker_id: str, *, visible_at: datetime | None = None) -> bool:
+    def release(
+        self,
+        item_id: str,
+        worker_id: str,
+        *,
+        visible_at: datetime | None = None,
+        refund_attempt: bool = False,
+    ) -> bool:
         """Return an item this worker owns to the queue (slot released on pause).
 
         With ``visible_at`` it schedules a delayed resume (the item stays invisible
-        until then); without it the item becomes claimable immediately."""
+        until then); without it the item becomes claimable immediately. Control-plane
+        releases such as graceful shutdown and provider capacity use ``refund_attempt``
+        because no execution failure occurred; error backoff keeps the claimed attempt."""
         with self._locked():
             items = self._read()
             for it in items:
                 if it.item_id == item_id and it.claimed_by == worker_id:
                     it.claimed_by = None
+                    if refund_attempt:
+                        it.attempts = max(0, it.attempts - 1)
                     it.visible_at = _iso(visible_at) if visible_at is not None else _EPOCH_ISO
                     self._write(items)
                     return True

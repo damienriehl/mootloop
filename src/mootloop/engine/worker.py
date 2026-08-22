@@ -47,6 +47,7 @@ from mootloop import budget, orchestrator
 from mootloop.engine.outbox import drain_pending_run_outboxes, drain_pending_vault_outboxes
 from mootloop.engine.queue import Queue, WorkItem
 from mootloop.errors import AuthError, LockHeldError, MootloopError, SeatLimitError, TurnError
+from mootloop.journal import load_state
 from mootloop.llm import LLMProvider, RawTurnResult
 from mootloop.models.common import MatterId
 from mootloop.models.events import TurnIntent
@@ -341,6 +342,9 @@ class Worker:
             return True
         if item.kind != "run_turn":
             raise TurnError(f"unknown work item kind: {item.kind}")
+        state = load_state(vault, run_id)
+        if state.status == "paused" and state.pause_reason == "capacity":
+            orchestrator.resume_run(vault, run_id)
         while True:
             if self.should_stop():
                 # The safe boundary: the previous turn is journaled, no provider call
@@ -352,7 +356,7 @@ class Worker:
                     self.worker_id,
                     item.item_id,
                 )
-                self.queue.release(item.item_id, self.worker_id)
+                self.queue.release(item.item_id, self.worker_id, refund_attempt=True)
                 return True
 
             specs = orchestrator.plan_next(vault, run_id)
@@ -389,6 +393,7 @@ class Worker:
                     item.item_id,
                     self.worker_id,
                     visible_at=now + timedelta(seconds=self.resume_delay_s),
+                    refund_attempt=True,
                 )
                 return True
             except AuthError:

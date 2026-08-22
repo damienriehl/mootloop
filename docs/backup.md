@@ -56,3 +56,36 @@ contract; the code is `src/mootloop/engine/backup.py` (`backup_matter` / `restor
 - The load-bearing proof is `tests/unit/test_engine_backup.py`: create → encrypted backup → restore into a fresh matters-root → assert the tree byte-matches the source (minus `staging/`), plus the fail-closed cases (wrong key, single-byte tamper, `..`/absolute/symlink members).
 - Run it before trusting a new box: `uv run pytest tests/unit/test_engine_backup.py`.
 - Periodically run a **live** drill: restore a real archive into a scratch matters-root and diff against the source before relying on the backups.
+
+## Matter close and destruction limits
+
+`mootloop close` is a retention-policy action, not a generic recursive-delete command.
+It fails closed unless `matter.yaml` has a non-empty `retention.retention_class`, a
+`retention.destruction_date` that is due, and `retention.litigation_hold: false`. It
+also refuses to purge while a live run holds the matter lock. Unless the operator uses
+the explicit unsafe acknowledgement, a fresh encrypted backup must complete before any
+vault file is removed.
+
+The CLI records the local OS account as the closing actor; it does not accept a
+caller-authored `--by` value. The hosted API records the verified Cloudflare Access
+principal, requires CSRF plus an exact matter-ID confirmation and an explicit
+not-assured-destruction acknowledgement, and takes its absolute backup destination
+only from `MOOTLOOP_BACKUP_DIR`. Neither surface lets a caller select the audit actor,
+timestamp, or hosted backup path. Close also refuses a backup destination anywhere
+inside the matters root, because purging or losing that root must not destroy the only
+recovery copy.
+
+After a successful close, `.closed/<matter-id>.json` under the matters root is the
+content-free destruction manifest. It snapshots the retention class and destruction
+date, the backup reference, every registered matter-scoped store and its removed-file
+count, the closing actor/time, and the audit-chain tombstone. The manifest deliberately
+labels the operation `logical-tree-deletion` and `assured_destruction: false`.
+
+Ordinary filesystem deletion is not assured physical destruction. SSD controllers can
+retain remapped flash cells; filesystem, hypervisor, and storage snapshots can retain
+older blocks; and synchronized or versioned storage can retain remote versions and
+replicas after the local tree disappears. Active vaults are forbidden in synchronized
+folders, but operators must still apply the storage provider's retention, snapshot,
+cryptographic-erasure, and media-disposal procedures when a legal destruction duty
+requires more than logical deletion. The close manifest records what MootLoop removed;
+it does not certify those external controls.

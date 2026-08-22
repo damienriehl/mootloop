@@ -21,14 +21,17 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 import mootloop
 from mootloop import attest as attest_svc
+from mootloop import close as close_svc
+from mootloop import context_memory as context_memory_svc
 from mootloop import decisions as decisions_svc
+from mootloop import evidence as evidence_svc
 from mootloop import orchestrator
 from mootloop import taskspec as taskspec_svc
 from mootloop.citations.check_runner import require_completed_draft_set
 from mootloop.engine.launch import launch_run as launch_run_service
 from mootloop.engine.queue import Queue as WorkQueue
 from mootloop.engine.queue import WorkItem
-from mootloop.errors import LearningImportError, OrchestratorError
+from mootloop.errors import CloseError, LearningImportError, OrchestratorError
 from mootloop.export import link as link_svc
 from mootloop.journal import load_state
 from mootloop.learn.service import (
@@ -39,6 +42,8 @@ from mootloop.learn.service import (
 )
 from mootloop.models.attestations import ReviewIntegrityStatus
 from mootloop.models.common import MatterId
+from mootloop.models.evidence import RunEvidencePack, TraceTree
+from mootloop.models.lifecycle import CloseRecord
 from mootloop.models.matters import MatterSummary
 from mootloop.production_suggestions import (
     ProductionSuggestionStore,
@@ -51,6 +56,7 @@ from mootloop.vault import safe_vault_path
 from mootloop.web import audit
 from mootloop.web.api import deps, models, readers
 from mootloop.web.api.deps import (
+    get_backup_dir,
     get_link_signer,
     get_queue,
     get_registry,
@@ -73,6 +79,7 @@ Csrf = Annotated[None, Depends(require_csrf)]
 Internal = Annotated[None, Depends(require_internal)]
 QueueDep = Annotated[WorkQueue, Depends(get_queue)]
 Signer = Annotated[link_svc.LinkSigner, Depends(get_link_signer)]
+BackupDir = Annotated[Path, Depends(get_backup_dir)]
 
 
 def _now_iso() -> str:
@@ -167,7 +174,7 @@ def _runs_for(vault: Path) -> list[models.RunSummary]:
 def get_csrf(
     request: Request,
     response: Response,
-    _principal: Principal,
+    principal: Principal,
 ) -> models.CsrfToken:
     return models.CsrfToken(csrf_token=issue_csrf_token(request, response))
 
@@ -193,6 +200,69 @@ def list_runs(
     return _runs_for(vault)
 
 
+@router.post("/api/matters/{matter_id}/close")
+def close_matter(
+    matter_id: str,
+    body: models.CloseMatterRequest,
+    principal: Principal,
+    vault: Vault,
+    registry: Registry,
+    backup_dir: BackupDir,
+    _csrf: Csrf,
+    _audited: Annotated[None, Depends(_audit_dep("matter_close"))],
+) -> CloseRecord:
+    """Close only after exact confirmation; actor/time/path are trusted server inputs."""
+    if body.confirm_matter_id != matter_id:
+        raise CloseError("close confirmation does not match the route matter id")
+    del vault
+    return close_svc.close_matter(
+        registry.root,
+        matter_id,
+        actor=principal.email,
+        now=_now_iso(),
+        backup_dir=backup_dir,
+    )
+
+
+@router.get(
+    "/api/matters/{matter_id}/context",
+    response_model=models.MatterContextResponse,
+    responses={204: {"description": "No approved context.md"}},
+)
+def get_matter_context(
+    matter_id: str,
+    _principal: Principal,
+    vault: Vault,
+    _audited: Annotated[None, Depends(_audit_dep("matter_context_show"))],
+) -> models.MatterContextResponse | Response:
+    loaded = context_memory_svc.load_context_memory(vault)
+    if loaded is None:
+        return Response(status_code=204)
+    text, metadata = loaded
+    return models.MatterContextResponse(text=text, metadata=metadata)
+
+
+@router.post("/api/matters/{matter_id}/context")
+def set_matter_context(
+    matter_id: str,
+    body: models.MatterContextRequest,
+    principal: Principal,
+    vault: Vault,
+    _csrf: Csrf,
+    _audited: Annotated[None, Depends(_audit_dep("matter_context_set"))],
+) -> models.MatterContextResponse:
+    metadata = context_memory_svc.set_context_memory(
+        vault,
+        body.text,
+        approved_by=principal.email,
+        approved_at=_now_iso(),
+    )
+    loaded = context_memory_svc.load_context_memory(vault)
+    assert loaded is not None
+    text, _ = loaded
+    return models.MatterContextResponse(text=text, metadata=metadata)
+
+
 # --- single-run read views (cockpit + inbox; Access + audited) --------------
 
 
@@ -216,6 +286,46 @@ def get_run_gates(
     _audited: Annotated[None, Depends(_audit_dep("run_gates"))],
 ) -> models.GateLedgerResponse:
     return readers.gate_ledger_response(vault, run_id)
+
+
+@router.get("/api/matters/{matter_id}/runs/{run_id}/trace")
+def get_run_trace(
+    matter_id: str,
+    run_id: str,
+    _principal: Principal,
+    vault: Vault,
+    _audited: Annotated[None, Depends(_audit_dep("run_trace"))],
+) -> TraceTree:
+    return evidence_svc.load_trace_tree(vault, run_id)
+
+
+@router.get("/api/matters/{matter_id}/runs/{run_id}/evidence")
+def list_run_evidence(
+    matter_id: str,
+    run_id: str,
+    _principal: Principal,
+    vault: Vault,
+    _audited: Annotated[None, Depends(_audit_dep("run_evidence_list"))],
+) -> list[RunEvidencePack]:
+    return evidence_svc.list_evidence_packs(vault, run_id)
+
+
+@router.post("/api/matters/{matter_id}/runs/{run_id}/evidence")
+def build_run_evidence(
+    matter_id: str,
+    run_id: str,
+    principal: Principal,
+    vault: Vault,
+    _csrf: Csrf,
+    _audited: Annotated[None, Depends(_audit_dep("run_evidence_build"))],
+) -> RunEvidencePack:
+    return evidence_svc.build_evidence_pack(
+        vault,
+        run_id,
+        _now_iso(),
+        generated_by=principal.email,
+        channel="api",
+    )
 
 
 @router.get("/api/matters/{matter_id}/runs/{run_id}/decisions")

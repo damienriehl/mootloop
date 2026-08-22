@@ -111,7 +111,7 @@ class Attorney(_Model):
 
 
 class Retention(_Model):
-    retention_class: str
+    retention_class: str = Field(min_length=1, max_length=128)
     destruction_date: date | None = None
     litigation_hold: bool = False
 
