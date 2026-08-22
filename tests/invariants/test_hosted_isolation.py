@@ -46,7 +46,7 @@ def test_driver_mounts_one_matter_and_reaches_network_only_through_proxy() -> No
     assert set(proxy["networks"]) == {"driver-egress", "proxy-outbound"}
     assert driver["depends_on"]["egress-proxy"]["condition"] == "service_healthy"
     assert driver["depends_on"]["folio-enrich"]["condition"] == "service_healthy"
-    assert proxy["secrets"] == ["egress_proxy_password"]
+    assert proxy["secrets"] == ["egress_proxy_password", "legal_egress_proxy_password"]
     assert "volumes" not in proxy
     assert compose["networks"]["driver-egress"]["internal"] is True
     assert compose["networks"]["driver-conversion"]["internal"] is True
@@ -74,10 +74,26 @@ def test_driver_mounts_one_matter_and_reaches_network_only_through_proxy() -> No
 
 def test_proxy_config_is_destination_allowlisted_and_authenticated() -> None:
     config = (ROOT / "deploy" / "egress" / "squid.conf").read_text(encoding="utf-8")
-    assert "api.anthropic.com" in config
-    assert "proxy_auth REQUIRED" in config
-    assert "http_access allow authenticated model_hosts CONNECT SSL_ports" in config
-    assert "http_access deny all" in config
+    lines = [line.strip() for line in config.splitlines() if line.strip()]
+    model_host_lines = [line for line in lines if line.startswith("acl model_hosts ")]
+    legal_host_lines = [line for line in lines if line.startswith("acl legal_hosts ")]
+    assert len(model_host_lines) == len(legal_host_lines) == 1
+    [model_hosts] = model_host_lines
+    [legal_hosts] = legal_host_lines
+    assert model_hosts.split()[3:] == ["api.anthropic.com"]
+    assert legal_hosts.split()[3:] == [
+        "www.courtlistener.com",
+        "api.courtlistener.com",
+        "www.revisor.mn.gov",
+    ]
+    assert lines.count("acl model_identity proxy_auth mootloop-model") == 1
+    assert lines.count("acl legal_identity proxy_auth mootloop-legal") == 1
+    assert [line for line in lines if line.startswith("http_access ")] == [
+        "http_access deny CONNECT !SSL_ports",
+        "http_access allow model_identity model_hosts CONNECT SSL_ports",
+        "http_access allow legal_identity legal_hosts CONNECT SSL_ports",
+        "http_access deny all",
+    ]
 
 
 def test_sse_uses_the_shared_outbound_serializer() -> None:

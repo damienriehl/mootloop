@@ -38,6 +38,7 @@ These rulings are settled implementation constraints for the continuation queue:
 | D-15 | A | Context changes always require a new run. |
 | D-16 | A | Order expansion from friction observed in the clean compounding loop. |
 | D-17 | A | Keep the named collaboration/integration breadth deferred. |
+| D-18 | A | Allow exactly the two CourtListener hosts and Minnesota Revisor through hosted CONNECT/443; retain fixed application routes, authenticated proxying, outbound privacy checks, and deny all other destinations. |
 
 For D-05/D-12, the implementation route and source inspection are recorded in
 `docs/research/2026-08-20-folio-integration-route.md`.
