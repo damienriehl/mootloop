@@ -2,8 +2,9 @@
 
 `CloseRecord` is the durable proof that a matter was closed and its confidential
 vault subtree purged. It lives at the matters-root level — *off* the matter vault, so
-it survives the very purge it records — and carries no confidential content: an opaque
-matter id, who/when, the backup reference, per-store removed counts, and the
+it survives the very purge it records — and carries no work-product content: the validated
+matter id, who/when, the retention policy, the backup reference, the complete registered
+store inventory, deletion limitations, and the
 matter-anonymized access-audit tombstone that keeps the FD-3 hash-chain intact past
 the close.
 
@@ -13,10 +14,31 @@ the in-vault stores, its path no longer implies the matter once the vault is gon
 
 from __future__ import annotations
 
-from mootloop.models.audit import AccessAuditEntry
-from mootloop.models.common import MatterProvenanced, VersionedModel
+from datetime import date
+from typing import Literal
 
-SCHEMA_VERSION = "1.0"
+from pydantic import Field
+
+from mootloop.models.audit import AccessAuditEntry
+from mootloop.models.common import MatterProvenanced, StrictModel, VersionedModel
+
+SCHEMA_VERSION = "1.1"
+
+
+class DestructionStore(StrictModel):
+    """One registered matter store included in the close manifest."""
+
+    name: str
+    glob: str
+    description: str
+    files_removed: int = Field(ge=0)
+
+
+class DestructionLimitation(StrictModel):
+    """A durable warning that logical deletion is not assured physical erasure."""
+
+    kind: Literal["solid_state_media", "synchronized_storage"]
+    detail: str
 
 
 class CloseRecord(MatterProvenanced, VersionedModel):
@@ -31,5 +53,11 @@ class CloseRecord(MatterProvenanced, VersionedModel):
     closed_at: str
     closed_by: str
     backup_ref: str | None
+    retention_class: str
+    destruction_date: date
+    destruction_method: Literal["logical-tree-deletion"] = "logical-tree-deletion"
+    assured_destruction: Literal[False] = False
+    limitations: tuple[DestructionLimitation, ...]
+    stores: tuple[DestructionStore, ...]
     removed_counts: dict[str, int]
     tombstone: AccessAuditEntry

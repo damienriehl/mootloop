@@ -50,6 +50,7 @@ def run_status_summary(vault: Path, run_id: str) -> models.RunStatusSummary:
         hard_cap_usd=hard_cap_usd,
         replayable=context_blocker is None,
         context_blocker=context_blocker,
+        pause_reason=state.pause_reason,
         completed_turns=len(state.completed_turns),
         discarded_turns=len(state.discarded),
         open_decisions=[d.decision_id for d in open_decisions],

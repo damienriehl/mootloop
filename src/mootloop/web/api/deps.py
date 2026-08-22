@@ -11,6 +11,7 @@ without executing it — the invariant test uses `route_auth_kinds`.
 from __future__ import annotations
 
 import hmac
+import os
 import secrets as secrets_mod
 from pathlib import Path
 from typing import Annotated, Any
@@ -31,6 +32,7 @@ CF_ACCESS_HEADER = "cf-access-jwt-assertion"
 CSRF_COOKIE = "mootloop_csrf"
 CSRF_HEADER = "x-csrf-token"
 _CSRF_MAX_AGE = 86_400
+BACKUP_DIR_ENV = "MOOTLOOP_BACKUP_DIR"
 
 
 # --- injectable providers (dependency_overrides seams) ----------------------
@@ -60,6 +62,17 @@ def get_link_signer() -> LinkSigner:
     """The download-link HMAC signer (key from the service-user secrets, fail-closed —
     derived + persisted on first use). Overridden in tests."""
     return LinkSigner(load_or_create_signing_key())
+
+
+def get_backup_dir() -> Path:
+    """Return the operator-configured absolute backup directory, or fail closed."""
+    raw = os.environ.get(BACKUP_DIR_ENV)
+    if not raw:
+        raise HTTPException(status_code=503, detail=f"{BACKUP_DIR_ENV} is not configured")
+    path = Path(raw)
+    if not path.is_absolute():
+        raise HTTPException(status_code=503, detail=f"{BACKUP_DIR_ENV} must be absolute")
+    return path
 
 
 # --- auth guards (introspectable) -------------------------------------------

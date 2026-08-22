@@ -62,6 +62,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/matters/{matter_id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close Matter
+         * @description Close only after exact confirmation; actor/time/path are trusted server inputs.
+         */
+        post: operations["close_matter_api_matters__matter_id__close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/matters/{matter_id}/context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Matter Context */
+        get: operations["get_matter_context_api_matters__matter_id__context_get"];
+        put?: never;
+        /** Set Matter Context */
+        post: operations["set_matter_context_api_matters__matter_id__context_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/matters/{matter_id}/judge-profile": {
         parameters: {
             query?: never;
@@ -353,6 +391,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/matters/{matter_id}/runs/{run_id}/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Run Evidence */
+        get: operations["list_run_evidence_api_matters__matter_id__runs__run_id__evidence_get"];
+        put?: never;
+        /** Build Run Evidence */
+        post: operations["build_run_evidence_api_matters__matter_id__runs__run_id__evidence_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/matters/{matter_id}/runs/{run_id}/gates": {
         parameters: {
             query?: never;
@@ -598,6 +654,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/matters/{matter_id}/runs/{run_id}/trace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Run Trace */
+        get: operations["get_run_trace_api_matters__matter_id__runs__run_id__trace_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/matters/{matter_id}/tasks": {
         parameters: {
             query?: never;
@@ -763,6 +836,31 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * AccessAuditEntry
+         * @description One append-only, hash-chained access-audit record.
+         */
+        AccessAuditEntry: {
+            /** Action */
+            action: string;
+            /** Actor */
+            actor: string;
+            /** Entry Hash */
+            entry_hash: string;
+            /** Matter Id */
+            matter_id: string;
+            /** Prev Hash */
+            prev_hash: string;
+            /** Resource */
+            resource: string;
+            /**
+             * Schema Version
+             * @default 1.0
+             */
+            schema_version: string;
+            /** Ts */
+            ts: string;
+        };
+        /**
          * ArtifactDigest
          * @description Exact bytes and vault-relative identity of one sealed export artifact.
          */
@@ -882,6 +980,70 @@ export interface components {
              * @constant
              */
             status: "queued";
+        };
+        /**
+         * CloseMatterRequest
+         * @description Hard-human close confirmation; actor, time, and backup path are server-derived.
+         */
+        CloseMatterRequest: {
+            /**
+             * Acknowledge Not Assured Destruction
+             * @constant
+             */
+            acknowledge_not_assured_destruction: true;
+            /** Confirm Matter Id */
+            confirm_matter_id: string;
+        };
+        /**
+         * CloseRecord
+         * @description Append-once record that a matter was closed and purged (plan FD-6).
+         *
+         *     ``removed_counts`` maps each matter-scoped inventory store name to the number of
+         *     files removed for it; ``tombstone`` is the anonymized `AccessAuditEntry` retained
+         *     to prove the matter existed and was closed while preserving the audit chain.
+         */
+        CloseRecord: {
+            /**
+             * Assured Destruction
+             * @default false
+             * @constant
+             */
+            assured_destruction: false;
+            /** Backup Ref */
+            backup_ref: string | null;
+            /** Closed At */
+            closed_at: string;
+            /** Closed By */
+            closed_by: string;
+            /**
+             * Destruction Date
+             * Format: date
+             */
+            destruction_date: string;
+            /**
+             * Destruction Method
+             * @default logical-tree-deletion
+             * @constant
+             */
+            destruction_method: "logical-tree-deletion";
+            /** Limitations */
+            limitations: components["schemas"]["DestructionLimitation"][];
+            /** Removed Counts */
+            removed_counts: {
+                [key: string]: number;
+            };
+            /** Retention Class */
+            retention_class: string;
+            /**
+             * Schema Version
+             * @default 1.1
+             */
+            schema_version: string;
+            /** Source Matter Id */
+            source_matter_id: string;
+            /** Stores */
+            stores: components["schemas"]["DestructionStore"][];
+            tombstone: components["schemas"]["AccessAuditEntry"];
         };
         /**
          * CsrfToken
@@ -1085,6 +1247,33 @@ export interface components {
             schema_version: string;
         };
         /**
+         * DestructionLimitation
+         * @description A durable warning that logical deletion is not assured physical erasure.
+         */
+        DestructionLimitation: {
+            /** Detail */
+            detail: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "solid_state_media" | "synchronized_storage";
+        };
+        /**
+         * DestructionStore
+         * @description One registered matter store included in the close manifest.
+         */
+        DestructionStore: {
+            /** Description */
+            description: string;
+            /** Files Removed */
+            files_removed: number;
+            /** Glob */
+            glob: string;
+            /** Name */
+            name: string;
+        };
+        /**
          * DocxRevision
          * @description One tracked OOXML insertion or deletion inside a recovered anchor.
          */
@@ -1100,6 +1289,20 @@ export interface components {
             kind: "insertion" | "deletion";
             /** Text */
             text: string;
+        };
+        /**
+         * EvidenceCommitment
+         * @description Exact bytes of one fixed, non-user-authored vault source path.
+         */
+        EvidenceCommitment: {
+            /** Kind */
+            kind: string;
+            /** Path */
+            path: string;
+            /** Sha256 */
+            sha256: string;
+            /** Size Bytes */
+            size_bytes: number;
         };
         /**
          * ExportSeal
@@ -1506,6 +1709,51 @@ export interface components {
             schema_version: string;
         };
         /**
+         * MatterContextMemory
+         * @description Trusted human provenance sidecar for the matter's bounded context.md memory.
+         */
+        MatterContextMemory: {
+            /** Approved At */
+            approved_at: string;
+            /** Approved By */
+            approved_by: string;
+            /** Content Sha256 */
+            content_sha256: string;
+            /**
+             * Schema Version
+             * @default 1.0
+             * @constant
+             */
+            schema_version: "1.0";
+            /** Source Matter Id */
+            source_matter_id: string;
+        };
+        /**
+         * MatterContextRequest
+         * @description Human-reviewed matter context; actor and time are server-derived.
+         */
+        MatterContextRequest: {
+            /** Text */
+            text: string;
+        };
+        /** MatterContextResponse */
+        MatterContextResponse: {
+            /**
+             * Kind
+             * @default matter_context
+             * @constant
+             */
+            kind: "matter_context";
+            metadata: components["schemas"]["MatterContextMemory"];
+            /**
+             * Schema Version
+             * @default 1.0
+             */
+            schema_version: string;
+            /** Text */
+            text: string;
+        };
+        /**
          * MatterSummary
          * @description Listing-safe summary of a single matter vault.
          *
@@ -1903,6 +2151,42 @@ export interface components {
             status: "running" | "finished" | "needs_attention" | "capped" | "needs_decisions" | "checkpoint" | "paused";
         };
         /**
+         * RunEvidencePack
+         * @description Immutable replay commitments for one numbered run evidence snapshot.
+         */
+        RunEvidencePack: {
+            /**
+             * Channel
+             * @enum {string}
+             */
+            channel: "api" | "cli";
+            /** Commitments */
+            commitments: components["schemas"]["EvidenceCommitment"][];
+            /** Created At */
+            created_at: string;
+            /** Evidence Pack Id */
+            evidence_pack_id: string;
+            /** Generated By */
+            generated_by: string;
+            /** Pack Sha256 */
+            pack_sha256: string;
+            /** Run Id */
+            run_id: string;
+            /**
+             * Schema Version
+             * @default 1.0
+             * @constant
+             */
+            schema_version: "1.0";
+            /** Sequence */
+            sequence: number;
+            /** Source Matter Id */
+            source_matter_id: string;
+            trace_tree: components["schemas"]["TraceTree"];
+            /** Trace Tree Sha256 */
+            trace_tree_sha256: string;
+        };
+        /**
          * RunStatusSummary
          * @description Single-run status envelope for the cockpit (folded from the journal). Exposes
          *     the `RunStatus` Literal; also returned by the start-run wrapper.
@@ -1939,6 +2223,8 @@ export interface components {
             mode: "autonomous" | "gated" | "observed";
             /** Open Decisions */
             open_decisions?: string[];
+            /** Pause Reason */
+            pause_reason?: string | null;
             /** Replayable */
             replayable: boolean;
             /** Run Id */
@@ -2193,6 +2479,48 @@ export interface components {
             /** Specs */
             specs?: components["schemas"]["TaskSpec"][];
         };
+        /**
+         * TraceNode
+         * @description One content-free node whose parent relation forms the run trace tree.
+         */
+        TraceNode: {
+            /** Kind */
+            kind: string;
+            /** Label */
+            label?: null;
+            /** Node Id */
+            node_id: string;
+            /** Parent Id */
+            parent_id?: string | null;
+            /** Sequence */
+            sequence: number;
+            /** Source Path */
+            source_path: string;
+            /** Source Sha256 */
+            source_sha256: string;
+        };
+        /**
+         * TraceTree
+         * @description A derived, content-free parent tree over exact journal event bytes.
+         */
+        TraceTree: {
+            /** Generated At */
+            generated_at: string;
+            /** Nodes */
+            nodes: components["schemas"]["TraceNode"][];
+            /** Run Id */
+            run_id: string;
+            /**
+             * Schema Version
+             * @default 1.0
+             * @constant
+             */
+            schema_version: "1.0";
+            /** Source Matter Id */
+            source_matter_id: string;
+            /** Tree Sha256 */
+            tree_sha256: string;
+        };
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -2282,6 +2610,114 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MatterSummary"][];
+                };
+            };
+        };
+    };
+    close_matter_api_matters__matter_id__close_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matter_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CloseMatterRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CloseRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_matter_context_api_matters__matter_id__context_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matter_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatterContextResponse"];
+                };
+            };
+            /** @description No approved context.md */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_matter_context_api_matters__matter_id__context_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matter_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MatterContextRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatterContextResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -2852,6 +3288,70 @@ export interface operations {
             };
         };
     };
+    list_run_evidence_api_matters__matter_id__runs__run_id__evidence_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matter_id: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunEvidencePack"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    build_run_evidence_api_matters__matter_id__runs__run_id__evidence_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matter_id: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunEvidencePack"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_run_gates_api_matters__matter_id__runs__run_id__gates_get: {
         parameters: {
             query?: never;
@@ -3273,6 +3773,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_run_trace_api_matters__matter_id__runs__run_id__trace_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matter_id: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TraceTree"];
                 };
             };
             /** @description Validation Error */

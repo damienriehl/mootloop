@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from typer.testing import CliRunner
@@ -42,6 +43,56 @@ def _init_from_fixture(vault: Path) -> None:
         ],
     )
     assert result.exit_code == 0, result.output
+
+
+def test_close_uses_trusted_local_os_actor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_close(*args: object, **kwargs: object) -> SimpleNamespace:
+        captured["args"] = args
+        captured.update(kwargs)
+        return SimpleNamespace(removed_counts={"facts": 1})
+
+    monkeypatch.setattr("mootloop.close.close_matter", fake_close)
+    monkeypatch.setattr(
+        "mootloop.cli.operations.pwd.getpwuid",
+        lambda _uid: SimpleNamespace(pw_name="trusted-local-user"),
+    )
+
+    refused = runner.invoke(
+        app,
+        [
+            "close",
+            "matter-1",
+            "--matters-root",
+            str(tmp_path / "matters"),
+            "--backup-dir",
+            str(tmp_path / "backups"),
+        ],
+    )
+    assert refused.exit_code == 1
+    assert "--acknowledge-not-assured-destruction" in refused.output
+    assert captured == {}
+
+    result = runner.invoke(
+        app,
+        [
+            "close",
+            "matter-1",
+            "--matters-root",
+            str(tmp_path / "matters"),
+            "--backup-dir",
+            str(tmp_path / "backups"),
+            "--acknowledge-not-assured-destruction",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured["actor"] == "trusted-local-user"
+    assert "closed matter-1: 1 registered-store match(es) inventoried" in result.output
+    assert "--by" not in runner.invoke(app, ["close", "--help"]).output
 
 
 def test_hosted_driver_refuses_unbound_or_missing_matter(tmp_path: Path) -> None:

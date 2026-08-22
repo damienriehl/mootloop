@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "mootloop",
+  "description": "Human-supervised legal-work simulation over private matter vaults.",
+  "version": "0.1.0",
+  "author": {
+    "name": "MootLoop contributors"
+  },
+  "repository": "https://github.com/damienriehl/mootloop",
+  "license": "MIT",
+  "skills": "./.claude/skills/",
+  "agents": [
+    "./.claude/agents/associate.md",
+    "./.claude/agents/judge.md",
+    "./.claude/agents/oc-associate.md",
+    "./.claude/agents/oc-partner.md",
+    "./.claude/agents/partner.md",
+    "./.claude/agents/rubric-judge.md"
+  ]
+}

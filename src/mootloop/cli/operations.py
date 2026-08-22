@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import pwd
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -16,7 +17,7 @@ from mootloop.engine import driver as driver_service
 from mootloop.errors import MootloopError
 from mootloop.runtime import RuntimeMode
 
-from . import _fail, _now, api_app, app, driver_app
+from . import _fail, _now, api_app, app, context_app, driver_app
 
 
 @driver_app.command("run-once")
@@ -145,6 +146,52 @@ def api_export_openapi(
     typer.echo(f"wrote OpenAPI schema to {path}")
 
 
+@context_app.command("show")
+def context_show(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    json_output: Annotated[bool, typer.Option("--json", help="Emit text and provenance")] = False,
+) -> None:
+    """Read the approved matter context and its exact human provenance."""
+    from mootloop.context_memory import load_context_memory
+
+    try:
+        loaded = load_context_memory(vault_path)
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    if loaded is None:
+        typer.echo("No approved context.md.")
+        return
+    content, metadata = loaded
+    if json_output:
+        typer.echo(json.dumps({"text": content, "metadata": metadata.model_dump(mode="json")}))
+        return
+    typer.echo(content, nl=False)
+
+
+@context_app.command("set")
+def context_set(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    input_path: Annotated[
+        Path, typer.Option("--input", help="UTF-8 Markdown reviewed by the attorney")
+    ],
+) -> None:
+    """Record trusted local human approval for exact context.md bytes."""
+    from mootloop.context_memory import set_context_memory
+
+    try:
+        text = input_path.read_text(encoding="utf-8")
+        actor = pwd.getpwuid(os.geteuid()).pw_name
+        metadata = set_context_memory(
+            vault_path,
+            text,
+            approved_by=actor,
+            approved_at=_now(),
+        )
+    except (OSError, UnicodeError, MootloopError) as exc:
+        raise _fail(exc) from exc
+    typer.echo(f"approved context.md by {metadata.approved_by}: {metadata.content_sha256}")
+
+
 @app.command()
 def backup(
     vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
@@ -183,7 +230,6 @@ def restore(
 @app.command()
 def close(
     matter_id: Annotated[str, typer.Argument(help="Matter id under the matters-root")],
-    by: Annotated[str, typer.Option("--by", help="Who is closing the matter (audit actor)")],
     backup_dir: Annotated[
         Path | None, typer.Option("--backup-dir", help="Destination for the pre-close backup")
     ] = None,
@@ -201,6 +247,13 @@ def close(
             help="Acknowledge that skipping the backup makes the data unrecoverable",
         ),
     ] = False,
+    acknowledge_not_assured_destruction: Annotated[
+        bool,
+        typer.Option(
+            "--acknowledge-not-assured-destruction",
+            help="Confirm logical deletion is not assured physical media destruction",
+        ),
+    ] = False,
 ) -> None:
     """Purge a closed matter's vault, retaining an anonymized tombstone (plan FD-6)."""
     from mootloop.close import close_matter
@@ -208,10 +261,15 @@ def close(
 
     root = matters_root or Path(os.environ.get(MATTERS_ROOT_ENV, DEFAULT_MATTERS_ROOT))
     try:
+        if not acknowledge_not_assured_destruction:
+            raise MootloopError(
+                "matter close requires --acknowledge-not-assured-destruction"
+            )
+        actor = pwd.getpwuid(os.geteuid()).pw_name
         record = close_matter(
             root,
             matter_id,
-            actor=by,
+            actor=actor,
             now=_now(),
             backup_dir=backup_dir,
             skip_backup=skip_backup,
@@ -219,5 +277,8 @@ def close(
         )
     except MootloopError as exc:
         raise _fail(exc) from exc
-    removed = sum(record.removed_counts.values())
-    typer.echo(f"closed {matter_id}: {removed} file(s) purged; tombstone retained")
+    registered_matches = sum(record.removed_counts.values())
+    typer.echo(
+        f"closed {matter_id}: {registered_matches} registered-store match(es) inventoried; "
+        "vault purged; tombstone retained"
+    )

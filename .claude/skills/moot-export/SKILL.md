@@ -1,5 +1,5 @@
 ---
-name: moot-export
+name: export
 description: Build a MootLoop run's court-formatted deliverables (master, verification page, privilege log, strategy memo, audit log) and render DOCX per set — draft until attested, clean only when the gate ledger is export-ready and the residue scan passes.
 disable-model-invocation: true
 argument-hint: <vault-path> <run-id> [--force-draft]

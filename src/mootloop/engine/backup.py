@@ -19,9 +19,13 @@ partial extract behind.
 from __future__ import annotations
 
 import io
+import logging
 import os
 import tarfile
 import tempfile
+import threading
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from cryptography.exceptions import InvalidTag
@@ -33,6 +37,7 @@ from mootloop.secrets import load_or_create_backup_key
 from mootloop.vault import (
     MATTER_YAML,
     RunLock,
+    _real,
     detect_sync_folder,
     enclosing_git_repo,
     load_matter,
@@ -42,6 +47,9 @@ from mootloop.vault import (
 _BACKUP_LOCK_RUN_ID = "backup"
 _NONCE_LEN = 12
 _GCM_TAG_LEN = 16
+_BACKUP_HEARTBEAT_INTERVAL_S = 30.0
+
+logger = logging.getLogger("mootloop.engine.backup")
 
 
 def _compact_ts(now: str) -> str:
@@ -67,6 +75,7 @@ def backup_matter(
     queue: Queue | None = None,
     encrypt: bool = True,
     key: bytes | None = None,
+    _held_lock: RunLock | None = None,
 ) -> Path:
     """Write a consistent snapshot of ``vault_root`` under ``dest_dir``, encrypted by default.
 
@@ -93,7 +102,7 @@ def backup_matter(
 
     if not encrypt:
         out = dest / f"{matter_id}-{ts}.tar.gz"
-        _snapshot_tar(vault_root, out, matter_id)
+        _snapshot_tar(vault_root, out, matter_id, held_lock=_held_lock)
         _verify_readback_plaintext(out, matter_id)
         return out
 
@@ -103,7 +112,7 @@ def backup_matter(
     os.close(fd)
     tmp_plain = Path(tmp_name)
     try:
-        _snapshot_tar(vault_root, tmp_plain, matter_id)
+        _snapshot_tar(vault_root, tmp_plain, matter_id, held_lock=_held_lock)
         _encrypt_file(tmp_plain, out, key_bytes)
     except BaseException:
         out.unlink(missing_ok=True)
@@ -115,10 +124,73 @@ def backup_matter(
     return out
 
 
-def _snapshot_tar(vault_root: Path | str, out: Path, matter_id: str) -> None:
+@contextmanager
+def _heartbeating_backup_lock(
+    vault_root: Path | str,
+    *,
+    heartbeat_interval_s: float = _BACKUP_HEARTBEAT_INTERVAL_S,
+    heartbeat: Callable[[], bool] | None = None,
+    heartbeat_observer: Callable[[], None] | None = None,
+    held_lock: RunLock | None = None,
+) -> Iterator[None]:
+    """Hold the matter lock and renew it while a blocking snapshot is in progress."""
+    if heartbeat_interval_s <= 0:
+        raise BackupError("backup heartbeat interval must be positive")
+    if held_lock is not None and _real(held_lock.vault_root) != _real(Path(vault_root)):
+        raise BackupError("held backup lock belongs to a different matter vault")
+    @contextmanager
+    def acquire() -> Iterator[RunLock]:
+        if held_lock is not None:
+            yield held_lock
+            return
+        with RunLock(vault_root, _BACKUP_LOCK_RUN_ID) as acquired:
+            yield acquired
+
+    with acquire() as lock:
+        beat = heartbeat or (lambda: lock.heartbeat(best_effort=True))
+        observe = heartbeat_observer or (lambda: None)
+        stop = threading.Event()
+        lost = threading.Event()
+
+        def renew() -> None:
+            while not stop.wait(heartbeat_interval_s):
+                try:
+                    owned = beat()
+                except Exception:  # noqa: BLE001 — any renewal failure loses the lock
+                    logger.exception("backup lock heartbeat failed")
+                    owned = False
+                try:
+                    observe()
+                except Exception:  # noqa: BLE001 — observer is part of the renewal seam
+                    logger.exception("backup lock heartbeat observer failed")
+                    owned = False
+                if not owned:
+                    lost.set()
+                    return
+
+        keeper = threading.Thread(target=renew, name="mootloop-backup-lock", daemon=True)
+        keeper.start()
+        try:
+            yield
+        finally:
+            stop.set()
+            keeper.join()
+        if lost.is_set():
+            raise BackupError("backup lost the matter lock while snapshotting")
+
+
+def _snapshot_tar(
+    vault_root: Path | str,
+    out: Path,
+    matter_id: str,
+    *,
+    held_lock: RunLock | None = None,
+) -> None:
     """Write the lock-consistent tar.gz to ``out`` (staging excluded). Fails closed."""
     try:
-        with RunLock(vault_root, _BACKUP_LOCK_RUN_ID), tarfile.open(out, "w:gz") as tar:
+        with _heartbeating_backup_lock(vault_root, held_lock=held_lock), tarfile.open(
+            out, "w:gz"
+        ) as tar:
             tar.add(
                 str(vault_root),
                 arcname=matter_id,
@@ -127,6 +199,9 @@ def _snapshot_tar(vault_root: Path | str, out: Path, matter_id: str) -> None:
     except LockHeldError as exc:
         out.unlink(missing_ok=True)
         raise BackupError(f"cannot snapshot {matter_id!r}: a live run holds the lock") from exc
+    except BackupError:
+        out.unlink(missing_ok=True)
+        raise
 
 
 def _encrypt_file(plaintext: Path, out: Path, key: bytes) -> None:

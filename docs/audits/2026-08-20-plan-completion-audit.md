@@ -8,8 +8,8 @@ uncommitted code change: the only pre-existing dirty file was the timer-managed
 `.claude/RESUME.md`. Both recent feature PRs are merged, and the backend and frontend
 validation suites are green.
 
-Execution update through 2026-08-21: U-01 through U-09 are complete, remotely reviewed,
-and merged. U-10 implementation and local validation are complete on its feature
+Execution update through 2026-08-21: U-01 through U-10 are complete, remotely reviewed,
+and merged. U-11A implementation and local validation are complete on its feature
 branch. U-09's defensive raw-OOXML recovery, durable human review, tier routing, shared scrub,
 ethical-wall exclusion, and future-run-only prompt readback are complete across
 service, CLI, API, and cockpit surfaces. The beneficial attorney before/after verdict
@@ -19,9 +19,11 @@ and cockpit surfaces, while the attorney's production disposition remains a sepa
 human action. U-07's hosted public-legal-source operability tail remains isolated behind
 D-18 because the deployed proxy still allows only the model endpoint. No hosted call,
 protected-data read, model call, Google access, or deployment change was attempted.
-U-10 now provides hidden synthetic answer-key evaluation, explicit zero-spend/paid
-test lanes, and a content-free durable benchmark evidence shape. U-11A is the next
-autonomous unit.
+U-10 provides hidden synthetic answer-key evaluation, explicit zero-spend/paid test
+lanes, and a content-free durable benchmark evidence shape. U-11A now closes the
+concrete recovery, close-policy, trace/evidence, plugin, context/sidecar, capability-
+matrix, ethics, and frontend-direction gaps. Publication review remains; deployment
+and protected-data validation remain separately gated.
 
 The broader repository audit nevertheless found genuine unfinished work in the two
 legacy plans still marked `active`. This document is the completion ledger for every
@@ -55,10 +57,10 @@ missing older source plan.
 
 ## Current Validation Evidence
 
-- Backend verification: the latest local `make check` passed: ruff clean, mypy strict
-  clean across 129 source files, and 1,106 zero-spend tests passed at 90% coverage;
+- Backend verification: the U-11A local `make check` passed: ruff clean, mypy strict
+  clean across 132 source files, and 1,132 zero-spend tests passed at 90% coverage;
   the explicit paid-oracle lane self-test also passed separately.
-- Frontend verification: ESLint clean, TypeScript clean, 11 Vitest files / 41 tests
+- Frontend verification: ESLint clean, TypeScript clean, 12 Vitest files / 42 tests
   passed, backend and generated-client OpenAPI drift checks pass, and the production
   build succeeds.
 - GitHub PR #30, execution/evidence/export hardening, merged 2026-08-06.
@@ -73,7 +75,9 @@ missing older source plan.
 - GitHub PR #48, local edit-learning and next-run readback, merged 2026-08-21 as
   `42bc33c` after all final-head checks passed and its actionable review fixes were
   resolved.
-- U-10 is locally complete on `feat/regression-oracles-u10`; its shipping PR/merge
+- GitHub PR #49, zero-spend regression oracles and benchmark evidence, merged
+  2026-08-21 as `f97082e` after all final-head CI and review gates passed.
+- U-11A is locally complete on `feat/close-recovery-u11a`; its shipping PR/merge
   evidence is intentionally not claimed until that branch is published and reviewed.
 - No GitHub issue was created or updated in the strict window.
 - At audit start, the current feature branch had no unique code commit relative to
@@ -131,7 +135,7 @@ Source: `docs/plans/2026-07-11-001-feat-mootloop-v1-agentic-litigation-pipeline-
 | V1-X2 | `folio-enrich` localhost-only ingest lane, allowlist preflight, no matter web search | COMPLETE locally / DEPLOYMENT-GATED | U-04B binds extraction to the fixed local/private endpoint, a digest-pinned reviewed source, bounded fixed-schema I/O, and a converter container with no egress, mounts, or public port. Synthetic deployed proof remains U-17A; real-folder evidence remains behind fresh D-03 authorization. |
 | V1-X3 | Full CLI breadth and non-discovery adapters | DEFERRED | Explicit post-first-serve scope. CLI parity foundations are U-11A/U-11B; adapter breadth remains in the Deferred Follow-up Queue. |
 | V1-X4 | README, AGENTS, THIRD-PARTY, mypy, ruff, pytest/invariants | COMPLETE | Files are present and both current validation suites pass. |
-| V1-DOCS | Ethics/supervision guidance and durable solution learnings | PARTIAL | `docs/ethics.md` is absent; plugin/skill and operational documentation closure is queued in U-11A. Solutions remain event-driven as lessons are completed. |
+| V1-DOCS | Ethics/supervision guidance and durable solution learnings | COMPLETE for current scope | U-11A adds `docs/ethics.md`, namespaced guarded skills, backup/close guidance, and durable frontend direction. Solutions remain event-driven as lessons are completed. |
 
 ### Acceptance-criterion reconciliation
 
@@ -148,18 +152,18 @@ delivery now share the same immutable commitment and recovery boundary.
 | ID | Reconciled status | Evidence or queue |
 |---|---|---|
 | D1 Architecture | PARTIAL | Provider/task/stage protocols, immutable persona/pipeline selection, deterministic convergence, uniform gate ordering/dependencies, the gate ledger, and copied-component seams/provenance exist. Synthesis remains U-12. |
-| D2 Packaging and skills | PARTIAL | Six executable personas with exact bodies and ownership contracts plus two local skills exist. Namespaced plugin packaging, complete side-effect invocation guards, compact navigators, and skill/CLI breadth remain U-11A/U-11B. |
+| D2 Packaging and skills | COMPLETE for current verbs / future breadth queued | Six executable personas, a valid namespaced plugin, exact ownership contracts, guarded side-effecting skills, and compact navigators exist. New U-12–U-15 verbs must extend the checked matrix and packaging contract. |
 | D3 Adversarial security | PARTIAL | Path/vault/privacy/redaction/type controls, enforced local isolation, integrity, and hostile DOCX/learning gates exist. Deployed proof and Google ACL controls remain U-17A/D-06. |
 | D4 Performance and scale | OPEN-AUTO | Flat-context proof, bounded fan-out, prompt caching, objection batching, cache metrics, and calibrated retry/concurrency are U-16. The process-wide CourtListener bucket already exists. |
 | D5 Cost and budget | PARTIAL | Tiered models, dated pricing, cache-aware metering, estimates, labels, and caps exist. Output-cap, batching, cache, and self-calibration refinements remain U-16. |
 | D6 Loop calibration | PARTIAL | Score delta + material-change + completeness convergence, directional-only jury signals, and held-out assigned-judge calibration are implemented. Remaining measurement-driven tuning is U-16. |
 | D7 Discovery-practice gates | COMPLETE for the current adapter | Current discovery shapes, RFA decisions, sanctions-linked rubric penalties, privilege log, structural export, and exact opinion-to-proposition support are implemented. |
 | D8 Export round trip | PARTIAL | DOCX rendering, attested local exports, bookmark/sentinel/revision reimport, defensive OOXML, and CriticMarkup learning state exist. Optional Google suggestions/comments remain D-06. |
-| D9 Lifecycle and integrity | PARTIAL | Cache staleness, close inventory, sync guard, locks, backups, full local attestation commitments, fact versions, and learning-event state exist. Close-policy enforcement and stronger remote signed heads remain U-11A and D-09/D-14. |
+| D9 Lifecycle and integrity | PARTIAL | Cache staleness, retention/hold close policy, complete close manifest, sync guard, heartbeating locks/backups, full local attestation commitments, fact versions, and learning-event state exist. The explicit whole-vault `verify` reconciliation remains U-11B; stronger remote signed heads remain D-09. |
 | D10 Python foundations | COMPLETE for the current suite | Domain models, strict schemas, migrations, five-layer frozen config, unions, protocols, sync-core boundaries, folds, typed trust zones, gate ordering, write-once turn results, copied-component seams, CLI split, learning package, and deterministic/replayed/invariant/explicit-paid test tiers exist. |
-| D11 Agent-native parity | PARTIAL | Current run/decision/attestation/export, TaskSpec-lock, and learning primitives have CLI/API paths. Sidecars, `context.md`, emergent-task proof, durable-job breadth, and the complete capability matrix remain U-11A/U-11B. |
-| D12 Vocabulary, IDs, config | PARTIAL | Five-layer resolution, structural override controls, canonical gate names/order, and IDs consumed by current immutable run/gate/learning context are complete. Trace/evidence vocabulary remains U-11A. |
-| D13 Sequencing | PARTIAL / DEFERRED | The pre-serve core, local edit-learning, and synthetic oracle exist, but clean validation is U-17. CLI breadth and generic evidence tooling remain U-11A/U-11B; Google/non-discovery breadth remains D-06/deferred. |
+| D11 Agent-native parity | PARTIAL | Current run/decision/attestation/export, TaskSpec-lock, learning, matter-context, trace/evidence, close, and reopen primitives have checked CLI/API paths; current human artifacts have sidecars. Emergent-task proof and the planned U-12–U-15 capability/durable-job breadth remain. |
+| D12 Vocabulary, IDs, config | COMPLETE for current models | Five-layer resolution, structural override controls, canonical gate names/order, current IDs, content-free trace trees, and numbered evidence-pack commitments are implemented. Future stores must extend the same checked contract. |
+| D13 Sequencing | PARTIAL / DEFERRED | The pre-serve core, local edit-learning, synthetic oracle, and generic evidence tooling exist, but clean validation is U-17. Remaining CLI breadth is explicitly owned by U-11B/U-12–U-15; Google/non-discovery breadth remains D-06/deferred. |
 
 ## Plan 2 — Demo Server and Deployment
 
@@ -224,11 +228,11 @@ Source: `docs/plans/2026-07-12-001-feat-hosted-frontend-folio-cockpit-plan.md`
 | FD-2 Perimeter | PARTIAL | JWT algorithm/audience/email/JWKS behavior and recorded AOP perimeter are complete. Device-only Google consent and connector/backup credential handling remain D-06/U-14. |
 | FD-3 Non-portable controls | PARTIAL | U-02 completes runtime outbound canary/redaction locally and U-03 completes the stronger audit/attestation commitment. Content-free notifications remain U-15. |
 | FD-4 Approve then inject | PARTIAL | Approval-filtered, provenance-tagged, DATA-fenced manifest injection is complete; durable board/changelog/review feed is U-13. |
-| FD-5 Architecture corrections | PARTIAL | Pause/queue/SSE/BFF, immutable launch bindings, and thin TaskSpec paths exist. Full task lanes, drain/failover behavior, and pipeline-shape deferral are U-11A/U-11B/U-12/U-15. |
-| FD-6 Data lifecycle | PARTIAL | Consistent backup, spend intent, close inventory, and queue locking exist. Full integrity/recovery/close policy, board mutation, hardened upload, and watcher reconciliation are U-03/U-11A/U-13/U-14. |
-| FD-7 Capability parity | PARTIAL | Current matter/run/decision/attestation/export rows exist. The checked capability matrix and remaining task/board/suggestion/failover/connector/notification verbs are U-11A/U-11B through U-15. |
+| FD-5 Architecture corrections | PARTIAL | Pause/queue/SSE/BFF, immutable launch bindings, thin TaskSpec paths, drain recovery, and control-plane attempt accounting exist. Full task lanes and failover behavior are U-11B/U-12/U-15; broad pipeline shape stays deferred. |
+| FD-6 Data lifecycle | PARTIAL | Consistent heartbeating backup, spend intent, complete close policy/manifest, recovery accounting, and queue locking exist. Board mutation, hardened upload, watcher reconciliation, and deployed restore proof remain U-13/U-14/U-17A. |
+| FD-7 Capability parity | PARTIAL | The checked matrix proves current matter/run/decision/attestation/export/close/context/evidence/reopen rows and names an owner for every planned row. Task/board/failover/connector/notification implementations remain U-12–U-15. |
 | FD-8 TypeScript contract | COMPLETE for FE-2 | Generated OpenAPI types, drift checks, typed modules, zod SSE, session-expiry handling, query keys, protected mutation semantics, and thin-BFF tests exist. New surfaces must extend the same contract in U-12–U-15. |
-| FD-9 Design direction | PARTIAL | The existing cockpit implements the case-file language and core ceremonies. The promised durable `docs/design/frontend-direction.md` plus remaining rooms/mobile board are U-11A/U-12–U-15. |
+| FD-9 Design direction | PARTIAL | The existing cockpit implements the case-file language and core ceremonies, and U-11A adds the durable `docs/design/frontend-direction.md`. Remaining rooms/mobile board are U-12–U-15. |
 | FD-10 Sequencing | PARTIAL | FE-0 through FE-2.5 are substantially present, but the clean first run is not accepted; U-17 precedes the queued FE-3–FE-6 expansion under D-10. |
 
 ### Explicitly deferred frontend scope
@@ -247,16 +251,16 @@ ahead of context reproducibility, isolation, and a clean live run.
 | RECENT-3 | PR #31 | Monitor the next three reopen operations or seven days | NOT EVIDENCED; D-07. |
 | RECENT-4 | 2026-08-05 blind-turn audit | Audit/discard suspect hosted turns or re-drive after the fix | DECISION-GATED; D-01/D-03. |
 | RECENT-5 | Historical live handoff | Resolve four attorney decisions and provide verified grounding facts | DECISION-GATED; D-02. No private answers belong in this repository. |
-| RECENT-6 | PR #30 durable follow-ups | Fact-store torn-tail recovery; lost-lock/background heartbeat; backup heartbeat; shutdown and seat-limit attempt accounting | OPEN-AUTO; U-03/U-11A before U-17B. |
-| RECENT-7 | PR #31 product follow-up | Expose `needs_attention` reopen reason/attempt/queue-repair state in the cockpit | OPEN-AUTO; U-11A/U-15. |
+| RECENT-6 | PR #30 durable follow-ups | Fact-store torn-tail recovery; lost-lock/background heartbeat; backup heartbeat; shutdown and seat-limit attempt accounting | COMPLETE locally in U-03/U-11A; deployed observation remains U-17A. |
+| RECENT-7 | PR #31 product follow-up | Expose `needs_attention` reopen reason/attempt/queue-repair state in the cockpit | COMPLETE locally in U-11A; browser/deployed journey remains U-17A. |
 
 ## Canonical Disposition
 
 Every discovered task now has one of four durable outcomes:
 
 1. `COMPLETE` with current evidence above.
-2. `OPEN-AUTO` as the still-unfinished portions of U-11A through U-17C in the
-   continuation plan; U-00 through U-09 are merged and U-10 is complete locally.
+2. `OPEN-AUTO` as U-11B through U-17C in the continuation plan; U-00 through U-10
+   are merged and U-11A is complete locally pending publication review.
    Their completed U-18 publication dispositions are recorded with each unit.
    Deployment remains a separate gated operation rather than part of that publication
    closure.
@@ -306,22 +310,34 @@ record attorney approvals, consent to OAuth, spend uncapped funds, or deploy pro
   `make check` explicitly excludes marker-gated paid oracles; and content-free,
   close-registered evidence-pack and hard-human verdict models bind exact digests
   without placing protected work product in Git.
+- Completed U-11A locally: fact journals repair torn terminal writes; long backups
+  heartbeat and fail closed on lost ownership; shutdown/capacity deferrals preserve
+  attempt accounting; and needs-attention runs expose blockers, reason, attempt grants,
+  and canonical queue repair in the cockpit. Matter close now enforces retention date
+  and litigation hold under one lock from backup through purge, writes a complete
+  registered-store destruction manifest, and records that logical deletion is not
+  assured media destruction. A checked capability matrix, valid namespaced guarded
+  plugin, approved `context.md` provenance, machine status sidecars, content-free trace
+  trees, immutable numbered evidence packs, ethics guidance, and frontend-direction
+  contract are all present with service/CLI/API/UI evidence where implemented.
 
 No hosted matter data, deployment, attorney approval, OAuth grant, or production state
 was read or changed. Those items remain on the Decision Sheet.
 
-## Final Local Verification — 2026-08-21
+## U-11A Local Verification — 2026-08-21
 
-- `make check`: passed — ruff, strict mypy across 92 source files, and 848 pytest tests
-  at 92% coverage (one existing Starlette deprecation warning).
-- Frontend: ESLint, TypeScript, 9 Vitest files / 37 tests, backend and client OpenAPI
-  drift checks, and the Next.js 16.2.10 production build passed. Next.js emitted its
-  non-blocking middleware-to-proxy deprecation warning.
+- `make check`: passed — ruff, strict mypy across 132 source files, and 1,132 zero-spend
+  pytest tests at 90% coverage (one existing Starlette deprecation warning).
+- Frontend: ESLint, TypeScript, 12 Vitest files / 42 tests, backend/client OpenAPI
+  drift checks, and the production build passed. Next.js emitted only its existing
+  middleware-to-proxy deprecation warning.
+- `claude plugin validate .`: passed.
 - `git diff --check`: passed.
-- PR #32 and PR #33 are merged. PR #33's backend, invariant, and frontend jobs passed
-  on head `acc1e51`; its one actionable review finding was fixed, replied to, and
-  resolved before merge. U-18 is complete for U-01. Deployment, hosted-vault access,
-  and the synthetic/real-matter gates remain unperformed.
+- The first full backend attempt exposed only the intentionally changed CLI-tree
+  snapshot: 1,131 tests passed and that one snapshot failed. The snapshot was updated,
+  its focused four-test suite passed, and the full authoritative gate above then passed.
+- U-11A remote PR/CI/merge evidence is not claimed here. Deployment, hosted-vault
+  access, and the synthetic/real-matter gates remain unperformed.
 
 ## U-04B Publication Record — 2026-08-21
 

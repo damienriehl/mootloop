@@ -7,8 +7,15 @@ import type { components } from "./schema";
 type Schemas = components["schemas"];
 
 export type MatterSummary = Schemas["MatterSummary"];
+export type CloseMatterRequest = Schemas["CloseMatterRequest"];
+export type CloseRecord = Schemas["CloseRecord"];
+export type MatterContextRequest = Schemas["MatterContextRequest"];
+export type MatterContextResponse = Schemas["MatterContextResponse"];
 export type RunSummary = Schemas["RunSummary"];
 export type RunStatusSummary = Schemas["RunStatusSummary"];
+export type AttentionBlocker = Schemas["AttentionBlocker"];
+export type TraceTree = Schemas["TraceTree"];
+export type RunEvidencePack = Schemas["RunEvidencePack"];
 export type RunActionResponse = Schemas["RunActionResponse"];
 export type CitationCheckQueuedResponse = Schemas["CitationCheckQueuedResponse"];
 export type JudgeProfileQueuedResponse = Schemas["JudgeProfileQueuedResponse"];

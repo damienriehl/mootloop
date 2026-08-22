@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from mootloop import orchestrator
+from mootloop.context_memory import context_memory_contribution
 from mootloop.context_sources import (
     ContextContributionStore,
     configured_firm_preferences_path,
@@ -51,6 +52,9 @@ def _commit_launch(
     )
     matter = load_matter(vault_root)
     contributions = list(ContextContributionStore(vault_root).list_all())
+    context_memory = context_memory_contribution(vault_root)
+    if context_memory is not None:
+        contributions.append(context_memory)
     firm_root = configured_firm_profile_root()
     if firm_root is not None:
         contributions.extend(FirmLearningStore(firm_root).list_all())

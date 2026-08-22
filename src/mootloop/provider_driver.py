@@ -7,6 +7,7 @@ optional driver part of the already-large state-machine module.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import threading
 from collections.abc import Callable
@@ -14,11 +15,18 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from mootloop import decisions
-from mootloop.context import RunContext, load_run_context, load_run_corpus
+from mootloop.context import (
+    RunContext,
+    context_manifest_path,
+    load_run_context,
+    load_run_corpus,
+)
 from mootloop.context_assembly import assemble_context
 from mootloop.errors import LockHeldError
 from mootloop.journal import load_state
+from mootloop.models.evidence import RunStatusSidecar
 from mootloop.models.run import DraftOutput
+from mootloop.persistence import sha256_file
 from mootloop.stages import first_incomplete_stage, render_prompt
 from mootloop.vault import RunLock, atomic_write_text, safe_vault_path
 
@@ -175,10 +183,27 @@ def write_observed_status(
     if state.mode != "observed":
         return
     run_context = run_context or load_run_context(vault_root, run_id)
-    path = safe_vault_path(vault_root, "runs", run_id, "STATUS.md")
+    rendered = _render_status_md(vault_root, run_id, state, run_context)
     atomic_write_text(
-        path,
-        _render_status_md(vault_root, run_id, state, run_context),
+        safe_vault_path(vault_root, "runs", run_id, "STATUS.md"),
+        rendered,
+    )
+    sidecar = RunStatusSidecar(
+        source_matter_id=run_context.manifest.matter_id,
+        run_id=run_context.manifest.run_id,
+        task=state.task or run_context.manifest.task,
+        mode=state.mode,
+        status=state.status,
+        current_stage=state.current_stage,
+        total_spend_usd=state.total_spend_usd,
+        completed_turns=len(state.completed_turns),
+        discarded_turns=len(state.discarded),
+        context_manifest_sha256=sha256_file(context_manifest_path(vault_root, run_id)),
+        human_view_sha256=hashlib.sha256(rendered.encode("utf-8")).hexdigest(),
+    )
+    atomic_write_text(
+        safe_vault_path(vault_root, "runs", run_id, "STATUS.json"),
+        sidecar.model_dump_json(indent=2) + "\n",
     )
 
 

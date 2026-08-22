@@ -1175,27 +1175,29 @@ def pause_run(vault_root: Path | str, run_id: str, reason: str = "manual") -> No
     Refuses to pause a terminally-complete run (``finished`` / ``needs_attention`` /
     ``capped``) — a paused run must be resumable, and those states are not."""
     with RunLock(vault_root, run_id):
-        load_run_context(vault_root, run_id)
+        run_context = load_run_context(vault_root, run_id)
         state = load_state(vault_root, run_id)
         if state.is_terminal:
             raise OrchestratorError(f"run {run_id!r} is complete ({state.status}); cannot pause")
         append(vault_root, run_id, RunPaused(reason=reason))
+        _write_observed_status(vault_root, run_id, run_context)
 
 
 def resume_run(vault_root: Path | str, run_id: str) -> None:
     """Resume a paused run (plan FE-1): append ``RunResumed`` so it reopens to running."""
     with RunLock(vault_root, run_id):
-        load_run_context(vault_root, run_id)
+        run_context = load_run_context(vault_root, run_id)
         state = load_state(vault_root, run_id)
         if state.status != "paused":
             raise OrchestratorError(f"run {run_id!r} is not paused")
         append(vault_root, run_id, RunResumed())
+        _write_observed_status(vault_root, run_id, run_context)
 
 
 def continue_run(vault_root: Path | str, run_id: str) -> None:
     """Clear a gated checkpoint (``mootloop run continue``) so the run resumes."""
     with RunLock(vault_root, run_id):
-        load_run_context(vault_root, run_id)
+        run_context = load_run_context(vault_root, run_id)
         events = read_events(vault_root, run_id)
         state = load_state(vault_root, run_id)
         if state.status != "checkpoint":
@@ -1205,6 +1207,7 @@ def continue_run(vault_root: Path | str, run_id: str) -> None:
             if isinstance(event, CheckpointReached):
                 boundary = event.boundary
         append(vault_root, run_id, CheckpointCleared(boundary=boundary))
+        _write_observed_status(vault_root, run_id, run_context)
 
 
 # --- needs-attention reopen (the operator's un-block verb) ------------------
@@ -1269,7 +1272,7 @@ def reopen_run(
     if grant_attempts < 0:
         raise OrchestratorError("grant_attempts must be >= 0")
     with RunLock(vault_root, run_id):
-        load_run_context(vault_root, run_id)
+        run_context = load_run_context(vault_root, run_id)
         state = load_state(vault_root, run_id)
         if state.status != "needs_attention":
             raise OrchestratorError(
@@ -1295,6 +1298,7 @@ def reopen_run(
                 reopened_by=reopened_by,
             ),
         )
+        _write_observed_status(vault_root, run_id, run_context)
     return load_state(vault_root, run_id)
 
 

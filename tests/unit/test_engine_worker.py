@@ -23,7 +23,7 @@ from mootloop.errors import SeatLimitError, TurnError
 from mootloop.journal import load_state, read_events
 from mootloop.llm import FakeLLMProvider, LLMProvider, RawTurnResult, TokenUsage
 from mootloop.models.common import DocId
-from mootloop.models.events import RunPaused, SpendRecorded, TurnIntent
+from mootloop.models.events import RunPaused, RunResumed, SpendRecorded, TurnIntent
 from mootloop.models.requests import RequestItem, RequestSet, RequestType
 from mootloop.models.run import TurnSpec
 from mootloop.registry import MatterRegistry
@@ -311,9 +311,15 @@ def test_worker_seat_limit_pauses_and_reschedules_slot(tmp_path: Path) -> None:
     # a claim right now sees nothing; a claim after the resume delay reclaims it.
     snap = queue.snapshot()
     assert len(snap) == 1 and snap[0].claimed_by is None
+    assert snap[0].attempts == 0  # capacity is not a failed execution attempt
     assert queue.claim("wS", NOW, visibility_timeout_s=60) is None
-    later = queue.claim("wS", NOW + timedelta(seconds=901), visibility_timeout_s=60)
-    assert later is not None and later.item_id == "wi-seat"
+
+    worker.provider_factory = _fake_factory
+    assert worker.run_once(NOW + timedelta(seconds=901)) is True
+    assert load_state(vault, run_id).status == "finished"
+    resumed = [e for e in read_events(vault, run_id) if isinstance(e, RunResumed)]
+    assert len(resumed) == 1
+    assert queue.snapshot() == []
 
 
 def test_worker_idle_returns_false(tmp_path: Path) -> None:
@@ -544,6 +550,7 @@ def test_generic_turn_error_still_retries_with_backoff(tmp_path: Path) -> None:
     assert load_state(vault, run_id).status == "running"
     [pending] = queue.snapshot()
     assert pending.claimed_by is None
+    assert pending.attempts == 1
     assert pending.visible_at == (NOW + timedelta(seconds=30)).isoformat()
     assert not (root / ".queue" / "notifications").exists()
 
@@ -657,6 +664,7 @@ def test_sigterm_stops_a_drain_at_a_turn_boundary(tmp_path: Path) -> None:
     [pending] = queue.snapshot()
     assert pending.item_id == "wi-1"
     assert pending.claimed_by is None
+    assert pending.attempts == 0  # graceful shutdown is not a failed execution attempt
 
     # A restarted worker resumes from the journal and carries the run to completion.
     provider.armed = False

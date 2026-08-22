@@ -11,7 +11,7 @@ from typing import Annotated
 
 import typer
 
-from mootloop import gate_ledger, orchestrator, panels
+from mootloop import evidence, gate_ledger, orchestrator, panels
 from mootloop.errors import MootloopError
 from mootloop.journal import load_state
 from mootloop.llm import FakeLLMProvider
@@ -177,6 +177,63 @@ def run_blockers(
         return
     for blocker in blockers:
         typer.secho(f"{blocker.kind}  {blocker.ref}  {blocker.detail}", fg=typer.colors.YELLOW)
+
+
+@run_app.command("evidence-build")
+def run_evidence_build(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+    json_output: Annotated[bool, typer.Option("--json", help="Emit the evidence JSON")] = False,
+) -> None:
+    """Build the next immutable run evidence pack and its content-free trace tree."""
+    try:
+        pack = evidence.build_evidence_pack(
+            vault_path,
+            run_id,
+            _now(),
+            generated_by=pwd.getpwuid(os.geteuid()).pw_name,
+            channel="cli",
+        )
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    if json_output:
+        typer.echo(pack.model_dump_json())
+        return
+    typer.echo(f"built {pack.evidence_pack_id} ({len(pack.commitments)} commitments)")
+
+
+@run_app.command("evidence-list")
+def run_evidence_list(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+    json_output: Annotated[bool, typer.Option("--json", help="Emit the evidence JSON")] = False,
+) -> None:
+    """List immutable evidence packs for one run."""
+    try:
+        packs = evidence.list_evidence_packs(vault_path, run_id)
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    if json_output:
+        typer.echo(json.dumps([pack.model_dump(mode="json") for pack in packs]))
+        return
+    if not packs:
+        typer.echo("No evidence packs.")
+        return
+    for pack in packs:
+        typer.echo(f"{pack.evidence_pack_id}  {pack.created_at}  {pack.pack_sha256}")
+
+
+@run_app.command("trace")
+def run_trace(
+    vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
+    run_id: Annotated[str, typer.Argument(help="Run id")],
+) -> None:
+    """Show the current persisted content-free trace tree."""
+    try:
+        tree = evidence.load_trace_tree(vault_path, run_id)
+    except MootloopError as exc:
+        raise _fail(exc) from exc
+    typer.echo(tree.model_dump_json(indent=2))
 
 
 @run_app.command("gates")

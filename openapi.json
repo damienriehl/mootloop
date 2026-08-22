@@ -1,6 +1,56 @@
 {
   "components": {
     "schemas": {
+      "AccessAuditEntry": {
+        "additionalProperties": false,
+        "description": "One append-only, hash-chained access-audit record.",
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "entry_hash": {
+            "title": "Entry Hash",
+            "type": "string"
+          },
+          "matter_id": {
+            "title": "Matter Id",
+            "type": "string"
+          },
+          "prev_hash": {
+            "title": "Prev Hash",
+            "type": "string"
+          },
+          "resource": {
+            "title": "Resource",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "ts": {
+            "title": "Ts",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ts",
+          "actor",
+          "action",
+          "matter_id",
+          "resource",
+          "prev_hash",
+          "entry_hash"
+        ],
+        "title": "AccessAuditEntry",
+        "type": "object"
+      },
       "ArtifactDigest": {
         "additionalProperties": false,
         "description": "Exact bytes and vault-relative identity of one sealed export artifact.",
@@ -239,6 +289,121 @@
           "item_id"
         ],
         "title": "CitationCheckQueuedResponse",
+        "type": "object"
+      },
+      "CloseMatterRequest": {
+        "additionalProperties": false,
+        "description": "Hard-human close confirmation; actor, time, and backup path are server-derived.",
+        "properties": {
+          "acknowledge_not_assured_destruction": {
+            "const": true,
+            "title": "Acknowledge Not Assured Destruction",
+            "type": "boolean"
+          },
+          "confirm_matter_id": {
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+            "title": "Confirm Matter Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "confirm_matter_id",
+          "acknowledge_not_assured_destruction"
+        ],
+        "title": "CloseMatterRequest",
+        "type": "object"
+      },
+      "CloseRecord": {
+        "additionalProperties": false,
+        "description": "Append-once record that a matter was closed and purged (plan FD-6).\n\n``removed_counts`` maps each matter-scoped inventory store name to the number of\nfiles removed for it; ``tombstone`` is the anonymized `AccessAuditEntry` retained\nto prove the matter existed and was closed while preserving the audit chain.",
+        "properties": {
+          "assured_destruction": {
+            "const": false,
+            "default": false,
+            "title": "Assured Destruction",
+            "type": "boolean"
+          },
+          "backup_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backup Ref"
+          },
+          "closed_at": {
+            "title": "Closed At",
+            "type": "string"
+          },
+          "closed_by": {
+            "title": "Closed By",
+            "type": "string"
+          },
+          "destruction_date": {
+            "format": "date",
+            "title": "Destruction Date",
+            "type": "string"
+          },
+          "destruction_method": {
+            "const": "logical-tree-deletion",
+            "default": "logical-tree-deletion",
+            "title": "Destruction Method",
+            "type": "string"
+          },
+          "limitations": {
+            "items": {
+              "$ref": "#/components/schemas/DestructionLimitation"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "removed_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Removed Counts",
+            "type": "object"
+          },
+          "retention_class": {
+            "title": "Retention Class",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": "1.1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "source_matter_id": {
+            "title": "Source Matter Id",
+            "type": "string"
+          },
+          "stores": {
+            "items": {
+              "$ref": "#/components/schemas/DestructionStore"
+            },
+            "title": "Stores",
+            "type": "array"
+          },
+          "tombstone": {
+            "$ref": "#/components/schemas/AccessAuditEntry"
+          }
+        },
+        "required": [
+          "source_matter_id",
+          "closed_at",
+          "closed_by",
+          "backup_ref",
+          "retention_class",
+          "destruction_date",
+          "limitations",
+          "stores",
+          "removed_counts",
+          "tombstone"
+        ],
+        "title": "CloseRecord",
         "type": "object"
       },
       "CsrfToken": {
@@ -643,6 +808,61 @@
         "title": "DeliverablesResponse",
         "type": "object"
       },
+      "DestructionLimitation": {
+        "additionalProperties": false,
+        "description": "A durable warning that logical deletion is not assured physical erasure.",
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "solid_state_media",
+              "synchronized_storage"
+            ],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "detail"
+        ],
+        "title": "DestructionLimitation",
+        "type": "object"
+      },
+      "DestructionStore": {
+        "additionalProperties": false,
+        "description": "One registered matter store included in the close manifest.",
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "files_removed": {
+            "minimum": 0.0,
+            "title": "Files Removed",
+            "type": "integer"
+          },
+          "glob": {
+            "title": "Glob",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "glob",
+          "description",
+          "files_removed"
+        ],
+        "title": "DestructionStore",
+        "type": "object"
+      },
       "DocxRevision": {
         "additionalProperties": false,
         "description": "One tracked OOXML insertion or deletion inside a recovered anchor.",
@@ -687,6 +907,42 @@
           "text"
         ],
         "title": "DocxRevision",
+        "type": "object"
+      },
+      "EvidenceCommitment": {
+        "additionalProperties": false,
+        "description": "Exact bytes of one fixed, non-user-authored vault source path.",
+        "properties": {
+          "kind": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Kind",
+            "type": "string"
+          },
+          "path": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256",
+            "type": "string"
+          },
+          "size_bytes": {
+            "minimum": 0.0,
+            "title": "Size Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "path",
+          "sha256",
+          "size_bytes"
+        ],
+        "title": "EvidenceCommitment",
         "type": "object"
       },
       "ExportSeal": {
@@ -1524,6 +1780,91 @@
         "title": "LearningScrubResponse",
         "type": "object"
       },
+      "MatterContextMemory": {
+        "additionalProperties": false,
+        "description": "Trusted human provenance sidecar for the matter's bounded context.md memory.",
+        "properties": {
+          "approved_at": {
+            "title": "Approved At",
+            "type": "string"
+          },
+          "approved_by": {
+            "maxLength": 320,
+            "minLength": 1,
+            "title": "Approved By",
+            "type": "string"
+          },
+          "content_sha256": {
+            "title": "Content Sha256",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "source_matter_id": {
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+            "title": "Source Matter Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_matter_id",
+          "content_sha256",
+          "approved_by",
+          "approved_at"
+        ],
+        "title": "MatterContextMemory",
+        "type": "object"
+      },
+      "MatterContextRequest": {
+        "additionalProperties": false,
+        "description": "Human-reviewed matter context; actor and time are server-derived.",
+        "properties": {
+          "text": {
+            "maxLength": 262144,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "MatterContextRequest",
+        "type": "object"
+      },
+      "MatterContextResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "matter_context",
+            "default": "matter_context",
+            "title": "Kind",
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/MatterContextMemory"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "metadata"
+        ],
+        "title": "MatterContextResponse",
+        "type": "object"
+      },
       "MatterSummary": {
         "additionalProperties": false,
         "description": "Listing-safe summary of a single matter vault.\n\n`display_name`/`case_number` are the caption strings a human uses to recognize a\nmatter (court captions are public record, not `MatterText`). `rel_path` is the\nvault directory name relative to the matters-root \u2014 never an absolute path.",
@@ -2325,6 +2666,92 @@
         "title": "RunActionResponse",
         "type": "object"
       },
+      "RunEvidencePack": {
+        "additionalProperties": false,
+        "description": "Immutable replay commitments for one numbered run evidence snapshot.",
+        "properties": {
+          "channel": {
+            "enum": [
+              "api",
+              "cli"
+            ],
+            "title": "Channel",
+            "type": "string"
+          },
+          "commitments": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceCommitment"
+            },
+            "title": "Commitments",
+            "type": "array"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "evidence_pack_id": {
+            "pattern": "^EP-mootloop-[a-z0-9][a-z0-9._-]{0,63}-[0-9]{3}$",
+            "title": "Evidence Pack Id",
+            "type": "string"
+          },
+          "generated_by": {
+            "maxLength": 320,
+            "minLength": 1,
+            "title": "Generated By",
+            "type": "string"
+          },
+          "pack_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Pack Sha256",
+            "type": "string"
+          },
+          "run_id": {
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "sequence": {
+            "maximum": 999.0,
+            "minimum": 1.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "source_matter_id": {
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+            "title": "Source Matter Id",
+            "type": "string"
+          },
+          "trace_tree": {
+            "$ref": "#/components/schemas/TraceTree"
+          },
+          "trace_tree_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Trace Tree Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "evidence_pack_id",
+          "source_matter_id",
+          "run_id",
+          "sequence",
+          "created_at",
+          "generated_by",
+          "channel",
+          "trace_tree_sha256",
+          "trace_tree",
+          "commitments",
+          "pack_sha256"
+        ],
+        "title": "RunEvidencePack",
+        "type": "object"
+      },
       "RunStatusSummary": {
         "additionalProperties": false,
         "description": "Single-run status envelope for the cockpit (folded from the journal). Exposes\nthe `RunStatus` Literal; also returned by the start-run wrapper.",
@@ -2400,6 +2827,17 @@
             },
             "title": "Open Decisions",
             "type": "array"
+          },
+          "pause_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pause Reason"
           },
           "replayable": {
             "title": "Replayable",
@@ -2917,6 +3355,112 @@
         "title": "TaskSpecsResponse",
         "type": "object"
       },
+      "TraceNode": {
+        "additionalProperties": false,
+        "description": "One content-free node whose parent relation forms the run trace tree.",
+        "properties": {
+          "kind": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "null"
+          },
+          "node_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Node Id",
+            "type": "string"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "source_path": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Source Path",
+            "type": "string"
+          },
+          "source_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Source Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_id",
+          "kind",
+          "sequence",
+          "source_path",
+          "source_sha256"
+        ],
+        "title": "TraceNode",
+        "type": "object"
+      },
+      "TraceTree": {
+        "additionalProperties": false,
+        "description": "A derived, content-free parent tree over exact journal event bytes.",
+        "properties": {
+          "generated_at": {
+            "title": "Generated At",
+            "type": "string"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/TraceNode"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "run_id": {
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "source_matter_id": {
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+            "title": "Source Matter Id",
+            "type": "string"
+          },
+          "tree_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Tree Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_matter_id",
+          "run_id",
+          "generated_at",
+          "nodes",
+          "tree_sha256"
+        ],
+        "title": "TraceTree",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -3042,6 +3586,145 @@
           }
         },
         "summary": "List Matters"
+      }
+    },
+    "/api/matters/{matter_id}/close": {
+      "post": {
+        "description": "Close only after exact confirmation; actor/time/path are trusted server inputs.",
+        "operationId": "close_matter_api_matters__matter_id__close_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseMatterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloseRecord"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Close Matter"
+      }
+    },
+    "/api/matters/{matter_id}/context": {
+      "get": {
+        "operationId": "get_matter_context_api_matters__matter_id__context_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatterContextResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "204": {
+            "description": "No approved context.md"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Matter Context"
+      },
+      "post": {
+        "operationId": "set_matter_context_api_matters__matter_id__context_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MatterContextRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatterContextResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Matter Context"
       }
     },
     "/api/matters/{matter_id}/judge-profile": {
@@ -3909,6 +4592,104 @@
         "summary": "Mint Download Link"
       }
     },
+    "/api/matters/{matter_id}/runs/{run_id}/evidence": {
+      "get": {
+        "operationId": "list_run_evidence_api_matters__matter_id__runs__run_id__evidence_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RunEvidencePack"
+                  },
+                  "title": "Response List Run Evidence Api Matters  Matter Id  Runs  Run Id  Evidence Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Run Evidence"
+      },
+      "post": {
+        "operationId": "build_run_evidence_api_matters__matter_id__runs__run_id__evidence_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunEvidencePack"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Build Run Evidence"
+      }
+    },
     "/api/matters/{matter_id}/runs/{run_id}/gates": {
       "get": {
         "operationId": "get_run_gates_api_matters__matter_id__runs__run_id__gates_get",
@@ -4593,6 +5374,54 @@
           }
         },
         "summary": "Stream Run"
+      }
+    },
+    "/api/matters/{matter_id}/runs/{run_id}/trace": {
+      "get": {
+        "operationId": "get_run_trace_api_matters__matter_id__runs__run_id__trace_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "matter_id",
+            "required": true,
+            "schema": {
+              "title": "Matter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TraceTree"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Run Trace"
       }
     },
     "/api/matters/{matter_id}/tasks": {

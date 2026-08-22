@@ -323,6 +323,7 @@ class RunState(StrictModel):
     task_spec_id: str | None = None
     mode: RunMode = "autonomous"
     status: RunStatus = "running"
+    pause_reason: str | None = None
     current_stage: str | None = None
     completed_turns: dict[str, TurnRecord] = Field(default_factory=dict)
     discarded: dict[str, int] = Field(default_factory=dict)

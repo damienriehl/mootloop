@@ -15,6 +15,7 @@ import zipfile
 from pathlib import Path
 
 import pytest
+import yaml
 from fastapi.testclient import TestClient
 
 from mootloop import orchestrator
@@ -31,7 +32,13 @@ from mootloop.production_suggestions import build_production_suggestions
 from mootloop.registry import MatterRegistry
 from mootloop.web import audit
 from mootloop.web.api import create_matter_api, routes
-from mootloop.web.api.deps import get_internal_auth, get_queue, get_registry, get_verifier
+from mootloop.web.api.deps import (
+    get_backup_dir,
+    get_internal_auth,
+    get_queue,
+    get_registry,
+    get_verifier,
+)
 from mootloop.web.security import AccessPrincipal, InternalAuth
 
 _PRINCIPAL = AccessPrincipal(email="attorney@example.com", subject="sub-1", claims={})
@@ -61,11 +68,12 @@ def queue(registry: MatterRegistry) -> Queue:
 
 
 @pytest.fixture
-def client(registry: MatterRegistry, queue: Queue) -> TestClient:
+def client(registry: MatterRegistry, queue: Queue, tmp_path: Path) -> TestClient:
     app = create_matter_api()
     app.dependency_overrides[get_verifier] = _StubVerifier
     app.dependency_overrides[get_registry] = lambda: registry
     app.dependency_overrides[get_queue] = lambda: queue
+    app.dependency_overrides[get_backup_dir] = lambda: tmp_path / "backups"
     return TestClient(app)
 
 
@@ -199,6 +207,69 @@ def test_csrf_issued_and_required_on_mutation(client: TestClient, matter: Matter
     assert blocked.status_code == 403
 
 
+def test_close_requires_exact_confirmation_and_uses_access_actor(
+    client: TestClient,
+    registry: MatterRegistry,
+    matter: MatterConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    vault = registry.resolve(matter.matter_id)
+    matter_path = vault / "matter.yaml"
+    raw = yaml.safe_load(matter_path.read_text(encoding="utf-8"))
+    raw["retention"]["destruction_date"] = "2026-07-12"
+    matter_path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    monkeypatch.setattr(routes, "_now_iso", lambda: _NOW_ISO)
+    headers = _with_csrf(client)
+    endpoint = f"/api/matters/{matter.matter_id}/close"
+
+    refused = client.post(
+        endpoint,
+        headers=headers,
+        json={
+            "confirm_matter_id": "wrong-matter",
+            "acknowledge_not_assured_destruction": True,
+        },
+    )
+    assert refused.status_code == 409
+    assert vault.exists()
+
+    closed = client.post(
+        endpoint,
+        headers=headers,
+        json={
+            "confirm_matter_id": matter.matter_id,
+            "acknowledge_not_assured_destruction": True,
+        },
+    )
+
+    assert closed.status_code == 200, closed.text
+    body = closed.json()
+    assert body["source_matter_id"] == matter.matter_id
+    assert body["closed_by"] == _PRINCIPAL.email
+    assert body["assured_destruction"] is False
+    assert not vault.exists()
+
+
+def test_context_api_uses_access_actor_and_exact_content(
+    client: TestClient, registry: MatterRegistry, matter: MatterConfig
+) -> None:
+    path = f"/api/matters/{matter.matter_id}/context"
+    missing = client.get(path, headers=_AUTH)
+    assert missing.status_code == 204
+
+    written = client.post(
+        path,
+        headers=_with_csrf(client),
+        json={"text": "Prefer a short chronology before analysis."},
+    )
+    reread = client.get(path, headers=_AUTH)
+
+    assert written.status_code == 200
+    assert written.json()["metadata"]["approved_by"] == _PRINCIPAL.email
+    assert reread.status_code == 200
+    assert reread.json()["text"] == "Prefer a short chronology before analysis.\n"
+
+
 # --- resolve: typed 409 on lock contention ----------------------------------
 
 
@@ -275,6 +346,39 @@ def test_runs_listing_returns_started_run(
     runs = resp.json()
     assert [r["run_id"] for r in runs] == [run_id]
     assert runs[0]["status"]
+
+
+def test_run_evidence_api_builds_lists_and_reads_trace(
+    client: TestClient, registry: MatterRegistry, matter: MatterConfig
+) -> None:
+    vault = registry.resolve(matter.matter_id)
+    run_id = orchestrator.start_run(
+        vault, "discovery-responses", _NOW_ISO, run_id="api-evidence-run"
+    )
+
+    built = client.post(
+        f"/api/matters/{matter.matter_id}/runs/{run_id}/evidence",
+        headers=_with_csrf(client),
+    )
+    listed = client.get(
+        f"/api/matters/{matter.matter_id}/runs/{run_id}/evidence", headers=_AUTH
+    )
+    traced = client.get(
+        f"/api/matters/{matter.matter_id}/runs/{run_id}/trace", headers=_AUTH
+    )
+
+    assert built.status_code == 200
+    assert built.json()["evidence_pack_id"] == f"EP-mootloop-{run_id}-001"
+    assert (built.json()["generated_by"], built.json()["channel"]) == (
+        _PRINCIPAL.email,
+        "api",
+    )
+    assert listed.status_code == 200
+    assert [item["evidence_pack_id"] for item in listed.json()] == [
+        f"EP-mootloop-{run_id}-001"
+    ]
+    assert traced.status_code == 200
+    assert traced.json()["tree_sha256"] == built.json()["trace_tree_sha256"]
 
 
 def test_start_run_enqueues_run_lane_work_item(

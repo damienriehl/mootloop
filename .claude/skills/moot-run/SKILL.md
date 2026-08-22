@@ -1,5 +1,5 @@
 ---
-name: moot-run
+name: run
 description: Drive a MootLoop discovery-response run end-to-end inside Claude Code by spawning persona subagents for each planned turn.
 disable-model-invocation: true
 argument-hint: <vault-path> [--task discovery-responses] [--mode autonomous|gated|observed]
@@ -61,7 +61,8 @@ Repeat until `status` reports `finished`:
   gate mode, summary, recommendation) to the attorney. **Do not resolve them
   yourself** — privilege calls, RFA dispositions, and attestation are human-by-design.
 - After the attorney decides, record each:
-  `uv run mootloop decide resolve "$VAULT" "$RUN" <decision-id> --action approve|modify|deny [--choose <key>] --by "Name"` (or a batch `--input decisions.json`).
+  `uv run mootloop decide resolve "$VAULT" "$RUN" <decision-id> --action approve|modify|deny [--choose <key>]`
+  (or a batch `--input decisions.json`). The CLI records the trusted local OS principal.
 - Resolving the last hard-human gate reopens the run — return to the drive loop.
 
 ### 4b. `needs_attention`
@@ -72,8 +73,8 @@ Repeat until `status` reports `finished`:
   outside the run (a persona body, a key, a config), so a human fixes it first.
 - Once the operator confirms the fix, they reopen it:
   `uv run mootloop run reopen "$VAULT" "$RUN" --reason "<what was fixed>" [--grant-attempts N]`
-  (a counter-capped turn needs the grant; `--force` overrides and is recorded as
-  forced). The run returns to `running` — resume the drive loop at step 2.
+  (a counter-capped turn needs the grant). The run returns to `running` — resume the
+  drive loop at step 2.
 
 ### 4c. `finished`
 
@@ -88,6 +89,11 @@ Repeat until `status` reports `finished`:
   `uv run mootloop attest-status "$VAULT" "$RUN" --json`.
 - `uv run mootloop run gates "$VAULT" "$RUN"` is the single source of truth for
   export-readiness (it lists any blockers).
+- Read `uv run mootloop context show "$VAULT" --json` and propose any durable matter
+  context learned from the finished run. Only if the attorney explicitly approves the
+  exact Markdown, write it to a temporary file and run
+  `uv run mootloop context set "$VAULT" --input <file>`. The next run snapshots it;
+  the finished run never changes.
 
 ## Rules
 

@@ -125,10 +125,13 @@ uv run mootloop export link ~/matters/acme --run <run-id> --doc <deliverable>  #
 ```bash
 uv run mootloop run start ~/matters/acme --mode gated
 uv run mootloop decide list ~/matters/acme <run-id>
-uv run mootloop decide resolve ~/matters/acme <run-id> <dec-id> --action approve --by "Jane"
-uv run mootloop attest ~/matters/acme <run-id> --by "Jane"
+uv run mootloop decide resolve ~/matters/acme <run-id> <dec-id> --action approve
+uv run mootloop attest ~/matters/acme <run-id>
 uv run mootloop run gates ~/matters/acme <run-id>
 ```
+
+The CLI derives the effective local OS principal for human-only actions; callers cannot
+submit an actor identity.
 
 **Phase 4 — Citation & fabrication gates.** The two guardrails that keep fabricated
 authority and unsupported facts out of the work product:
@@ -271,6 +274,19 @@ uv run mootloop init ~/matters/acme-v-widgets \
 
 uv run mootloop validate ~/matters/acme-v-widgets
 ```
+
+### Claude Code plugin
+
+The repository is a validated Claude Code plugin. Load a checkout for development with:
+
+```bash
+claude --plugin-dir .
+```
+
+It exposes `/mootloop:setup`, `ingest`, `run`, `decide`, `export`, `learn`, and `status`.
+Every skill that can mutate a vault or spend model capacity requires explicit invocation;
+`status` is the only read-only, model-invocable skill. The skills call the same service and
+CLI primitives as the API. Run `claude plugin validate .` to validate the package.
 
 ## Demo
 

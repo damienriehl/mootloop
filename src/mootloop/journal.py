@@ -337,9 +337,11 @@ def fold(events: list[JournalEvent]) -> RunState:
                 state.status = "running"  # reopen a gated stage-boundary pause
         elif isinstance(event, RunPaused):
             state.status = "paused"
+            state.pause_reason = event.reason
         elif isinstance(event, RunResumed):
             if state.status == "paused":
                 state.status = "running"  # reopen an operator/worker pause
+                state.pause_reason = None
         elif isinstance(event, RunReopened):
             # The grant lands whether or not the status flips, so a replayed journal
             # always shows the retry ceiling the run actually ran under.
