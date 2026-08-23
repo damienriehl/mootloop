@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import base64
-import hashlib
 import os
 import stat
+import subprocess
 from pathlib import Path
 
 from mootloop import secrets
@@ -37,8 +36,21 @@ def _read_password(env_name: str) -> str:
 
 
 def _password_line(identity: ProxyIdentity, password: str) -> str:
-    digest = base64.b64encode(hashlib.sha1(password.encode("utf-8")).digest()).decode("ascii")
-    return f"{identity}:{{SHA}}{digest}\n"
+    try:
+        result = subprocess.run(
+            ["openssl", "passwd", "-6", "-stdin"],
+            input=password,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise SystemExit("could not hash egress proxy password") from exc
+    password_hash = result.stdout.strip()
+    parts = password_hash.split("$")
+    if len(parts) != 4 or parts[:2] != ["", "6"] or not all(parts[2:]):
+        raise SystemExit("could not hash egress proxy password")
+    return f"{identity}:{password_hash}\n"
 
 
 def main() -> None:

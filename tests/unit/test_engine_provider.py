@@ -500,10 +500,61 @@ def test_proxy_service_prepares_auth_file_before_exec(
     proxy_service.main()
 
     password_lines = password_file.read_text(encoding="utf-8").splitlines()
-    assert password_lines[0].startswith("mootloop-model:{SHA}")
-    assert password_lines[1].startswith("mootloop-legal:{SHA}")
+    model_identity, model_hash = password_lines[0].split(":", maxsplit=1)
+    legal_identity, legal_hash = password_lines[1].split(":", maxsplit=1)
+    assert model_identity == "mootloop-model"
+    assert model_hash.startswith("$6$")
+    model_salt = model_hash.split("$")[2]
+    model_check = subprocess.run(
+        ["openssl", "passwd", "-6", "-salt", model_salt, "-stdin"],
+        input="proxy-secret",
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert model_check.stdout.strip() == model_hash
+    assert legal_identity == "mootloop-legal"
+    assert legal_hash.startswith("$6$")
+    legal_salt = legal_hash.split("$")[2]
+    legal_check = subprocess.run(
+        ["openssl", "passwd", "-6", "-salt", legal_salt, "-stdin"],
+        input="legal-proxy-secret",
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert legal_check.stdout.strip() == legal_hash
     assert password_file.stat().st_mode & 0o777 == 0o600
     assert executed == ["squid", "squid", "-NYCd", "1"]
+
+
+def test_proxy_service_fails_closed_when_password_hashing_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from mootloop.engine import proxy_service
+
+    def fail_hash(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        raise OSError("openssl missing")
+
+    monkeypatch.setattr(proxy_service.subprocess, "run", fail_hash)
+
+    with pytest.raises(SystemExit, match="could not hash"):
+        proxy_service._password_line(proxy_service.ProxyIdentity.MODEL, "proxy-secret")
+
+
+def test_proxy_service_fails_closed_on_malformed_password_hash(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from mootloop.engine import proxy_service
+
+    monkeypatch.setattr(
+        proxy_service.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args=[], returncode=0, stdout="bad\n"),
+    )
+
+    with pytest.raises(SystemExit, match="could not hash"):
+        proxy_service._password_line(proxy_service.ProxyIdentity.MODEL, "proxy-secret")
 
 
 @pytest.mark.parametrize("password_kind", ["missing", "directory", "symlink", "empty"])
