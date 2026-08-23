@@ -176,6 +176,8 @@ multiplayer, UTBMS, and a generic fallback adapter.
 - **D-15:** new-run-only context changes versus an explicit invalidating rebase.
 - **D-16:** post-validation ordering of adapter/panel breadth versus FE-3–FE-6.
 - **D-17:** whether currently deferred integrations enter the next milestone.
+- **D-18:** exact hosted CONNECT/443 scope for the three fixed public legal-source
+  hosts.
 
 The full choices and recommended defaults are in
 `docs/decisions/2026-08-20-plan-completion-decision-sheet.md`.
@@ -592,7 +594,9 @@ the current profile must match its write-once archive; malformed hosted-vault id
 fails closed. eCFR, GovInfo, and Federal Register remain research requests. D-18 is the
 sole hosted-operability tail: deployment's proxy still permits only the model endpoint,
 so no hosted legal-source call is attempted until its exact three-host expansion is
-authorized. No hosted matter or deployment was accessed.
+authorized. No hosted matter or deployment was accessed during U-07 publication.
+This is the publication-time boundary; D-18's later ruling and U-17A deployed result
+are recorded in `docs/audits/2026-08-23-u17a-synthetic-deployed-gate.md`.
 
 ### U-08 — Add RFP production assistance — COMPLETE
 

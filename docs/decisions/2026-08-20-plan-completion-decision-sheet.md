@@ -220,7 +220,9 @@ permission to include unrelated dirty files.
 commits, PR #32, remote CI repair, and PR-feedback repair. The user subsequently
 authorized merge of PR #32 and the reviewed continuation work. PR #33 merged as
 `74dec0a` after all remote checks passed and its actionable review thread was resolved;
-every deployment remains withheld for a fresh inline authorization.
+the user later separately authorized U-17A's synthetic development deployment.
+Production and protected-matter operations remain withheld unless explicitly
+authorized.
 
 ### D-14 — How literal should `source_matter_id` persistence be?
 
@@ -262,13 +264,15 @@ detached record self-identifying.
 - B — Create a successor plan for selected items after U-17C; name them in notes.
 - C — Create that successor scope now, without moving it ahead of the safety queue.
 
-### D-18 — May hosted workers reach the three fixed public legal-source hosts? — UNANSWERED
+### D-18 — May hosted workers reach the three fixed public legal-source hosts? — ANSWERED A
 
 **Why this matters:** U-07's application layer accepts only fixed paths on
 `www.courtlistener.com`, `api.courtlistener.com`, and `www.revisor.mn.gov`; no ingested
-text can choose a destination. The deployed authenticated proxy still permits only the
-model endpoint, so hosted citation checks and judge-profile builds will fail closed
-until this separate network policy is expanded.
+text can choose a destination. The deployed authenticated proxy permitted only the
+model endpoint when this question was asked. D-18 A has since been deployed as
+a separate authenticated legal-source identity; U-17A proves its fixed-route policy
+while retaining the CourtListener DNS/token limitations in the deployed evidence
+report.
 
 - **A — Authorize exactly those three public legal-source hosts in the hosted CONNECT
   allowlist (recommended).** Keep the application fixed-path checks, proxy authentication,
