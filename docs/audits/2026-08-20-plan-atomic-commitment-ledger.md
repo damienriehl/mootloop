@@ -41,12 +41,12 @@ short label is less detailed.
 | D3-C3 | ID/path/filename realpath-containment hardening | COMPLETE |
 | D3-C4 | Google permission read-back and recipient allowlist after export | DECISION-GATED — D-06 |
 | D3-H5 | Vault/repo separation and no-follow symlink invariants | COMPLETE |
-| D3-H6 | Secrets outside vault/repo, minimal env, runtime redaction | COMPLETE locally and synthetically deployed — U-02/U-17A |
+| D3-H6 | Secrets outside vault/repo, minimal env, runtime redaction | COMPLETE locally / DEPLOYED PARTIAL — U-02; U-17A observes dedicated proxy-secret isolation, while deployed minimal-environment/runtime-redaction proof remains open |
 | D3-H7 | Ethical walls and cross-matter learning exclusion | COMPLETE locally — source matter, sharing scope, and per-matter exclusions are launch-filtered |
 | D3-H8 | Immutable verification source, chained logs/decisions, full attestation tuple | COMPLETE locally — exact-byte v2 commitment and mutation gates |
 | D3-H9 | Fixed legal-host egress allowlist; no content-derived target | COMPLETE for current routes — D-18's separate authenticated CONNECT/443 identity is deployed; arbitrary hosts/paths and cross-identity use fail closed |
 | D3-H10 | Defensive DOCX/ZIP/XXE parsing and pinned model/catalog fetches | PARTIAL — protected conversion and hostile local DOCX edit parsing complete; catalog updates U-12 |
-| D3-M11 | Per-matter canaries and fail-closed privacy scanning | COMPLETE locally and synthetically deployed — U-02/U-17A planted outbound probe |
+| D3-M11 | Per-matter canaries and fail-closed privacy scanning | COMPLETE locally / DEPLOYED PARTIAL — U-02; U-17A proves the direct canary component, while deployed fail-closed privacy-scanning fixture proof remains open |
 | D3-M12 | Shared export controls for every CLI/skill path | COMPLETE for current sealed exports; extensions U-11A |
 | D3-13 | Every confidentiality/attestation error fails closed | PARTIAL — enforced per landing unit |
 | D3-14 | `MatterText`/`PublicText` trust conversion through scrub | COMPLETE for current sinks — U-09 shared text joins the U-02/U-05 outbound conversion boundary |
