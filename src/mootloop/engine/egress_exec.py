@@ -175,6 +175,10 @@ def apply_landlock(env: dict[str, str]) -> None:
             _allow_path(ruleset_fd, path, _READ_EXEC & handled)
         device_access = (_READ_FILE | _WRITE_FILE | _READ_DIR) & handled
         _allow_path(ruleset_fd, Path("/dev"), device_access)
+        # Claude Code's native binary reads its own memory map during startup and
+        # aborts with SIGABRT when Landlock hides it. Bind the rule to this process's
+        # maps inode before exec; do not expose procfs generally or any other PID.
+        _allow_path(ruleset_fd, Path("/proc/self/maps"), _READ_FILE & handled)
         _allow_path(ruleset_fd, config, handled)
         libc = ctypes.CDLL(None, use_errno=True)
         if libc.prctl(_PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0:
