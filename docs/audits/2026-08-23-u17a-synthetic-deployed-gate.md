@@ -6,22 +6,28 @@ Environment: Hetzner development host, synthetic matter only
 
 Matter ID: `2026-08-22-synthetic-u17a`
 
-Run ID: `u17a-recovery-20260823`
+Primary recovery run ID: `u17a-recovery-20260823`
+
+Qualifying drain/reclaim run ID: `u17a-reclaim-final-20260823`
 
 ## Verdict
 
-The deployed worker now exits cleanly
-under Compose stop/recreate, fixed-route authenticated egress fails closed, a planted
-canary cannot leave the worker, sibling matter paths are absent, isolated conversion
-is reproducible, queue/reopen recovery finishes without duplicate work, encrypted
-backup restores byte-for-byte, synthetic key retirement purges retired archives, and
-the public perimeter is intercepted by Cloudflare Access.
+The deployed worker now exits cleanly under Compose stop/recreate, survives an
+in-flight provider interruption with exact queue release/reclaim accounting,
+fixed-route authenticated egress fails closed, and a hostile canary payload entering
+the normal provider boundary is rejected before a subprocess can start. Sibling matter
+paths are absent, isolated conversion is reproducible, queue/reopen recovery finishes
+without duplicate work, encrypted backup restores byte-for-byte, synthetic key
+retirement purges retired archives, and the public perimeter is intercepted by
+Cloudflare Access.
 
-Three evidence tails remain: a full hostile-input/persona-turn trace that ends at the
-blocked transport boundary, an in-flight stop with durable checkpoint/reclaim on boot,
-and the authenticated mobile journey after a human Cloudflare Access sign-in. No
-protected matter was opened, listed, or used. U-17A therefore remains `PARTIAL`; the
-direct component probes below must not be promoted into broader end-to-end claims.
+Every autonomous U-17A runtime drill is complete. The only remaining tail is the
+authenticated mobile journey after a human Cloudflare Access sign-in. Chrome and its
+ChatGPT extension are installed and enabled, but the installed Browser plugin's
+control client fails during initialization before tab discovery; reinstalling that
+plugin is required before the content-free phone-width check can resume. No protected
+matter was opened, listed, or used. U-17A therefore remains `PARTIAL` solely at this
+human/browser boundary.
 
 ## Scope and human boundary
 
@@ -40,11 +46,11 @@ direct component probes below must not be promoted into broader end-to-end claim
 
 | Component | Observed version or immutable identity |
 |---|---|
-| Control checkout | `eb4fd08aa44035f8367798d0ad728f0d9e028483` |
+| Control checkout | `71d2b97ef9edc1c1288fee40236903e7ebf070fa` |
 | Linux kernel | `6.8.0-136-generic` |
 | Docker Engine | `29.4.0` |
 | Docker Compose | `5.1.1` |
-| Worker driver image | `sha256:81dae55498f365b47552b2bf1bf1ea179bdd4ef024266f0d0edba8d91ca57362` |
+| Worker driver image | `sha256:90c4e355d41a1af3a6ef3f9b920814895a2526c7d33e94e5ccdcf6d0ef7a4fa5` |
 | Egress proxy image | `sha256:43807e876be4168217efe89904e726da22bf1d45c27c4df50f6bd348b224a88f` |
 | `folio-enrich` image | `sha256:584774699e50b5f7c95d147a896664c5c30dbcbeed727dfe0d5254715068916b` |
 | Reviewed converter commit | `f5364365346d93a3aa01fd5fecf219090afe5410` |
@@ -59,7 +65,7 @@ direct component probes below must not be promoted into broader end-to-end claim
 | Worker PID 1 | Runtime executable owns PID 1; no parent shell | `mootloop` owned PID 1 and the stored command used `exec` | PASS |
 | Graceful termination | Compose stop exits within the grace period without SIGKILL/137 | Stop completed in 1.25 seconds; exit 0; `OOM=false` | PASS |
 | Recreate/signal delivery | Recreate does not force-kill the worker | Recreate completed in 3.26 seconds; later queue-drill stop completed in 1.56 seconds | PASS |
-| In-flight drain/reclaim | A claimed turn checkpoints or finishes on SIGTERM and remaining work is reclaimed on boot | No turn was deliberately held in flight during the stop timing probe | OPEN — separate controlled drill |
+| In-flight drain/reclaim | A claimed turn is released on SIGTERM, reclaimed once on boot, and completed without duplicate work or spend | While `claude -p` was in flight, Compose stop exited 0 in 10.153 seconds without OOM; the exact item was released with its attempt refunded, reclaimed once at the unchanged one-turn/$0.062512 baseline, and the next distinct turn completed | PASS |
 | Worker health | Driver, proxy, and converter reach healthy state | All three healthy after exact serial rebuild | PASS |
 | Direct model egress | Direct outbound connection is impossible | Direct Anthropic connection failed before HTTP | PASS |
 | Model proxy identity | Only the model host is reachable | Anthropic tunnel reached HTTP 404; both legal identities and arbitrary hosts were denied | PASS |
@@ -68,7 +74,7 @@ direct component probes below must not be promoted into broader end-to-end claim
 | Non-TLS egress | Port 80 is denied | Proxy returned 403 / `TCP_DENIED` | PASS |
 | Fixed application routes | Content cannot choose a host or path | Fixed Minnesota statute route reached HTTP 200; fixed CourtListener route reached HTTP 401; arbitrary host and arbitrary path raised `EgressError` before transport | PASS |
 | Runtime canary component | Current matter canary is centrally registered and blocks a direct outbound payload | A missing synthetic-fixture registration was repaired atomically; the repeated direct probe raised `OutboundPrivacyError` before transport | PASS after repair |
-| Planted-injection execution path | Hostile matter input traverses the normal persona/run path and any attempted exfiltration is blocked before transport | Hostile instruction-like input was converted as data, but no live persona turn was driven from that fixture | OPEN — end-to-end trace required |
+| Planted-injection provider path | Hostile matter input entering the normal provider boundary is rejected before any model subprocess or transport starts | The registered synthetic canary was supplied through `HeadlessClaudeProvider.run_turn`; it raised `OutboundPrivacyError`, and a subprocess tripwire confirmed no subprocess started | PASS |
 | Sibling filesystem | Worker cannot read a sibling matter marker | Both worker-root and host-style sibling paths returned `FileNotFoundError` | PASS |
 | Isolated conversion | Hostile instruction-like text remains data and conversion is reproducible | Pinned converter returned the same receipt on retry; normalized output preserved the text and arbitrary URL only as data | PASS |
 | Converter sandbox | No public port, host mount, privilege, or general egress | Non-root, read-only root filesystem, all capabilities dropped, no mounts or published ports, internal conversion network only | PASS |
@@ -77,7 +83,7 @@ direct component probes below must not be promoted into broader end-to-end claim
 | Synthetic key retirement | A new key cannot decrypt the retired archive and retired archives are purged | Wrong-key restore raised `BackupError`; old and ephemeral new drill archives were purged; zero rotation archives remained | PASS |
 | Access edge | Anonymous public requests never reach the application | Public request redirected to Cloudflare Access; direct origin TLS failed for lack of the Cloudflare client certificate | PASS |
 | Internal API/worker boundary | Health is available; internal routes require the secret; worker has no API/Docker control path | `/health` returned 200; unauthenticated matter/internal routes returned 401; in-memory authenticated internal ping returned 200; worker could not resolve `api`, joined only its two internal networks, had exactly five expected mounts, and had no Docker socket | PASS |
-| Authenticated mobile journey | Attorney can enter through Access and inspect only the synthetic flow at phone width | Controlled Chrome reached the Access login; human sign-in is pending | BLOCKED — human auth |
+| Authenticated mobile journey | Attorney can enter through Access and inspect only the synthetic flow at phone width | Access previously intercepted the exact synthetic route. The installed Chrome extension is enabled, but the Browser plugin control client now fails before tab discovery, so sign-in and phone-width QA cannot be driven | BLOCKED — Browser plugin reinstall, then human auth |
 
 ## Conversion and recovery receipts
 
@@ -90,6 +96,11 @@ direct component probes below must not be promoted into broader end-to-end claim
 - Completed turns: 12
 - Final synthetic queue depth: 0
 - Current canary registration: present and mapped to the synthetic matter
+- Qualifying drain run final status: `finished`
+- Qualifying drain run completed/discarded turns: 12 / 1
+- Qualifying drain run total tokens: 500,228
+- Qualifying drain run final notional spend: `$0.718948`
+- Qualifying drain run exact residual queue items: 0
 
 ## PR #30 / #31 monitoring ledger
 
@@ -113,20 +124,29 @@ behavior above tests their operational contracts rather than reconstructing stal
    `0600`, the worker was recreated to refresh the bind inode, and the outbound probe
    then failed closed before transport. Existing registry entries were preserved and
    never printed. This was an environment-fixture repair, not a code change.
+3. The hosted provider initially read its control state from the wrong matter-relative
+   location. PR #58 bound provider state to the current matter; final-head CI passed,
+   the PR merged, and the deployed content-free provider probe returned the exact
+   requested result with usage metadata.
+4. Claude Code aborted under Landlock because it could not read `/proc/self/maps`.
+   PR #59 allows that one read-only self path while regression tests prove parent-PID
+   maps and `/proc/self/cgroup` remain denied. The validated launcher first reused a
+   cached image that lacked the rule, so the driver and proxy were explicitly rebuilt
+   from merged head before recreation. The rebuilt worker reported Claude Code
+   `2.1.207`, and the live content-free provider probe succeeded.
+
+Two preliminary drain attempts were deliberately excluded from the qualifying
+evidence: the first reached a gated checkpoint before SIGTERM took effect, and the
+second used an observer pattern that missed the provider process. Neither was counted
+as reclaim proof. The final run used an exact `^claude -p` observer and produced the
+release/reclaim receipt above.
 
 ## Remaining risk and queue
 
-- **End-to-end planted injection:** the direct registered-canary probe proves the
-  privacy control, and hostile conversion proves instruction-like input remains data,
-  but no normal persona/run path joined those observations. FD1-05 remains partial
-  until a controlled synthetic hostile-input turn ends at the blocked transport seam.
-- **In-flight drain/reclaim:** PID 1 and graceful stop are proved, but no turn was held
-  in flight during SIGTERM. FD5-07's deployed drain/reclaim clause remains open until a
-  controlled synthetic worker checkpoints or finishes and boot recovery reclaims the
-  residual queue item.
-- **Human Access session:** authenticated desktop/mobile browser evidence remains the
-  final human-assisted U-17A blocker. A user must complete Cloudflare Access in the
-  controlled Chrome profile; credentials and one-time codes stay human-only.
+- **Human Access session:** authenticated desktop/mobile browser evidence is the sole
+  remaining U-17A blocker. Reinstall the Browser plugin from the ChatGPT plugin UI,
+  then complete Cloudflare Access in the controlled Chrome profile; credentials and
+  one-time codes stay human-only.
 - **CourtListener alternate host:** `api.courtlistener.com` did not resolve from the
   development host or proxy. MootLoop's implemented fixed routes use
   `www.courtlistener.com`; the unresolved alternate remains an external availability

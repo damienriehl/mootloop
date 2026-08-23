@@ -28,9 +28,13 @@ Execution update through 2026-08-23: D-18 A is deployed for the fixed legal-sour
 hosts behind separate authenticated proxy identities, and U-17A's direct synthetic
 worker, egress, canary, sibling-path, converter, queue/reopen, backup/restore,
 key-retirement, and Access-perimeter probes pass. PRs #52 through #56 are merged.
-U-17A still needs an end-to-end hostile-input trace, an in-flight drain/reclaim drill,
-and an authenticated mobile journey waiting on human Cloudflare Access. U-17B remains
-behind fresh D-03 authorization; U-17C and
+PRs #58 and #59 subsequently repaired the hosted provider-state binding and Claude
+Code's read-only Landlock self-maps requirement. A hostile canary entering the normal
+provider boundary now fails before subprocess start, and an in-flight stop/reclaim
+drill passed without duplicate turn or spend. U-17A now needs only the authenticated
+mobile journey; its Chrome control client requires a Browser plugin reinstall before
+human Cloudflare Access can be completed. U-17B remains behind fresh D-03
+authorization; U-17C and
 the post-validation U-11B/U-12–U-16 breadth remain durably queued behind the clean
 workflow/observed-friction gate rather than silently omitted.
 
@@ -95,6 +99,11 @@ missing older source plan.
   PR #55 repaired Squid-compatible credentials; and PR #56 made the hosted driver own
   PID 1. Each is merged, and U-17A recorded exact deployed behavior for their runtime
   contracts in `docs/audits/2026-08-23-u17a-synthetic-deployed-gate.md`.
+- GitHub PR #58 repaired hosted provider-state binding. PR #59 allowed only
+  `/proc/self/maps` through the Claude Landlock read boundary while keeping parent-PID
+  maps and `/proc/self/cgroup` denied. Its final `make check` passed ruff, strict mypy
+  across 132 source files, and 1,200 zero-spend tests at 90% coverage; final-head CI
+  passed and PR #59 merged as `71d2b97`.
 - No GitHub issue was created or updated in the strict window.
 - At audit start, the current feature branch had no unique code commit relative to
   its already-merged result and its file tree matched `origin/main`. U-00 now adds the
@@ -240,7 +249,7 @@ Source: `docs/plans/2026-07-12-001-feat-hosted-frontend-folio-cockpit-plan.md`
 
 | ID | Reconciled status | Evidence or queue |
 |---|---|---|
-| FD-1 Sandbox/internal trust | PARTIAL | Persona turns receive no filesystem tools; U-02 enforces egress/per-matter isolation; U-17A proves direct canary blocking, sibling-path absence, authenticated route separation, and no direct egress. A normal hostile-input/persona-turn trace remains open. |
+| FD-1 Sandbox/internal trust | PARTIAL | Persona turns receive no filesystem tools; U-02 enforces egress/per-matter isolation; U-17A proves hostile canary rejection at the normal provider boundary before subprocess start, sibling-path absence, authenticated route separation, and no direct egress. Later notification sinks remain U-15. |
 | FD-2 Perimeter | PARTIAL | JWT algorithm/audience/email/JWKS behavior and recorded AOP perimeter are complete. Device-only Google consent and connector/backup credential handling remain D-06/U-14. |
 | FD-3 Non-portable controls | PARTIAL | U-02 completes runtime outbound canary/redaction locally and U-03 completes the stronger audit/attestation commitment. Content-free notifications remain U-15. |
 | FD-4 Approve then inject | PARTIAL | Approval-filtered, provenance-tagged, DATA-fenced manifest injection is complete; durable board/changelog/review feed is U-13. |
@@ -276,8 +285,8 @@ Every discovered task now has one of four durable outcomes:
 
 1. `COMPLETE` with current evidence above.
 2. `OPEN-AUTO` as U-11B through U-16 plus U-17B/U-17C in the continuation plan;
-   U-17A has two autonomous runtime drills and one human-authenticated browser step
-   left, and U-00 through U-11A are remotely reviewed and merged.
+   U-17A's autonomous runtime drills are complete and only its human-authenticated
+   browser step remains, while U-00 through U-11A are remotely reviewed and merged.
    Their completed U-18 publication dispositions are recorded with each unit.
    Deployment remains a separate gated operation rather than part of that publication
    closure.
@@ -303,9 +312,9 @@ record attorney approvals, consent to OAuth, spend uncapped funds, or deploy pro
 
 | Queue item | State | Next admissible action |
 |---|---|---|
-| U-17A hostile-input trace | OPEN AUTO / RUNTIME-SENSITIVE | Drive a controlled synthetic hostile input through the normal persona/run path and prove the outbound attempt is blocked before transport; do not expose a real canary or protected text in evidence. |
-| U-17A in-flight drain/reclaim | OPEN AUTO / RUNTIME-SENSITIVE | Hold a controlled synthetic turn in flight, send normal Compose stop, and prove durable checkpoint-or-finish plus boot reclaim without SIGKILL or duplicate work. |
-| U-17A authenticated mobile journey | HUMAN-AUTH BLOCKER | User completes Cloudflare Access and opens the exact synthetic run; agent performs phone-width, content-free QA and closes the evidence report. |
+| U-17A hostile-input provider trace | COMPLETE | Registered synthetic canary payload entered `HeadlessClaudeProvider.run_turn`, raised `OutboundPrivacyError`, and a subprocess tripwire proved rejection before process or transport start. |
+| U-17A in-flight drain/reclaim | COMPLETE | Exact `claude -p` observation preceded a normal Compose stop; exit was 0 without OOM, the attempt was refunded and released, boot reclaimed it once at an unchanged completed-turn/spend baseline, and the run finished with 12 turns plus zero residual queue items. |
+| U-17A authenticated mobile journey | BROWSER-REPAIR / HUMAN-AUTH BLOCKER | Reinstall the Browser plugin from the ChatGPT plugin UI, complete Cloudflare Access in Chrome, and open the exact synthetic run; the agent can then perform phone-width, content-free QA and close U-17A. |
 | U-17B clean protected workflow | AUTHORIZATION-GATED | After U-17A, request fresh D-03 authorization for the named protected read/run. Attorney alone supplies facts, resolves gates, reviews, attests, and exports. |
 | U-17C beneficial learning proof | JUDGMENT-GATED | After U-17B, agent prepares the controlled comparison; attorney supplies the non-degrading quality/confidentiality verdict. |
 | PR #30/#31 monitoring tails | OPEN DURING AUTHORIZED OPERATIONS | Record two more qualifying runs/reopens, or the applicable authorized observation window, without creating standalone protected operations merely to satisfy monitoring. |
@@ -314,8 +323,9 @@ record attorney approvals, consent to OAuth, spend uncapped funds, or deploy pro
 | D-06 Google lane inside U-14 | CONSENT-GATED | Build remains queued with U-14; OAuth/device consent and recipient/ACL approval stay human-only. |
 | Deferred collaboration/integration breadth | DEFERRED BY D-17 | Keep Dropbox/OneDrive, Web Push, broad `pipeline_shape`, and multiplayer visible in the successor queue; do not start them implicitly. |
 
-U-17A's two runtime-sensitive drills remain autonomous work and precede the human
-browser handoff. Starting U-11B/U-12–U-16 before the clean compounding loop would
+U-17A's runtime-sensitive drills are complete; only the Browser-plugin repair and
+human-authenticated browser handoff remain. Starting U-11B/U-12–U-16 before the clean
+compounding loop would
 violate the user's D-10/D-16 sequencing rulings. The agent can prepare, test, review,
 and publish every later unit once its named human boundary is satisfied.
 
@@ -365,21 +375,27 @@ record below is limited to the separately authorized synthetic development deplo
 
 ## U-17A Synthetic Deployed Record — 2026-08-23
 
-- Exact control head `eb4fd08` was rebuilt on the development host. The worker owned
+- Exact control head `71d2b97` was rebuilt on the development host. The worker owned
   PID 1, Compose stop exited 0 in 1.25 seconds without OOM/137, and forced recreate
   completed in 3.26 seconds.
 - Separate authenticated model/legal proxy identities denied direct, unauthenticated,
   non-TLS, cross-identity, arbitrary-host, and arbitrary-path egress. The fixed
   Minnesota route reached HTTP 200; the fixed CourtListener route reached HTTP 401,
   proving transport while identifying the missing development token.
-- A direct planted matter canary payload was blocked before transport after repairing the synthetic
-  fixture's missing central registry entry. A temporary empty sibling marker was
-  absent from both worker-visible path shapes and was then removed.
+- A hostile planted matter canary payload entered the normal provider boundary and
+  raised `OutboundPrivacyError` before a subprocess could start, after repairing the
+  synthetic fixture's missing central registry entry. A temporary empty sibling marker
+  was absent from both worker-visible path shapes and was then removed.
 - Pinned `folio-enrich` conversion was idempotent and preserved hostile instructions
   only as data. The live converter was non-root, read-only, capability-free, mount-free,
   unpublished, and confined to its internal conversion network.
 - One synthetic run traversed authentication failure, `needs_attention`, reopen,
   pause/resume, and `finished`; all 12 turns completed and the queue returned to zero.
+- A second qualifying run was stopped while exact `claude -p` work was in flight.
+  Compose stop exited 0 in 10.153 seconds without OOM, released the exact queue item
+  with its attempt refunded, and boot reclaimed it once at an unchanged one-turn and
+  `$0.062512` baseline. It then finished with 12 completed turns, one discarded
+  in-flight attempt, `$0.718948` total notional spend, and zero residual exact items.
 - The encrypted synthetic backup restored all 28 non-transient files with an identical
   hash tree; wrong-key restore failed without a partial vault. Isolated key rotation
   proved retired archives cannot be opened with the new key and are purged.
@@ -388,14 +404,17 @@ record below is limited to the separately authorized synthetic development deplo
   authenticated internal ping returned 200 without revealing the secret. The worker
   could not resolve the API, joined only its two internal networks, had exactly the
   five expected mounts, and had no Docker socket.
-- U-17A still needs an end-to-end hostile-input/persona-turn trace, an in-flight
-  checkpoint/reclaim drill, and the authenticated phone-width journey after a human
-  completes Access login. The redacted evidence report is
+- PR #58 repaired hosted provider-state binding, and PR #59 repaired Claude Code's
+  Landlock self-maps read while preserving sibling `/proc` denials. The explicitly
+  rebuilt deployed image passed both wrapped Claude version and content-free live
+  provider probes.
+- U-17A still needs only the authenticated phone-width journey after the Browser plugin
+  is reinstalled and a human completes Access login. The redacted evidence report is
   `docs/audits/2026-08-23-u17a-synthetic-deployed-gate.md`.
 
 No protected matter was read or run. Same-host synthetic restore proof does not close
-FD6-01's off-box sink clause. The three evidence tails above prevent U-17A from being
-marked fully complete yet.
+FD6-01's off-box sink clause. The single browser/authentication tail above prevents
+U-17A from being marked fully complete yet.
 
 ## U-11A Publication Record — 2026-08-22
 
