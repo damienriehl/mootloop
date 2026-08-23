@@ -10,12 +10,15 @@ Primary recovery run ID: `u17a-recovery-20260823`
 
 Qualifying drain/reclaim run ID: `u17a-reclaim-final-20260823`
 
+Planted-discovery run ID: `u17a-injection-final-20260823`
+
 ## Verdict
 
 The deployed worker now exits cleanly under Compose stop/recreate, survives an
 in-flight provider interruption with exact queue release/reclaim accounting,
-fixed-route authenticated egress fails closed, and a hostile canary payload entering
-the normal provider boundary is rejected before a subprocess can start. Sibling matter
+fixed-route authenticated egress fails closed, and a canary-bearing hostile discovery
+document traverses ingest, immutable context capture, persona prompt assembly, and the
+normal provider boundary before rejection without a subprocess. Sibling matter
 paths are absent, isolated conversion is reproducible, queue/reopen recovery finishes
 without duplicate work, encrypted backup restores byte-for-byte, synthetic key
 retirement purges retired archives, and the public perimeter is intercepted by
@@ -74,7 +77,7 @@ human/browser boundary.
 | Non-TLS egress | Port 80 is denied | Proxy returned 403 / `TCP_DENIED` | PASS |
 | Fixed application routes | Content cannot choose a host or path | Fixed Minnesota statute route reached HTTP 200; fixed CourtListener route reached HTTP 401; arbitrary host and arbitrary path raised `EgressError` before transport | PASS |
 | Runtime canary component | Current matter canary is centrally registered and blocks a direct outbound payload | A missing synthetic-fixture registration was repaired atomically; the repeated direct probe raised `OutboundPrivacyError` before transport | PASS after repair |
-| Planted-injection provider path | Hostile matter input entering the normal provider boundary is rejected before any model subprocess or transport starts | The registered synthetic canary was supplied through `HeadlessClaudeProvider.run_turn`; it raised `OutboundPrivacyError`, and a subprocess tripwire confirmed no subprocess started | PASS |
+| Planted-injection discovery path | A canary-bearing hostile discovery document traverses ingest and context assembly, then is rejected before any model subprocess or transport starts | Run-visible `doc-511e103b3fd8a0b4` was captured in the run's immutable manifest and corpus snapshot; the assembled persona prompt contained the registered canary, `HeadlessClaudeProvider.run_turn` raised `OutboundPrivacyError`, and a subprocess tripwire remained false | PASS |
 | Sibling filesystem | Worker cannot read a sibling matter marker | Both worker-root and host-style sibling paths returned `FileNotFoundError` | PASS |
 | Isolated conversion | Hostile instruction-like text remains data and conversion is reproducible | Pinned converter returned the same receipt on retry; normalized output preserved the text and arbitrary URL only as data | PASS |
 | Converter sandbox | No public port, host mount, privilege, or general egress | Non-root, read-only root filesystem, all capabilities dropped, no mounts or published ports, internal conversion network only | PASS |
@@ -101,6 +104,10 @@ human/browser boundary.
 - Qualifying drain run total tokens: 500,228
 - Qualifying drain run final notional spend: `$0.718948`
 - Qualifying drain run exact residual queue items: 0
+- Planted-discovery document ID: `doc-511e103b3fd8a0b4`
+- Planted-discovery run final status: `needs_attention`
+- Planted-discovery run completed turns / tokens / spend: 0 / 0 / `$0.00`
+- Planted-discovery run exact residual queue items: 0
 
 ## PR #30 / #31 monitoring ledger
 
@@ -140,6 +147,15 @@ evidence: the first reached a gated checkpoint before SIGTERM took effect, and t
 second used an observer pattern that missed the provider process. Neither was counted
 as reclaim proof. The final run used an exact `^claude -p` observer and produced the
 release/reclaim receipt above.
+
+The earlier direct canary probe was also excluded as sufficient planted-injection
+evidence. The qualifying run instead ingested a canary-bearing `.txt` document as
+non-privileged served discovery, captured its document ID in both immutable launch
+artifacts, assembled the registered canary into the schedulable persona prompt, and
+reached the normal hosted provider. Three bounded live-worker attempts produced zero
+turns, tokens, and spend before the run reached `needs_attention`; an exact diagnostic
+of the same immutable prompt proved `OutboundPrivacyError` occurred before subprocess
+start. No canary value was printed or persisted in Git.
 
 ## Remaining risk and queue
 

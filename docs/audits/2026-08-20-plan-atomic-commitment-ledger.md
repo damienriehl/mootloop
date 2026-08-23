@@ -46,7 +46,7 @@ short label is less detailed.
 | D3-H8 | Immutable verification source, chained logs/decisions, full attestation tuple | COMPLETE locally — exact-byte v2 commitment and mutation gates |
 | D3-H9 | Fixed legal-host egress allowlist; no content-derived target | COMPLETE for current routes — D-18's separate authenticated CONNECT/443 identity is deployed; arbitrary hosts/paths and cross-identity use fail closed |
 | D3-H10 | Defensive DOCX/ZIP/XXE parsing and pinned model/catalog fetches | PARTIAL — protected conversion and hostile local DOCX edit parsing complete; catalog updates U-12 |
-| D3-M11 | Per-matter canaries and fail-closed privacy scanning | COMPLETE locally and synthetically deployed — U-02/U-17A; a registered current-matter canary entering the normal provider boundary raised `OutboundPrivacyError` before subprocess start |
+| D3-M11 | Per-matter canaries and fail-closed privacy scanning | COMPLETE locally and synthetically deployed — U-02/U-17A; a registered current-matter canary in ingested discovery traversed immutable context assembly and raised `OutboundPrivacyError` before provider subprocess start |
 | D3-M12 | Shared export controls for every CLI/skill path | COMPLETE for current sealed exports; extensions U-11A |
 | D3-13 | Every confidentiality/attestation error fails closed | PARTIAL — enforced per landing unit |
 | D3-14 | `MatterText`/`PublicText` trust conversion through scrub | COMPLETE for current sinks — U-09 shared text joins the U-02/U-05 outbound conversion boundary |
@@ -123,7 +123,7 @@ short label is less detailed.
 | FD1-02 | Per-turn network jail allows only Anthropic endpoint | COMPLETE locally and synthetically deployed — U-02/U-17A; D-18 legal routes use a separate identity outside persona turns |
 | FD1-03 | Per-matter UID/container filesystem isolation | COMPLETE locally and synthetically deployed — U-02/U-17A sibling-path probe |
 | FD1-04 | Driver auth, private API network, no Docker socket | COMPLETE for the current deployed worker — authenticated internal ping 200/unauthenticated 401; worker cannot resolve API, has only its two internal networks and five expected mounts, and has no Docker socket |
-| FD1-05 | Planted-injection exfiltration gate | COMPLETE for the current provider boundary — a registered current-matter hostile canary payload entered `HeadlessClaudeProvider.run_turn`, raised `OutboundPrivacyError`, and a tripwire proved no subprocess or transport started |
+| FD1-05 | Planted-injection exfiltration gate | COMPLETE — run-visible canary-bearing discovery entered the immutable manifest/corpus snapshot and assembled persona prompt; `HeadlessClaudeProvider.run_turn` raised `OutboundPrivacyError`, and a tripwire proved no subprocess or transport started |
 | FD2-01 | Pin audience/RS256/JWKS behavior; reject service tokens on matter routes | COMPLETE |
 | FD2-02 | Google uses device flow only | DECISION-GATED — D-06/U-14 |
 | FD2-03 | AOP key permissions and non-shared volume | COMPLETE by recorded perimeter evidence |

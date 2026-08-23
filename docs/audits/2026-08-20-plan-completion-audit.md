@@ -29,8 +29,9 @@ hosts behind separate authenticated proxy identities, and U-17A's direct synthet
 worker, egress, canary, sibling-path, converter, queue/reopen, backup/restore,
 key-retirement, and Access-perimeter probes pass. PRs #52 through #56 are merged.
 PRs #58 and #59 subsequently repaired the hosted provider-state binding and Claude
-Code's read-only Landlock self-maps requirement. A hostile canary entering the normal
-provider boundary now fails before subprocess start, and an in-flight stop/reclaim
+Code's read-only Landlock self-maps requirement. A canary-bearing hostile discovery
+document now traverses ingest and immutable context assembly before failing at the
+normal provider boundary without subprocess start, and an in-flight stop/reclaim
 drill passed without duplicate turn or spend. U-17A now needs only the authenticated
 mobile journey; its Chrome control client requires a Browser plugin reinstall before
 human Cloudflare Access can be completed. U-17B remains behind fresh D-03
@@ -249,7 +250,7 @@ Source: `docs/plans/2026-07-12-001-feat-hosted-frontend-folio-cockpit-plan.md`
 
 | ID | Reconciled status | Evidence or queue |
 |---|---|---|
-| FD-1 Sandbox/internal trust | PARTIAL | Persona turns receive no filesystem tools; U-02 enforces egress/per-matter isolation; U-17A proves hostile canary rejection at the normal provider boundary before subprocess start, sibling-path absence, authenticated route separation, and no direct egress. Later notification sinks remain U-15. |
+| FD-1 Sandbox/internal trust | PARTIAL | Persona turns receive no filesystem tools; U-02 enforces egress/per-matter isolation; U-17A proves a planted discovery canary traverses immutable context and is rejected before provider subprocess start, plus sibling-path absence, authenticated route separation, and no direct egress. Later notification sinks remain U-15. |
 | FD-2 Perimeter | PARTIAL | JWT algorithm/audience/email/JWKS behavior and recorded AOP perimeter are complete. Device-only Google consent and connector/backup credential handling remain D-06/U-14. |
 | FD-3 Non-portable controls | PARTIAL | U-02 completes runtime outbound canary/redaction locally and U-03 completes the stronger audit/attestation commitment. Content-free notifications remain U-15. |
 | FD-4 Approve then inject | PARTIAL | Approval-filtered, provenance-tagged, DATA-fenced manifest injection is complete; durable board/changelog/review feed is U-13. |
@@ -312,7 +313,7 @@ record attorney approvals, consent to OAuth, spend uncapped funds, or deploy pro
 
 | Queue item | State | Next admissible action |
 |---|---|---|
-| U-17A hostile-input provider trace | COMPLETE | Registered synthetic canary payload entered `HeadlessClaudeProvider.run_turn`, raised `OutboundPrivacyError`, and a subprocess tripwire proved rejection before process or transport start. |
+| U-17A hostile-input discovery trace | COMPLETE | Run-visible planted discovery was captured in the immutable manifest/corpus snapshot and assembled into the persona prompt; `HeadlessClaudeProvider.run_turn` raised `OutboundPrivacyError`, and a subprocess tripwire proved rejection before process or transport start. |
 | U-17A in-flight drain/reclaim | COMPLETE | Exact `claude -p` observation preceded a normal Compose stop; exit was 0 without OOM, the attempt was refunded and released, boot reclaimed it once at an unchanged completed-turn/spend baseline, and the run finished with 12 turns plus zero residual queue items. |
 | U-17A authenticated mobile journey | BROWSER-REPAIR / HUMAN-AUTH BLOCKER | Reinstall the Browser plugin from the ChatGPT plugin UI, complete Cloudflare Access in Chrome, and open the exact synthetic run; the agent can then perform phone-width, content-free QA and close U-17A. |
 | U-17B clean protected workflow | AUTHORIZATION-GATED | After U-17A, request fresh D-03 authorization for the named protected read/run. Attorney alone supplies facts, resolves gates, reviews, attests, and exports. |
@@ -382,10 +383,13 @@ record below is limited to the separately authorized synthetic development deplo
   non-TLS, cross-identity, arbitrary-host, and arbitrary-path egress. The fixed
   Minnesota route reached HTTP 200; the fixed CourtListener route reached HTTP 401,
   proving transport while identifying the missing development token.
-- A hostile planted matter canary payload entered the normal provider boundary and
-  raised `OutboundPrivacyError` before a subprocess could start, after repairing the
-  synthetic fixture's missing central registry entry. A temporary empty sibling marker
-  was absent from both worker-visible path shapes and was then removed.
+- A canary-bearing hostile discovery document (`doc-511e103b3fd8a0b4`) was ingested
+  as run-visible untrusted data, captured in the run's immutable manifest and corpus
+  snapshot, and assembled into the persona prompt. The normal hosted provider raised
+  `OutboundPrivacyError` before subprocess start. The bounded worker run ended at
+  `needs_attention` with zero turns/tokens/spend and zero residual queue items. A
+  temporary empty sibling marker was absent from both worker-visible path shapes and
+  was then removed.
 - Pinned `folio-enrich` conversion was idempotent and preserved hostile instructions
   only as data. The live converter was non-root, read-only, capability-free, mount-free,
   unpublished, and confined to its internal conversion network.
