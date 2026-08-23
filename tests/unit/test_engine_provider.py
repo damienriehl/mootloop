@@ -37,6 +37,7 @@ from mootloop.errors import (
     OutboundPrivacyError,
     SeatLimitError,
     TurnError,
+    VaultBoundaryError,
 )
 from mootloop.models.run import PersonaName, TurnSpec
 
@@ -48,6 +49,8 @@ def _provider(tmp_path: Path, **kw: object) -> HeadlessClaudeProvider:
     run_dir.mkdir(parents=True, exist_ok=True)
     kw.setdefault("oauth_token_loader", lambda: "sk-ant-oat-TESTTOKEN")
     kw.setdefault("api_key_loader", lambda: "sk-ant-api-TESTKEY")
+    if kw.get("runtime_mode") == "hosted":
+        kw.setdefault("matter_id", "2026-08-21-test-matter")
     return HeadlessClaudeProvider(
         vault_root=vault,
         run_dir=run_dir,
@@ -976,6 +979,45 @@ def test_config_dir_honours_the_env_override(
     monkeypatch.setenv(ENGINE_CONFIG_ENV, str(tmp_path / "engine-cfg"))
     provider = _provider(tmp_path)
     assert str(provider._config_dir()).startswith(str(tmp_path / "engine-cfg"))
+
+
+def test_hosted_config_dir_uses_bound_identity_not_mount_alias(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    engine_root = tmp_path / "engine-cfg"
+    monkeypatch.setenv(ENGINE_CONFIG_ENV, str(engine_root))
+    provider = _provider(
+        tmp_path,
+        runtime_mode="hosted",
+        egress_wrapper=hosted_wrapper(),
+        matter_id="2026-08-21-acme.foo_test",
+    )
+
+    assert provider._config_dir() == engine_root / "2026-08-21-acme.foo_test" / "r1"
+
+
+def test_hosted_provider_requires_bound_matter_identity(tmp_path: Path) -> None:
+    vault = tmp_path / "matter"
+    run_dir = vault / "runs" / "r1"
+    run_dir.mkdir(parents=True)
+
+    with pytest.raises(ValueError, match="bound matter id"):
+        HeadlessClaudeProvider(
+            vault_root=vault,
+            run_dir=run_dir,
+            runtime_mode="hosted",
+            egress_wrapper=hosted_wrapper(),
+        )
+
+
+def test_hosted_provider_rejects_invalid_bound_matter_identity(tmp_path: Path) -> None:
+    with pytest.raises(VaultBoundaryError, match="path components"):
+        _provider(
+            tmp_path,
+            runtime_mode="hosted",
+            egress_wrapper=hosted_wrapper(),
+            matter_id="../other",
+        )
 
 
 def test_config_dir_is_per_run_so_sessions_resume(tmp_path: Path) -> None:
