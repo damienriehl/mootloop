@@ -13,10 +13,12 @@ LABEL org.opencontainers.image.title="mootloop-driver" \
 #  - squid: authenticated destination-allowlisting proxy used by the hosted topology.
 #  - pandoc: export/docx_render.py shells to it to render DOCX deliverables.
 #  - curl, ca-certificates: TLS roots for the operator's subscription auth path.
+#  - openssl: SHA-512 crypt password hashes accepted by Squid's NCSA helper.
 #  - procps: cheap pgrep liveness probe for the worker.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
+    openssl \
     pandoc \
     procps \
     squid \
