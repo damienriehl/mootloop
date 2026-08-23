@@ -24,6 +24,16 @@ concrete recovery, close-policy, trace/evidence, plugin, context/sidecar, capabi
 matrix, ethics, and frontend-direction gaps. Deployment and protected-data validation
 remain separately gated.
 
+Execution update through 2026-08-23: D-18 A is deployed for the fixed legal-source
+hosts behind separate authenticated proxy identities, and U-17A's direct synthetic
+worker, egress, canary, sibling-path, converter, queue/reopen, backup/restore,
+key-retirement, and Access-perimeter probes pass. PRs #52 through #56 are merged.
+U-17A still needs an end-to-end hostile-input trace, an in-flight drain/reclaim drill,
+and an authenticated mobile journey waiting on human Cloudflare Access. U-17B remains
+behind fresh D-03 authorization; U-17C and
+the post-validation U-11B/U-12–U-16 breadth remain durably queued behind the clean
+workflow/observed-friction gate rather than silently omitted.
+
 The broader repository audit nevertheless found genuine unfinished work in the two
 legacy plans still marked `active`. This document is the completion ledger for every
 plan unit and acceptance criterion. Open autonomous work is routed to
@@ -80,6 +90,11 @@ missing older source plan.
   `ec75d9e` from final code head `3152bfb` after all six final-head CI jobs passed;
   both actionable review findings were fixed, regression-tested, replied to, and
   resolved.
+- GitHub PR #52 deployed D-18's separated legal-source egress identities; PRs #53 and
+  #54 repaired the Coolify worker Compose and digest-qualified converter registry;
+  PR #55 repaired Squid-compatible credentials; and PR #56 made the hosted driver own
+  PID 1. Each is merged, and U-17A recorded exact deployed behavior for their runtime
+  contracts in `docs/audits/2026-08-23-u17a-synthetic-deployed-gate.md`.
 - No GitHub issue was created or updated in the strict window.
 - At audit start, the current feature branch had no unique code commit relative to
   its already-merged result and its file tree matched `origin/main`. U-00 now adds the
@@ -126,14 +141,14 @@ Source: `docs/plans/2026-07-11-001-feat-mootloop-v1-agentic-litigation-pipeline-
 | V1-4 | Citation clients/cache, fabrication gate, and research-request queue | COMPLETE for current routes | Gate framework and current legal-source clients exist. OpenLaws consolidation remains intentionally deferred. |
 | V1-5 | Decisions, gated/observed/autonomous modes, configurable attorney gates | COMPLETE | Durable decision and attestation primitives exist across CLI/API for current actions. |
 | V1-6a | Discovery judge panel and costed restructure pass | COMPLETE | Implemented and exercised by synthetic/demo tests. |
-| V1-6b | Optional jury panel and calibrated-judge builder | COMPLETE locally | U-07 adds a directional-only non-gating jury and exact-evidence judge profiles that enter Judge DATA only after held-out calibration. Hosted public-source use remains D-18-gated. |
+| V1-6b | Optional jury panel and calibrated-judge builder | COMPLETE for current routes | U-07 adds a directional-only non-gating jury and exact-evidence judge profiles that enter Judge DATA only after held-out calibration. D-18's fixed hosted legal-source transport is deployed; actual calibration remains measurement-gated. |
 | V1-7a | Stable anchors, DOCX, memo, privilege log, attestation, audit, watermark/residue gate | COMPLETE | Current export and attestation modules/tests cover the core court-usable lane. |
 | V1-7b | Google Doc export, annotated draft, Google comment reimport | DECISION-GATED | Local DOCX learning is proven; the external Google lane remains D-06. |
 | V1-8 | Edited DOCX/GDoc reimport, anchored diffs, reviewed tier routing, scrubbed learning promotion/readback | COMPLETE locally / external lane gated | U-09 supplies defensive DOCX recovery, durable blocked-import review, CriticMarkup diffs, human tier actions, firm merge/conflict view, ethical walls, and next-run readback. Google access remains D-06 and the attorney benefit verdict remains U-17C. |
 | V1-9a | Hidden answer-key persona regression oracle in CI | COMPLETE locally | Test-only keys are outside normal prompt/matter sources; the evaluator rejects seeded wrong-domain output, and fast CI excludes the explicit paid lane. |
 | V1-9b | Hand-draft benchmark, judged live run, first compounding-loop cycle | DECISION-GATED | Requires attorney benchmark verdict and private matter access. D-01 through D-03. |
 | V1-X1 | RFP responsive/non-responsive light-production suggestions | COMPLETE locally / PR #47 | U-08 adds ranked immutable-snapshot candidates with exact provenance, privilege/triage exclusions, append-only human review, and a separate explicit production disposition across service, CLI, API, worker, and cockpit surfaces. |
-| V1-X2 | `folio-enrich` localhost-only ingest lane, allowlist preflight, no matter web search | COMPLETE locally / DEPLOYMENT-GATED | U-04B binds extraction to the fixed local/private endpoint, a digest-pinned reviewed source, bounded fixed-schema I/O, and a converter container with no egress, mounts, or public port. Synthetic deployed proof remains U-17A; real-folder evidence remains behind fresh D-03 authorization. |
+| V1-X2 | `folio-enrich` localhost-only ingest lane, allowlist preflight, no matter web search | COMPLETE locally and synthetically deployed | U-04B binds extraction to the fixed local/private endpoint, a digest-pinned reviewed source, bounded fixed-schema I/O, and a converter container with no egress, mounts, or public port. U-17A proves the deployed synthetic lane; real-folder evidence remains behind fresh D-03 authorization. |
 | V1-X3 | Full CLI breadth and non-discovery adapters | DEFERRED | Explicit post-first-serve scope. CLI parity foundations are U-11A/U-11B; adapter breadth remains in the Deferred Follow-up Queue. |
 | V1-X4 | README, AGENTS, THIRD-PARTY, mypy, ruff, pytest/invariants | COMPLETE | Files are present and both current validation suites pass. |
 | V1-DOCS | Ethics/supervision guidance and durable solution learnings | COMPLETE for current scope | U-11A adds `docs/ethics.md`, namespaced guarded skills, backup/close guidance, and durable frontend direction. Solutions remain event-driven as lessons are completed. |
@@ -154,7 +169,7 @@ delivery now share the same immutable commitment and recovery boundary.
 |---|---|---|
 | D1 Architecture | PARTIAL | Provider/task/stage protocols, immutable persona/pipeline selection, deterministic convergence, uniform gate ordering/dependencies, the gate ledger, and copied-component seams/provenance exist. Synthesis remains U-12. |
 | D2 Packaging and skills | COMPLETE for current verbs / future breadth queued | Six executable personas, a valid namespaced plugin, exact ownership contracts, guarded side-effecting skills, and compact navigators exist. New U-12–U-15 verbs must extend the checked matrix and packaging contract. |
-| D3 Adversarial security | PARTIAL | Path/vault/privacy/redaction/type controls, enforced local isolation, integrity, and hostile DOCX/learning gates exist. Deployed proof and Google ACL controls remain U-17A/D-06. |
+| D3 Adversarial security | PARTIAL | Path/vault/privacy/redaction/type controls, deployed isolation, fixed egress, canary exfiltration blocking, integrity, and hostile conversion/learning gates are proved. Google ACL controls and later sinks remain D-06/U-14/U-15. |
 | D4 Performance and scale | OPEN-AUTO | Flat-context proof, bounded fan-out, prompt caching, objection batching, cache metrics, and calibrated retry/concurrency are U-16. The process-wide CourtListener bucket already exists. |
 | D5 Cost and budget | PARTIAL | Tiered models, dated pricing, cache-aware metering, estimates, labels, and caps exist. Output-cap, batching, cache, and self-calibration refinements remain U-16. |
 | D6 Loop calibration | PARTIAL | Score delta + material-change + completeness convergence, directional-only jury signals, and held-out assigned-judge calibration are implemented. Remaining measurement-driven tuning is U-16. |
@@ -193,7 +208,7 @@ Source: `docs/plans/2026-07-12-001-feat-hosted-frontend-folio-cockpit-plan.md`
 |---|---|---|---|
 | FE-0a | Threat model, registry, JWT/internal auth, rate limit, CSRF, audit, API invariants | COMPLETE | Code and regression tests exist. |
 | FE-0b | Access/DNS/AOP/Coolify infrastructure and 13-point live penetration gate | COMPLETE, stale checkboxes | Deployment handoff records completion. No private matter content was needed to verify the recorded state. |
-| FE-0c | Enforced outbound egress jail and per-matter OS isolation | COMPLETE locally / deployed proof gated | U-02 enforces one-matter workers, a fixed authenticated proxy contract, and the common outbound privacy gate. Synthetic deployed proof remains U-17A under D-03. |
+| FE-0c | Enforced outbound egress jail and per-matter OS isolation | COMPLETE locally and synthetically deployed | U-02 enforces one-matter workers, fixed authenticated proxy identities, and the common outbound privacy gate. U-17A proves direct-egress denial, legal/model identity separation, canary blocking, and sibling-path absence. |
 | FE-1a | Provider, queue/worker, pause/resume/reopen, spend ledger, SSE, consistent backup, driver CLI | COMPLETE | Engine and recovery modules/tests exist; PRs #30/#31 hardened them. |
 | FE-1b | Real-provider synthetic server gate | PARTIAL / DECISION-GATED | A hosted real-provider run occurred, but not a clean planted-injection gate under the final isolation contract. D-03. |
 | FE-1c | Seat-limit push, one-tap bounded API failover, auto-resume | OPEN-AUTO, then live test | Pause/reschedule seam exists; notification/failover authorization flow does not. U-15. |
@@ -218,19 +233,19 @@ Source: `docs/plans/2026-07-12-001-feat-hosted-frontend-folio-cockpit-plan.md`
 | Three on-ramps plus adapter/rubric synthesis and lock | OPEN-AUTO |
 | Strategy board and reviewable system edits | OPEN-AUTO |
 | Drive watcher, triage, suggestion, push | DECISION-GATED then OPEN-AUTO |
-| Demo and vault/privacy boundaries intact | COMPLETE locally; deployed isolation proof remains U-17A/D-03 |
+| Demo and vault/privacy boundaries intact | COMPLETE locally and synthetically deployed; protected workflow remains U-17B/D-03 |
 | Backend and frontend checks in CI | COMPLETE locally and on the merged U-00 remote workflow |
 
 ### Exhaustive FD-1–FD-10 deepening disposition
 
 | ID | Reconciled status | Evidence or queue |
 |---|---|---|
-| FD-1 Sandbox/internal trust | PARTIAL | Persona turns receive no filesystem tools; U-02 completes enforceable egress/per-matter isolation locally. The planted-injection deployed proof remains U-17A. |
+| FD-1 Sandbox/internal trust | PARTIAL | Persona turns receive no filesystem tools; U-02 enforces egress/per-matter isolation; U-17A proves direct canary blocking, sibling-path absence, authenticated route separation, and no direct egress. A normal hostile-input/persona-turn trace remains open. |
 | FD-2 Perimeter | PARTIAL | JWT algorithm/audience/email/JWKS behavior and recorded AOP perimeter are complete. Device-only Google consent and connector/backup credential handling remain D-06/U-14. |
 | FD-3 Non-portable controls | PARTIAL | U-02 completes runtime outbound canary/redaction locally and U-03 completes the stronger audit/attestation commitment. Content-free notifications remain U-15. |
 | FD-4 Approve then inject | PARTIAL | Approval-filtered, provenance-tagged, DATA-fenced manifest injection is complete; durable board/changelog/review feed is U-13. |
 | FD-5 Architecture corrections | PARTIAL | Pause/queue/SSE/BFF, immutable launch bindings, thin TaskSpec paths, drain recovery, and control-plane attempt accounting exist. Full task lanes and failover behavior are U-11B/U-12/U-15; broad pipeline shape stays deferred. |
-| FD-6 Data lifecycle | PARTIAL | Consistent heartbeating backup, spend intent, complete close policy/manifest, recovery accounting, and queue locking exist. Board mutation, hardened upload, watcher reconciliation, and deployed restore proof remain U-13/U-14/U-17A. |
+| FD-6 Data lifecycle | PARTIAL | Consistent heartbeating backup, spend intent, complete close policy/manifest, recovery accounting, queue locking, and a synthetic byte-identical restore/key-retirement drill exist. Off-box sink selection, board mutation, hardened upload, and watcher reconciliation remain D-09/U-13/U-14. |
 | FD-7 Capability parity | PARTIAL | The checked matrix proves current matter/run/decision/attestation/export/close/context/evidence/reopen rows and names an owner for every planned row. Task/board/failover/connector/notification implementations remain U-12–U-15. |
 | FD-8 TypeScript contract | COMPLETE for FE-2 | Generated OpenAPI types, drift checks, typed modules, zod SSE, session-expiry handling, query keys, protected mutation semantics, and thin-BFF tests exist. New surfaces must extend the same contract in U-12–U-15. |
 | FD-9 Design direction | PARTIAL | The existing cockpit implements the case-file language and core ceremonies, and U-11A adds the durable `docs/design/frontend-direction.md`. Remaining rooms/mobile board are U-12–U-15. |
@@ -248,24 +263,25 @@ ahead of context reproducibility, isolation, and a clean live run.
 | ID | Source | Obligation | Status / routing |
 |---|---|---|---|
 | RECENT-1 | 2026-08-06 orientation handoff | Review and land PRs #30 and #31 | COMPLETE; both merged 2026-08-06. |
-| RECENT-2 | PR #30 | Monitor the next three hosted runs or seven days for duplicate turns, spend/lock anomalies, and export-attestation integrity | NOT EVIDENCED; D-07. |
-| RECENT-3 | PR #31 | Monitor the next three reopen operations or seven days | NOT EVIDENCED; D-07. |
+| RECENT-2 | PR #30 | Monitor the next three hosted runs or seven days for duplicate turns, spend/lock anomalies, and export-attestation integrity | PARTIAL; U-17A records one qualifying synthetic operation with no duplicate turn or lock/spend anomaly. No export-attestation claim was exercised. Continue on future authorized operations. |
+| RECENT-3 | PR #31 | Monitor the next three reopen operations or seven days | PARTIAL; U-17A records one qualifying reopen through `needs_attention` to `finished` with zero residual queue items. Continue on future authorized operations. |
 | RECENT-4 | 2026-08-05 blind-turn audit | Audit/discard suspect hosted turns or re-drive after the fix | DECISION-GATED; D-01/D-03. |
 | RECENT-5 | Historical live handoff | Resolve four attorney decisions and provide verified grounding facts | DECISION-GATED; D-02. No private answers belong in this repository. |
-| RECENT-6 | PR #30 durable follow-ups | Fact-store torn-tail recovery; lost-lock/background heartbeat; backup heartbeat; shutdown and seat-limit attempt accounting | COMPLETE locally in U-03/U-11A; deployed observation remains U-17A. |
-| RECENT-7 | PR #31 product follow-up | Expose `needs_attention` reopen reason/attempt/queue-repair state in the cockpit | COMPLETE locally in U-11A; browser/deployed journey remains U-17A. |
+| RECENT-6 | PR #30 durable follow-ups | Fact-store torn-tail recovery; lost-lock/background heartbeat; backup heartbeat; shutdown and seat-limit attempt accounting | COMPLETE locally in U-03/U-11A; U-17A observes graceful shutdown and backup/restore only. Other deployed behaviors remain for future authorized monitoring. |
+| RECENT-7 | PR #31 product follow-up | Expose `needs_attention` reopen reason/attempt/queue-repair state in the cockpit | COMPLETE locally in U-11A; worker/API recovery is synthetically deployed, while the authenticated cockpit journey remains the final U-17A step. |
 
 ## Canonical Disposition
 
 Every discovered task now has one of four durable outcomes:
 
 1. `COMPLETE` with current evidence above.
-2. `OPEN-AUTO` as U-11B through U-17C in the continuation plan; U-00 through U-11A
-   are remotely reviewed and merged.
+2. `OPEN-AUTO` as U-11B through U-16 plus U-17B/U-17C in the continuation plan;
+   U-17A has two autonomous runtime drills and one human-authenticated browser step
+   left, and U-00 through U-11A are remotely reviewed and merged.
    Their completed U-18 publication dispositions are recorded with each unit.
    Deployment remains a separate gated operation rather than part of that publication
    closure.
-3. `DECISION-GATED` as D-01 through D-17 in the Decision Sheet (D-15 through D-17
+3. `DECISION-GATED` as D-01 through D-18 in the Decision Sheet (D-15 through D-17
    have safe defaults and do not block pre-validation work).
 4. `DEFERRED` but retained explicitly in the continuation plan rather than silently dropped.
 
@@ -275,12 +291,33 @@ choice: D-03 A requires a fresh authorization before any real hosted-matter acce
 D-06 B does not self-grant Google OAuth consent; D-08 A is read-only; D-09 A requires
 approval of a named remote sink. D-13 A initially permitted only a PR/CI run; the user
 later authorized merge of PR #32 and the reviewed continuation work. PR #33 merged as
-`74dec0a`; deployment remains unauthorized.
+`74dec0a`. The user later authorized U-17A's synthetic development deployment;
+production and protected-matter operations remain unauthorized by implication.
 The FOLIO source/update investigation required by D-05/D-12 is recorded in
 `docs/research/2026-08-20-folio-integration-route.md`.
 
 This audit is a status ledger, not permission to inspect privileged hosted artifacts,
 record attorney approvals, consent to OAuth, spend uncapped funds, or deploy production.
+
+## Remaining Execution Queue — 2026-08-23
+
+| Queue item | State | Next admissible action |
+|---|---|---|
+| U-17A hostile-input trace | OPEN AUTO / RUNTIME-SENSITIVE | Drive a controlled synthetic hostile input through the normal persona/run path and prove the outbound attempt is blocked before transport; do not expose a real canary or protected text in evidence. |
+| U-17A in-flight drain/reclaim | OPEN AUTO / RUNTIME-SENSITIVE | Hold a controlled synthetic turn in flight, send normal Compose stop, and prove durable checkpoint-or-finish plus boot reclaim without SIGKILL or duplicate work. |
+| U-17A authenticated mobile journey | HUMAN-AUTH BLOCKER | User completes Cloudflare Access and opens the exact synthetic run; agent performs phone-width, content-free QA and closes the evidence report. |
+| U-17B clean protected workflow | AUTHORIZATION-GATED | After U-17A, request fresh D-03 authorization for the named protected read/run. Attorney alone supplies facts, resolves gates, reviews, attests, and exports. |
+| U-17C beneficial learning proof | JUDGMENT-GATED | After U-17B, agent prepares the controlled comparison; attorney supplies the non-degrading quality/confidentiality verdict. |
+| PR #30/#31 monitoring tails | OPEN DURING AUTHORIZED OPERATIONS | Record two more qualifying runs/reopens, or the applicable authorized observation window, without creating standalone protected operations merely to satisfy monitoring. |
+| D-09 immutable remote sink / FD6-01 off-box clause | PROVIDER-CHOICE-GATED | Present a concrete least-privilege sink and mutation scope for approval; same-host synthetic restore is already proved. |
+| U-11B and U-12–U-16 | QUEUED AUTO | Under D-10/D-16, do not expand breadth before the clean compounding loop; afterwards execute in the continuation plan's dependency order, prioritized by observed attorney friction. |
+| D-06 Google lane inside U-14 | CONSENT-GATED | Build remains queued with U-14; OAuth/device consent and recipient/ACL approval stay human-only. |
+| Deferred collaboration/integration breadth | DEFERRED BY D-17 | Keep Dropbox/OneDrive, Web Push, broad `pipeline_shape`, and multiplayer visible in the successor queue; do not start them implicitly. |
+
+U-17A's two runtime-sensitive drills remain autonomous work and precede the human
+browser handoff. Starting U-11B/U-12–U-16 before the clean compounding loop would
+violate the user's D-10/D-16 sequencing rulings. The agent can prepare, test, review,
+and publish every later unit once its named human boundary is satisfied.
 
 ## Autonomous Work Completed During This Audit
 
@@ -322,8 +359,43 @@ record attorney approvals, consent to OAuth, spend uncapped funds, or deploy pro
   trees, immutable numbered evidence packs, ethics guidance, and frontend-direction
   contract are all present with service/CLI/API/UI evidence where implemented.
 
-No hosted matter data, deployment, attorney approval, OAuth grant, or production state
-was read or changed. Those items remain on the Decision Sheet.
+At the U-11A publication checkpoint, no hosted matter data, deployment, attorney
+approval, OAuth grant, or production state had been read or changed. The later U-17A
+record below is limited to the separately authorized synthetic development deployment.
+
+## U-17A Synthetic Deployed Record — 2026-08-23
+
+- Exact control head `eb4fd08` was rebuilt on the development host. The worker owned
+  PID 1, Compose stop exited 0 in 1.25 seconds without OOM/137, and forced recreate
+  completed in 3.26 seconds.
+- Separate authenticated model/legal proxy identities denied direct, unauthenticated,
+  non-TLS, cross-identity, arbitrary-host, and arbitrary-path egress. The fixed
+  Minnesota route reached HTTP 200; the fixed CourtListener route reached HTTP 401,
+  proving transport while identifying the missing development token.
+- A direct planted matter canary payload was blocked before transport after repairing the synthetic
+  fixture's missing central registry entry. A temporary empty sibling marker was
+  absent from both worker-visible path shapes and was then removed.
+- Pinned `folio-enrich` conversion was idempotent and preserved hostile instructions
+  only as data. The live converter was non-root, read-only, capability-free, mount-free,
+  unpublished, and confined to its internal conversion network.
+- One synthetic run traversed authentication failure, `needs_attention`, reopen,
+  pause/resume, and `finished`; all 12 turns completed and the queue returned to zero.
+- The encrypted synthetic backup restored all 28 non-transient files with an identical
+  hash tree; wrong-key restore failed without a partial vault. Isolated key rotation
+  proved retired archives cannot be opened with the new key and are purged.
+- Cloudflare Access intercepted the public edge, direct-origin TLS required its client
+  certificate, unauthenticated internal matter/driver routes returned 401, and an
+  authenticated internal ping returned 200 without revealing the secret. The worker
+  could not resolve the API, joined only its two internal networks, had exactly the
+  five expected mounts, and had no Docker socket.
+- U-17A still needs an end-to-end hostile-input/persona-turn trace, an in-flight
+  checkpoint/reclaim drill, and the authenticated phone-width journey after a human
+  completes Access login. The redacted evidence report is
+  `docs/audits/2026-08-23-u17a-synthetic-deployed-gate.md`.
+
+No protected matter was read or run. Same-host synthetic restore proof does not close
+FD6-01's off-box sink clause. The three evidence tails above prevent U-17A from being
+marked fully complete yet.
 
 ## U-11A Publication Record — 2026-08-22
 
@@ -357,5 +429,6 @@ was read or changed. Those items remain on the Decision Sheet.
   conversion identity and recovery. Each thread has a visible fix reply and is
   authoritatively resolved.
 - This closes U-18 for U-04B's local converter and synthetic-test slice. It does not
-  claim a deployed sidecar proof, protected-folder review, hosted-matter access, or a
-  real-matter run. Those remain behind U-17A and fresh D-03 authorization.
+  claim a protected-folder review, hosted-matter access, or a real-matter run. U-17A
+  now supplies the synthetic deployed sidecar proof; the protected tail remains behind
+  fresh D-03 authorization.

@@ -33,7 +33,7 @@ short label is less detailed.
 | D2-01 | Namespaced `mootloop` Claude Code plugin and verbs | COMPLETE locally — U-11A |
 | D2-02 | Disable model invocation for every side-effecting skill | COMPLETE locally — U-11A invariant checks every packaged skill |
 | D2-03 | One parameterized judge/juror persona rather than forks | COMPLETE locally — runtime U-07 plus plugin packaging U-11A |
-| D2-04 | Least-privilege persona/panel/cite-checker tool sets | COMPLETE locally — no persona tools; hosted egress remains D3-H9/D-18 |
+| D2-04 | Least-privilege persona/panel/cite-checker tool sets | COMPLETE for current routes — no persona tools; D-18 legal transport uses a separate authenticated fixed-route identity proved in U-17A |
 | D2-05 | Persona-body contract and injected excellence standard | COMPLETE |
 | D2-06 | Compact run-skill navigator over durable references | COMPLETE locally — U-11A |
 | D3-C1 | Fence all untrusted text as data; content never drives tools/control flow | COMPLETE locally — hostile reimport remains data-only and cannot auto-route ambiguous anchors |
@@ -41,12 +41,12 @@ short label is less detailed.
 | D3-C3 | ID/path/filename realpath-containment hardening | COMPLETE |
 | D3-C4 | Google permission read-back and recipient allowlist after export | DECISION-GATED — D-06 |
 | D3-H5 | Vault/repo separation and no-follow symlink invariants | COMPLETE |
-| D3-H6 | Secrets outside vault/repo, minimal env, runtime redaction | COMPLETE locally — U-02; deployed proof U-17A |
+| D3-H6 | Secrets outside vault/repo, minimal env, runtime redaction | COMPLETE locally / DEPLOYED PARTIAL — U-02; U-17A observes dedicated proxy-secret isolation, while deployed minimal-environment/runtime-redaction proof remains open |
 | D3-H7 | Ethical walls and cross-matter learning exclusion | COMPLETE locally — source matter, sharing scope, and per-matter exclusions are launch-filtered |
 | D3-H8 | Immutable verification source, chained logs/decisions, full attestation tuple | COMPLETE locally — exact-byte v2 commitment and mutation gates |
-| D3-H9 | Fixed legal-host egress allowlist; no content-derived target | PARTIAL — application paths/hosts fixed; hosted proxy expansion D-18 |
+| D3-H9 | Fixed legal-host egress allowlist; no content-derived target | COMPLETE for current routes — D-18's separate authenticated CONNECT/443 identity is deployed; arbitrary hosts/paths and cross-identity use fail closed |
 | D3-H10 | Defensive DOCX/ZIP/XXE parsing and pinned model/catalog fetches | PARTIAL — protected conversion and hostile local DOCX edit parsing complete; catalog updates U-12 |
-| D3-M11 | Per-matter canaries and fail-closed privacy scanning | COMPLETE locally — U-02; deployed proof U-17A |
+| D3-M11 | Per-matter canaries and fail-closed privacy scanning | COMPLETE locally / DEPLOYED PARTIAL — U-02; U-17A proves the direct canary component, while deployed fail-closed privacy-scanning fixture proof remains open |
 | D3-M12 | Shared export controls for every CLI/skill path | COMPLETE for current sealed exports; extensions U-11A |
 | D3-13 | Every confidentiality/attestation error fails closed | PARTIAL — enforced per landing unit |
 | D3-14 | `MatterText`/`PublicText` trust conversion through scrub | COMPLETE for current sinks — U-09 shared text joins the U-02/U-05 outbound conversion boundary |
@@ -120,16 +120,16 @@ short label is less detailed.
 | ID | Atomic commitment | Disposition |
 |---|---|---|
 | FD1-01 | Personas have read-only file tools; no shell/web tools | COMPLETE locally |
-| FD1-02 | Per-turn network jail allows only Anthropic endpoint | COMPLETE locally — U-02; deployed proof U-17A |
-| FD1-03 | Per-matter UID/container filesystem isolation | COMPLETE locally — U-02; deployed proof U-17A |
-| FD1-04 | Driver auth, private API network, no Docker socket | PARTIAL — code/perimeter complete; deployed proof U-17A |
-| FD1-05 | Planted-injection exfiltration gate | OPEN-AUTO — deployed proof U-17A |
+| FD1-02 | Per-turn network jail allows only Anthropic endpoint | COMPLETE locally and synthetically deployed — U-02/U-17A; D-18 legal routes use a separate identity outside persona turns |
+| FD1-03 | Per-matter UID/container filesystem isolation | COMPLETE locally and synthetically deployed — U-02/U-17A sibling-path probe |
+| FD1-04 | Driver auth, private API network, no Docker socket | COMPLETE for the current deployed worker — authenticated internal ping 200/unauthenticated 401; worker cannot resolve API, has only its two internal networks and five expected mounts, and has no Docker socket |
+| FD1-05 | Planted-injection exfiltration gate | PARTIAL — direct current-matter canary probe raised `OutboundPrivacyError` before transport; normal hostile-input/persona-turn trace remains U-17A |
 | FD2-01 | Pin audience/RS256/JWKS behavior; reject service tokens on matter routes | COMPLETE |
 | FD2-02 | Google uses device flow only | DECISION-GATED — D-06/U-14 |
 | FD2-03 | AOP key permissions and non-shared volume | COMPLETE by recorded perimeter evidence |
-| FD2-04 | Backups exclude secrets/config token copy; rotation purges history | PARTIAL — vault-only backup excludes external secrets/config; deployed rotation/purge drill U-17A |
+| FD2-04 | Backups exclude secrets/config token copy; rotation purges history | COMPLETE for the synthetic drill — vault-only backup excludes external secrets/config; U-17A proves wrong-key failure and retired-archive purge without rotating protected keys |
 | FD3-01 | Redact Google/OAuth/exact-secret values at every current sink | COMPLETE locally — U-02; future notification sinks U-15 |
-| FD3-02 | Runtime canary blocks outbound/notification payloads | PARTIAL — outbound complete locally in U-02; notification path U-15 |
+| FD3-02 | Runtime canary blocks outbound/notification payloads | PARTIAL — outbound complete locally and synthetically deployed in U-02/U-17A; notification path U-15 |
 | FD3-03 | Access audit chained, attestation-bound, fail-closed on downloads, stronger sink | COMPLETE locally — stronger remote sink remains D-09 |
 | FD3-04 | Secret ntfy topic, content-free digest, separate Gmail/Drive credentials | OPEN/DECISION — U-15/D-06 |
 | FD4-01 | Auto-derived board edits are immediately visible and journaled | OPEN-AUTO — U-13 |
@@ -141,9 +141,9 @@ short label is less detailed.
 | FD5-03 | First-class pause/resume status/events | COMPLETE |
 | FD5-04 | Priority queue, slot release, heartbeat/visibility reclaim | COMPLETE locally — U-11A closes shutdown/capacity attempt accounting |
 | FD5-05 | SSE read-only tail and stepwise driver loop | COMPLETE |
-| FD5-06 | Thin Next BFF as sole verified surface | COMPLETE locally; deployed proof U-17A |
-| FD5-07 | Stateless web redeploy; driver drain/reclaim contract | COMPLETE locally for current workers — deployed drain proof U-17A; failover extension U-15 |
-| FD6-01 | Driver-coordinated encrypted off-box backup and restore drill | PARTIAL — backup exists; proof U-17A |
+| FD5-06 | Thin Next BFF as sole verified surface | COMPLETE locally; deployed unauthenticated route boundary proved in U-17A; authenticated journey still pending human Access login |
+| FD5-07 | Stateless web redeploy; driver drain/reclaim contract | PARTIAL — U-17A proves PID 1 and clean stop/recreate, but not an in-flight turn checkpoint and boot reclaim; failover extension U-15 |
+| FD6-01 | Driver-coordinated encrypted off-box backup and restore drill | PARTIAL — U-17A proves byte-identical encrypted same-host synthetic restore and key retirement; approved off-box sink remains D-09 |
 | FD6-02 | Close inventory/source binding/anonymized audit retention | COMPLETE locally — U-11A implements D-14 for its new stores and a complete close manifest |
 | FD6-03 | Atomic board edit/changelog fold and typed optimistic conflict | OPEN-AUTO — U-13 |
 | FD6-04 | Write-ahead idempotent spend intent with billing tag and conservative cap | COMPLETE |
@@ -177,7 +177,7 @@ short label is less detailed.
 | FD8-09 | Hierarchical query-key factories | COMPLETE |
 | FD8-10 | Decide may be conflict-aware optimistic; attest never optimistic | COMPLETE |
 | FD8-11 | Module-scoped JWKS and matcher discipline | COMPLETE |
-| FD8-12 | Typed MSW/unit tests now; browser tests only for unreproducible seams | COMPLETE for FE-2; extend U-17 |
+| FD8-12 | Typed MSW/unit tests now; browser tests only for unreproducible seams | COMPLETE for FE-2; U-17A authenticated mobile seam waits for human Access login |
 | FD8-13 | Tokenized/generalized board component adaptations | OPEN-AUTO — U-13 |
 | FD9-01 | Case-file/pleading-spine navigation and mobile docket tabs | PARTIAL — remaining rooms U-12–U-15 |
 | FD9-02 | Serif argument voice and mono record voice | COMPLETE for FE-2 |
@@ -189,7 +189,7 @@ short label is less detailed.
 | FD9-08 | Linearized accessible mobile board | OPEN-AUTO — U-13 |
 | FD9-09 | Avoid banned SaaS/legal-cliché visual patterns | PARTIAL — enforce in U-12–U-15 |
 | FD9-10 | Durable room-by-room frontend direction document | COMPLETE locally — U-11A |
-| FD10-01 | First-live sequence FE-0 → FE-2.5 → protected seed/run | PARTIAL — clean proof U-17 |
+| FD10-01 | First-live sequence FE-0 → FE-2.5 → protected seed/run | PARTIAL — U-17A synthetic infrastructure proof is nearly complete; authenticated mobile journey and protected U-17B clean proof remain |
 | FD10-02 | Post-live FE-3 → FE-6 sequence | OPEN-AUTO — U-12–U-15 under D-10 |
 | FD10-03 | Dropbox/OneDrive/Web Push/pipeline-shape/multiplayer stay deferred | DEFERRED — successor queue |
 | FD10-04 | TaskSpec fields land only as consumed | COMPLETE for current TaskSpec; extensions enforced in U-12 |
