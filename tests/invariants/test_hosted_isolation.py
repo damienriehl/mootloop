@@ -72,6 +72,12 @@ def test_driver_mounts_one_matter_and_reaches_network_only_through_proxy() -> No
     assert "cap_add" not in driver and "privileged" not in driver
 
 
+def test_driver_entrypoint_execs_worker_as_pid_one() -> None:
+    dockerfile = (ROOT / "Dockerfile.driver").read_text(encoding="utf-8")
+
+    assert 'CMD ["sh", "-c", "exec mootloop driver serve ' in dockerfile
+
+
 def test_coolify_compose_excludes_dynamic_worker_mounts() -> None:
     compose = yaml.safe_load((ROOT / "docker-compose.matter.yaml").read_text(encoding="utf-8"))
 
