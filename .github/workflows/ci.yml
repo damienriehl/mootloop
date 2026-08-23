@@ -35,6 +35,17 @@ jobs:
       - name: Repo-hygiene invariants
         run: uv run pytest tests/invariants -v
 
+  worker-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build driver image
+        run: docker build -f Dockerfile.driver -t mootloop-driver-auth-test .
+      - name: Verify Squid password-file compatibility
+        run: >-
+          docker run --rm --entrypoint uv
+          mootloop-driver-auth-test run --no-sync python tools/security/check_squid_auth.py
+
   frontend:
     runs-on: ubuntu-latest
     defaults:

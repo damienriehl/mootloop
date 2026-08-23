@@ -528,13 +528,18 @@ def test_proxy_service_prepares_auth_file_before_exec(
     assert executed == ["squid", "squid", "-NYCd", "1"]
 
 
+@pytest.mark.parametrize(
+    "hash_error",
+    [OSError("openssl missing"), subprocess.CalledProcessError(1, ["openssl"])],
+)
 def test_proxy_service_fails_closed_when_password_hashing_is_unavailable(
     monkeypatch: pytest.MonkeyPatch,
+    hash_error: Exception,
 ) -> None:
     from mootloop.engine import proxy_service
 
     def fail_hash(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
-        raise OSError("openssl missing")
+        raise hash_error
 
     monkeypatch.setattr(proxy_service.subprocess, "run", fail_hash)
 
@@ -542,15 +547,19 @@ def test_proxy_service_fails_closed_when_password_hashing_is_unavailable(
         proxy_service._password_line(proxy_service.ProxyIdentity.MODEL, "proxy-secret")
 
 
+@pytest.mark.parametrize("hash_output", ["bad", "$5$salt$hash", "$6$$hash", "$6$salt$"])
 def test_proxy_service_fails_closed_on_malformed_password_hash(
     monkeypatch: pytest.MonkeyPatch,
+    hash_output: str,
 ) -> None:
     from mootloop.engine import proxy_service
 
     monkeypatch.setattr(
         proxy_service.subprocess,
         "run",
-        lambda *args, **kwargs: subprocess.CompletedProcess(args=[], returncode=0, stdout="bad\n"),
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=[], returncode=0, stdout=f"{hash_output}\n"
+        ),
     )
 
     with pytest.raises(SystemExit, match="could not hash"):
