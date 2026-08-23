@@ -311,6 +311,9 @@ record attorney approvals, consent to OAuth, spend uncapped funds, or deploy pro
 
 ## Remaining Execution Queue — 2026-08-23
 
+Human-only prerequisites and their secret-safe completion checks are preserved in
+`docs/handoffs/2026-08-23-deferred-operator-actions.md`.
+
 | Queue item | State | Next admissible action |
 |---|---|---|
 | U-17A hostile-input discovery trace | COMPLETE | Run-visible planted discovery was captured in the immutable manifest/corpus snapshot and assembled into the persona prompt; `HeadlessClaudeProvider.run_turn` raised `OutboundPrivacyError`, and a subprocess tripwire proved rejection before process or transport start. |

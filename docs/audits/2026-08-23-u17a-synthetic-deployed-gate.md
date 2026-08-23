@@ -177,7 +177,8 @@ start. No canary value was printed or persisted in Git.
 - **Coolify API token:** the token file is owned by `deploy`, mode `0600`, but the local
   Coolify API returns 401. The token must be regenerated in Coolify and replaced
   without pasting it into chat. Direct Compose deployment was sufficient for this
-  synthetic gate.
+  synthetic gate. The reboot-safe operator checklist is recorded in
+  `docs/handoffs/2026-08-23-deferred-operator-actions.md`.
 - **Protected workflow:** U-17B remains queued behind fresh D-03 authorization. This
   report does not authorize or imply a protected read, run, review, attestation, or
   export.
