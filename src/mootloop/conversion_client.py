@@ -22,8 +22,11 @@ FOLIO_ENRICH_COMMIT_ENV = "MOOTLOOP_FOLIO_ENRICH_COMMIT"
 MAX_CONVERSION_INPUT_BYTES = 50 * 1024 * 1024
 MAX_CONVERTER_OUTPUT_BYTES = 8 * 1024 * 1024
 MAX_CONVERTER_RESPONSE_BYTES = MAX_CONVERTER_OUTPUT_BYTES + 64 * 1024
-_DIGEST_IMAGE_RE = re.compile(
-    r"^(?:[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?@)?sha256:[0-9a-f]{64}$"
+_IMAGE_DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+_IMAGE_REPOSITORY_RE = re.compile(
+    r"^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?"
+    r"(?::(?P<port>[0-9]{1,5})(?=/))?"
+    r"(?:/[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?)*$"
 )
 _SOURCE_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 _FORMAT_BY_SUFFIX = {
@@ -50,11 +53,15 @@ def conversion_format_for_suffix(suffix: str) -> str:
 
 def validate_folio_enrich_image(image_ref: str) -> str:
     """Require an OCI digest reference; mutable tags are never accepted."""
-    repository = image_ref.split("@", 1)[0] if "@" in image_ref else ""
+    repository, separator, digest = image_ref.rpartition("@")
+    if not separator:
+        digest = image_ref
+    repository_match = _IMAGE_REPOSITORY_RE.fullmatch(repository) if repository else None
+    port = repository_match.group("port") if repository_match is not None else None
     if (
-        not _DIGEST_IMAGE_RE.fullmatch(image_ref)
-        or "/../" in f"/{repository}/"
-        or "//" in repository
+        not _IMAGE_DIGEST_RE.fullmatch(digest)
+        or (separator and repository_match is None)
+        or (port is not None and not 1 <= int(port) <= 65535)
     ):
         raise ConversionError("folio-enrich image must be pinned by a lowercase SHA-256 digest")
     return image_ref
