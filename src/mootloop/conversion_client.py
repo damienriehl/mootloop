@@ -23,11 +23,10 @@ MAX_CONVERSION_INPUT_BYTES = 50 * 1024 * 1024
 MAX_CONVERTER_OUTPUT_BYTES = 8 * 1024 * 1024
 MAX_CONVERTER_RESPONSE_BYTES = MAX_CONVERTER_OUTPUT_BYTES + 64 * 1024
 _IMAGE_DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
-_IMAGE_REPOSITORY_RE = re.compile(
-    r"^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?"
-    r"(?::(?P<port>[0-9]{1,5})(?=/))?"
-    r"(?:/[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?)*$"
-)
+_IMAGE_PATH_COMPONENT_RE = re.compile(r"^[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*$")
+_REGISTRY_HOST_LABEL = r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
+_REGISTRY_HOST_RE = re.compile(rf"^{_REGISTRY_HOST_LABEL}(?:\.{_REGISTRY_HOST_LABEL})*$")
+_REGISTRY_PORT_RE = re.compile(r"^[0-9]{1,5}$")
 _SOURCE_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 _FORMAT_BY_SUFFIX = {
     ".pdf": "pdf",
@@ -51,17 +50,42 @@ def conversion_format_for_suffix(suffix: str) -> str:
         ) from exc
 
 
+def _valid_image_repository(repository: str) -> bool:
+    """Validate registry and path grammar without mistaking numeric tags for ports."""
+    components = repository.split("/")
+    if any(not component for component in components):
+        return False
+
+    first = components[0]
+    path_components = components
+    if ":" in first:
+        if len(components) == 1 or first.count(":") != 1:
+            return False
+        host, port = first.rsplit(":", 1)
+        if (
+            not _REGISTRY_HOST_RE.fullmatch(host)
+            or not _REGISTRY_PORT_RE.fullmatch(port)
+            or not 1 <= int(port) <= 65535
+        ):
+            return False
+        path_components = components[1:]
+    elif len(components) > 1 and ("." in first or first == "localhost"):
+        if not _REGISTRY_HOST_RE.fullmatch(first):
+            return False
+        path_components = components[1:]
+
+    return all(_IMAGE_PATH_COMPONENT_RE.fullmatch(component) for component in path_components)
+
+
 def validate_folio_enrich_image(image_ref: str) -> str:
     """Require an OCI digest reference; mutable tags are never accepted."""
     repository, separator, digest = image_ref.rpartition("@")
     if not separator:
         digest = image_ref
-    repository_match = _IMAGE_REPOSITORY_RE.fullmatch(repository) if repository else None
-    port = repository_match.group("port") if repository_match is not None else None
     if (
         not _IMAGE_DIGEST_RE.fullmatch(digest)
-        or (separator and repository_match is None)
-        or (port is not None and not 1 <= int(port) <= 65535)
+        or (separator and not repository)
+        or (separator and not _valid_image_repository(repository))
     ):
         raise ConversionError("folio-enrich image must be pinned by a lowercase SHA-256 digest")
     return image_ref

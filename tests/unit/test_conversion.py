@@ -173,6 +173,16 @@ def test_folio_client_rejects_redirects_and_response_metadata_drift(
         "registry.example/folio-enrich@SHA256:" + "a" * 64,
         "registry.example/folio-enrich@sha256:" + "A" * 64,
         "registry.example/folio-enrich@@sha256:" + "a" * 64,
+        "registry_bad.example:5000/folio-enrich@sha256:" + "a" * 64,
+        "registry..example:5000/folio-enrich@sha256:" + "a" * 64,
+        "registry_bad.example/folio-enrich@sha256:" + "a" * 64,
+        "registry..example/folio-enrich@sha256:" + "a" * 64,
+        "-registry.example:5000/folio-enrich@sha256:" + "a" * 64,
+        "registry-.example:5000/folio-enrich@sha256:" + "a" * 64,
+        "registry.example-:5000/folio-enrich@sha256:" + "a" * 64,
+        "registry.example:5000/owner..name/folio-enrich@sha256:" + "a" * 64,
+        "registry.example:5000/owner___name/folio-enrich@sha256:" + "a" * 64,
+        "registry.example:5000/owner._name/folio-enrich@sha256:" + "a" * 64,
     ],
 )
 def test_folio_client_requires_digest_pinned_image(image_ref: str) -> None:
@@ -185,9 +195,19 @@ def test_folio_client_requires_digest_pinned_image(image_ref: str) -> None:
         )
 
 
-@pytest.mark.parametrize("port", [1, 5000, 65535])
-def test_folio_client_accepts_digest_pinned_image_from_registry_with_port(port: int) -> None:
-    image_ref = f"127.0.0.1:{port}/folio-enrich@sha256:" + "a" * 64
+@pytest.mark.parametrize(
+    ("registry", "port"),
+    [
+        ("127.0.0.1", 1),
+        ("localhost", 5000),
+        ("registry-1.example.com", 65535),
+    ],
+)
+def test_folio_client_accepts_digest_pinned_image_from_registry_with_port(
+    registry: str,
+    port: int,
+) -> None:
+    image_ref = f"{registry}:{port}/folio-enrich@sha256:" + "a" * 64
 
     converter = FolioEnrichConverter(
         endpoint="http://127.0.0.1:8731",
