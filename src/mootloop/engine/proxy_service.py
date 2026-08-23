@@ -15,6 +15,7 @@ from mootloop.engine.isolation import (
 )
 
 PASSWORD_FILE = "/tmp/mootloop-squid-passwords"
+MAX_OPENSSL_PASSWORD_BYTES = 256
 
 
 def _read_password(env_name: str) -> str:
@@ -36,6 +37,8 @@ def _read_password(env_name: str) -> str:
 
 
 def _password_line(identity: ProxyIdentity, password: str) -> str:
+    if len(password.encode("utf-8")) > MAX_OPENSSL_PASSWORD_BYTES:
+        raise SystemExit("egress proxy password must be at most 256 UTF-8 bytes")
     try:
         result = subprocess.run(
             ["openssl", "passwd", "-6", "-stdin"],

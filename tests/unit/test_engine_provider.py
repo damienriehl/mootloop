@@ -30,7 +30,7 @@ from mootloop.engine.claude_provider import (
     _unfence,
 )
 from mootloop.engine.egress_exec import validate_isolated_command
-from mootloop.engine.isolation import hosted_wrapper
+from mootloop.engine.isolation import ProxyIdentity, hosted_wrapper
 from mootloop.errors import (
     AuthError,
     EgressError,
@@ -545,6 +545,43 @@ def test_proxy_service_fails_closed_when_password_hashing_is_unavailable(
 
     with pytest.raises(SystemExit, match="could not hash"):
         proxy_service._password_line(proxy_service.ProxyIdentity.MODEL, "proxy-secret")
+
+
+@pytest.mark.parametrize("identity", list(ProxyIdentity))
+def test_proxy_service_accepts_maximum_password_length(
+    monkeypatch: pytest.MonkeyPatch,
+    identity: ProxyIdentity,
+) -> None:
+    from mootloop.engine import proxy_service
+
+    password = "x" * 256
+    calls: list[str] = []
+
+    def hash_password(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append(str(kwargs["input"]))
+        return subprocess.CompletedProcess(args=[], returncode=0, stdout="$6$salt$hash\n")
+
+    monkeypatch.setattr(proxy_service.subprocess, "run", hash_password)
+
+    assert proxy_service._password_line(identity, password) == f"{identity}:$6$salt$hash\n"
+    assert calls == [password]
+
+
+@pytest.mark.parametrize("identity", list(ProxyIdentity))
+def test_proxy_service_rejects_overlong_password_before_hashing(
+    monkeypatch: pytest.MonkeyPatch,
+    identity: ProxyIdentity,
+) -> None:
+    from mootloop.engine import proxy_service
+
+    monkeypatch.setattr(
+        proxy_service.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail("OpenSSL must not receive an overlong password"),
+    )
+
+    with pytest.raises(SystemExit, match="at most 256 UTF-8 bytes"):
+        proxy_service._password_line(identity, "x" * 257)
 
 
 @pytest.mark.parametrize("hash_output", ["bad", "$5$salt$hash", "$6$$hash", "$6$salt$"])
