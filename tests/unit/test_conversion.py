@@ -163,6 +163,26 @@ def test_folio_client_rejects_redirects_and_response_metadata_drift(
         "ghcr.io/alea-institute/folio-enrich:latest",
         "ghcr.io/alea-institute/folio-enrich@sha256:short",
         "https://ghcr.io/alea-institute/folio-enrich@sha256:" + "a" * 64,
+        "127.0.0.1:0/folio-enrich@sha256:" + "a" * 64,
+        "127.0.0.1:65536/folio-enrich@sha256:" + "a" * 64,
+        "127.0.0.1:http/folio-enrich@sha256:" + "a" * 64,
+        "folio-enrich:5000@sha256:" + "a" * 64,
+        "127.0.0.1:5000@sha256:" + "a" * 64,
+        "registry.example/owner/../folio-enrich@sha256:" + "a" * 64,
+        "registry.example/owner//folio-enrich@sha256:" + "a" * 64,
+        "registry.example/folio-enrich@SHA256:" + "a" * 64,
+        "registry.example/folio-enrich@sha256:" + "A" * 64,
+        "registry.example/folio-enrich@@sha256:" + "a" * 64,
+        "registry_bad.example:5000/folio-enrich@sha256:" + "a" * 64,
+        "registry..example:5000/folio-enrich@sha256:" + "a" * 64,
+        "registry_bad.example/folio-enrich@sha256:" + "a" * 64,
+        "registry..example/folio-enrich@sha256:" + "a" * 64,
+        "-registry.example:5000/folio-enrich@sha256:" + "a" * 64,
+        "registry-.example:5000/folio-enrich@sha256:" + "a" * 64,
+        "registry.example-:5000/folio-enrich@sha256:" + "a" * 64,
+        "registry.example:5000/owner..name/folio-enrich@sha256:" + "a" * 64,
+        "registry.example:5000/owner___name/folio-enrich@sha256:" + "a" * 64,
+        "registry.example:5000/owner._name/folio-enrich@sha256:" + "a" * 64,
     ],
 )
 def test_folio_client_requires_digest_pinned_image(image_ref: str) -> None:
@@ -173,6 +193,30 @@ def test_folio_client_requires_digest_pinned_image(image_ref: str) -> None:
             source_commit=FOLIO_ENRICH_COMMIT,
             runtime_mode=RuntimeMode.LOCAL,
         )
+
+
+@pytest.mark.parametrize(
+    ("registry", "port"),
+    [
+        ("127.0.0.1", 1),
+        ("localhost", 5000),
+        ("registry-1.example.com", 65535),
+    ],
+)
+def test_folio_client_accepts_digest_pinned_image_from_registry_with_port(
+    registry: str,
+    port: int,
+) -> None:
+    image_ref = f"{registry}:{port}/folio-enrich@sha256:" + "a" * 64
+
+    converter = FolioEnrichConverter(
+        endpoint="http://127.0.0.1:8731",
+        image_ref=image_ref,
+        source_commit=FOLIO_ENRICH_COMMIT,
+        runtime_mode=RuntimeMode.LOCAL,
+    )
+
+    assert converter.image_ref == image_ref
 
 
 def test_conversion_promotes_text_and_persists_exact_receipt(tmp_path: Path) -> None:
