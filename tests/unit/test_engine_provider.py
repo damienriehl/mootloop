@@ -440,6 +440,49 @@ def test_hosted_wrapper_landlock_hides_matter_control_and_secrets(tmp_path: Path
     assert allowed == "allowed"
 
 
+def test_hosted_wrapper_exposes_only_required_proc_self_maps(tmp_path: Path) -> None:
+    """Claude Code's native binary aborts when Landlock hides ``/proc/self/maps``.
+
+    The exception must stay process-local: another live PID's maps file and an unrelated
+    procfs identity/status file remain blocked.
+    """
+    vault = tmp_path / "worker" / "bound-matter"
+    config = tmp_path / "config"
+    queue = tmp_path / "worker" / ".queue"
+    secrets_dir = tmp_path / "secrets"
+    canary_registry = tmp_path / "global-canaries.json"
+    for path in (vault, config, queue, secrets_dir):
+        path.mkdir(parents=True, exist_ok=True)
+    canary_registry.write_text("{}", encoding="utf-8")
+    env = {
+        "HTTP_PROXY": "http://mootloop-model:secret@egress-proxy:3128",
+        "HTTPS_PROXY": "http://mootloop-model:secret@egress-proxy:3128",
+        "MOOTLOOP_PROVIDER_VAULT": str(vault),
+        "MOOTLOOP_PROVIDER_CONFIG_DIR": str(config),
+        "MOOTLOOP_CONTROL_DIR": str(queue),
+        "MOOTLOOP_SECRETS_DIR": str(secrets_dir),
+        "MOOTLOOP_CANARY_REGISTRY": str(canary_registry),
+    }
+    probe = (
+        "import json,os,pathlib; out=[]; "
+        "paths=('/proc/self/maps',f'/proc/{os.getppid()}/maps','/proc/self/cgroup'); "
+        "exec(\"for p in paths:\\n"
+        " try: pathlib.Path(p).read_text(); out.append(True)"
+        "\\n except OSError: out.append(False)\"); "
+        "print(json.dumps(out))"
+    )
+
+    completed = subprocess.run(
+        [*hosted_wrapper(), "/usr/bin/python3", "-c", probe],
+        env={**os.environ, **env},
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    assert json.loads(completed.stdout) == [True, False, False]
+
+
 @pytest.mark.parametrize(
     ("key", "value", "message"),
     [
