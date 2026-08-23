@@ -69,4 +69,4 @@ HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
 
 # The supervised loop drains the current turn on SIGTERM (compose stop_grace_period
 # must exceed the 600s turn timeout — see docker-compose.worker.yaml).
-CMD ["sh", "-c", "mootloop driver serve --mode hosted --matter-id ${MOOTLOOP_MATTER_ID:?required} --matter-vault /srv/mootloop-worker/matter --matters-root /srv/mootloop-worker --worker-id ${MOOTLOOP_WORKER_ID:-driver-1}"]
+CMD ["sh", "-c", "exec mootloop driver serve --mode hosted --matter-id ${MOOTLOOP_MATTER_ID:?required} --matter-vault /srv/mootloop-worker/matter --matters-root /srv/mootloop-worker --worker-id ${MOOTLOOP_WORKER_ID:-driver-1}"]
