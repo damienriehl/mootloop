@@ -249,7 +249,12 @@ def resolve_driver_binding(
     return DriverBinding(bound_id, Path(vault).resolve())
 
 
-def provider_factory(fake: bool, mode: RuntimeMode) -> ProviderFactory:
+def provider_factory(
+    fake: bool,
+    mode: RuntimeMode,
+    *,
+    bound_matter_id: MatterId | None = None,
+) -> ProviderFactory:
     if fake:
 
         def _fake(vault_root: Path, run_dir: Path, billing_mode: str) -> LLMProvider:
@@ -262,6 +267,7 @@ def provider_factory(fake: bool, mode: RuntimeMode) -> ProviderFactory:
             vault_root=vault_root,
             run_dir=run_dir,
             billing_mode=billing_mode,
+            matter_id=bound_matter_id,
             runtime_mode=mode,
             egress_wrapper=hosted_wrapper() if mode is RuntimeMode.HOSTED else [],
         )
@@ -288,7 +294,7 @@ def build_driver_worker(
         matters_root,
         worker_id,
         Queue(matters_root),
-        provider_factory(fake, mode),
+        provider_factory(fake, mode, bound_matter_id=binding.matter_id),
         bound_matter_id=binding.matter_id,
         bound_vault=binding.vault,
     )

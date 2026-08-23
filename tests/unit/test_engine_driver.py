@@ -9,10 +9,12 @@ import pytest
 
 from mootloop.conversion import FOLIO_ENRICH_COMMIT
 from mootloop.engine import driver
+from mootloop.engine.claude_provider import ENGINE_CONFIG_ENV, HeadlessClaudeProvider
 from mootloop.errors import ConversionError, DriverError, VaultBoundaryError
 from mootloop.models.common import MatterId
 from mootloop.registry import MatterRegistry
 from mootloop.runtime import RuntimeMode
+from mootloop.vault import atomic_write_text, safe_vault_path
 from tests.conftest import make_matter
 
 IMAGE = "ghcr.io/alea-institute/folio-enrich@sha256:" + "a" * 64
@@ -50,6 +52,61 @@ def test_hosted_binding_uses_one_exact_preflighted_vault(tmp_path: Path) -> None
 
     assert binding.matter_id == "2026-08-21-acme-test"
     assert binding.vault == vault.resolve()
+
+
+def test_hosted_provider_factory_keys_config_by_bound_matter_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    matter_id = "2026-08-21-acme.foo-test"
+    _root, vault = _hosted_matter(tmp_path, matter_id)
+    run_dir = vault / "runs" / "run-a"
+    run_dir.mkdir(parents=True)
+    engine_root = tmp_path / "engine-config"
+    monkeypatch.setenv(ENGINE_CONFIG_ENV, str(engine_root))
+
+    provider = driver.provider_factory(
+        False,
+        RuntimeMode.HOSTED,
+        bound_matter_id=MatterId(matter_id),
+    )(
+        vault, run_dir, "subscription"
+    )
+
+    assert isinstance(provider, HeadlessClaudeProvider)
+    assert provider.matter_id == matter_id
+    assert provider._config_dir() == engine_root / "2026-08-21-acme.foo-test" / "run-a"
+
+
+def test_hosted_worker_provider_factory_retains_preflighted_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    matter_id = "2026-08-21-acme-test"
+    root, vault = _hosted_matter(tmp_path, matter_id)
+    engine_root = tmp_path / "engine-config"
+    monkeypatch.setenv(ENGINE_CONFIG_ENV, str(engine_root))
+    worker = driver.build_driver_worker(
+        root,
+        "worker-a",
+        fake=False,
+        mode=RuntimeMode.HOSTED,
+        matter_id=matter_id,
+        matter_vault=vault,
+    )
+    matter_path = safe_vault_path(vault, "matter.yaml")
+    atomic_write_text(
+        matter_path,
+        matter_path.read_text(encoding="utf-8").replace(
+            matter_id, "2026-08-21-changed-test"
+        ),
+    )
+    run_dir = vault / "runs" / "run-a"
+    run_dir.mkdir(parents=True)
+
+    provider = worker.provider_factory(vault, run_dir, "subscription")
+
+    assert isinstance(provider, HeadlessClaudeProvider)
+    assert provider.matter_id == matter_id
+    assert provider._config_dir() == engine_root / matter_id / "run-a"
 
 
 def test_hosted_binding_rejects_mounted_matter_identity_mismatch(tmp_path: Path) -> None:

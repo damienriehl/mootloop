@@ -52,11 +52,12 @@ from mootloop.engine.isolation import (
 )
 from mootloop.errors import AuthError, EgressError, SeatLimitError, TurnError
 from mootloop.llm import RawTurnResult, TokenUsage
+from mootloop.models.common import MatterId
 from mootloop.models.run import TurnSpec
 from mootloop.privacy import CANARY_REGISTRY_ENV, scrub_outbound
 from mootloop.runtime import RuntimeMode, validate_runtime_mode
 from mootloop.secrets import SECRETS_FILE, register_secret
-from mootloop.vault import _is_within, _real, atomic_write_text, safe_vault_path
+from mootloop.vault import _is_within, _real, atomic_write_text, safe_vault_path, validate_id
 
 # The approved context assembler supplies persona inputs in the prompt. These tools
 # remain only as an explicit diagnostic seam; normal persona turns receive none.
@@ -249,6 +250,7 @@ class HeadlessClaudeProvider:
     claude_bin: str = "claude"
     egress_wrapper: list[str] = field(default_factory=list)
     config_dir: Path | None = None
+    matter_id: MatterId | None = None
     oauth_token_loader: TokenLoader | None = None
     api_key_loader: TokenLoader | None = None
     max_turns: int = 6
@@ -262,6 +264,9 @@ class HeadlessClaudeProvider:
         if self.runtime_mode is RuntimeMode.HOSTED and self.egress_wrapper != hosted_wrapper():
             raise ValueError("hosted mode requires the exact built-in egress wrapper")
         if self.runtime_mode is RuntimeMode.HOSTED:
+            if self.matter_id is None:
+                raise ValueError("hosted mode requires the bound matter id")
+            self.matter_id = MatterId(validate_id(str(self.matter_id), kind="matter_id"))
             config_real = _real(self._config_dir())
             secrets_real = _real(SECRETS_FILE.parent)
             if _is_within(config_real, secrets_real):
@@ -287,8 +292,12 @@ class HeadlessClaudeProvider:
         if self.config_dir is not None:
             return Path(self.config_dir)
         run_dir = self.run_dir
-        matter = run_dir.parent.parent.name or "matter"
-        return engine_config_root() / _slug(matter) / _slug(run_dir.name)
+        matter_dir = (
+            str(self.matter_id)
+            if self.runtime_mode is RuntimeMode.HOSTED
+            else _slug(run_dir.parent.parent.name or "matter")
+        )
+        return engine_config_root() / matter_dir / _slug(run_dir.name)
 
     def _secrets_real(self) -> Path:
         return Path(os.path.realpath(SECRETS_FILE))
