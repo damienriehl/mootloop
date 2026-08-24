@@ -66,8 +66,9 @@ journey remains.
   `docs/decisions/2026-08-23-d09-remote-signed-head-sink.md` before the content-free
   signed-head integrity ledger can be implemented. That approval does not authorize
   or close FD6-01's separate encrypted off-box backup destination and restore drill.
-- FD6-01 requires its own encrypted-backup provider, retention, and provisioning
-  approval before any remote backup write or restore drill.
+- FD6-01 requires the provider/retention choice in
+  `docs/decisions/2026-08-24-fd6-01-off-box-backup.md` before implementation,
+  provisioning, any remote backup write, or restore drill.
 
 U-11B and U-12 through U-16 remain blocked until the U-17A -> U-17B -> U-17C
 clean-compounding-loop sequence is complete under D-10/D-16. D-09 independently

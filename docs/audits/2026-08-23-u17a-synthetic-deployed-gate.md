@@ -174,9 +174,10 @@ start. No canary value was printed or persisted in Git.
   were proved; authenticated legal-source semantics were not.
 - **Off-box backup and signed-head ledger:** the restore drill used a dedicated
   same-host synthetic backup root. FD6-01 still requires an approved encrypted off-box
-  backup destination and a restore drill against that destination. D-09 separately
-  governs a signed-head integrity ledger: D-09P approval neither authorizes backup
-  provisioning or remote backup writes nor closes FD6-01.
+  backup destination and a restore drill against that destination; its provider packet
+  is `docs/decisions/2026-08-24-fd6-01-off-box-backup.md`. D-09 separately governs a
+  signed-head integrity ledger: D-09P approval neither authorizes backup provisioning
+  or remote backup writes nor closes FD6-01.
 - **Coolify API token:** the token file is owned by `deploy`, mode `0600`, but the local
   Coolify API returns 401. The token must be regenerated in Coolify and replaced
   without pasting it into chat. Direct Compose deployment was sufficient for this
