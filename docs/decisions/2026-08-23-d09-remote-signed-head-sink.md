@@ -2,7 +2,7 @@
 
 Date prepared: 2026-08-23
 
-Status: awaiting provider and retention approval
+Status: awaiting two-account AWS architecture and retention approval
 
 This packet completes the concrete follow-up required by D-09. It authorizes no
 remote write and contains no credentials, protected matter identifiers, or matter
@@ -12,23 +12,35 @@ obligation.
 
 ## Recommendation
 
-Use a dedicated private AWS S3 general-purpose bucket with Versioning and S3 Object
-Lock enabled. Apply a bucket-default **Compliance-mode** retention period to every
-object. Store only signed integrity heads: opaque HMAC-derived scope identifiers,
-sequence number, prior-head digest, current-head digest, signing-key identifier,
-signature, and UTC timestamps. Never store matter text, filenames, party names,
-readable matter IDs, prompts, drafts, or exports in this ledger.
+Use a concrete two-account AWS architecture:
 
-S3 Object Lock is the recommended provider because its Compliance mode prevents a
-protected object version from being overwritten or deleted by any AWS identity,
-including the account root, and prevents shortening its retention period. Cloudflare
-R2 Bucket Locks are an alternative in the existing Cloudflare estate, but an
-authorized configuration administrator can remove a lock rule. R2's standard Object
-Read & Write credential also permits reading, writing, and listing objects; it is not
-a put-only runtime credential. A put-only R2 design would require a protected
-off-host credential broker to retain the parent secret and locally issue short-lived
-temporary credentials scoped to the `PutObject` action and the exact object path.
-That extra high-trust broker and R2's removable lock rule make R2 less preferred.
+1. a private primary S3 general-purpose bucket in a dedicated signed-head AWS account;
+   and
+2. a private verifier-receipt S3 general-purpose bucket in a separately controlled AWS
+   account that the MootLoop writer and primary-account administrator cannot control.
+
+Both buckets have Versioning and S3 Object Lock enabled at creation, block all public
+access, require TLS and server-side encryption, and apply the same approved
+bucket-default **Compliance-mode** retention period to every object. The primary
+bucket stores only signed integrity heads: opaque HMAC-derived scope identifiers,
+sequence number, prior-head digest, current-head digest, signing-key identifier,
+signature, and UTC timestamps. The receipt bucket stores only signed content-free
+verification receipts for those heads. Neither bucket stores matter text, filenames,
+party names, readable matter IDs, prompts, drafts, exports, or encrypted backups.
+
+S3 Object Lock is recommended because its Compliance mode prevents a protected object
+version from being overwritten or deleted by any AWS identity, including the account
+root, and prevents shortening its retention period. Separating the signed heads and
+verifier receipts across accounts prevents either mandatory remote component from
+depending on an unnamed sink or the writer's control plane.
+
+Cloudflare R2 is rejected for this packet rather than offered as an approval option.
+An authorized configuration administrator can remove an R2 Bucket Lock rule, and an
+R2 Object Read & Write credential permits reading, writing, and listing objects rather
+than put-only access. A defensible R2 design would require a protected off-host broker
+to hold the parent secret and locally issue short-lived, action-scoped credentials for
+each exact `PutObject` path, plus an R2-specific receipt and recovery design. That is a
+second architecture and is not approved or specified here.
 
 Official references:
 
@@ -38,12 +50,15 @@ Official references:
 - [Cloudflare R2 API-token permissions](https://developers.cloudflare.com/r2/api/tokens/)
 - [Cloudflare R2 temporary credentials](https://developers.cloudflare.com/r2/api/s3/temporary-credentials/)
 
-## API and authentication path
+## Accounts, APIs, and authentication
 
-Provision the bucket and its retention configuration through a separately controlled
-administrator identity. The MootLoop runtime receives a dedicated AWS IAM access key
-from its approved secrets store and uses only the S3 `PutObject` API against one fixed
-bucket and prefix.
+Provision each bucket and its retention configuration through the administrator of its
+own AWS account. Account policy keeps the primary signed-head administrator, the
+verifier-receipt administrator, and the MootLoop runtime under separate control.
+
+The MootLoop runtime receives a dedicated AWS IAM access key from its approved secrets
+store and uses only the S3 `PutObject` API against the primary bucket's fixed
+`signed-heads/` prefix.
 
 The runtime identity must be allowed only:
 
@@ -73,31 +88,54 @@ compromised host may append false future entries while it controls both credenti
 but it cannot rewrite or delete already retained history.
 
 Verification is performed off the MootLoop host by a separately controlled principal.
-Its AWS identity is restricted to `s3:ListBucketVersions` on the fixed
-`signed-heads/` prefix plus `s3:GetObjectVersion` and `s3:GetObjectRetention` for
-versions under that prefix. It receives no put, delete, tagging, legal-hold,
-retention-write, lifecycle, policy, replication, versioning, or bucket-configuration
-permission. The verifier signs a content-free receipt containing the scope, sequence,
-object key, canonical-byte digest, signing-key identifier, S3 version ID, retention
-mode, retain-until date, observation time, and prior receipt digest. Those receipts
-are stored outside both the writer host and the signed-head sink account under a
-separately controlled append-only policy.
+It uses three non-interchangeable identities:
 
-Every accepted anchor requires its exact verifier receipt synchronously, so an
-accepted head has zero checkpoint staleness. The verifier also performs a full-chain
-consistency sweep at least every 24 hours. If the newest valid external receipt or
+- **Primary reader:** `s3:ListBucketVersions` on the primary bucket constrained to the
+  fixed `signed-heads/` prefix, plus `s3:GetObjectVersion` and
+  `s3:GetObjectRetention` for versions under that prefix. It has no primary-bucket
+  writes, deletes, tags, holds, retention writes, lifecycle, policy, replication,
+  versioning, or configuration permissions.
+- **Receipt writer:** only `s3:PutObject` with `If-None-Match: *` against
+  `arn:aws:s3:::<approved-receipt-bucket>/verifier-receipts/*`. Receipt-bucket policy
+  rejects writes outside that prefix and requests missing the required TLS,
+  encryption, checksum, or conditional-write headers. This identity cannot list,
+  read, delete, tag, configure, alter retention or legal holds, manage lifecycle or
+  versioning, or bypass retention.
+- **Recovery auditor:** a separate identity with `s3:ListBucketVersions` on the
+  receipt bucket constrained to `verifier-receipts/`, plus `s3:GetObjectVersion` and
+  `s3:GetObjectRetention` for versions under that prefix. It has no receipt-bucket
+  writes, deletes, tags, holds, retention writes, lifecycle, policy, replication,
+  versioning, configuration, or retention-bypass permissions.
+
+The verifier signs canonical content-free receipt bytes containing the opaque scope,
+zero-padded sequence, primary object key, canonical-head digest, head signing-key
+identifier, primary S3 version ID, primary retention mode and retain-until date,
+observation time, and prior receipt digest. Its deterministic receipt key is exactly
+`verifier-receipts/<opaque-scope>/<20-digit-zero-padded-sequence>.json`. The receipt
+writer uploads those exact bytes without changing the key or signature.
+
+Every accepted anchor requires its exact receipt to be stored synchronously in the
+verifier-receipt bucket with Compliance-mode retention for the approved period. The
+receipt write succeeds only after S3 returns or reconciliation recovers its version
+ID, and the recovery auditor confirms that exact version's canonical receipt bytes,
+verifier signature, checksum, Compliance mode, and retain-until date. An accepted head
+therefore has zero checkpoint staleness. The verifier also performs a full two-bucket
+consistency sweep at least every 24 hours. If the newest valid retained receipt or
 full-chain sweep is older than 24 hours, the current chain is reported as stale and
 must not be described as currently host-writer-resistant. Recovery trusts the last
-externally stored receipt whose verifier signature and receipt chain validate; any
-newer remote or local entries remain untrusted until independently admitted.
+receipt version whose verifier signature, receipt chain, checksum, and retention
+validate; any newer primary, receipt, or local entries remain untrusted until
+independently admitted.
 
 ## Retention and immutability guarantee
 
-Enable Versioning and Object Lock at bucket creation, then configure a bucket-default
-Compliance-mode retention period before issuing the runtime credential. The exact
-period is a firm records-policy judgment. The proposed default is **seven years**,
-subject to the firm's governing retention schedule. Object keys and versions are
-never reused, and no lifecycle rule may delete retained versions before expiration.
+Enable Versioning and Object Lock when creating both buckets, then configure the same
+bucket-default Compliance-mode retention period on both before issuing any runtime,
+verifier, receipt-writer, or recovery-auditor credential. The exact period is a firm
+records-policy judgment. The proposed default is **seven years**, subject to the
+firm's governing retention schedule. Object keys and versions are never reused, and
+neither account may configure a lifecycle rule that deletes retained versions before
+expiration.
 
 ## Fail-closed behavior
 
@@ -111,8 +149,8 @@ described as host-writer-resistant. The anchoring operation succeeds only after:
    outcome to exactly one acceptable version;
 4. the off-host verifier admits the record into the existing scope chain and confirms
    the exact bytes, signature, version ID, Compliance mode, and retain-until date;
-5. the verifier's signed receipt is durably stored outside the writer host and sink
-   account; and
+5. the verifier's signed receipt is retained in the separately controlled receipt
+   bucket and its exact version is confirmed by the recovery auditor; and
 6. the local append-only journal records that receipt without matter content.
 
 Authentication failure, timeout, HTTP 409/412, checksum mismatch, missing retention
@@ -132,6 +170,18 @@ Zero matches, multiple matches, any conflicting version, any delete marker, or a
 retention mismatch is a blocking integrity incident. Only an accepted reconciliation
 may recover the actual S3 version ID and produce the external verifier receipt.
 
+Receipt PUTs use the same durable expected-object and ambiguity contract. Before its
+PUT, the off-host verifier durably records the exact receipt key, canonical bytes,
+signature, checksum, and minimum retain-until date. A timeout, 409, or 412 leaves the
+receipt pending; the receipt writer never changes the key, bytes, or signature. The
+recovery auditor enumerates every version and delete marker for the exact receipt key
+and accepts only one non-delete version whose bytes, verifier signature, checksum,
+opaque scope, sequence, prior receipt digest, Compliance mode, and retain-until date
+match the expected record. Zero matches, multiple matches, a conflicting version, a
+delete marker, or a retention mismatch is a blocking integrity incident. Only that
+exact-match reconciliation may recover the receipt-bucket version ID and complete the
+anchor.
+
 ## Recovery and verification
 
 The off-host verifier is the chain-admission authority, not merely a read-after-write
@@ -142,14 +192,16 @@ sequence, wrong prior digest, conflicting version, delete marker, or unadmitted 
 state remains pending and becomes a blocking integrity incident; nothing uses
 last-write-wins or repairs the chain automatically.
 
-Recovery uses the same off-host read-only principal to enumerate every object version
-and delete marker and retrieve signed heads. It folds heads by opaque scope and
-sequence, verifies canonical bytes, every signature and prior-head link, key state,
-retention, and the external verifier-receipt chain, then compares the admitted remote
+Recovery uses the primary-reader and recovery-auditor identities to enumerate every
+version and delete marker under both fixed prefixes and retrieve signed heads and
+receipts. It folds heads and receipts by opaque scope and sequence, verifies canonical
+bytes, every signature and prior link, key state, checksums, version-specific
+retention, and one-to-one head/receipt admission, then compares the admitted remote
 head with the local journal and backup inventory. A fork, gap, stale or unexpected
-key, retention downgrade, stale external checkpoint, or local/remote divergence is a
-blocking integrity incident rather than an automatic repair. A mutable or stale local
-journal or backup never overrides the last valid external receipt.
+key, missing or conflicting receipt, retention downgrade, stale checkpoint, or
+local/remote divergence is a blocking integrity incident rather than an automatic
+repair. A mutable or stale local journal or backup never overrides the last valid
+retained receipt.
 
 Signing-key rotation is an explicit chain state transition. Its canonical record
 contains `record_type`, schema and algorithm versions, old and new key identifiers,
@@ -175,11 +227,11 @@ separate custody.
 
 Choose one inline:
 
-- **D-09P A (recommended):** AWS S3 Object Lock, Compliance mode, seven-year default.
-- **D-09P B:** AWS S3 Object Lock, Compliance mode, with another exact retention period.
-- **D-09P C:** Cloudflare R2 Bucket Lock, indefinite retention, accepting that an
-  authorized configuration administrator can remove the lock rule and that put-only
-  runtime access requires the protected off-host temporary-credential broker above.
+- **D-09P A (recommended):** the two-account AWS S3 Object Lock architecture above,
+  with Compliance mode and a seven-year default on both buckets.
+- **D-09P B:** the same two-account AWS S3 Object Lock architecture and Compliance
+  mode, with another exact approved retention period applied identically to both
+  buckets.
 
 Implementation and provisioning remain blocked until this named provider/retention
 choice is explicitly approved. Provisioning credentials, bucket creation, and any
