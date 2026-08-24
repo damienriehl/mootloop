@@ -32,9 +32,10 @@ PRs #58 and #59 subsequently repaired the hosted provider-state binding and Clau
 Code's read-only Landlock self-maps requirement. A canary-bearing hostile discovery
 document now traverses ingest and immutable context assembly before failing at the
 normal provider boundary without subprocess start, and an in-flight stop/reclaim
-drill passed without duplicate turn or spend. U-17A now needs only the authenticated
-mobile journey; its Chrome control client requires a Browser plugin reinstall before
-human Cloudflare Access can be completed. U-17B remains behind fresh D-03
+drill passed without duplicate turn or spend. Chrome DevTools control is restored, and
+the Cloudflare Access phone-edge check passed at 390-by-844, DPR-3 without horizontal
+overflow. U-17A now needs only human Cloudflare Access authentication followed by the
+content-free authenticated application phone journey. U-17B remains behind fresh D-03
 authorization; U-17C and
 the post-validation U-11B/U-12–U-16 breadth remain durably queued behind the clean
 workflow/observed-friction gate rather than silently omitted.
@@ -185,7 +186,7 @@ delivery now share the same immutable commitment and recovery boundary.
 | D6 Loop calibration | PARTIAL | Score delta + material-change + completeness convergence, directional-only jury signals, and held-out assigned-judge calibration are implemented. Remaining measurement-driven tuning is U-16. |
 | D7 Discovery-practice gates | COMPLETE for the current adapter | Current discovery shapes, RFA decisions, sanctions-linked rubric penalties, privilege log, structural export, and exact opinion-to-proposition support are implemented. |
 | D8 Export round trip | PARTIAL | DOCX rendering, attested local exports, bookmark/sentinel/revision reimport, defensive OOXML, and CriticMarkup learning state exist. Optional Google suggestions/comments remain D-06. |
-| D9 Lifecycle and integrity | PARTIAL | Cache staleness, retention/hold close policy, complete close manifest, sync guard, heartbeating locks/backups, full local attestation commitments, fact versions, and learning-event state exist. The explicit whole-vault `verify` reconciliation remains U-11B; stronger remote signed heads remain D-09. |
+| D9 Lifecycle and integrity | PARTIAL | Cache staleness, retention/hold close policy, complete close manifest, sync guard, heartbeating locks/backups, full local attestation commitments, fact versions, and learning-event state exist. The explicit whole-vault `verify` reconciliation remains U-11B; the signed-head packet is ready at `docs/decisions/2026-08-23-d09-remote-signed-head-sink.md` and awaits explicit D-09P approval. |
 | D10 Python foundations | COMPLETE for the current suite | Domain models, strict schemas, migrations, five-layer frozen config, unions, protocols, sync-core boundaries, folds, typed trust zones, gate ordering, write-once turn results, copied-component seams, CLI split, learning package, and deterministic/replayed/invariant/explicit-paid test tiers exist. |
 | D11 Agent-native parity | PARTIAL | Current run/decision/attestation/export, TaskSpec-lock, learning, matter-context, trace/evidence, close, and reopen primitives have checked CLI/API paths; current human artifacts have sidecars. Emergent-task proof and the planned U-12–U-15 capability/durable-job breadth remain. |
 | D12 Vocabulary, IDs, config | COMPLETE for current models | Five-layer resolution, structural override controls, canonical gate names/order, current IDs, content-free trace trees, and numbered evidence-pack commitments are implemented. Future stores must extend the same checked contract. |
@@ -255,7 +256,7 @@ Source: `docs/plans/2026-07-12-001-feat-hosted-frontend-folio-cockpit-plan.md`
 | FD-3 Non-portable controls | PARTIAL | U-02 completes runtime outbound canary/redaction locally and U-03 completes the stronger audit/attestation commitment. Content-free notifications remain U-15. |
 | FD-4 Approve then inject | PARTIAL | Approval-filtered, provenance-tagged, DATA-fenced manifest injection is complete; durable board/changelog/review feed is U-13. |
 | FD-5 Architecture corrections | PARTIAL | Pause/queue/SSE/BFF, immutable launch bindings, thin TaskSpec paths, drain recovery, and control-plane attempt accounting exist. Full task lanes and failover behavior are U-11B/U-12/U-15; broad pipeline shape stays deferred. |
-| FD-6 Data lifecycle | PARTIAL | Consistent heartbeating backup, spend intent, complete close policy/manifest, recovery accounting, queue locking, and a synthetic byte-identical restore/key-retirement drill exist. Off-box sink selection, board mutation, hardened upload, and watcher reconciliation remain D-09/U-13/U-14. |
+| FD-6 Data lifecycle | PARTIAL | Consistent heartbeating backup, spend intent, complete close policy/manifest, recovery accounting, queue locking, and a synthetic byte-identical restore/key-retirement drill exist. D-09P approval covers only the signed-head integrity ledger; FD6-01 still needs an independently approved encrypted off-box backup destination and restore drill. Board mutation, hardened upload, and watcher reconciliation remain U-13/U-14. |
 | FD-7 Capability parity | PARTIAL | The checked matrix proves current matter/run/decision/attestation/export/close/context/evidence/reopen rows and names an owner for every planned row. Task/board/failover/connector/notification implementations remain U-12–U-15. |
 | FD-8 TypeScript contract | COMPLETE for FE-2 | Generated OpenAPI types, drift checks, typed modules, zod SSE, session-expiry handling, query keys, protected mutation semantics, and thin-BFF tests exist. New surfaces must extend the same contract in U-12–U-15. |
 | FD-9 Design direction | PARTIAL | The existing cockpit implements the case-file language and core ceremonies, and U-11A adds the durable `docs/design/frontend-direction.md`. Remaining rooms/mobile board are U-12–U-15. |
@@ -298,8 +299,10 @@ Every discovered task now has one of four durable outcomes:
 On 2026-08-20 the user answered D-01 through D-17. The rulings are recorded in the
 Decision Sheet. Some operations remain intentionally gated even after their policy
 choice: D-03 A requires a fresh authorization before any real hosted-matter access;
-D-06 B does not self-grant Google OAuth consent; D-08 A is read-only; D-09 A requires
-approval of a named remote sink. D-13 A initially permitted only a PR/CI run; the user
+D-06 B does not self-grant Google OAuth consent; D-08 A is read-only; and the named
+D-09 provider packet at `docs/decisions/2026-08-23-d09-remote-signed-head-sink.md`
+awaits explicit D-09P approval. That packet is an integrity ledger, not FD6-01's
+encrypted off-box backup destination. D-13 A initially permitted only a PR/CI run; the user
 later authorized merge of PR #32 and the reviewed continuation work. PR #33 merged as
 `74dec0a`. The user later authorized U-17A's synthetic development deployment;
 production and protected-matter operations remain unauthorized by implication.
@@ -318,17 +321,19 @@ Human-only prerequisites and their secret-safe completion checks are preserved i
 |---|---|---|
 | U-17A hostile-input discovery trace | COMPLETE | Run-visible planted discovery was captured in the immutable manifest/corpus snapshot and assembled into the persona prompt; `HeadlessClaudeProvider.run_turn` raised `OutboundPrivacyError`, and a subprocess tripwire proved rejection before process or transport start. |
 | U-17A in-flight drain/reclaim | COMPLETE | Exact `claude -p` observation preceded a normal Compose stop; exit was 0 without OOM, the attempt was refunded and released, boot reclaimed it once at an unchanged completed-turn/spend baseline, and the run finished with 12 turns plus zero residual queue items. |
-| U-17A authenticated mobile journey | BROWSER-REPAIR / HUMAN-AUTH BLOCKER | Reinstall the Browser plugin from the ChatGPT plugin UI, complete Cloudflare Access in Chrome, and open the exact synthetic run; the agent can then perform phone-width, content-free QA and close U-17A. |
+| U-17A authenticated mobile journey | HUMAN-AUTH BLOCKER | Chrome DevTools opened the exact synthetic route at 390-by-844, DPR-3; the Cloudflare Access phone-edge check passed without horizontal overflow and exposed the email/login-code controls. Complete human-only Access authentication, then let the agent perform the content-free authenticated application phone journey and close U-17A. |
 | U-17B clean protected workflow | AUTHORIZATION-GATED | After U-17A, request fresh D-03 authorization for the named protected read/run. Attorney alone supplies facts, resolves gates, reviews, attests, and exports. |
 | U-17C beneficial learning proof | JUDGMENT-GATED | After U-17B, agent prepares the controlled comparison; attorney supplies the non-degrading quality/confidentiality verdict. |
 | PR #30/#31 monitoring tails | OPEN DURING AUTHORIZED OPERATIONS | Record two more qualifying runs/reopens, or the applicable authorized observation window, without creating standalone protected operations merely to satisfy monitoring. |
-| D-09 immutable remote sink / FD6-01 off-box clause | PROVIDER-CHOICE-GATED | Present a concrete least-privilege sink and mutation scope for approval; same-host synthetic restore is already proved. |
+| D-09 signed-head ledger | D-09P-APPROVAL-GATED | The concrete provider/retention packet is ready at `docs/decisions/2026-08-23-d09-remote-signed-head-sink.md`; await explicit D-09P approval before any implementation or remote write. |
+| FD6-01 encrypted off-box backup | PROVIDER-CHOICE-GATED | Independently approve and provision an encrypted off-box backup destination, then complete its restore drill; the D-09 signed-head integrity ledger cannot close this backup requirement. |
 | U-11B and U-12–U-16 | QUEUED AUTO | Under D-10/D-16, do not expand breadth before the clean compounding loop; afterwards execute in the continuation plan's dependency order, prioritized by observed attorney friction. |
 | D-06 Google lane inside U-14 | CONSENT-GATED | Build remains queued with U-14; OAuth/device consent and recipient/ACL approval stay human-only. |
 | Deferred collaboration/integration breadth | DEFERRED BY D-17 | Keep Dropbox/OneDrive, Web Push, broad `pipeline_shape`, and multiplayer visible in the successor queue; do not start them implicitly. |
 
-U-17A's runtime-sensitive drills are complete; only the Browser-plugin repair and
-human-authenticated browser handoff remain. Starting U-11B/U-12–U-16 before the clean
+U-17A's runtime-sensitive drills are complete; only human Cloudflare Access
+authentication and the subsequent authenticated application phone journey remain.
+Starting U-11B/U-12–U-16 before the clean
 compounding loop would
 violate the user's D-10/D-16 sequencing rulings. The agent can prepare, test, review,
 and publish every later unit once its named human boundary is satisfied.
@@ -415,13 +420,17 @@ record below is limited to the separately authorized synthetic development deplo
   Landlock self-maps read while preserving sibling `/proc` denials. The explicitly
   rebuilt deployed image passed both wrapped Claude version and content-free live
   provider probes.
-- U-17A still needs only the authenticated phone-width journey after the Browser plugin
-  is reinstalled and a human completes Access login. The redacted evidence report is
+- Chrome DevTools opened the exact synthetic route at 390-by-844, DPR-3, where the
+  Cloudflare Access page passed the phone-edge overflow and accessibility-tree check.
+  U-17A still needs human Access authentication followed by the content-free
+  authenticated application phone journey. The redacted evidence report is
   `docs/audits/2026-08-23-u17a-synthetic-deployed-gate.md`.
 
 No protected matter was read or run. Same-host synthetic restore proof does not close
-FD6-01's off-box sink clause. The single browser/authentication tail above prevents
-U-17A from being marked fully complete yet.
+FD6-01: the D-09 signed-head integrity ledger awaits D-09P approval, while an encrypted
+off-box backup destination and its restore drill remain independently open. The single
+human-authentication/application-journey tail above prevents U-17A from being marked
+fully complete yet.
 
 ## U-11A Publication Record — 2026-08-22
 
