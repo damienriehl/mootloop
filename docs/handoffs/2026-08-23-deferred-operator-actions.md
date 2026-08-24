@@ -44,6 +44,11 @@ only by `deploy`.
 **Status:** Browser control restored on 2026-08-23; authentication remains open and is
 the sole remaining U-17A tail
 
+**Last rechecked:** 2026-08-24. The controlled 390-by-844, DPR-3 Chrome session still
+stops at Cloudflare Access's email/login-code form; no reusable authenticated session
+is present. The agent did not enter an email, request a code, or bypass the human
+authentication boundary.
+
 Chrome DevTools control is working and the exact synthetic U-17A run route is open at
 the Cloudflare Access login page. The Browser-plugin client still lacks its trusted
 Node service, but that no longer blocks QA because the user explicitly approved Chrome

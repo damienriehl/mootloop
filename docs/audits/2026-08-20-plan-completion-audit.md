@@ -40,6 +40,16 @@ authorization; U-17C and
 the post-validation U-11B/U-12–U-16 breadth remain durably queued behind the clean
 workflow/observed-friction gate rather than silently omitted.
 
+Execution update through 2026-08-24: the all-history plan inventory was rechecked and
+still contains exactly the three July source plans plus this audit-created continuation
+queue; no later or previously missed `ce-plan` document exists in the repository.
+PR #64 merged the corrected PR #30/#31 monitoring thresholds. D-08's public-demo
+housekeeping check is now complete read-only as recorded below. The remaining queue is
+unchanged: the human Access login gates U-17A, fresh protected-matter authorization
+gates U-17B, attorney judgment gates U-17C, D-09P and FD6-01P gate their respective
+remote sinks, and D-10/D-16 intentionally hold the breadth units until the clean
+compounding loop supplies prioritization evidence.
+
 The broader repository audit nevertheless found genuine unfinished work in the two
 legacy plans still marked `active`. This document is the completion ledger for every
 plan unit and acceptance criterion. Open autonomous work is routed to
@@ -206,7 +216,11 @@ Source: `docs/plans/2026-07-11-002-feat-demo-server-and-deployment-plan.md`
 | DEMO-A | Green checks, attested/restructured bake, vault-only reads, secretless health, no writers | COMPLETE | Current local validation and invariants pass. |
 
 The later `www` certificate/redeploy note is not part of this plan's acceptance
-criteria. It remains an ask-gated production housekeeping choice in D-08.
+criteria. D-08's read-only verification completed on 2026-08-24: valid TLS connections
+and successful GETs reached both `mootloop.org` and `www.mootloop.org`; both `/health`
+routes returned `{"status":"ok","version":"0.0.0"}`, and both roots served the
+synthetic, read-only demo. No certificate repair, redeploy, or other production
+mutation was necessary or performed.
 
 ## Plan 3 — Hosted Frontend FOLIO Cockpit
 
@@ -325,6 +339,7 @@ Human-only prerequisites and their secret-safe completion checks are preserved i
 | U-17B clean protected workflow | AUTHORIZATION-GATED | After U-17A, request fresh D-03 authorization for the named protected read/run. Attorney alone supplies facts, resolves gates, reviews, attests, and exports. |
 | U-17C beneficial learning proof | JUDGMENT-GATED | After U-17B, agent prepares the controlled comparison; attorney supplies the non-degrading quality/confidentiality verdict. |
 | PR #30/#31 monitoring tails | OPEN DURING AUTHORIZED OPERATIONS | Record one more qualifying hosted run for PR #30 and two more qualifying reopen operations for PR #31. The seven-day minimum has elapsed, but each three-operation condition is longer and therefore controls. Do not create standalone protected operations merely to satisfy monitoring. |
+| D-08 production housekeeping | COMPLETE READ-ONLY | On 2026-08-24 both apex and `www` completed TLS and served the synthetic read-only demo; both `/health` routes returned `status=ok`. No production mutation was needed or performed. |
 | D-09 signed-head ledger | D-09P-APPROVAL-GATED | The concrete provider/retention packet is ready at `docs/decisions/2026-08-23-d09-remote-signed-head-sink.md`; await explicit D-09P approval before any implementation or remote write. |
 | FD6-01 encrypted off-box backup | FD6-01P-APPROVAL-GATED | The provider-specific packet is ready at `docs/decisions/2026-08-24-fd6-01-off-box-backup.md`; await explicit FD6-01P approval before implementation, provisioning, remote upload, or restore. The D-09 signed-head integrity ledger cannot close this backup requirement. |
 | U-11B and U-12–U-16 | QUEUED AUTO | Under D-10/D-16, do not expand breadth before the clean compounding loop; afterwards execute in the continuation plan's dependency order, prioritized by observed attorney friction. |
