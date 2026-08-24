@@ -25,12 +25,14 @@ retirement purges retired archives, and the public perimeter is intercepted by
 Cloudflare Access.
 
 Every autonomous U-17A runtime drill is complete. The only remaining tail is the
-authenticated mobile journey after a human Cloudflare Access sign-in. Chrome and its
-ChatGPT extension are installed and enabled, but the installed Browser plugin's
-control client fails during initialization before tab discovery; reinstalling that
-plugin is required before the content-free phone-width check can resume. No protected
-matter was opened, listed, or used. U-17A therefore remains `PARTIAL` solely at this
-human/browser boundary.
+authenticated application journey after a human Cloudflare Access sign-in. Chrome
+DevTools control is restored and has opened the exact synthetic route. At a
+390-by-844, DPR-3 mobile viewport, the Access login page has no horizontal overflow
+and exposes the required email/login-code controls. A Cloudflare-hosted inline SVG is
+blocked by that page's own content-security policy, but the login form remains
+available. No protected matter was opened, listed, or used. U-17A therefore remains
+`PARTIAL` solely at the human authentication boundary; the content-free application
+journey can resume immediately after sign-in.
 
 ## Scope and human boundary
 
@@ -86,7 +88,7 @@ human/browser boundary.
 | Synthetic key retirement | A new key cannot decrypt the retired archive and retired archives are purged | Wrong-key restore raised `BackupError`; old and ephemeral new drill archives were purged; zero rotation archives remained | PASS |
 | Access edge | Anonymous public requests never reach the application | Public request redirected to Cloudflare Access; direct origin TLS failed for lack of the Cloudflare client certificate | PASS |
 | Internal API/worker boundary | Health is available; internal routes require the secret; worker has no API/Docker control path | `/health` returned 200; unauthenticated matter/internal routes returned 401; in-memory authenticated internal ping returned 200; worker could not resolve `api`, joined only its two internal networks, had exactly five expected mounts, and had no Docker socket | PASS |
-| Authenticated mobile journey | Attorney can enter through Access and inspect only the synthetic flow at phone width | Access previously intercepted the exact synthetic route. The installed Chrome extension is enabled, but the Browser plugin control client now fails before tab discovery, so sign-in and phone-width QA cannot be driven | BLOCKED — Browser plugin reinstall, then human auth |
+| Authenticated mobile journey | Attorney can enter through Access and inspect only the synthetic flow at phone width | Chrome DevTools opened the exact synthetic route at a 390-by-844, DPR-3 mobile viewport. The Access page has no horizontal overflow and exposes its email/login-code form. Application inspection remains behind the human-only login code | BLOCKED — human Access authentication only |
 
 ## Conversion and recovery receipts
 
@@ -159,10 +161,10 @@ start. No canary value was printed or persisted in Git.
 
 ## Remaining risk and queue
 
-- **Human Access session:** authenticated desktop/mobile browser evidence is the sole
-  remaining U-17A blocker. Reinstall the Browser plugin from the ChatGPT plugin UI,
-  then complete Cloudflare Access in the controlled Chrome profile; credentials and
-  one-time codes stay human-only.
+- **Human Access session:** authenticated application evidence is the sole remaining
+  U-17A blocker. Chrome DevTools control and phone-width emulation are working; complete
+  Cloudflare Access in the controlled Chrome profile, keeping credentials and one-time
+  codes human-only.
 - **CourtListener alternate host:** `api.courtlistener.com` did not resolve from the
   development host or proxy. MootLoop's implemented fixed routes use
   `www.courtlistener.com`; the unresolved alternate remains an external availability
@@ -170,10 +172,11 @@ start. No canary value was printed or persisted in Git.
 - **CourtListener credential:** the fixed API route reached the service but returned
   HTTP 401 because no usable development token was available. Transport and policy
   were proved; authenticated legal-source semantics were not.
-- **Off-box evidence sink:** the restore drill used a dedicated same-host synthetic
-  backup root. An approved immutable remote signed-head/backup sink remains D-09 work,
-  so FD6-01's off-box clause is still open even though U-17A's restore and rotation
-  behavior passed.
+- **Off-box backup and signed-head ledger:** the restore drill used a dedicated
+  same-host synthetic backup root. FD6-01 still requires an approved encrypted off-box
+  backup destination and a restore drill against that destination. D-09 separately
+  governs a signed-head integrity ledger: D-09P approval neither authorizes backup
+  provisioning or remote backup writes nor closes FD6-01.
 - **Coolify API token:** the token file is owned by `deploy`, mode `0600`, but the local
   Coolify API returns 401. The token must be regenerated in Coolify and replaced
   without pasting it into chat. Direct Compose deployment was sufficient for this

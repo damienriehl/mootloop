@@ -143,7 +143,7 @@ short label is less detailed.
 | FD5-05 | SSE read-only tail and stepwise driver loop | COMPLETE |
 | FD5-06 | Thin Next BFF as sole verified surface | COMPLETE locally; deployed unauthenticated route boundary proved in U-17A; authenticated journey still pending human Access login |
 | FD5-07 | Stateless web redeploy; driver drain/reclaim contract | COMPLETE for the current single-worker contract — U-17A proves PID 1, clean stop/recreate, in-flight exact-item release with refunded attempt, one boot reclaim, unchanged completed-turn/spend baseline, and no duplicate work; multi-worker failover extension remains U-15 |
-| FD6-01 | Driver-coordinated encrypted off-box backup and restore drill | PARTIAL — U-17A proves byte-identical encrypted same-host synthetic restore and key retirement; approved off-box sink remains D-09 |
+| FD6-01 | Driver-coordinated encrypted off-box backup and restore drill | PARTIAL — U-17A proves byte-identical encrypted same-host synthetic restore and key retirement; an independently approved encrypted off-box backup destination and restore drill remain open. D-09's signed-head integrity ledger does not close this requirement. |
 | FD6-02 | Close inventory/source binding/anonymized audit retention | COMPLETE locally — U-11A implements D-14 for its new stores and a complete close manifest |
 | FD6-03 | Atomic board edit/changelog fold and typed optimistic conflict | OPEN-AUTO — U-13 |
 | FD6-04 | Write-ahead idempotent spend intent with billing tag and conservative cap | COMPLETE |
