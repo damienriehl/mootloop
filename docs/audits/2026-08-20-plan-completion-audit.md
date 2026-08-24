@@ -326,7 +326,7 @@ Human-only prerequisites and their secret-safe completion checks are preserved i
 | U-17C beneficial learning proof | JUDGMENT-GATED | After U-17B, agent prepares the controlled comparison; attorney supplies the non-degrading quality/confidentiality verdict. |
 | PR #30/#31 monitoring tails | OPEN DURING AUTHORIZED OPERATIONS | Record two more qualifying runs/reopens, or the applicable authorized observation window, without creating standalone protected operations merely to satisfy monitoring. |
 | D-09 signed-head ledger | D-09P-APPROVAL-GATED | The concrete provider/retention packet is ready at `docs/decisions/2026-08-23-d09-remote-signed-head-sink.md`; await explicit D-09P approval before any implementation or remote write. |
-| FD6-01 encrypted off-box backup | PROVIDER-CHOICE-GATED | Independently approve and provision an encrypted off-box backup destination, then complete its restore drill; the D-09 signed-head integrity ledger cannot close this backup requirement. |
+| FD6-01 encrypted off-box backup | FD6-01P-APPROVAL-GATED | The provider-specific packet is ready at `docs/decisions/2026-08-24-fd6-01-off-box-backup.md`; await explicit FD6-01P approval before implementation, provisioning, remote upload, or restore. The D-09 signed-head integrity ledger cannot close this backup requirement. |
 | U-11B and U-12–U-16 | QUEUED AUTO | Under D-10/D-16, do not expand breadth before the clean compounding loop; afterwards execute in the continuation plan's dependency order, prioritized by observed attorney friction. |
 | D-06 Google lane inside U-14 | CONSENT-GATED | Build remains queued with U-14; OAuth/device consent and recipient/ACL approval stay human-only. |
 | Deferred collaboration/integration breadth | DEFERRED BY D-17 | Keep Dropbox/OneDrive, Web Push, broad `pipeline_shape`, and multiplayer visible in the successor queue; do not start them implicitly. |
@@ -427,8 +427,9 @@ record below is limited to the separately authorized synthetic development deplo
   `docs/audits/2026-08-23-u17a-synthetic-deployed-gate.md`.
 
 No protected matter was read or run. Same-host synthetic restore proof does not close
-FD6-01: the D-09 signed-head integrity ledger awaits D-09P approval, while an encrypted
-off-box backup destination and its restore drill remain independently open. The single
+FD6-01: the D-09 signed-head integrity ledger awaits D-09P approval, while the separate
+encrypted off-box packet awaits FD6-01P approval before its destination and restore drill.
+The single
 human-authentication/application-journey tail above prevents U-17A from being marked
 fully complete yet.
 
