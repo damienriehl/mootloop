@@ -28,7 +28,7 @@ These rulings are settled implementation constraints for the continuation queue:
 | D-05 | B, with comparison | Integrate `folio-enrich` directly and evaluate the FOLIO rendering module as a complementary component. |
 | D-06 | B | Build local DOCX learning and the Google Drive/Docs lane in parallel; OAuth consent remains human-only. |
 | D-07 | A | Record redacted monitoring during the next authorized operations. |
-| D-08 | A — executed 2026-08-24 | Read-only verification found valid apex/`www` TLS, healthy endpoints, and the synthetic demo serving from both names; no production mutation was needed or performed. |
+| D-08 | A — read-only check executed 2026-08-24; credential tail open | Apex/`www` TLS, health, and demo availability are verified without mutation. A-03 separately preserves the human-only rotation of the previously exposed registrar key and migration to an approved secret store. |
 | D-09 | A | Use OS-keychain signing plus an approved immutable remote signed-head sink; provider details require a separate concrete approval. |
 | D-10 | A | Gate backlog expansion on the smallest clean workflow and observed attorney friction. |
 | D-11 | A | Authenticated Confirm is the human lock; append actor/time/task/rubric digests. |

@@ -61,6 +61,33 @@ journey remains.
 2. Tell the agent when the authenticated synthetic route is open. The agent can then
    perform the content-free phone-width journey and close U-17A.
 
+## A-03 — Rotate and relocate the Namecheap registrar credential
+
+**Owner:** Damien
+
+**Status:** Open — historical credential exposure and nonstandard storage
+
+The historical deployment handoff records that the Namecheap API key used for
+`mootloop.org` DNS was pasted into chat and stored outside MootLoop's approved secret
+locations. D-08's 2026-08-24 read-only check proves that apex and `www` TLS, health,
+and the public synthetic demo now work, so no DNS, certificate, or redeploy mutation is
+needed. It does not make the exposed key safe.
+
+When ready:
+
+1. Revoke or rotate the exposed Namecheap API key through Namecheap's authenticated
+   account controls. Do not paste the old or new value into chat or a command line.
+2. Store the replacement in the OS keychain or `~/.mootloop/secrets.env`, mode `0600`;
+   do not retain it in the historical `~/.secrets/namecheap` file.
+3. Preserve the narrow existing source-IP allowlist and DNS-only scope. Before any
+   future DNS write, read the complete record set because Namecheap `setHosts` replaces
+   all host records.
+4. Remove the obsolete credential file only after the replacement is verified without
+   printing the value.
+
+**Done when:** the old key is unusable, the new key is held only in an approved secret
+store, a content-free authenticated Namecheap read succeeds, and no DNS record changed.
+
 ## Subsequent human gates
 
 - U-17B requires a new, explicit D-03 authorization before any named protected-matter

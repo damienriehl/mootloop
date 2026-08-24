@@ -296,7 +296,7 @@ rubric-gated loops, with the gate ledger, attorney-gate decisions, objection-sur
 panels, and finished deliverables all browsable:
 
 - **DEV:** <https://mootloop.dev.openlegalstandard.org>
-- **PROD:** <https://mootloop.org> (coming)
+- **PROD:** <https://mootloop.org>
 
 The demo run is pre-baked at image build time with a deterministic fake model
 provider — zero LLM calls, zero secrets, zero matter-data mechanisms at runtime.
