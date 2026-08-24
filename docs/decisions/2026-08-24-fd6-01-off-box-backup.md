@@ -65,6 +65,11 @@ Use separately issued, non-interchangeable credentials:
   capabilities needed to create objects. It receives no delete, retention-change,
   legal-hold, lifecycle, bucket-administration, key-administration, or account-wide
   listing capability.
+- **Recovery-catalog writer:** restricted to the one bucket and
+  `recovery-catalogs/` prefix, with only the capabilities needed to create catalog
+  objects. It receives no access to `archives/`, read, list, delete,
+  retention-change, legal-hold, lifecycle, bucket-administration,
+  key-administration, or account-wide listing capability.
 - **Verifier/restorer:** stored off the MootLoop host and restricted to listing and
   reading object versions, retention, and encryption metadata from that bucket. It
   receives no write, delete, retention-change, lifecycle, bucket, or key-management
@@ -86,18 +91,25 @@ would no longer be reliably discoverable after total host loss.
 Account-owner access is never automated or stored on the MootLoop host. Protect it
 with the strongest MFA Backblaze supports, a distinct monitored administrative
 mailbox, offline recovery material, and audited break-glass use. Inventory uploader,
-verifier/restorer, retention-administrator, and account-owner credentials; store them
-only in their approved custody boundary; rotate them on a documented cadence; and
-revoke them immediately on suspected compromise. Provisioning must verify the exact
-current B2 application-key capabilities before any credential is issued.
+recovery-catalog-writer, verifier/restorer, retention-administrator, and account-owner
+credentials; store them only in their approved custody boundary; rotate them on a
+documented cadence; and revoke them immediately on suspected compromise. Provisioning
+must verify the exact current B2 application-key capabilities before any credential is
+issued.
 
 ## Upload and acceptance contract
 
 1. Create and locally verify the lock-consistent encrypted snapshot using the existing
    `backup_matter` path.
-2. Before network I/O, durably record the expected opaque key, ciphertext SHA-256,
-   byte length, archive-key identifier, creation time, required retain-until time,
-   approved legal-hold state, and `remote_backup_pending` state.
+2. Before network I/O, calculate the bucket-default retain-until date and any later
+   date required by separately approved backup-retention authority or litigation
+   hold. Durably record the expected opaque key, ciphertext SHA-256, byte length,
+   archive-key identifier, creation time, required retain-until time, the governing
+   retention-authority reference and approved-through date, approved legal-hold state,
+   and `remote_backup_pending` state. If the immutable lock would outlive that approved
+   authority, block before upload. The local backup required by `close_matter` is not
+   automatically eligible for remote locking; a close-time archive needs this
+   separate off-box retention authority before upload.
 3. Upload the exact ciphertext once under the deterministic key over TLS. A response
    lost after the request might have reached B2, so that ambiguous PUT is never retried
    automatically and never receives a new key or timestamp. Reconciliation runs first.
@@ -113,8 +125,10 @@ current B2 application-key capabilities before any credential is issued.
 6. The verifier confirms the single candidate's expected byte length, SHA-256,
    Compliance retain-until date, legal-hold state, and server-side encryption.
 7. Create an authenticated, client-encrypted recovery-catalog snapshot containing the
-   accepted mapping, upload it under a content-addressed key in `recovery-catalogs/`,
-   and subject it to the same Compliance retention and exact-version verification.
+   accepted mapping. The recovery-catalog writer uploads it under a content-addressed
+   key in `recovery-catalogs/`; the retention administrator applies any required
+   extension or legal hold, and the verifier subjects it to the same Compliance
+   retention and exact-version verification as the archive.
 8. Only then may the local journal record `remote_backup_verified`.
 
 Authentication failure, timeout, ambiguous success, or verification failure leaves
@@ -123,19 +137,29 @@ off-box recovery point until exact verification succeeds.
 
 ## Retention, legal holds, and deletion
 
-The proposed default is **seven years** in Compliance mode, subject to the firm's
-governing records schedule. Each archive's required retain-until date is the later of
-the bucket default and the matter's approved destruction date. A litigation hold is a
-separate legal-hold control and prevents deletion until the authorized records process
-releases it.
+The proposed default is **seven years from each object's upload** in Compliance mode,
+subject to the firm's governing records schedule. Applying that default to the archive
+created immediately before matter close retains its encrypted contents after the
+matter's approved destruction date. Choosing FD6-01P A expressly approves that
+post-destruction retention consequence only if the governing records authority permits
+it; `retention.destruction_date` makes the matter eligible for close but does not by
+itself authorize an immutable remote copy after destruction.
+
+Each archive's required retain-until date is the bucket-default expiration, extended
+only by separately approved backup-retention authority or a litigation hold. Before
+upload, the approved authority must cover the entire immutable period; otherwise the
+upload blocks and the local archive remains pending operator resolution. A litigation
+hold is a separate legal-hold control and prevents deletion until the authorized
+records process releases it.
 
 Object Lock prevents premature provider deletion; it does not authorize over-retention.
-After both the approved destruction date and every legal hold have cleared, a separate
-retention job may delete expired versions under a short-lived deletion credential and
-record the outcome. The always-on uploader and verifier never receive delete authority.
-If client-key destruction is used as an additional cryptographic-erasure step, it must
-be separately approved only after proving no still-retained archive depends on that
-key.
+After the immutable period expires, the governing remote-retention authority requires
+destruction, and every legal hold has cleared, a separate retention job may delete
+expired versions under a short-lived deletion credential and record the outcome. The
+always-on uploader, recovery-catalog writer, and verifier never receive delete
+authority. If client-key destruction is used as an additional cryptographic-erasure
+step, it must be separately approved only after proving no still-retained archive
+depends on that key.
 
 ## RPO, RTO, and restore proof
 
@@ -180,7 +204,10 @@ Choose one inline:
   Backblaze B2 architecture above, seven-year Compliance default, nightly backups for
   active matters, on-demand backups before risky operations, a backup before matter
   close, 24-hour RTO, quarterly synthetic drill, and annual authorized representative
-  restore. Choosing A confirms that the firm schedule authorizes seven years.
+  restore. Choosing A confirms that the firm schedule authorizes every uploaded
+  archive, including the close-time archive, to remain encrypted and immutably retained
+  for seven years from upload even when that period extends after the matter's approved
+  destruction date.
 - **FD6-01P B:** the same Backblaze architecture with another exact retention period,
   RPO, RTO, or drill cadence; state the changed values.
 - **FD6-01P C:** do not use Backblaze; name the preferred provider and any required
