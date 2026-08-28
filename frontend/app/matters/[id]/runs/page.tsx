@@ -31,20 +31,22 @@ export default function RunsIndexPage() {
         </p>
       )}
 
-      <ul className="grid gap-3">
+      <ul className="grid min-w-0 gap-3">
         {data?.map((run) => (
-          <li key={run.run_id}>
+          <li key={run.run_id} className="min-w-0">
             <Link
               href={`/matters/${matterId}/runs/${run.run_id}`}
-              className="flex items-center justify-between gap-4 border border-rule border-l-4 border-l-accent bg-paper-raised px-5 py-4 no-underline shadow-ledger transition-colors hover:bg-accent-soft"
+              className="flex min-w-0 flex-col items-stretch gap-3 border border-rule border-l-4 border-l-accent bg-paper-raised px-5 py-4 no-underline shadow-ledger transition-colors hover:bg-accent-soft sm:flex-row sm:items-center sm:justify-between sm:gap-4"
             >
               <div className="min-w-0">
-                <span className="font-mono font-bold text-ink">{run.run_id}</span>
+                <span className="block break-all font-mono font-bold text-ink">
+                  {run.run_id}
+                </span>
                 <span className="mt-1 block truncate font-mono text-[0.7rem] uppercase tracking-[0.08em] text-ink-faint">
                   {run.task ?? "—"} · {run.mode} · {run.current_stage ?? "—"}
                 </span>
               </div>
-              <div className="flex shrink-0 items-center gap-4">
+              <div className="flex min-w-0 items-center justify-between gap-3 sm:shrink-0 sm:justify-start sm:gap-4">
                 <span className="font-mono text-sm text-ink-soft">{usd(run.total_spend_usd)}</span>
                 <StatusStamp status={run.status} />
               </div>

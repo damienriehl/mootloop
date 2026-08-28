@@ -177,7 +177,7 @@ short label is less detailed.
 | FD8-09 | Hierarchical query-key factories | COMPLETE |
 | FD8-10 | Decide may be conflict-aware optimistic; attest never optimistic | COMPLETE |
 | FD8-11 | Module-scoped JWKS and matcher discipline | COMPLETE |
-| FD8-12 | Typed MSW/unit tests now; browser tests only for unreproducible seams | COMPLETE for FE-2; U-17A authenticated mobile seam waits for human Access login |
+| FD8-12 | Typed MSW/unit tests now; browser tests only for unreproducible seams | COMPLETE for FE-2; U-17A authentication succeeded on 2026-08-28, and its discovered Runs-list mobile overflow has a local regression-tested fix awaiting deployment and recheck |
 | FD8-13 | Tokenized/generalized board component adaptations | OPEN-AUTO — U-13 |
 | FD9-01 | Case-file/pleading-spine navigation and mobile docket tabs | PARTIAL — remaining rooms U-12–U-15 |
 | FD9-02 | Serif argument voice and mono record voice | COMPLETE for FE-2 |
@@ -189,7 +189,7 @@ short label is less detailed.
 | FD9-08 | Linearized accessible mobile board | OPEN-AUTO — U-13 |
 | FD9-09 | Avoid banned SaaS/legal-cliché visual patterns | PARTIAL — enforce in U-12–U-15 |
 | FD9-10 | Durable room-by-room frontend direction document | COMPLETE locally — U-11A |
-| FD10-01 | First-live sequence FE-0 → FE-2.5 → protected seed/run | PARTIAL — U-17A's autonomous synthetic infrastructure proof is complete; the authenticated mobile journey and protected U-17B clean proof remain |
+| FD10-01 | First-live sequence FE-0 → FE-2.5 → protected seed/run | PARTIAL — U-17A's autonomous synthetic infrastructure proof and authenticated read-only journey are complete except for deploying/rechecking the local Runs-list mobile fix; protected U-17B clean proof remains |
 | FD10-02 | Post-live FE-3 → FE-6 sequence | OPEN-AUTO — U-12–U-15 under D-10 |
 | FD10-03 | Dropbox/OneDrive/Web Push/pipeline-shape/multiplayer stay deferred | DEFERRED — successor queue |
 | FD10-04 | TaskSpec fields land only as consumed | COMPLETE for current TaskSpec; extensions enforced in U-12 |

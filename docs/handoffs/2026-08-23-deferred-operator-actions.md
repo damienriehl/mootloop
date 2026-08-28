@@ -41,25 +41,24 @@ only by `deploy`.
 
 **Owner:** Damien for authentication; agent for browser QA
 
-**Status:** Browser control restored on 2026-08-23; authentication remains open and is
-the sole remaining U-17A tail
+**Status:** Complete for the current controlled Chrome profile; no operator action is
+currently required
 
-**Last rechecked:** 2026-08-24. The controlled 390-by-844, DPR-3 Chrome session still
-stops at Cloudflare Access's email/login-code form; no reusable authenticated session
-is present. The agent did not enter an email, request a code, or bypass the human
-authentication boundary.
+**Last rechecked:** 2026-08-28. The controlled Chrome profile reached the exact
+synthetic U-17A route through Cloudflare Access without another login prompt. The
+agent did not enter credentials, request a code, inspect browser storage, or invoke an
+application mutation.
 
-Chrome DevTools control is working and the exact synthetic U-17A run route is open at
-the Cloudflare Access login page. The Browser-plugin client still lacks its trusted
-Node service, but that no longer blocks QA because the user explicitly approved Chrome
-DevTools as the control path. The Access page itself has passed a 390-by-844, DPR-3
-phone-width overflow and accessibility-tree check; only the authenticated application
-journey remains.
+The authenticated 390-by-844 phone-width journey reached the run cockpit, Begin Task,
+Decision Inbox, and Export room without invoking a button or substantive attorney
+action. Those rooms did not overflow. The Runs index did overflow to 590 pixels; its
+local fix and regression test are recorded in
+`docs/audits/2026-08-28-readonly-state-confirmation.md` and await a separately
+authorized delivery/deployment before U-17A can close.
 
-1. Complete Cloudflare Access in the controlled Chrome profile. Credentials and
-   one-time codes remain human-only.
-2. Tell the agent when the authenticated synthetic route is open. The agent can then
-   perform the content-free phone-width journey and close U-17A.
+If the Access session expires before the post-deployment recheck, authenticate the
+same controlled Chrome profile again and tell the agent when it is ready. Credentials
+and one-time codes remain human-only.
 
 ## A-03 — Rotate and relocate the Namecheap registrar credential
 

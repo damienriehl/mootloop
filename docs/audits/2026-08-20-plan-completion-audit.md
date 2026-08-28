@@ -329,7 +329,7 @@ The FOLIO source/update investigation required by D-05/D-12 is recorded in
 This audit is a status ledger, not permission to inspect privileged hosted artifacts,
 record attorney approvals, consent to OAuth, spend uncapped funds, or deploy production.
 
-## Remaining Execution Queue — 2026-08-23
+## Remaining Execution Queue — 2026-08-28
 
 Human-only prerequisites and their secret-safe completion checks are preserved in
 `docs/handoffs/2026-08-23-deferred-operator-actions.md`.
@@ -338,19 +338,21 @@ Human-only prerequisites and their secret-safe completion checks are preserved i
 |---|---|---|
 | U-17A hostile-input discovery trace | COMPLETE | Run-visible planted discovery was captured in the immutable manifest/corpus snapshot and assembled into the persona prompt; `HeadlessClaudeProvider.run_turn` raised `OutboundPrivacyError`, and a subprocess tripwire proved rejection before process or transport start. |
 | U-17A in-flight drain/reclaim | COMPLETE | Exact `claude -p` observation preceded a normal Compose stop; exit was 0 without OOM, the attempt was refunded and released, boot reclaimed it once at an unchanged completed-turn/spend baseline, and the run finished with 12 turns plus zero residual queue items. |
-| U-17A authenticated mobile journey | HUMAN-AUTH BLOCKER | Chrome DevTools opened the exact synthetic route at 390-by-844, DPR-3; the Cloudflare Access phone-edge check passed without horizontal overflow and exposed the email/login-code controls. Complete human-only Access authentication, then let the agent perform the content-free authenticated application phone journey and close U-17A. |
+| U-17A authenticated mobile journey | LOCAL FIX READY / DEPLOYMENT-GATED | On 2026-08-28 the controlled Chrome profile reached the exact synthetic route through Access. At 390-by-844, the cockpit, Begin Task, Decision Inbox, and Export room did not overflow, but the Runs index measured 590 pixels wide. A local responsive fix and regression test are ready on `fix/u17a-mobile-runs-overflow`; deliver, deploy, and repeat the read-only phone check when remote mutation is authorized. |
 | U-17B clean protected workflow | AUTHORIZATION-GATED | After U-17A, request fresh D-03 authorization for the named protected read/run. Attorney alone supplies facts, resolves gates, reviews, attests, and exports. |
 | U-17C beneficial learning proof | JUDGMENT-GATED | After U-17B, agent prepares the controlled comparison; attorney supplies the non-degrading quality/confidentiality verdict. |
 | PR #30/#31 monitoring tails | OPEN DURING AUTHORIZED OPERATIONS | Record one more qualifying hosted run for PR #30 and two more qualifying reopen operations for PR #31. The seven-day minimum has elapsed, but each three-operation condition is longer and therefore controls. Do not create standalone protected operations merely to satisfy monitoring. |
-| D-08 production housekeeping | PARTIAL — PUBLIC CHECK COMPLETE / HUMAN SECRET ROTATION | On 2026-08-24 both apex and `www` completed TLS and served the synthetic read-only demo; both `/health` routes returned `status=ok`. No certificate repair or redeploy was needed. A-03 preserves the human-only rotation of the previously exposed registrar key and its migration to an approved secret store. |
+| D-08 production housekeeping | PARTIAL — PUBLIC CHECK COMPLETE / HUMAN SECRET ROTATION | Rechecked 2026-08-28: apex and `www` completed TLS and served the synthetic read-only demo; both `/health` routes returned `status=ok`. No certificate repair or redeploy was needed. A-03 preserves the human-only rotation of the previously exposed registrar key and its migration to an approved secret store. |
 | D-09 signed-head ledger | D-09P-APPROVAL-GATED | The concrete provider/retention packet is ready at `docs/decisions/2026-08-23-d09-remote-signed-head-sink.md`; await explicit D-09P approval before any implementation or remote write. |
 | FD6-01 encrypted off-box backup | FD6-01P-APPROVAL-GATED | The provider-specific packet is ready at `docs/decisions/2026-08-24-fd6-01-off-box-backup.md`; await explicit FD6-01P approval before implementation, provisioning, remote upload, or restore. The D-09 signed-head integrity ledger cannot close this backup requirement. |
 | U-11B and U-12–U-16 | QUEUED AUTO | Under D-10/D-16, do not expand breadth before the clean compounding loop; afterwards execute in the continuation plan's dependency order, prioritized by observed attorney friction. |
 | D-06 Google lane inside U-14 | CONSENT-GATED | Build remains queued with U-14; OAuth/device consent and recipient/ACL approval stay human-only. |
 | Deferred collaboration/integration breadth | DEFERRED BY D-17 | Keep Dropbox/OneDrive, Web Push, broad `pipeline_shape`, and multiplayer visible in the successor queue; do not start them implicitly. |
 
-U-17A's runtime-sensitive drills are complete; only human Cloudflare Access
-authentication and the subsequent authenticated application phone journey remain.
+U-17A's runtime-sensitive drills and human Cloudflare Access authentication are
+complete. The only remaining U-17A tail is delivery, deployment, and read-only
+reverification of the local Runs-list phone-width fix documented in
+`docs/audits/2026-08-28-readonly-state-confirmation.md`.
 Starting U-11B/U-12–U-16 before the clean
 compounding loop would
 violate the user's D-10/D-16 sequencing rulings. The agent can prepare, test, review,

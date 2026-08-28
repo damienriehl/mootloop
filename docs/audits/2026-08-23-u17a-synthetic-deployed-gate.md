@@ -34,6 +34,17 @@ available. No protected matter was opened, listed, or used. U-17A therefore rema
 `PARTIAL` solely at the human authentication boundary; the content-free application
 journey can resume immediately after sign-in.
 
+## Read-only reassessment — 2026-08-28
+
+The controlled Chrome profile is now authenticated and reached the exact synthetic
+route at 390 by 844 without another login prompt. The run cockpit, Begin Task,
+Decision Inbox, and Export room had no horizontal overflow. The Runs index expanded
+to 590 pixels, so U-17A remains `PARTIAL` for a different, narrower reason: a local
+responsive fix and regression test now await authorized delivery, deployment, and a
+read-only post-deployment recheck. No application mutation or protected-matter read
+occurred. Current evidence and queue state are recorded in
+`docs/audits/2026-08-28-readonly-state-confirmation.md`.
+
 ## Scope and human boundary
 
 - Authorization covered synthetic deployed testing and runtime-only use of existing
