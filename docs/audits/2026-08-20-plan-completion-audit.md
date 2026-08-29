@@ -305,7 +305,7 @@ ahead of context reproducibility, isolation, and a clean live run.
 | RECENT-4 | 2026-08-05 blind-turn audit | Audit/discard suspect hosted turns or re-drive after the fix | DECISION-GATED; D-01/D-03. |
 | RECENT-5 | Historical live handoff | Resolve four attorney decisions and provide verified grounding facts | DECISION-GATED; D-02. No private answers belong in this repository. |
 | RECENT-6 | PR #30 durable follow-ups | Fact-store torn-tail recovery; lost-lock/background heartbeat; backup heartbeat; shutdown and seat-limit attempt accounting | COMPLETE locally in U-03/U-11A; U-17A observes graceful shutdown and backup/restore only. Other deployed behaviors remain for future authorized monitoring. |
-| RECENT-7 | PR #31 product follow-up | Expose `needs_attention` reopen reason/attempt/queue-repair state in the cockpit | COMPLETE locally in U-11A; worker/API recovery is synthetically deployed, while the authenticated cockpit journey remains the final U-17A step. |
+| RECENT-7 | PR #31 product follow-up | Expose `needs_attention` reopen reason/attempt/queue-repair state in the cockpit | COMPLETE; U-11A implemented the cockpit state, U-17A proved worker/API recovery in the synthetic deployment, and the authenticated cockpit journey passed its final deployed browser check on 2026-08-28. |
 
 ## Canonical Disposition
 
@@ -313,8 +313,8 @@ Every discovered task now has one of four durable outcomes:
 
 1. `COMPLETE` with current evidence above.
 2. `OPEN-AUTO` as U-11B through U-16 plus U-17B/U-17C in the continuation plan;
-   U-17A's autonomous runtime drills are complete and only its human-authenticated
-   browser step remains, while U-00 through U-11A are remotely reviewed and merged.
+   U-17A, including its authenticated deployed browser step, and U-00 through U-11A
+   are remotely reviewed and complete.
    Their completed U-18 publication dispositions are recorded with each unit.
    Deployment remains a separate gated operation rather than part of that publication
    closure.
@@ -447,18 +447,19 @@ record below is limited to the separately authorized synthetic development deplo
   Landlock self-maps read while preserving sibling `/proc` denials. The explicitly
   rebuilt deployed image passed both wrapped Claude version and content-free live
   provider probes.
-- Chrome DevTools opened the exact synthetic route at 390-by-844, DPR-3, where the
-  Cloudflare Access page passed the phone-edge overflow and accessibility-tree check.
-  U-17A still needs human Access authentication followed by the content-free
-  authenticated application phone journey. The redacted evidence report is
+- Initial Chrome DevTools evidence opened the exact synthetic route at 390-by-844,
+  DPR-3, where the Cloudflare Access page passed the phone-edge overflow and
+  accessibility-tree check. This was the remaining state at the end of the 2026-08-23
+  drill. On 2026-08-28, Access authentication, PR #66's responsive repair, exact-commit
+  deployment, and the 390/640-width production recheck completed that tail. The
+  redacted evidence report is
   `docs/audits/2026-08-23-u17a-synthetic-deployed-gate.md`.
 
 No protected matter was read or run. Same-host synthetic restore proof does not close
 FD6-01: the D-09 signed-head integrity ledger awaits D-09P approval, while the separate
 encrypted off-box packet awaits FD6-01P approval before its destination and restore drill.
-The single
-human-authentication/application-journey tail above prevents U-17A from being marked
-fully complete yet.
+The earlier human-authentication/application-journey tail is now closed; U-17A is
+fully complete.
 
 ## U-11A Publication Record — 2026-08-22
 

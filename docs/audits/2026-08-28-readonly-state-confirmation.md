@@ -27,9 +27,10 @@ authorization, an operator secret action, a pending approval, or an attorney jud
 | Production browser verification | At 390 by 844, document `scrollWidth` equaled `clientWidth` (375 pixels after the vertical scrollbar), metadata stacked below the identity, and no horizontal overflow occurred. At 640 by 844, both widths were 640 pixels and the blocks were center-aligned on one row. Browser logs were empty. |
 
 Only synthetic matter `2026-08-22-synthetic-u17a` was inspected. No protected matter,
-secret value, credential store, browser storage, or private roster data was read. All
-GitHub, production, and browser checks were read-only, and no remote system was
-mutated.
+secret value, credential store, browser storage, or private roster data was read. The
+post-deployment browser verification and health observations were read-only. The
+authorized PR #66 merge and exact-commit Coolify deployment were the remote mutations
+recorded by this closure.
 
 ## Durable queue
 
