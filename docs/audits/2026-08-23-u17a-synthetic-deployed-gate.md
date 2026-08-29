@@ -99,7 +99,7 @@ occurred. Current evidence and queue state are recorded in
 | Synthetic key retirement | A new key cannot decrypt the retired archive and retired archives are purged | Wrong-key restore raised `BackupError`; old and ephemeral new drill archives were purged; zero rotation archives remained | PASS |
 | Access edge | Anonymous public requests never reach the application | Public request redirected to Cloudflare Access; direct origin TLS failed for lack of the Cloudflare client certificate | PASS |
 | Internal API/worker boundary | Health is available; internal routes require the secret; worker has no API/Docker control path | `/health` returned 200; unauthenticated matter/internal routes returned 401; in-memory authenticated internal ping returned 200; worker could not resolve `api`, joined only its two internal networks, had exactly five expected mounts, and had no Docker socket | PASS |
-| Authenticated mobile journey | Attorney can enter through Access and inspect only the synthetic flow at phone width | Chrome DevTools opened the exact synthetic route at a 390-by-844, DPR-3 mobile viewport. The Access page has no horizontal overflow and exposes its email/login-code form. Application inspection remains behind the human-only login code | BLOCKED — human Access authentication only |
+| Authenticated mobile journey | Attorney can enter through Access and inspect only the synthetic flow at phone width | The controlled Chrome profile reached the exact synthetic route through Access. The run cockpit, Begin Task, Decision Inbox, and Export room fit the 390-by-844 viewport; the Runs index expanded to 590 pixels, and its local responsive repair awaits delivery and deployed recheck | PARTIAL — deployment and read-only reverification |
 
 ## Conversion and recovery receipts
 
@@ -172,10 +172,10 @@ start. No canary value was printed or persisted in Git.
 
 ## Remaining risk and queue
 
-- **Human Access session:** authenticated application evidence is the sole remaining
-  U-17A blocker. Chrome DevTools control and phone-width emulation are working; complete
-  Cloudflare Access in the controlled Chrome profile, keeping credentials and one-time
-  codes human-only.
+- **Authenticated mobile recheck:** Cloudflare Access authentication and the read-only
+  application journey are complete. Deliver and deploy the local Runs-index responsive
+  repair, then repeat the synthetic 390-by-844 check without invoking an application
+  mutation or opening protected matter data.
 - **CourtListener alternate host:** `api.courtlistener.com` did not resolve from the
   development host or proxy. MootLoop's implemented fixed routes use
   `www.courtlistener.com`; the unresolved alternate remains an external availability
