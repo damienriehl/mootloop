@@ -46,10 +46,19 @@ queue; no later or previously missed `ce-plan` document exists in the repository
 PR #64 merged the corrected PR #30/#31 monitoring thresholds. D-08's public-demo
 certificate and availability check is complete read-only as recorded below; its leaked
 registrar-key rotation and approved-store migration remain a human operator action.
-The remaining queue is otherwise unchanged: the human Access login gates U-17A, fresh
+At that point, the remaining queue was unchanged: the human Access login gated U-17A, fresh
 protected-matter authorization gates U-17B, attorney judgment gates U-17C, D-09P and
 FD6-01P gate their respective remote sinks, and D-10/D-16 intentionally hold the
 breadth units until the clean compounding loop supplies prioritization evidence.
+
+Execution update through 2026-08-28: U-17A is complete. PR #66 merged the responsive
+Runs-list repair as `29f683bb93bdcff6a3f8f42daa1343f49fdcd45d`; Coolify deployment
+`xz67wsxhtg2p1040v6stk3hd` finished on that exact commit with healthy web and API
+containers. The authenticated, read-only production recheck had no horizontal
+overflow at 390-by-844 or 640-by-844 and emitted no browser logs. U-17B now becomes
+the next clean-loop gate and still requires fresh D-03 authorization; U-17C remains
+behind the attorney verdict. No protected matter was opened and no application
+mutation occurred during the U-17A closure check.
 
 The broader repository audit nevertheless found genuine unfinished work in the two
 legacy plans still marked `active`. This document is the completion ledger for every
@@ -338,7 +347,7 @@ Human-only prerequisites and their secret-safe completion checks are preserved i
 |---|---|---|
 | U-17A hostile-input discovery trace | COMPLETE | Run-visible planted discovery was captured in the immutable manifest/corpus snapshot and assembled into the persona prompt; `HeadlessClaudeProvider.run_turn` raised `OutboundPrivacyError`, and a subprocess tripwire proved rejection before process or transport start. |
 | U-17A in-flight drain/reclaim | COMPLETE | Exact `claude -p` observation preceded a normal Compose stop; exit was 0 without OOM, the attempt was refunded and released, boot reclaimed it once at an unchanged completed-turn/spend baseline, and the run finished with 12 turns plus zero residual queue items. |
-| U-17A authenticated mobile journey | LOCAL FIX READY / DEPLOYMENT-GATED | On 2026-08-28 the controlled Chrome profile reached the exact synthetic route through Access. At 390-by-844, the cockpit, Begin Task, Decision Inbox, and Export room did not overflow, but the Runs index measured 590 pixels wide. A local responsive fix and regression test are ready on `fix/u17a-mobile-runs-overflow`; deliver, deploy, and repeat the read-only phone check when remote mutation is authorized. |
+| U-17A authenticated mobile journey | COMPLETE | PR #66 delivered the responsive repair as merge commit `29f683bb93bdcff6a3f8f42daa1343f49fdcd45d`; Coolify deployment `xz67wsxhtg2p1040v6stk3hd` finished on that exact commit with healthy web/API containers. The authenticated production recheck had no horizontal overflow at 390-by-844 or 640-by-844 and emitted no browser logs. |
 | U-17B clean protected workflow | AUTHORIZATION-GATED | After U-17A, request fresh D-03 authorization for the named protected read/run. Attorney alone supplies facts, resolves gates, reviews, attests, and exports. |
 | U-17C beneficial learning proof | JUDGMENT-GATED | After U-17B, agent prepares the controlled comparison; attorney supplies the non-degrading quality/confidentiality verdict. |
 | PR #30/#31 monitoring tails | OPEN DURING AUTHORIZED OPERATIONS | Record one more qualifying hosted run for PR #30 and two more qualifying reopen operations for PR #31. The seven-day minimum has elapsed, but each three-operation condition is longer and therefore controls. Do not create standalone protected operations merely to satisfy monitoring. |
@@ -349,11 +358,9 @@ Human-only prerequisites and their secret-safe completion checks are preserved i
 | D-06 Google lane inside U-14 | CONSENT-GATED | Build remains queued with U-14; OAuth/device consent and recipient/ACL approval stay human-only. |
 | Deferred collaboration/integration breadth | DEFERRED BY D-17 | Keep Dropbox/OneDrive, Web Push, broad `pipeline_shape`, and multiplayer visible in the successor queue; do not start them implicitly. |
 
-U-17A's runtime-sensitive drills and human Cloudflare Access authentication are
-complete. The only remaining U-17A tail is delivery, deployment, and read-only
-reverification of the local Runs-list phone-width fix documented in
-`docs/audits/2026-08-28-readonly-state-confirmation.md`.
-Starting U-11B/U-12–U-16 before the clean
+U-17A's runtime-sensitive drills, Cloudflare Access authentication, responsive repair,
+exact-commit deployment, and production reverification are complete. Starting
+U-11B/U-12–U-16 before the clean
 compounding loop would
 violate the user's D-10/D-16 sequencing rulings. The agent can prepare, test, review,
 and publish every later unit once its named human boundary is satisfied.

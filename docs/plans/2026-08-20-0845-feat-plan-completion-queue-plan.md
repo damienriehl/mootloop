@@ -911,6 +911,14 @@ ledger.
 **Acceptance:** the evidence report records environment, versions, manifest digest,
 expected/actual outcomes, human actor boundaries, and remaining risk.
 
+**Execution closure (2026-08-28):** COMPLETE. PR #66 merged the responsive Runs-list
+repair as `29f683bb93bdcff6a3f8f42daa1343f49fdcd45d`; Coolify deployment
+`xz67wsxhtg2p1040v6stk3hd` finished on that exact commit with healthy web and API
+containers. The authenticated read-only production recheck showed no horizontal
+overflow or browser logs at 390-by-844 and 640-by-844. No application mutation or
+protected-matter read occurred. The complete evidence record is
+`docs/audits/2026-08-23-u17a-synthetic-deployed-gate.md`.
+
 ### U-17B — Prove a clean authorized legal workflow
 
 **Outcome:** an authorized real-matter run completes start → decisions → review →
