@@ -51,14 +51,14 @@ application mutation.
 
 The authenticated 390-by-844 phone-width journey reached the run cockpit, Begin Task,
 Decision Inbox, and Export room without invoking a button or substantive attorney
-action. Those rooms did not overflow. The Runs index did overflow to 590 pixels; its
-local fix and regression test are recorded in
-`docs/audits/2026-08-28-readonly-state-confirmation.md` and await a separately
-authorized delivery/deployment before U-17A can close.
+action. Those rooms did not overflow. The Runs index defect found during that journey
+was fixed in PR #66, deployed as exact commit
+`29f683bb93bdcff6a3f8f42daa1343f49fdcd45d`, and passed its authenticated production
+recheck at 390 and 640 pixels. U-17A is complete.
 
-If the Access session expires before the post-deployment recheck, authenticate the
-same controlled Chrome profile again and tell the agent when it is ready. Credentials
-and one-time codes remain human-only.
+If a future protected or synthetic browser operation needs Access after the session
+expires, authenticate the same controlled Chrome profile and tell the agent when it is
+ready. Credentials and one-time codes remain human-only.
 
 ## A-03 — Rotate and relocate the Namecheap registrar credential
 
@@ -101,8 +101,9 @@ store, a content-free authenticated Namecheap read succeeds, and no DNS record c
   `docs/decisions/2026-08-24-fd6-01-off-box-backup.md` before implementation,
   provisioning, any remote backup write, or restore drill.
 
-U-11B and U-12 through U-16 remain blocked until the U-17A -> U-17B -> U-17C
-clean-compounding-loop sequence is complete under D-10/D-16. D-09 independently
+U-11B and U-12 through U-16 remain blocked until the remaining U-17B -> U-17C
+clean-compounding-loop sequence is complete under D-10/D-16; U-17A is complete.
+D-09 independently
 gates only the content-free signed-head ledger; FD6-01 remains a separate provider,
 provisioning, and restore decision. Until the clean compounding loop is complete, the
 agent may maintain documentation and verify repository-only state but must not start

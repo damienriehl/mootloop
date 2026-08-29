@@ -14,6 +14,13 @@ Planted-discovery run ID: `u17a-injection-final-20260823`
 
 ## Verdict
 
+**Current status: COMPLETE as of 2026-08-28.** PR #66 merged as commit
+`29f683bb93bdcff6a3f8f42daa1343f49fdcd45d`, Coolify deployment
+`xz67wsxhtg2p1040v6stk3hd` finished on that exact commit, and both the web and API
+containers were healthy. The authenticated read-only production recheck passed at
+phone and small-tablet widths with no horizontal overflow or console errors. No
+application mutation or protected-matter read occurred.
+
 The deployed worker now exits cleanly under Compose stop/recreate, survives an
 in-flight provider interruption with exact queue release/reclaim accounting,
 fixed-route authenticated egress fails closed, and a canary-bearing hostile discovery
@@ -24,26 +31,38 @@ without duplicate work, encrypted backup restores byte-for-byte, synthetic key
 retirement purges retired archives, and the public perimeter is intercepted by
 Cloudflare Access.
 
-Every autonomous U-17A runtime drill is complete. The only remaining tail is the
-authenticated application journey after a human Cloudflare Access sign-in. Chrome
-DevTools control is restored and has opened the exact synthetic route. At a
-390-by-844, DPR-3 mobile viewport, the Access login page has no horizontal overflow
-and exposes the required email/login-code controls. A Cloudflare-hosted inline SVG is
-blocked by that page's own content-security policy, but the login form remains
-available. No protected matter was opened, listed, or used. U-17A therefore remains
-`PARTIAL` solely at the human authentication boundary; the content-free application
-journey can resume immediately after sign-in.
+Every autonomous U-17A runtime drill and the authenticated application journey are
+complete. The dated reassessments below preserve the progression from the original
+human-authentication boundary through the responsive repair and deployed closure.
 
 ## Read-only reassessment — 2026-08-28
 
 The controlled Chrome profile is now authenticated and reached the exact synthetic
 route at 390 by 844 without another login prompt. The run cockpit, Begin Task,
 Decision Inbox, and Export room had no horizontal overflow. The Runs index expanded
-to 590 pixels, so U-17A remains `PARTIAL` for a different, narrower reason: a local
-responsive fix and regression test now await authorized delivery, deployment, and a
-read-only post-deployment recheck. No application mutation or protected-matter read
-occurred. Current evidence and queue state are recorded in
+to 590 pixels, so U-17A temporarily became `PARTIAL` for a different, narrower reason:
+a local responsive fix and regression test needed authorized delivery, deployment,
+and a read-only post-deployment recheck. No application mutation or protected-matter
+read occurred. Current evidence and queue state are recorded in
 `docs/audits/2026-08-28-readonly-state-confirmation.md`.
+
+## Deployment closure — 2026-08-28
+
+PR #66 delivered the responsive repair and merged as
+`29f683bb93bdcff6a3f8f42daa1343f49fdcd45d`. Coolify deployment
+`xz67wsxhtg2p1040v6stk3hd` finished on that exact commit; the resulting web and API
+containers were both healthy. The authenticated controlled Chrome profile then
+revisited the exact synthetic Runs route:
+
+- At 390 by 844, `scrollWidth` equaled `clientWidth` (375 pixels after the vertical
+  scrollbar), the identity and status blocks stacked, and no horizontal overflow was
+  present.
+- At 640 by 844, `scrollWidth` and `clientWidth` were both 640 pixels, and the identity
+  and status blocks remained center-aligned on one row.
+- Browser logs were empty at both widths. No button, decision, attestation, upload,
+  export, or run action was invoked.
+
+This closes the authenticated mobile acceptance row and U-17A as `COMPLETE`.
 
 ## Scope and human boundary
 
@@ -99,7 +118,7 @@ occurred. Current evidence and queue state are recorded in
 | Synthetic key retirement | A new key cannot decrypt the retired archive and retired archives are purged | Wrong-key restore raised `BackupError`; old and ephemeral new drill archives were purged; zero rotation archives remained | PASS |
 | Access edge | Anonymous public requests never reach the application | Public request redirected to Cloudflare Access; direct origin TLS failed for lack of the Cloudflare client certificate | PASS |
 | Internal API/worker boundary | Health is available; internal routes require the secret; worker has no API/Docker control path | `/health` returned 200; unauthenticated matter/internal routes returned 401; in-memory authenticated internal ping returned 200; worker could not resolve `api`, joined only its two internal networks, had exactly five expected mounts, and had no Docker socket | PASS |
-| Authenticated mobile journey | Attorney can enter through Access and inspect only the synthetic flow at phone width | The controlled Chrome profile reached the exact synthetic route through Access. The run cockpit, Begin Task, Decision Inbox, and Export room fit the 390-by-844 viewport; the Runs index expanded to 590 pixels, and its local responsive repair awaits delivery and deployed recheck | PARTIAL — deployment and read-only reverification |
+| Authenticated mobile journey | Attorney can enter through Access and inspect only the synthetic flow at phone width | The controlled Chrome profile reached the exact synthetic route through Access. After PR #66 and deployment `xz67wsxhtg2p1040v6stk3hd`, the Runs index had no horizontal overflow at 390 by 844 or 640 by 844, preserved the intended stacked/row layouts, and emitted no browser logs | PASS |
 
 ## Conversion and recovery receipts
 
@@ -172,10 +191,8 @@ start. No canary value was printed or persisted in Git.
 
 ## Remaining risk and queue
 
-- **Authenticated mobile recheck:** Cloudflare Access authentication and the read-only
-  application journey are complete. Deliver and deploy the local Runs-index responsive
-  repair, then repeat the synthetic 390-by-844 check without invoking an application
-  mutation or opening protected matter data.
+- **Authenticated mobile recheck:** complete. PR #66, exact-commit deployment, healthy
+  containers, and the authenticated 390/640-width production recheck close this tail.
 - **CourtListener alternate host:** `api.courtlistener.com` did not resolve from the
   development host or proxy. MootLoop's implemented fixed routes use
   `www.courtlistener.com`; the unresolved alternate remains an external availability

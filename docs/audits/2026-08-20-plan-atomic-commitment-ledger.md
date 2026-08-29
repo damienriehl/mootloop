@@ -141,7 +141,7 @@ short label is less detailed.
 | FD5-03 | First-class pause/resume status/events | COMPLETE |
 | FD5-04 | Priority queue, slot release, heartbeat/visibility reclaim | COMPLETE locally — U-11A closes shutdown/capacity attempt accounting |
 | FD5-05 | SSE read-only tail and stepwise driver loop | COMPLETE |
-| FD5-06 | Thin Next BFF as sole verified surface | COMPLETE locally; deployed unauthenticated route boundary proved in U-17A; authenticated journey still pending human Access login |
+| FD5-06 | Thin Next BFF as sole verified surface | COMPLETE; U-17A proved the deployed unauthenticated route boundary and completed the authenticated synthetic journey after Access login |
 | FD5-07 | Stateless web redeploy; driver drain/reclaim contract | COMPLETE for the current single-worker contract — U-17A proves PID 1, clean stop/recreate, in-flight exact-item release with refunded attempt, one boot reclaim, unchanged completed-turn/spend baseline, and no duplicate work; multi-worker failover extension remains U-15 |
 | FD6-01 | Driver-coordinated encrypted off-box backup and restore drill | PARTIAL — U-17A proves byte-identical encrypted same-host synthetic restore and key retirement; the provider-specific packet at `docs/decisions/2026-08-24-fd6-01-off-box-backup.md` awaits FD6-01P approval before implementation, provisioning, remote upload, or restore. D-09's signed-head integrity ledger does not close this requirement. |
 | FD6-02 | Close inventory/source binding/anonymized audit retention | COMPLETE locally — U-11A implements D-14 for its new stores and a complete close manifest |
@@ -177,7 +177,7 @@ short label is less detailed.
 | FD8-09 | Hierarchical query-key factories | COMPLETE |
 | FD8-10 | Decide may be conflict-aware optimistic; attest never optimistic | COMPLETE |
 | FD8-11 | Module-scoped JWKS and matcher discipline | COMPLETE |
-| FD8-12 | Typed MSW/unit tests now; browser tests only for unreproducible seams | COMPLETE for FE-2; U-17A authentication succeeded on 2026-08-28, and its discovered Runs-list mobile overflow has a local regression-tested fix awaiting deployment and recheck |
+| FD8-12 | Typed MSW/unit tests now; browser tests only for unreproducible seams | COMPLETE for FE-2; U-17A authentication succeeded on 2026-08-28, and PR #66's regression-tested Runs-list repair passed the deployed 390/640-width recheck |
 | FD8-13 | Tokenized/generalized board component adaptations | OPEN-AUTO — U-13 |
 | FD9-01 | Case-file/pleading-spine navigation and mobile docket tabs | PARTIAL — remaining rooms U-12–U-15 |
 | FD9-02 | Serif argument voice and mono record voice | COMPLETE for FE-2 |
@@ -189,7 +189,7 @@ short label is less detailed.
 | FD9-08 | Linearized accessible mobile board | OPEN-AUTO — U-13 |
 | FD9-09 | Avoid banned SaaS/legal-cliché visual patterns | PARTIAL — enforce in U-12–U-15 |
 | FD9-10 | Durable room-by-room frontend direction document | COMPLETE locally — U-11A |
-| FD10-01 | First-live sequence FE-0 → FE-2.5 → protected seed/run | PARTIAL — U-17A's autonomous synthetic infrastructure proof and authenticated read-only journey are complete except for deploying/rechecking the local Runs-list mobile fix; protected U-17B clean proof remains |
+| FD10-01 | First-live sequence FE-0 → FE-2.5 → protected seed/run | PARTIAL — U-17A's autonomous synthetic infrastructure proof and deployed authenticated read-only journey are complete; protected U-17B clean proof remains |
 | FD10-02 | Post-live FE-3 → FE-6 sequence | OPEN-AUTO — U-12–U-15 under D-10 |
 | FD10-03 | Dropbox/OneDrive/Web Push/pipeline-shape/multiplayer stay deferred | DEFERRED — successor queue |
 | FD10-04 | TaskSpec fields land only as consumed | COMPLETE for current TaskSpec; extensions enforced in U-12 |
