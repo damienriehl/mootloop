@@ -380,3 +380,27 @@ def web_replay_script(bundle_path: Path, strategy: str, destination: Path) -> No
     except (MootloopError, ValueError, OSError) as exc:
         raise _fail(exc) from exc
     typer.echo(str(destination))
+
+
+@web_app.command("prepare")
+def web_prepare(
+    fixture: Path,
+    work_directory: Path,
+    output_directory: Path,
+    revision: Annotated[str, typer.Option("--revision")],
+    software_revision: Annotated[str, typer.Option("--software-revision")],
+) -> None:
+    """Replay an authored demo and extract public stages; does not approve publication."""
+    from mootloop.demo_prepare import prepare_demo
+
+    try:
+        snapshot = prepare_demo(
+            fixture,
+            work_directory,
+            output_directory,
+            revision=revision,
+            software_revision=software_revision,
+        )
+    except (MootloopError, ValueError, OSError) as exc:
+        raise _fail(exc) from exc
+    typer.echo(f"Prepared {snapshot.descriptor.demo_id}; editorial publication review is required.")

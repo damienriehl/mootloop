@@ -1,0 +1,47 @@
+{
+  "schema_version": "1.0",
+  "input_id": "advice",
+  "task": "business-advice",
+  "represented_side": "In-house counsel to the fictional business",
+  "jurisdiction": "Delaware target and applicable U.S. federal law",
+  "court_level": "advisory",
+  "cutoff": "2026-09-20",
+  "strategy_id": "reviewed-advice",
+  "assumptions": [
+    "All business facts and organizations in this scenario are fictional.",
+    "Missing facts must remain unresolved rather than assumed favorable."
+  ],
+  "preservation_constraints": [
+    "The packet is bounded to the listed authorities and facts; no comprehensive current-law clearance is implied."
+  ],
+  "units": [
+    {
+      "unit_id": "advice",
+      "title": "What must we resolve before buying this startup?",
+      "instructions": "What must we resolve before buying this startup? Analyze the supplied facts, alternatives, adverse consequences and missing information. Produce advice and the concrete secondary action document identified in the scenario. Required work product: Diligence priorities and deal protections.",
+      "issues": [
+        "Structure is undecided; section 251 merger mechanics do not substitute for stock-purchase analysis or required approvals.",
+        "Share ownership does not repair a missing IP assignment or override customer data-use restrictions.",
+        "The omitted notes and major-customer consent can change price, ownership and the ability to close."
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "source_id": "scenario",
+      "text": "Fictional Alder Systems proposes a $12 million acquisition of Delaware corporation Spruce Workflow. The term sheet says “stock acquisition or merger, structure to be agreed,” with a 30-day exclusivity period. The draft cap table omits two convertible notes. A founding contractor wrote the core scheduling engine before signing an assignment that names a different project. Spruce’s largest customer supplies 38% of recurring revenue; its contract has a change-of-control consent clause. A data-processing agreement limits customer data to service delivery. The financial model assumes immediate use of all target data to train Alder’s model. Two engineers are labeled contractors but work full time under management control. The term sheet is not a signed definitive acquisition agreement.",
+      "sha256": "fb460132dbc8442fa9bfc260bc924f9b83a49db33e032268f1cef3f5497a801e",
+      "available_on": "2026-09-20",
+      "classification": "hypothetical",
+      "public": true
+    },
+    {
+      "source_id": "de-merger",
+      "text": "Authority summary: Delaware General Corporation Law section 251 governs specified merger agreement and approval mechanics; a stock purchase and other structures require their own analysis rather than automatic application of one merger checklist.",
+      "sha256": "6b0a92d1720944549107e0cdc5737f6359043f709855ee59fa1b7833a6b03baf",
+      "available_on": "2026-09-20",
+      "classification": "record",
+      "public": true
+    }
+  ]
+}

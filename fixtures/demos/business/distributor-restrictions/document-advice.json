@@ -1,0 +1,47 @@
+{
+  "schema_version": "1.0",
+  "input_id": "advice",
+  "task": "business-advice",
+  "represented_side": "In-house counsel to the fictional business",
+  "jurisdiction": "U.S. federal law and California",
+  "court_level": "advisory",
+  "cutoff": "2026-09-20",
+  "strategy_id": "reviewed-advice",
+  "assumptions": [
+    "All business facts and organizations in this scenario are fictional.",
+    "Missing facts must remain unresolved rather than assumed favorable."
+  ],
+  "preservation_constraints": [
+    "The packet is bounded to the listed authorities and facts; no comprehensive current-law clearance is implied."
+  ],
+  "units": [
+    {
+      "unit_id": "advice",
+      "title": "Can we control dealers’ territories and resale prices?",
+      "instructions": "Can we control dealers’ territories and resale prices? Analyze the supplied facts, alternatives, adverse consequences and missing information. Produce advice and the concrete secondary action document identified in the scenario. Required work product: Competition review and alternatives.",
+      "issues": [
+        "An unsupported share of an undefined market is not antitrust clearance.",
+        "Federal treatment does not establish California legality of mandatory minimum resale pricing.",
+        "The joint dealer request raises a horizontal-coordination concern distinct from a manufacturer’s independent distribution decision."
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "source_id": "scenario",
+      "text": "Fictional Summit Pumps sells specialty irrigation pumps through independent California dealers and estimates an 8% share of a loosely defined regional category. It wants exclusive zip-code territories, a mandatory $900 minimum resale price, and termination for any online discount. Three competing dealers jointly requested the price floor and copied one another on emails complaining about a discounter. Summit has no reliable market-definition study or evidence that price restrictions fund additional services. Its stated goal is trained installation and reliable warranty support, which can be measured through service standards.",
+      "sha256": "37762f7a070a75de35bbc21523452e1b17a6841868ef19e3465b17fab586dbe2",
+      "available_on": "2026-09-20",
+      "classification": "hypothetical",
+      "public": true
+    },
+    {
+      "source_id": "ftc-distributor",
+      "text": "Authority summary: Federal guidance distinguishes vertical restrictions and evaluates many under a rule-of-reason framework while warning that state law can differ; dealer coordination raises separate concerns.",
+      "sha256": "1c36129fbfd2758a52bb98decff3234471541fd87d1d795ef043026a8e4d83ae",
+      "available_on": "2026-09-20",
+      "classification": "record",
+      "public": true
+    }
+  ]
+}

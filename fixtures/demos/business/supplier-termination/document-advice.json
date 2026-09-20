@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "input_id": "advice",
+  "task": "business-advice",
+  "represented_side": "In-house counsel to the fictional business",
+  "jurisdiction": "Minnesota",
+  "court_level": "advisory",
+  "cutoff": "2026-09-20",
+  "strategy_id": "reviewed-advice",
+  "assumptions": [
+    "All business facts and organizations in this scenario are fictional.",
+    "Missing facts must remain unresolved rather than assumed favorable."
+  ],
+  "preservation_constraints": [
+    "The packet is bounded to the listed authorities and facts; no comprehensive current-law clearance is implied."
+  ],
+  "units": [
+    {
+      "unit_id": "advice",
+      "title": "Can we terminate after three missed deliveries?",
+      "instructions": "Can we terminate after three missed deliveries? Analyze the supplied facts, alternatives, adverse consequences and missing information. Produce advice and the concrete secondary action document identified in the scenario. Required work product: Contract analysis and notice.",
+      "issues": [
+        "Three failures do not automatically establish substantial impairment of the entire installment contract. Explain the effect of accepting earlier deliveries.",
+        "The supplied agreement requires a written 15-day cure notice. Telephone complaints are not the specified notice, and the furnace explanation needs investigation.",
+        "Blanket nonpayment creates a counterclaim; distinguish disputed damages from payment for accepted goods. Separate cure from adequate assurance."
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "source_id": "scenario",
+      "text": "All companies and facts are fictional. North Shore Fabrication buys 500 housings monthly from Cedar Components under a Minnesota-law installment agreement requiring delivery on the first calendar day of each month. July delivery was 12 days late, August was 18 days late, and September remains undelivered on September 20, 2026. Section 9 permits termination for a material breach remaining uncured 15 calendar days after written notice delivered to contracts@cedar.example. Earlier complaints were telephone calls, not contractual notices. North Shore accepted July and August shipments, paid the undisputed invoices, and lost two production shifts. Cedar attributes September delay to a furnace failure and offers an October 2 recovery shipment. A backup supplier can cover half the October need at a 20% premium. There is no written force-majeure notice in the supplied record. Procurement wants to cancel immediately and withhold all outstanding invoices.",
+      "sha256": "31b2298bdfcd6210eb7ca44bc5f53f914dd542ea43a09404ac4a95803460bf38",
+      "available_on": "2026-09-20",
+      "classification": "hypothetical",
+      "public": true
+    },
+    {
+      "source_id": "mn-installments",
+      "text": "Authority summary: Installment nonconformity and whole-contract cancellation require distinct substantial-impairment analysis; acceptance and subsequent conduct may matter.",
+      "sha256": "f41d76c1a4129a94180bf85420e4d5af1476534c59e2a051f0864391191a1f87",
+      "available_on": "2026-09-20",
+      "classification": "record",
+      "public": true
+    },
+    {
+      "source_id": "mn-assurances",
+      "text": "Authority summary: Reasonable grounds for insecurity can support a written adequate-assurance demand and commercially reasonable suspension; the response period depends on circumstances and cannot exceed the statutory maximum.",
+      "sha256": "afef329f85a34ccea0dfd920f8f49b39c399d8a42f636423d3a623c2ed42745c",
+      "available_on": "2026-09-20",
+      "classification": "record",
+      "public": true
+    }
+  ]
+}

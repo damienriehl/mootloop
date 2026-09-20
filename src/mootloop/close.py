@@ -55,6 +55,7 @@ from mootloop.models.demo import (
     PublicationReview,
     SourceReference,
 )
+from mootloop.models.demo_preparation import DemoPreparation
 from mootloop.models.document_task import DocumentTaskInput
 from mootloop.models.evidence import RunEvidencePack, RunStatusSidecar, TraceTree
 from mootloop.models.facts import Fact
@@ -357,6 +358,7 @@ MATTER_SCOPED_STORES: tuple[MatterScopedStore, ...] = (
 # Concrete `VersionedModel`s that are deliberately NOT matter-scoped-purgeable, each
 # with the reason the invariant records instead of demanding a store.
 EXEMPT_MODELS: dict[type[VersionedModel], str] = {
+    DemoPreparation: "Public or fictional authored demo recipe, not active matter state.",
     PreparedReplay: (
         "Caller-supplied portable replay input, never persisted by the service; accepted "
         "responses enter the registered run journal and document master stores."

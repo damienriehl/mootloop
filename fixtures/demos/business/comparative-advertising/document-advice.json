@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "input_id": "advice",
+  "task": "business-advice",
+  "represented_side": "In-house counsel to the fictional business",
+  "jurisdiction": "U.S. federal law and New York",
+  "court_level": "advisory",
+  "cutoff": "2026-09-20",
+  "strategy_id": "reviewed-advice",
+  "assumptions": [
+    "All business facts and organizations in this scenario are fictional.",
+    "Missing facts must remain unresolved rather than assumed favorable."
+  ],
+  "preservation_constraints": [
+    "The packet is bounded to the listed authorities and facts; no comprehensive current-law clearance is implied."
+  ],
+  "units": [
+    {
+      "unit_id": "advice",
+      "title": "Can we advertise “twice as fast as the market leader”?",
+      "instructions": "Can we advertise “twice as fast as the market leader”? Analyze the supplied facts, alternatives, adverse consequences and missing information. Produce advice and the concrete secondary action document identified in the scenario. Required work product: Advertising review and proposed revisions.",
+      "issues": [
+        "The headline implies broad performance and every-user assurance not measured by this single benchmark.",
+        "The tested competitor version is stale and five queries were slower; identify how those facts limit the message.",
+        "A distant footnote cannot turn an unqualified guarantee into a narrow measured claim."
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "source_id": "scenario",
+      "text": "Fictional Lumen Search plans a New York-based national business-software campaign stating “twice as fast as the market leader—guaranteed.” Its lab ran 30 queries on one static 100,000-record dataset using Lumen version 3 and Rival version 8 with default settings. Median latency was 0.8 seconds for Lumen and 1.7 seconds for Rival, but five Lumen queries were slower. No tests measured ingestion, accuracy, uptime, other hardware or current Rival version 9. Marketing proposes a small footnote linking a study summary. Engineering can rerun a defined benchmark within two weeks; the public launch is tomorrow.",
+      "sha256": "faea1474a524aa384671579af6f6007b65f5e15250c8a6144b1d711bca453ea3",
+      "available_on": "2026-09-20",
+      "classification": "hypothetical",
+      "public": true
+    },
+    {
+      "source_id": "ftc-comparative",
+      "text": "Authority summary: FTC policy supports truthful, nondeceptive comparative advertising with a clear basis for the comparison.",
+      "sha256": "6c04944e72ab6996de61e5aaa77fc448634897c015aa490d3da7ccc85ee2118d",
+      "available_on": "2026-09-20",
+      "classification": "record",
+      "public": true
+    },
+    {
+      "source_id": "ftc-advertising",
+      "text": "Authority summary: Advertisers need substantiation for objective express and implied claims before dissemination; disclosures cannot reliably cure a contradictory headline.",
+      "sha256": "12c8f2e86e4dec3d9e30862641ac29be86f082f8f326b1ac47cab71e3e0a1508",
+      "available_on": "2026-09-20",
+      "classification": "record",
+      "public": true
+    }
+  ]
+}

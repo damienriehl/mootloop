@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "input_id": "advice",
+  "task": "business-advice",
+  "represented_side": "In-house counsel to the fictional business",
+  "jurisdiction": "California and applicable U.S. federal law",
+  "court_level": "advisory",
+  "cutoff": "2026-09-20",
+  "strategy_id": "reviewed-advice",
+  "assumptions": [
+    "All business facts and organizations in this scenario are fictional.",
+    "Missing facts must remain unresolved rather than assumed favorable."
+  ],
+  "preservation_constraints": [
+    "The packet is bounded to the listed authorities and facts; no comprehensive current-law clearance is implied."
+  ],
+  "units": [
+    {
+      "unit_id": "advice",
+      "title": "Can customer support tickets train our new AI feature?",
+      "instructions": "Can customer support tickets train our new AI feature? Analyze the supplied facts, alternatives, adverse consequences and missing information. Produce advice and the concrete secondary action document identified in the scenario. Required work product: Privacy and contractual risk assessment.",
+      "issues": [
+        "Customer possession is not permission for every downstream use; distinguish service delivery from shared-model training.",
+        "A privacy-policy edit does not supply missing contract authority or necessarily satisfy purpose/notice requirements.",
+        "Free-text health details, vendor training rights and incomplete deletion propagation undermine the proposed retention assurance."
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "source_id": "scenario",
+      "text": "Fictional Mesa Service Desk stores customer support tickets for business clients, including names, work emails and occasional health details typed into free text. Its California-law customer agreement allows processing to provide contracted support analytics; it does not expressly permit training a shared model. The proposed feature sends unredacted tickets to an external model vendor that retains prompts for 30 days and may improve its general model. Product wants a public beta in two weeks. Customers include California businesses with California consumer records. Mesa has not determined CCPA applicability for every party, mapped service-provider terms, completed deletion propagation, or verified vendor training opt-outs. There is no evidence of consumer authorization for a secondary training purpose.",
+      "sha256": "f3dd5ae877fcaadbce66689dbe614de9f8451643e88bc71de9b243db4aa8bbb6",
+      "available_on": "2026-09-20",
+      "classification": "hypothetical",
+      "public": true
+    },
+    {
+      "source_id": "ca-privacy",
+      "text": "Authority summary: CCPA rights and obligations depend on covered businesses, personal information and applicable roles; an AI label does not determine coverage.",
+      "sha256": "ef27d09d392fceab517a281d4aea15397036abfa1934d5c475cca85d2b07f9c4",
+      "available_on": "2026-09-20",
+      "classification": "record",
+      "public": true
+    },
+    {
+      "source_id": "ca-purpose",
+      "text": "Authority summary: California Civil Code 1798.100 addresses notice, reasonably necessary and proportionate processing for disclosed compatible purposes, and specified recipient contracts.",
+      "sha256": "2d3d3ecc17f95c92588b80fe34498c32c7632f15d8e1494d28c9113a3b192639",
+      "available_on": "2026-09-20",
+      "classification": "record",
+      "public": true
+    }
+  ]
+}

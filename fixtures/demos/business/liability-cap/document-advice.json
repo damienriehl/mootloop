@@ -1,0 +1,47 @@
+{
+  "schema_version": "1.0",
+  "input_id": "advice",
+  "task": "business-advice",
+  "represented_side": "In-house counsel to the fictional business",
+  "jurisdiction": "New York governing law",
+  "court_level": "advisory",
+  "cutoff": "2026-09-20",
+  "strategy_id": "reviewed-advice",
+  "assumptions": [
+    "All business facts and organizations in this scenario are fictional.",
+    "Missing facts must remain unresolved rather than assumed favorable."
+  ],
+  "preservation_constraints": [
+    "The packet is bounded to the listed authorities and facts; no comprehensive current-law clearance is implied."
+  ],
+  "units": [
+    {
+      "unit_id": "advice",
+      "title": "What should we offer instead of unlimited liability?",
+      "instructions": "What should we offer instead of unlimited liability? Analyze the supplied facts, alternatives, adverse consequences and missing information. Produce advice and the concrete secondary action document identified in the scenario. Required work product: Negotiation positions and revised clause.",
+      "issues": [
+        "Insurance limits do not promise coverage for a particular claim or create a per-customer pool; identify retention, exclusions and aggregate erosion.",
+        "Define overlapping indemnity, confidentiality and data claims so a broad label cannot swallow the ordinary cap.",
+        "Do not guarantee enforceability or assume all gross-negligence treatment is identical to an exculpatory clause."
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "source_id": "scenario",
+      "text": "Fictional Harbor Metrics offers business analytics software to Beacon Retail for $120,000 annually on a two-year New York-law agreement. Beacon proposes uncapped liability for every breach, all consequential damages, and indemnity for any customer loss. Harbor carries a $2 million cyber policy with a $100,000 retention; policy exclusions and erosion by other claims have not been reviewed. Harbor’s standard contract caps all claims at the preceding 12 months’ fees and excludes lost profits. Beacon processes order history, business contacts and support tickets; payment-card processing is excluded. Sales can obtain a 15% premium for a risk-adjusted offer but cannot price unlimited exposure. Neither party has supplied its complete indemnity language.",
+      "sha256": "5cfccb5d9f399a4404e64b75ce31175a9c6e12d8beccacddd4d63a21b3fdc1e2",
+      "available_on": "2026-09-20",
+      "classification": "hypothetical",
+      "public": true
+    },
+    {
+      "source_id": "ny-liability",
+      "text": "Authority summary: New York’s Part 60 Put-Back decision distinguishes a limitation of contractual remedies from complete exculpation; gross-negligence arguments require attention to the clause and claim rather than a blanket enforceability assertion.",
+      "sha256": "c822d5d8c6ed82a8ded3217365bff17eda1c810ffe09ca27c79f7eacd08ce3cc",
+      "available_on": "2026-09-20",
+      "classification": "record",
+      "public": true
+    }
+  ]
+}

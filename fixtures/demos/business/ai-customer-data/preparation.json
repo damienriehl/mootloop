@@ -1,0 +1,188 @@
+{
+  "schema_version": "1.0",
+  "descriptor": {
+    "schema_version": "1.0",
+    "demo_id": "ai-customer-data",
+    "title": "Can we use customer data for this AI feature?",
+    "introduction": "Can customer support tickets train our new AI feature? A fictional business decision with a reviewed action document.",
+    "collection": "business",
+    "practice_area": "Privacy and technology",
+    "work_product": "Privacy and contractual risk assessment",
+    "jurisdiction": "California / U.S. federal",
+    "court_level": "advisory",
+    "task": "business-advice"
+  },
+  "strategies": [
+    {
+      "strategy_id": "reviewed-advice",
+      "title": "Advice tested against business and legal risks",
+      "input_ids": [
+        "advice"
+      ],
+      "input_summary": "Fictional Mesa Service Desk stores customer support tickets for business clients, including names, work emails and occasional health details typed into free text. Its California-law customer agreement allows processing to provide contracted support analytics; it does not expressly permit training a shared model. The proposed feature sends unredacted tickets to an external model vendor that retains prompts for 30 days and may improve its general model. Product wants a public beta in two weeks. Customers include California businesses with California consumer records. Mesa has not determined CCPA applicability for every party, mapped service-provider terms, completed deletion propagation, or verified vendor training opt-outs. There is no evidence of consumer authorization for a secondary training purpose.",
+      "assumptions": [
+        "All business facts and organizations in this scenario are fictional.",
+        "Missing facts must remain unresolved rather than assumed favorable."
+      ],
+      "source_ids": [
+        "ca-privacy",
+        "ca-purpose"
+      ],
+      "outputs": {
+        "advice": {
+          "initial": {
+            "response_text": "## Recommendation\nLaunch the beta because the data already belongs to our business customers and the vendor deletes prompts after 30 days. Add a sentence about AI to the privacy policy after launch.\n\n## Proposed action\nProceed on that recommendation using the supplied business objective; this initial draft has not yet addressed the opposing critique.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "ca-privacy",
+              "ca-purpose"
+            ],
+            "attorney_gate_items": [
+              "Verify missing facts, governing legal requirements and the secondary document before use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted demonstration, not an independent model or attorney opinion."
+          },
+          "revised": {
+            "response_text": "## Recommendation\nHold the proposed unredacted-ticket beta. Offer a limited, customer-authorized pilot using synthetic tickets first, then a defined data-minimized subset only after roles, purposes, contracts, vendor restrictions and deletion controls are resolved. Disable vendor general-model training and prohibit secondary reuse by contract and tested configuration. Treat permission for customer-specific analytics separately from permission to improve a shared model.\n\n## Risks\nMesa cannot infer legal authority from business-to-business contracting or a 30-day retention promise. The service may contain personal information about people who never negotiated the contract. Determine CCPA applicability and role-specific obligations rather than assume every customer is covered or exempt. The presence of health-related text does not, by itself, establish HIPAA applicability, but it requires inventory and handling analysis. This packet does not clear sector rules, biometric uses, international transfers or all current AI regulation.\n\n## Options\nSynthetic-only demonstration permits product learning without exporting customer records. A restricted inference pilot may be feasible with purpose-specific customer authorization and appropriate notices, contracts and controls. Shared-model training is a separate proposal requiring its own authority and risk assessment; do not hide it inside the inference pilot. Customer refusal means exclude its data, not broaden the policy unilaterally.\n\n## Next Steps\nPrivacy: map data categories, affected individuals, purpose and each party’s statutory role. Commercial legal: amend customer and vendor terms as needed. Engineering: test redaction, logging, retention, deletion propagation and training opt-out in a nonproduction environment. Security: review access and incident handling. Product: use a launch gate with named owners and evidence; no customer data until every prerequisite for that use is documented.\n\n## Secondary Deliverable\n**Launch checklist and proposed data-use rider**\n- Confirm permitted purpose: customer-specific ticket classification and summarization only.\n- Exclude sensitive free text and identifiers unnecessary to that purpose; validate the exclusion with representative tests.\n- Record applicable customer authorization and notices; document CCPA role and contract analysis.\n- Vendor must not train, improve a general model, sell, share or otherwise reuse submitted customer content outside the authorized service; align defined terms with applicable law.\n- Specify approved subprocessors, access controls, incident reporting, retention, deletion verification and audit evidence.\n- Maintain a rollback switch and customer-specific exclusion list.\nDraft rider: “Provider may process the specifically approved ticket fields solely to deliver the customer-specific feature described in this order. General-model training and other secondary uses require a separate written agreement and satisfaction of applicable privacy obligations. Provider will impose equivalent use limits on approved subprocessors and document deletion under the agreed schedule.”\nThe rider is a starting point; signatures alone do not cure incompatible processing or missing consumer-facing obligations.\n\n## Source boundary\nLaw-as-of preparation: September 20, 2026. Source summaries and links are in the input packet. This draft does not establish citation currency or attorney approval.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "ca-privacy",
+              "ca-purpose"
+            ],
+            "attorney_gate_items": [
+              "Verify missing facts, governing legal requirements and the secondary document before use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted demonstration, not an independent model or attorney opinion."
+          },
+          "critique": {
+            "verdict": "revise",
+            "critiques": [
+              "Customer possession is not permission for every downstream use; distinguish service delivery from shared-model training.",
+              "A privacy-policy edit does not supply missing contract authority or necessarily satisfy purpose/notice requirements.",
+              "Free-text health details, vendor training rights and incomplete deletion propagation undermine the proposed retention assurance."
+            ],
+            "instructions": [
+              "Replace the initial recommendation with the supported alternatives and missing-fact analysis.",
+              "Include the complete action document and identify its unresolved prerequisites."
+            ],
+            "self_assessment": "Scripted adversarial review; these objections remain inspectable after revision."
+          },
+          "assessment": {
+            "disposition": "revise",
+            "reasons": [
+              "The revised design narrows the data flow and makes authorization testable, so a limited pilot may become supportable. It does not authorize the original general-training design. If the vendor cannot disable reuse or deletion cannot be verified, the customer-data pilot remains blocked despite commercial pressure."
+            ],
+            "limitations": [
+              "This is a fictional, agent-authored scenario replayed without model calls.",
+              "Unresolved factual and legal questions require qualified counsel; this is not attorney approval."
+            ],
+            "self_assessment": "A qualified assessment of the revised approach, not a predicted outcome."
+          },
+          "initial_rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 1,
+                "evidence": "Customer possession is not permission for every downstream use; distinguish service delivery from shared-model training."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 1,
+                "evidence": "A privacy-policy edit does not supply missing contract authority or necessarily satisfy purpose/notice requirements."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 1,
+                "evidence": "Free-text health details, vendor training rights and incomplete deletion propagation undermine the proposed retention assurance."
+              }
+            ],
+            "overall_notes": "Prepared editorial scores of this scripted draft, not a success probability or independent legal validation.",
+            "self_assessment": "Initial gaps require revision."
+          },
+          "rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 4,
+                "evidence": "Hold the proposed unredacted-ticket beta. Offer a limited, customer-authorized pilot using synthetic tickets first, then a defined data-minimized subset only after roles, purposes, contracts, vendor restrictions and deletion controls are resolved. Disable vendor general-model training and prohibit secondary reuse by contract and tested configuration. Treat permission for customer-specific analytics separately from permission to improve a shared model."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 4,
+                "evidence": "Mesa cannot infer legal authority from business-to-business contracting or a 30-day retention promise. The service may contain personal information about people who never negotiated the contract. Determine CCPA applicability and role-specific obligations rather than assume every customer is covered or exempt. The presence of health-related text does not, by itself, establish HIPAA applicability, but it requires inventory and handling analysis. This packet does not clear sector rules, biometric uses, international transfers or all current AI regulation."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 4,
+                "evidence": "The revised design narrows the data flow and makes authorization testable, so a limited pilot may become supportable. It does not authorize the original general-training design. If the vendor cannot disable reuse or deletion cannot be verified, the customer-data pilot remains blocked despite commercial pressure."
+              }
+            ],
+            "overall_notes": "Prepared editorial scores of this scripted draft, not a success probability or independent legal validation.",
+            "self_assessment": "The revision addresses the scripted critique; factual and legal limits remain."
+          }
+        }
+      }
+    }
+  ],
+  "sources": [
+    {
+      "schema_version": "1.0",
+      "source_id": "ca-privacy",
+      "title": "California Attorney General CCPA guidance",
+      "url": "https://www.oag.ca.gov/privacy/ccpa",
+      "available_on": "2026-09-20",
+      "filed_on": null,
+      "effective_on": null,
+      "retrieved_on": "2026-09-20",
+      "sha256": "74e1a2e06df14c7f4d8964a9cd7c8611fdb825742f855faee12eaf9c91d9a00e",
+      "locator": "Business scope, consumer rights, service providers",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Link to the acquired primary authority; local inputs contain concise original summaries, not wholesale source copies. Availability date records confirmed public availability at preparation."
+    },
+    {
+      "schema_version": "1.0",
+      "source_id": "ca-purpose",
+      "title": "California Civil Code1798.100",
+      "url": "https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=CIV&sectionNum=1798.100.",
+      "available_on": "2026-09-20",
+      "filed_on": null,
+      "effective_on": null,
+      "retrieved_on": "2026-09-20",
+      "sha256": "605e2d46699cee0a3dc0d04fb04c3a11d867b2a9dccefda3a7d19f42f5216053",
+      "locator": "Subsections(a), (c), (d): notice, purpose limits, agreements",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Link to primary authority; only original summaries included in example inputs."
+    }
+  ],
+  "claims": [
+    {
+      "claim": "CCPA rights and obligations depend on covered businesses, personal information and applicable roles; an AI label does not determine coverage.",
+      "source_ids": [
+        "ca-privacy"
+      ],
+      "locator": "Business scope, consumer rights, service providers",
+      "classification": "law"
+    },
+    {
+      "claim": "California Civil Code 1798.100 addresses notice, reasonably necessary and proportionate processing for disclosed compatible purposes, and specified recipient contracts.",
+      "source_ids": [
+        "ca-purpose"
+      ],
+      "locator": "Subsections(a), (c), (d): notice, purpose limits, agreements",
+      "classification": "law"
+    }
+  ],
+  "limitations": [
+    "Fictional business facts; no actual client data.",
+    "Prepared scripts and editorial scoring, with zero live model calls.",
+    "Sources were checked for this bounded preparation on September 20, 2026; no exhaustive legal review or attorney approval."
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "input_id": "advice",
+  "task": "business-advice",
+  "represented_side": "In-house counsel to the fictional business",
+  "jurisdiction": "Massachusetts",
+  "court_level": "advisory",
+  "cutoff": "2026-09-20",
+  "strategy_id": "reviewed-advice",
+  "assumptions": [
+    "All business facts and organizations in this scenario are fictional.",
+    "Missing facts must remain unresolved rather than assumed favorable."
+  ],
+  "preservation_constraints": [
+    "The packet is bounded to the listed authorities and facts; no comprehensive current-law clearance is implied."
+  ],
+  "units": [
+    {
+      "unit_id": "advice",
+      "title": "Can a competitor hire our sales team and use its files?",
+      "instructions": "Can a competitor hire our sales team and use its files? Analyze the supplied facts, alternatives, adverse consequences and missing information. Produce advice and the concrete secondary action document identified in the scenario. Required work product: Covenant and trade-secret assessment.",
+      "issues": [
+        "No noncompete is supplied; recruitment and competition alone are not misappropriation.",
+        "A download is a lead, not proof of improper acquisition, retention or use. Separate public customer names from protected information.",
+        "Public accusations can create new claims and destroy a proportionate investigation."
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "source_id": "scenario",
+      "text": "Fictional Baylight Analytics employs six Massachusetts sales staff. Three resign for a competitor on September 18, 2026. Their 2023 agreements include confidentiality clauses and a customer nonsolicitation clause; no employee noncompetition covenant is supplied. A log shows one employee downloaded a 400-row customer pricing file two days before departure, but downloads also occurred during normal sales work. Baylight has not found evidence of competitor use or customer diversion. The file combines public customer names with nonpublic renewal dates and individually negotiated pricing. HR wants to threaten immediate litigation against the competitor and tell all customers the departing staff stole trade secrets.",
+      "sha256": "7117de69535040970074d02adf4aa4153fa8fb198cf45436172e994a20168a89",
+      "available_on": "2026-09-20",
+      "classification": "hypothetical",
+      "public": true
+    },
+    {
+      "source_id": "ma-noncompete",
+      "text": "Authority summary: Massachusetts section 24L addresses employee noncompetition agreements and expressly distinguishes specified other agreements; do not assume every nonsolicitation or confidentiality term is governed identically.",
+      "sha256": "c2c3e9f0f539c394191540e8508474d3b7b3e2630842b2761af85a42a4e991fc",
+      "available_on": "2026-09-20",
+      "classification": "record",
+      "public": true
+    },
+    {
+      "source_id": "ma-trade-secret",
+      "text": "Authority summary: Massachusetts trade-secret protection depends on statutory secrecy/value and reasonable protective measures, with misappropriation requiring more than lawful recruitment.",
+      "sha256": "3abb884dccaf207af761cbb0a4d3273f75b8f65a41ab81063fa8fa6a0c452f47",
+      "available_on": "2026-09-20",
+      "classification": "record",
+      "public": true
+    }
+  ]
+}
