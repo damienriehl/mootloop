@@ -260,6 +260,26 @@ sources:
   bytes: 446447
   pages: 49
   eligibility: outcome_only
+- id: law-winter
+  url: https://www.govinfo.gov/content/pkg/USREPORTS-555/pdf/USREPORTS-555-7.pdf
+  sha256: 45fdee1e0b73c914c1c67b021f4d042704622e34256c24b2f393f59b60c1a916
+  eligibility: pre_cutoff_legal_authority
+  available_on: '2008-11-12'
+- id: law-anderson
+  url: https://www.govinfo.gov/content/pkg/USREPORTS-477/pdf/USREPORTS-477-242.pdf
+  sha256: 072965900ad617f779c6be70fa6093e506acbd1d94473807f96b2289437d7edc
+  eligibility: pre_cutoff_legal_authority
+  available_on: '1986-06-25'
+- id: law-alston
+  url: https://www.supremecourt.gov/opinions/20pdf/20-512_gfbh.pdf
+  sha256: 0990ee9c6f2c9f59ca68b301febcbf56d59cc3271e9def91da16074a9ce25f57
+  eligibility: pre_cutoff_legal_authority
+  available_on: '2021-06-21'
+- id: law-campbell
+  url: https://www.govinfo.gov/content/pkg/USREPORTS-510/pdf/USREPORTS-510-569.pdf
+  sha256: 170e4bcfb7b76f5fe2940d92a4e2e540245fce66e70efe6fdbafd316ed765d75
+  eligibility: pre_cutoff_legal_authority
+  available_on: '1994-03-07'
 cases:
 - demo_id: musk-openai
   cutoff: '2025-02-03'
@@ -269,6 +289,10 @@ cases:
     correctness.
   constraint: Use the donor-trust scope; the actual reply was not acquired. Do not claim exhaustive briefing
     review.
+  preparation_contract: DemoPreparation v1.0; external original summaries and two strategy-bound document
+    inputs
+  review_limit: Agent editorial review only; unresolved legal and human gates remain visible; zero live
+    provider calls.
 - demo_id: dominion-fox
   cutoff: '2023-03-21'
   source_prefixes:
@@ -277,6 +301,10 @@ cases:
   publication_review: Required against the exact claims and artifact. Acquisition does not establish legal
     correctness.
   constraint: Distinguish Fox Corporation and Fox News Network; quotations in briefs remain party characterizations.
+  preparation_contract: DemoPreparation v1.0; external original summaries and two strategy-bound document
+    inputs
+  review_limit: Agent editorial review only; unresolved legal and human gates remain visible; zero live
+    provider calls.
 - demo_id: epic-apple
   cutoff: '2022-11-13'
   source_prefixes:
@@ -285,6 +313,10 @@ cases:
   publication_review: Required against the exact claims and artifact. Acquisition does not establish legal
     correctness.
   constraint: Respect district findings and preserved appellate issues; no new trial evidence.
+  preparation_contract: DemoPreparation v1.0; external original summaries and two strategy-bound document
+    inputs
+  review_limit: Agent editorial review only; unresolved legal and human gates remain visible; zero live
+    provider calls.
 - demo_id: tesla-tornetta
   cutoff: '2025-10-14'
   source_prefixes:
@@ -293,6 +325,10 @@ cases:
     correctness.
   constraint: Alternative remedial remand requires expressly hypothetical earlier preservation unless
     actual preservation is proved.
+  preparation_contract: DemoPreparation v1.0; external original summaries and two strategy-bound document
+    inputs
+  review_limit: Agent editorial review only; unresolved legal and human gates remain visible; zero live
+    provider calls.
 - demo_id: google-oracle
   cutoff: '2020-10-06'
   source_prefixes:
@@ -301,3 +337,7 @@ cases:
     correctness.
   constraint: Distinguish asserted licensing evidence from established record findings; no later opinion
     in strategy inputs.
+  preparation_contract: DemoPreparation v1.0; external original summaries and two strategy-bound document
+    inputs
+  review_limit: Agent editorial review only; unresolved legal and human gates remain visible; zero live
+    provider calls.
