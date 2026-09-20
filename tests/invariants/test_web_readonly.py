@@ -85,3 +85,29 @@ def test_bake_is_importable_but_separate(app_imports: tuple[set[str], set[str]])
     names, modules = app_imports
     assert "build_demo_vault" not in names
     assert not any(m.startswith("mootloop.web.bake") for m in modules)
+
+
+def test_catalog_reader_has_no_transitive_vault_or_writer_imports() -> None:
+    source_root = APP_PATH.parents[1]
+    visited: set[str] = set()
+    pending = ["mootloop.web.catalog"]
+    allowed = {"mootloop.web.catalog", "mootloop.models.demo", "mootloop.models.common"}
+    while pending:
+        module = pending.pop()
+        if module in visited:
+            continue
+        visited.add(module)
+        assert module in allowed, f"public reader imports operational module: {module}"
+        path = source_root.joinpath(*module.split(".")[1:]).with_suffix(".py")
+        tree = ast.parse(path.read_text())
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.ImportFrom)
+                and node.module
+                and node.module.startswith("mootloop.")
+            ):
+                pending.append(node.module)
+            elif isinstance(node, ast.Import):
+                pending.extend(
+                    alias.name for alias in node.names if alias.name.startswith("mootloop.")
+                )

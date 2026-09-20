@@ -17,7 +17,7 @@ from mootloop.engine import driver as driver_service
 from mootloop.errors import MootloopError
 from mootloop.runtime import RuntimeMode
 
-from . import _fail, _now, api_app, app, context_app, driver_app
+from . import _fail, _now, api_app, app, context_app, driver_app, web_app
 
 
 @driver_app.command("run-once")
@@ -311,9 +311,7 @@ def close(
     root = matters_root or Path(os.environ.get(MATTERS_ROOT_ENV, DEFAULT_MATTERS_ROOT))
     try:
         if not acknowledge_not_assured_destruction:
-            raise MootloopError(
-                "matter close requires --acknowledge-not-assured-destruction"
-            )
+            raise MootloopError("matter close requires --acknowledge-not-assured-destruction")
         actor = pwd.getpwuid(os.geteuid()).pw_name
         record = close_matter(
             root,
@@ -331,3 +329,54 @@ def close(
         f"closed {matter_id}: {registered_matches} registered-store match(es) inventoried; "
         "vault purged; tombstone retained"
     )
+
+
+@web_app.command("publish")
+def web_publish(source: Path, destination: Path) -> None:
+    """Validate and atomically promote a complete reviewed public release."""
+    from mootloop.web.publish import publish_release
+
+    try:
+        release = publish_release(source, destination)
+    except (MootloopError, ValueError, OSError) as exc:
+        raise _fail(exc) from exc
+    typer.echo(f"Published {release}")
+
+
+@web_app.command("import-demo")
+def web_import_demo(
+    bundle_path: Path,
+    vault_path: Path,
+    matter_id: Annotated[str, typer.Option("--matter-id")],
+) -> None:
+    """Create a fresh local vault from permitted inputs, without copied approvals."""
+    from mootloop.demo_inputs import import_bundle
+    from mootloop.models.demo import LocalInputBundle
+
+    try:
+        bundle = LocalInputBundle.model_validate_json(bundle_path.read_bytes())
+        vault = import_bundle(bundle, vault_path, matter_id=matter_id)
+    except (MootloopError, ValueError, OSError) as exc:
+        raise _fail(exc) from exc
+    typer.echo(f"Imported {bundle.demo_id} into {vault}; no run has been started.")
+
+
+@web_app.command("replay-script")
+def web_replay_script(bundle_path: Path, strategy: str, destination: Path) -> None:
+    """Extract one prepared replay script to a new file outside the vault."""
+    from mootloop.demo_inputs import validate_bundle
+    from mootloop.models.demo import LocalInputBundle
+    from mootloop.vault import validate_id
+
+    try:
+        validate_id(strategy, kind="strategy_id")
+        bundle = LocalInputBundle.model_validate_json(bundle_path.read_bytes())
+        validate_bundle(bundle)
+        file = next((f for f in bundle.files if f.name == f"replay-{strategy}.json"), None)
+        if file is None:
+            raise ValueError("No prepared replay for that strategy")
+        with destination.open("x", encoding="utf-8") as stream:
+            stream.write(file.text)
+    except (MootloopError, ValueError, OSError) as exc:
+        raise _fail(exc) from exc
+    typer.echo(str(destination))
