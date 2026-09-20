@@ -300,3 +300,12 @@ class LegacyProjection(VersionedModel):
             ):
                 raise ValueError("invalid public deliverable name")
         return self
+
+
+class DemoReleasePin(VersionedModel):
+    schema_version: Literal["1.0"] = "1.0"
+    release_id: Identity
+    sha256: Digest
+    url: str = Field(
+        pattern=r"^https://github\.com/damienriehl/mootloop/releases/download/[a-z0-9._-]+/release\.tar$"
+    )

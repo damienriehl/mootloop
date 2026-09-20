@@ -1,15 +1,22 @@
-# Never ship VCS state, caches, or test scaffolding in the demo image.
-# NOTE: fixtures/, personas/, config/, rubrics/ MUST stay in — they are bake inputs.
+# Public records and release archives are supplied only through an external context.
 .git
 .venv
-__pycache__
+.claude
+.codex
+.agents
+.env*
 **/__pycache__
 *.pyc
 tests
+frontend
+fixtures
+docs
+personas
+rubrics
+matters
+*.tar
+*.tar.gz
 .mypy_cache
 .pytest_cache
 .ruff_cache
 .coverage
-matters/
-Dockerfile
-.dockerignore

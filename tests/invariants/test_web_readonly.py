@@ -93,6 +93,10 @@ def test_catalog_reader_has_no_transitive_vault_or_writer_imports() -> None:
     pending = ["mootloop.web.catalog", "mootloop.web.app"]
     allowed = {
         "mootloop",
+        "mootloop.web",
+        "mootloop.models",
+        "mootloop.models.matter",
+        "mootloop.models.config",
         "mootloop.web.app",
         "mootloop.web.catalog",
         "mootloop.models.demo",
@@ -103,6 +107,8 @@ def test_catalog_reader_has_no_transitive_vault_or_writer_imports() -> None:
         if module in visited:
             continue
         visited.add(module)
+        parts = module.split(".")
+        pending.extend(".".join(parts[:i]) for i in range(1, len(parts)))
         assert module in allowed, f"public reader imports operational module: {module}"
         path = source_root.joinpath(*module.split(".")[1:])
         path = path / "__init__.py" if path.is_dir() else path.with_suffix(".py")

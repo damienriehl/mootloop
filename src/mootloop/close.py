@@ -50,6 +50,7 @@ from mootloop.models.decisions import Decision
 from mootloop.models.demo import (
     DemoCatalog,
     DemoDescriptor,
+    DemoReleasePin,
     DemoSnapshot,
     LegacyProjection,
     LocalInputBundle,
@@ -359,6 +360,7 @@ MATTER_SCOPED_STORES: tuple[MatterScopedStore, ...] = (
 # Concrete `VersionedModel`s that are deliberately NOT matter-scoped-purgeable, each
 # with the reason the invariant records instead of demanding a store.
 EXEMPT_MODELS: dict[type[VersionedModel], str] = {
+    DemoReleasePin: "Public release archive pin, not active matter state.",
     LegacyProjection: "Public API projection of the original fictional demo, not active state.",
     DemoPreparation: "Public or fictional authored demo recipe, not active matter state.",
     PreparedReplay: (
