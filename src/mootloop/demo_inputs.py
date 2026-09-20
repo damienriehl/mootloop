@@ -38,6 +38,8 @@ def validate_bundle(bundle: LocalInputBundle) -> dict[str, tuple[str, ...]]:
             if file.name == "facts.jsonl":
                 if bundle.task != "discovery-responses":
                     raise PublicationError("document task cannot import discovery facts")
+                if file.text and not file.text.endswith("\n"):
+                    raise PublicationError("bundle facts require a final newline")
                 for line in file.text.splitlines():
                     fact = Fact.model_validate_json(line)
                     if fact.reviewed_by or fact.reviewed_at or fact.review_note:

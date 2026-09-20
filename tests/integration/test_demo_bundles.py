@@ -70,6 +70,43 @@ def test_bundle_rejects_wrong_task(tmp_path):
         validate_bundle(bundle.model_copy(update={"task": "motion"}))
 
 
+@pytest.mark.parametrize("terminated", [False, True])
+def test_import_requires_complete_fact_records(tmp_path, terminated):
+    from mootloop.context import load_run_context
+    from mootloop.orchestrator import start_run
+
+    fixture = Path(__file__).resolve().parents[2] / "fixtures/demos/synthetic/supplier-discovery"
+    files = []
+    for name in ("matter.json", "request-rog-1.json", "facts.jsonl"):
+        text = (fixture / name).read_text()
+        if name == "facts.jsonl" and not terminated:
+            text = text.rstrip("\n")
+        files.append(
+            BundleFile(name=name, text=text, sha256=hashlib.sha256(text.encode()).hexdigest())
+        )
+    bundle = LocalInputBundle(
+        demo_id="supplier-discovery",
+        revision="r1",
+        task="discovery-responses",
+        software_revision="test",
+        instructions="Import the fictional discovery inputs.",
+        files=tuple(files),
+    )
+    destination = tmp_path / "imported"
+    if not terminated:
+        with pytest.raises(PublicationError, match="newline"):
+            import_bundle(
+                bundle, destination, matter_id="fact-boundary", registry_path=tmp_path / "canaries"
+            )
+        assert not destination.exists()
+        return
+    vault = import_bundle(
+        bundle, destination, matter_id="fact-boundary", registry_path=tmp_path / "canaries"
+    )
+    run = start_run(vault, "discovery-responses", "2026-09-20T00:00:00+00:00", run_id="facts")
+    assert [fact.fact_id for fact in load_run_context(vault, run).manifest.facts] == ["scenario"]
+
+
 def test_cli_import_exposes_clean_local_workflow(tmp_path, monkeypatch):
     from typer.testing import CliRunner
 
