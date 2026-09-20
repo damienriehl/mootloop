@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from mootloop import journal
 from mootloop.errors import JournalIntegrityError
@@ -79,7 +80,7 @@ def test_append_read_roundtrip(tmp_path: Path) -> None:
     assert isinstance(events[2], TurnCompleted)
 
 
-def test_first_journal_creation_fsyncs_parent_once(
+def test_journal_append_fsyncs_file_and_parent(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     calls: list[int] = []
@@ -89,7 +90,7 @@ def test_first_journal_creation_fsyncs_parent_once(
         calls.append(fd)
         original(fd)
 
-    monkeypatch.setattr(journal.os, "fsync", tracked)
+    monkeypatch.setattr(os, "fsync", tracked)
     append(tmp_path, RUN, _started())
     assert len(calls) == 2  # journal bytes, then its parent directory entry
     append(
@@ -97,7 +98,7 @@ def test_first_journal_creation_fsyncs_parent_once(
         RUN,
         RunEnqueued(item_id="run:acme-v-widgets:r1", payload_sha256="0" * 64),
     )
-    assert len(calls) == 3  # established journal appends only fsync the file
+    assert len(calls) == 4  # the shared persistence primitive reasserts both
 
 
 def test_fold_derives_state(tmp_path: Path) -> None:
@@ -152,9 +153,11 @@ def test_torn_final_line_recovered(tmp_path: Path) -> None:
     path = journal_path(tmp_path, RUN)
     with path.open("a", encoding="utf-8") as handle:
         handle.write('{"kind": "turn_completed", "record": {"spec"')
+    original = path.read_bytes()
     events = read_events(tmp_path, RUN)
     assert len(events) == 2  # torn line dropped, valid prefix kept
-    # The tail was truncated, so a subsequent append lands cleanly.
+    assert path.read_bytes() == original  # readers never repair a live writer's tail
+    # The next writer repairs the tail before appending.
     append(tmp_path, RUN, RunFinished(status="finished"))
     events2 = read_events(tmp_path, RUN)
     assert len(events2) == 3
@@ -210,7 +213,7 @@ def test_is_terminal_only_for_complete_states() -> None:
         assert not RunState(status=status).is_terminal
 
 
-def test_fold_turn_intent_reconciles_on_completion(tmp_path: Path) -> None:
+def test_fold_completion_without_usage_retains_reservation(tmp_path: Path) -> None:
     turn_id = f"{RUN}-t0000"
     append(tmp_path, RUN, _started())
     append(
@@ -222,10 +225,10 @@ def test_fold_turn_intent_reconciles_on_completion(tmp_path: Path) -> None:
     )
     pending = fold(read_events(tmp_path, RUN))
     assert pending.pending_intents == {turn_id: 1.25}
-    # A TurnCompleted reconciles (clears) the intent, even with no SpendRecorded.
+    # Completion proves output persistence, not settlement of the provider charge.
     append(tmp_path, RUN, TurnCompleted(record=_turn_record(turn_id)))
     reconciled = fold(read_events(tmp_path, RUN))
-    assert reconciled.pending_intents == {}
+    assert reconciled.pending_intents == {turn_id: 1.25}
 
 
 def test_fold_turn_intent_reconciles_on_spend(tmp_path: Path) -> None:
@@ -286,7 +289,7 @@ def test_tail_events_preserves_torn_tail_then_advances(tmp_path: Path) -> None:
     events, offset = tail_events(path, 0)
     assert len(events) == 2  # only the two complete lines parse
     assert offset == complete_size  # offset stops before the torn bytes
-    # Writer-safety: unlike read_events, tail_events does NOT truncate the torn tail.
+    # Neither reader truncates the writer's incomplete tail.
     assert path.stat().st_size == complete_size + len(half.encode("utf-8"))
 
     # The writer finishes the interrupted line; tailing from the saved offset advances.
@@ -502,19 +505,13 @@ def test_cache_survives_a_torn_tail_truncation(tmp_path: Path) -> None:
     with path.open("a", encoding="utf-8") as handle:
         handle.write('{"kind": "turn_completed", "record": {"spec"')
 
-    assert len(read_events(tmp_path, RUN)) == 1  # torn line dropped + truncated
+    assert len(read_events(tmp_path, RUN)) == 1  # torn line remains uncommitted
     append(tmp_path, RUN, RunFinished(status="finished"))
     events = read_events(tmp_path, RUN)
     assert [type(e) for e in events] == [RunStarted, RunFinished]
 
 
-def test_unterminated_final_line_is_returned_but_never_cached(tmp_path: Path) -> None:
-    """A parseable line with no trailing newline is not proof the writer finished it.
-
-    It is returned (that is the historical behavior) but kept out of the cached
-    prefix, so the completed line the writer eventually lands is not shadowed by the
-    partial one we happened to read first.
-    """
+def test_unterminated_final_line_is_uncommitted(tmp_path: Path) -> None:
     clear_cache()
     append(tmp_path, RUN, _started())
     path = journal_path(tmp_path, RUN)
@@ -522,9 +519,53 @@ def test_unterminated_final_line_is_returned_but_never_cached(tmp_path: Path) ->
     with path.open("a", encoding="utf-8") as handle:
         handle.write(line)  # complete JSON, no newline yet
 
-    assert [type(e) for e in read_events(tmp_path, RUN)] == [RunStarted, RunPaused]
+    assert [type(e) for e in read_events(tmp_path, RUN)] == [RunStarted]
     # The writer finishes the line and appends the next event.
     with path.open("a", encoding="utf-8") as handle:
         handle.write("\n")
     append(tmp_path, RUN, RunResumed())
     assert [type(e) for e in read_events(tmp_path, RUN)] == [RunStarted, RunPaused, RunResumed]
+
+
+def test_reader_cannot_truncate_a_concurrent_recovery_append(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    clear_cache()
+    append(tmp_path, RUN, _started())
+    path = journal_path(tmp_path, RUN)
+    prefix = path.read_bytes()
+    path.write_bytes(prefix + b'{"kind":')
+
+    class RecoveryAdapter(_CountingAdapter):
+        recovered = False
+
+        def validate_json(self, data: bytes | str):  # type: ignore[no-untyped-def]
+            if not self.recovered:
+                self.recovered = True
+                # A recovery writer commits after the reader took its snapshot.
+                path.write_bytes(prefix)
+                append(tmp_path, RUN, RunFinished(status="finished"))
+            return super().validate_json(data)
+
+    monkeypatch.setattr(journal, "_EVENT_ADAPTER", RecoveryAdapter())
+    assert [type(event) for event in read_events(tmp_path, RUN)] == [RunStarted]
+    assert [type(event) for event in read_events(tmp_path, RUN)] == [RunStarted, RunFinished]
+
+
+def test_complete_corrupt_final_record_fails_without_mutation(tmp_path: Path) -> None:
+    append(tmp_path, RUN, _started())
+    path = journal_path(tmp_path, RUN)
+    corrupted = path.read_bytes() + b'{"kind":"spend_recorded"}\n'
+    path.write_bytes(corrupted)
+    with pytest.raises(ValidationError):
+        read_events(tmp_path, RUN)
+    assert path.read_bytes() == corrupted
+
+
+def test_append_repairs_parseable_uncommitted_tail(tmp_path: Path) -> None:
+    append(tmp_path, RUN, _started())
+    path = journal_path(tmp_path, RUN)
+    with path.open("ab") as handle:
+        handle.write(_EVENT_ADAPTER.dump_json(RunPaused(reason="manual")))
+    append(tmp_path, RUN, RunFinished(status="finished"))
+    assert [type(event) for event in read_events(tmp_path, RUN)] == [RunStarted, RunFinished]

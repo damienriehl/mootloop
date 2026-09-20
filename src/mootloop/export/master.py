@@ -5,7 +5,7 @@ matter, and the served-request sets and emits ``deliverables/<run-id>/master.md`
 a MN discovery-response document — caption block, a per-set document title, each
 interrogatory RESTATED before its answer (MN Rule 33), per-request response blocks
 keeping ``::: {#resp-ID}`` anchors, objections with specificity, RFA dispositions
-(with the reasonable-inquiry recital on lack-of-knowledge), RFP withheld-statements,
+(with the reasonable-inquiry recital on lack-of-knowledge), drafted RFP narratives,
 the attorney signature block, and a certificate-of-service stub.
 
 `build_verification_page` emits the separate ``verification.md`` for rog sets with
@@ -20,10 +20,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from mootloop.context import RunContext, load_run_context
+from mootloop.context import RunContext, load_run_context, validate_run_request_identity
 from mootloop.decisions import DecisionStore
 from mootloop.export import deliverables_dir
-from mootloop.models.decisions import DecisionKind
 from mootloop.models.matter import Attorney, MatterConfig
 from mootloop.models.requests import (
     RequestItem,
@@ -34,6 +33,7 @@ from mootloop.models.requests import (
 )
 from mootloop.models.run import DraftOutput
 from mootloop.orchestrator import operative_drafts
+from mootloop.output_review import decision_revision_requirements
 from mootloop.vault import atomic_write_text
 
 # The EXACT MN interrogatory perjury declaration (Minn. R. Civ. P. 33; plan D7).
@@ -41,13 +41,6 @@ MN_VERIFICATION_DECLARATION = (
     "I declare under penalty of perjury that everything I have stated in this "
     "document is true and correct."
 )
-
-# Heller v. City of Dallas / Rule 34(b): each production response must say whether
-# responsive materials are withheld on the basis of an objection (plan D7).
-_WITHHELD_YES = (
-    "Responsive materials are being withheld on the basis of the foregoing objection(s)."
-)
-_WITHHELD_NO = "No responsive materials are being withheld on the basis of any objection."
 
 # Rule 36(a): the reasonable-inquiry recital a lack-of-knowledge answer must carry.
 _REASONABLE_INQUIRY = (
@@ -111,10 +104,11 @@ def _objection_lines(draft: DraftOutput) -> list[str]:
     return lines
 
 
-def _rfa_disposition(draft: DraftOutput, resolved: str | None) -> tuple[str, str]:
+def _rfa_disposition(draft: DraftOutput) -> tuple[str, str | None]:
     """(display text, disposition key) for an RFA response."""
-    disposition = resolved or draft.rfa_disposition or "deny"
-    return _RFA_DISPOSITION_LABEL.get(disposition, "Denied."), disposition
+    disposition = draft.rfa_disposition
+    display = _RFA_DISPOSITION_LABEL[disposition] if disposition else ""
+    return display, disposition
 
 
 def _response_block(
@@ -138,8 +132,16 @@ def _response_block(
         return lines
 
     if request_type is RequestType.RFA:
-        display, disposition = _rfa_disposition(draft, resolved_rfa)
-        lines.append(f"**RESPONSE:** {display}")
+        display, disposition = _rfa_disposition(draft)
+        if resolved_rfa is not None and resolved_rfa != disposition:
+            lines.append(
+                "**DRAFT — revised response required:** selected RFA disposition "
+                "does not match the drafted answer."
+            )
+            lines.append("")
+        narrative = draft.response_text.strip()
+        response = f"{display}\n\n{narrative}" if display else narrative
+        lines.append(f"**RESPONSE:** {response}")
         if disposition == "lack_of_knowledge":
             lines.append("")
             lines.append(_REASONABLE_INQUIRY)
@@ -151,9 +153,6 @@ def _response_block(
             lines.append(objection_line)
             lines.append("")
         lines.append(f"**RESPONSE:** {draft.response_text.strip()}")
-        if request_type is RequestType.RFP:
-            lines.append("")
-            lines.append(_WITHHELD_YES if draft.objections else _WITHHELD_NO)
     lines.append("")
     lines.append(":::")
     return lines
@@ -197,27 +196,23 @@ def _certificate_of_service(matter: MatterConfig) -> list[str]:
     ]
 
 
-def _resolved_rfa_dispositions(vault_root: Path | str, run_id: str) -> dict[str, str]:
-    out: dict[str, str] = {}
-    for decision in DecisionStore(vault_root, run_id).list_all():
-        if (
-            decision.kind is DecisionKind.RFA_DISPOSITION
-            and decision.request_id is not None
-            and decision.resolution is not None
-            and decision.resolution.chosen_key is not None
-        ):
-            out[str(decision.request_id)] = decision.resolution.chosen_key
-    return out
+def _review_warnings(
+    vault_root: Path | str, run_id: str, drafts: dict[str, DraftOutput | None]
+) -> list[str]:
+    revisions = decision_revision_requirements(DecisionStore(vault_root, run_id).list_all(), drafts)
+    return [f"**DRAFT — revised response required:** {reason}" for reason in revisions.values()]
 
 
 def _set_body(
     matter: MatterConfig,
     request_set: RequestSet,
     drafts: dict[str, DraftOutput | None],
-    resolved_rfa: dict[str, str],
+    review_warnings: list[str],
 ) -> list[str]:
     """The per-request response blocks for one served set (title + blocks)."""
     lines = [f"# {_document_title(matter, request_set)}", ""]
+    for warning in review_warnings:
+        lines.extend([warning, ""])
     top_level = [item for item in request_set.items if item.subpart is None]
     top_level.sort(key=lambda i: i.number)
     for item in top_level:
@@ -227,7 +222,7 @@ def _set_body(
                 item,
                 drafts.get(str(item.request_id)),
                 request_set.request_type,
-                resolved_rfa.get(str(item.request_id)),
+                None,
             )
         )
         lines.append("")
@@ -247,10 +242,11 @@ def build_set_masters(
     context = run_context or load_run_context(vault_root, run_id)
     matter = context.manifest.matter_config
     request_sets = context.manifest.request_sets
+    validate_run_request_identity(request_sets)
     drafts: dict[str, DraftOutput | None] = {
         str(item.request_id): draft for item, draft in operative_drafts(vault_root, run_id)
     }
-    resolved_rfa = _resolved_rfa_dispositions(vault_root, run_id)
+    review_warnings = _review_warnings(vault_root, run_id, drafts)
 
     out: list[tuple[str, Path]] = []
     for request_set in request_sets:
@@ -259,7 +255,7 @@ def build_set_masters(
         lines.append("")
         lines.append(f"_Run `{run_id}` · generated {now}_")
         lines.append("")
-        lines.extend(_set_body(matter, request_set, drafts, resolved_rfa))
+        lines.extend(_set_body(matter, request_set, drafts, review_warnings))
         lines.extend(_signature_block(matter))
         lines.append("")
         lines.extend(_certificate_of_service(matter))
@@ -280,10 +276,11 @@ def build_court_master(
     context = run_context or load_run_context(vault_root, run_id)
     matter = context.manifest.matter_config
     request_sets = context.manifest.request_sets
+    validate_run_request_identity(request_sets)
     drafts: dict[str, DraftOutput | None] = {
         str(item.request_id): draft for item, draft in operative_drafts(vault_root, run_id)
     }
-    resolved_rfa = _resolved_rfa_dispositions(vault_root, run_id)
+    review_warnings = _review_warnings(vault_root, run_id, drafts)
 
     lines: list[str] = []
     lines.extend(_caption_block(matter))
@@ -292,7 +289,7 @@ def build_court_master(
     lines.append("")
 
     for request_set in request_sets:
-        lines.extend(_set_body(matter, request_set, drafts, resolved_rfa))
+        lines.extend(_set_body(matter, request_set, drafts, review_warnings))
 
     lines.extend(_signature_block(matter))
     lines.append("")

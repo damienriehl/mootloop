@@ -279,8 +279,8 @@ class RunReopened(StrictModel):
 
 class TurnIntent(StrictModel):
     """A spend write-ahead ledger entry (plan FD-6): recorded *before* a turn calls the
-    provider. It is folded as *pending* spend until the matching ``TurnCompleted`` /
-    ``SpendRecorded`` for the same ``turn_id`` reconciles it. The cap counts every
+    provider. It is folded as *pending* spend until a matching ``SpendRecorded``
+    for the same ``turn_id`` reconciles it. The cap counts every
     unreconciled intent at ``max_plausible_usd`` (conservative), so an in-flight turn
     can never push a run past its budget cap unnoticed."""
 
@@ -341,7 +341,7 @@ class RunState(StrictModel):
     # ``max_attempts`` to form the run's effective per-turn retry ceiling.
     attempts_granted: int = 0
     # Write-ahead spend ledger (plan FD-6): turn_id -> max_plausible_usd for intents
-    # that have NOT yet been reconciled by their matching TurnCompleted/SpendRecorded.
+    # that have NOT yet been reconciled by a matching SpendRecorded.
     pending_intents: dict[str, float] = Field(default_factory=dict)
 
     @property

@@ -51,10 +51,18 @@ class MatterRegistry:
         """Return the vault path for ``matter_id``, fail-closed.
 
         Validates the id charset (rejecting ``.``, ``..``, and separators), asserts the
-        resolved vault stays inside realpath(root), and requires the directory to exist.
+        resolved vault stays inside realpath(root), and requires its configuration identity
+        to agree with the requested directory identity.
         Raises `VaultBoundaryError` on a charset/containment breach and
         `MatterNotFoundError` when no such matter directory is present.
         """
+        vault_real = self._resolve_path(matter_id)
+        matter = load_matter(vault_real)
+        if matter.matter_id != matter_id:
+            raise VaultBoundaryError("matter directory and configuration identity disagree")
+        return vault_real
+
+    def _resolve_path(self, matter_id: str) -> Path:
         validate_id(matter_id, kind="matter_id")
         root_real = _real(self.root)
         vault_real = _real(root_real / matter_id)
@@ -80,7 +88,7 @@ class MatterRegistry:
             return []
         summaries: list[MatterSummary] = []
         for child in sorted(root_real.iterdir()):
-            if not child.is_dir():
+            if not child.is_dir() or child.name.startswith("."):
                 continue
             child_real = _real(child)
             if not _is_within(child_real, root_real) or child_real == root_real:
@@ -93,7 +101,9 @@ class MatterRegistry:
                 matter = load_matter(child_real)
             except MatterConfigError:
                 continue
-            summaries.append(self._summarize(matter, child_real.name))
+            if matter.matter_id != child.name:
+                raise VaultBoundaryError("matter directory and configuration identity disagree")
+            summaries.append(self._summarize(matter, child.name))
         return summaries
 
     def recovery_vaults(self) -> list[tuple[MatterId, Path]]:
@@ -106,7 +116,7 @@ class MatterRegistry:
             if not child.is_dir() or child.name.startswith("."):
                 continue
             try:
-                child_real = self.resolve(child.name)
+                child_real = self._resolve_path(child.name)
             except (MatterNotFoundError, VaultBoundaryError):
                 logger.exception("skipping unsafe recovery vault %s", child)
                 continue

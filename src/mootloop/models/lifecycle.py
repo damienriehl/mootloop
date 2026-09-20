@@ -61,3 +61,14 @@ class CloseRecord(MatterProvenanced, VersionedModel):
     stores: tuple[DestructionStore, ...]
     removed_counts: dict[str, int]
     tombstone: AccessAuditEntry
+
+
+class CloseIntent(VersionedModel):
+    """Prepared close evidence persisted outside the vault before destructive work."""
+
+    schema_version: str = "1.0"
+    record: CloseRecord
+    vault_device: int
+    vault_inode: int
+    quarantine_id: str
+    detached: bool = False

@@ -10,11 +10,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from mootloop import gate_ledger
-from mootloop.journal import read_events
+import pytest
+from pydantic import ValidationError
+
+from mootloop import gate_ledger, orchestrator
+from mootloop.context import load_run_context
+from mootloop.journal import journal_path, load_state, read_events
 from mootloop.llm import FakeLLMProvider
 from mootloop.models.events import GateEvaluated
 from mootloop.orchestrator import run_with_provider, start_run
+from mootloop.vault import atomic_write_text
 from tests.unit.test_orchestrator_planning import (
     NOW,
     _build_single_request_vault,
@@ -93,3 +98,61 @@ def test_fabrication_in_the_operative_draft_still_blocks(tmp_path: Path) -> None
     assert doc.gates[REQUEST_ID]["fabrication"] == "fail"
     assert "fabrication" in doc.blockers
     assert doc.export_ready is False
+
+
+def test_ledger_selects_each_operative_draft_only_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    vault = _build_single_request_vault(tmp_path)
+    run_id = "ledger-one-pass"
+    _run(vault, run_id, fabricating_stage="associate_draft")
+    original = orchestrator._context_for
+    calls = 0
+
+    def counted(*args: Any, **kwargs: Any) -> Any:
+        nonlocal calls
+        calls += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(orchestrator, "_context_for", counted)
+    doc = gate_ledger.build_ledger(vault, run_id)
+    assert doc.gates[REQUEST_ID]["fabrication"] == "pass"
+    assert calls == len(doc.gates)
+
+
+def test_ledger_before_any_draft_fails_closed_and_reads_new_events(tmp_path: Path) -> None:
+    vault = _build_single_request_vault(tmp_path)
+    run_id = "ledger-unfinished"
+    start_run(vault, "discovery-responses", NOW, run_id=run_id)
+    before = gate_ledger.build_ledger(vault, run_id)
+    assert before.export_ready is False
+    assert before.gates[REQUEST_ID]["fabrication"] == "pending"
+
+    run_with_provider(vault, run_id, FakeLLMProvider(), NOW)
+    after = gate_ledger.build_ledger(vault, run_id)
+    assert after.gates[REQUEST_ID]["fabrication"] == "pass"
+    assert before.gates[REQUEST_ID]["fabrication"] == "pending"
+
+
+def test_selected_draft_records_are_detached_from_loaded_state(tmp_path: Path) -> None:
+    vault = _build_single_request_vault(tmp_path)
+    run_id = "ledger-detached"
+    _run(vault, run_id, fabricating_stage="associate_draft")
+    state = load_state(vault, run_id)
+    snapshot = state.model_copy(deep=True)
+    selected = orchestrator.operative_draft_records(run_id, load_run_context(vault, run_id), state)
+    record = selected[0][1]
+    assert record is not None
+    record.output["response_text"] = "Mutation must remain local to the selected copy."
+    assert state == snapshot
+
+
+def test_ledger_rejects_corruption_after_a_successful_read(tmp_path: Path) -> None:
+    vault = _build_single_request_vault(tmp_path)
+    run_id = "ledger-corrupt"
+    start_run(vault, "discovery-responses", NOW, run_id=run_id)
+    gate_ledger.build_ledger(vault, run_id)
+    path = journal_path(vault, run_id)
+    atomic_write_text(path, path.read_text() + '{"broken":true}\n')
+    with pytest.raises(ValidationError):
+        gate_ledger.build_ledger(vault, run_id)

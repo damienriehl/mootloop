@@ -6,9 +6,9 @@ bodies are additionally written write-once to ``runs/<run-id>/turns/<turn-id>.js
 fail closed). `fold` replays events into a `RunState` and is a pure function, so resume
 after a kill is exactly a re-fold.
 
-`read_events` tolerates a *torn final line* (a crash mid-append): it truncates the
-file back to the last complete line and warns, never crashing. A corrupt line that
-is not the final one is a hard error — that is real corruption, not a torn write.
+`read_events` ignores an incomplete final line without modifying the journal.
+Writers repair incomplete tails under an exclusive file lock before appending.
+Every malformed newline-terminated record is a hard error, including the last one.
 
 It also reads INCREMENTALLY. A turn folds the journal about ten times, so parsing
 the whole file every call made a run quadratic in its own length: doubling the turns
@@ -30,8 +30,6 @@ corruption, not a torn write.
 from __future__ import annotations
 
 import hashlib
-import logging
-import os
 from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
@@ -60,9 +58,8 @@ from mootloop.models.events import (
     TurnIntent,
 )
 from mootloop.models.run import TurnRecord
+from mootloop.persistence import append_fsync_line
 from mootloop.vault import safe_vault_path
-
-logger = logging.getLogger("mootloop.journal")
 
 _EVENT_ADAPTER: TypeAdapter[JournalEvent] = TypeAdapter(JournalEvent)
 
@@ -81,21 +78,7 @@ def turn_body_path(vault_root: Path | str, run_id: str, turn_id: str) -> Path:
 def append(vault_root: Path | str, run_id: str, event: JournalEvent) -> None:
     """Serialize ``event`` and append it as one fsync'd line."""
     path = journal_path(vault_root, run_id)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    first_record = not path.exists()
-    line = _EVENT_ADAPTER.dump_json(event).decode("utf-8") + "\n"
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(line)
-        handle.flush()
-        os.fsync(handle.fileno())
-    if first_record:
-        # The file fsync makes the record durable; the directory fsync makes the new
-        # journal name durable. Later appends do not change the directory entry.
-        parent_fd = os.open(path.parent, os.O_RDONLY)
-        try:
-            os.fsync(parent_fd)
-        finally:
-            os.close(parent_fd)
+    append_fsync_line(path, _EVENT_ADAPTER.dump_json(event).decode("utf-8"))
 
 
 def write_turn_body(
@@ -184,7 +167,7 @@ def _prefix_intact(snapshot: bytes, prefix: _ParsedPrefix) -> bool:
 
 
 def read_events(vault_root: Path | str, run_id: str) -> list[JournalEvent]:
-    """Read every event, tolerating a torn final line by truncating it away.
+    """Read committed events without modifying an incomplete writer's tail.
 
     Lines are split on ``\\n`` — the byte the writer actually appends — so a record
     carrying a raw U+2028/U+2029 or form feed stays one line, as `tail_events` has
@@ -212,26 +195,12 @@ def read_events(vault_root: Path | str, run_id: str) -> list[JournalEvent]:
     pos = 0
     while pos < len(chunk):
         newline = chunk.find(b"\n", pos)
-        line = chunk[pos:] if newline == -1 else chunk[pos : newline + 1]
+        if newline == -1:
+            break
+        line = chunk[pos : newline + 1]
         stripped = line.strip()
         if stripped:
-            try:
-                events.append(_EVENT_ADAPTER.validate_json(stripped))
-            except ValidationError:
-                if newline != -1 and newline + 1 != len(chunk):
-                    raise  # a bad line with good lines after it is real corruption
-                logger.warning(
-                    "journal %s: torn final line dropped (%d valid events kept)",
-                    run_id,
-                    len(events),
-                )
-                _truncate(path, start + consumed)
-                break
-        if newline == -1:
-            # A final line with no newline that nonetheless parsed. Return it, but
-            # leave it out of the cached prefix: only a newline proves the writer
-            # finished with it, and the cache must never freeze a half-written line.
-            break
+            events.append(_EVENT_ADAPTER.validate_json(stripped))
         pos = newline + 1
         consumed = pos
         cacheable = len(events)
@@ -248,8 +217,8 @@ def read_events(vault_root: Path | str, run_id: str) -> list[JournalEvent]:
 def tail_events(path: Path | str, after_offset: int = 0) -> tuple[list[JournalEvent], int]:
     """Read events appended since ``after_offset``; return ``(events, new_offset)``.
 
-    A read-only incremental reader (plan FE-1) — unlike `read_events`, it NEVER
-    truncates the file. It seeks to ``after_offset``, reads to EOF, and parses every
+    A read-only incremental reader (plan FE-1). It seeks to ``after_offset``,
+    reads to EOF, and parses every
     COMPLETE (newline-terminated) line. A torn/in-progress final line (no trailing
     newline) is left untouched for the writer: it is not parsed and the returned
     offset does not advance past it. Blank lines are skipped but their bytes still
@@ -277,17 +246,6 @@ def tail_events(path: Path | str, after_offset: int = 0) -> tuple[list[JournalEv
     return events, after_offset + consumed
 
 
-def _truncate(path: Path, size: int) -> None:
-    """Best-effort truncate to the last complete line so future appends stay clean."""
-    try:
-        with path.open("r+b") as handle:
-            handle.truncate(size)
-            handle.flush()
-            os.fsync(handle.fileno())
-    except OSError:  # pragma: no cover - defensive; a read-only FS still folds fine
-        logger.warning("journal %s: could not truncate torn tail", path)
-
-
 # --- fold (pure) ------------------------------------------------------------
 
 
@@ -307,9 +265,6 @@ def fold(events: list[JournalEvent]) -> RunState:
             state.current_stage = event.stage
         elif isinstance(event, TurnCompleted):
             state.completed_turns[event.record.spec.turn_id] = event.record
-            # Reconcile the write-ahead intent: a completed turn (even one with no
-            # usage) clears its pending max-plausible reservation (plan FD-6).
-            state.pending_intents.pop(event.record.spec.turn_id, None)
         elif isinstance(event, TurnDiscarded):
             state.discarded[event.turn_id] = event.attempt
             if event.detail:

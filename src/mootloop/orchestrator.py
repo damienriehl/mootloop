@@ -472,6 +472,7 @@ def record_turn(
                 dedupe=True,
                 provider_call_id=provider_call_id,
             )
+            _finalize(vault_root, run_id, now, run_context)
             return record
         units = run_context.units
         facts = run_context.facts
@@ -523,19 +524,23 @@ def _book_spend(
     and its settlement can never be priced off two different keys; ``usage.model``
     still records what the provider reported.
 
-    ``dedupe`` guards the one path that can be reached without a fresh provider call:
-    re-recording an already-completed turn. New providers identify the invocation
-    directly. Legacy callers without an identity retain the historical usage-signature
-    fallback so old integrations and journals remain idempotent.
+    ``dedupe`` guards replay of an identified invocation, including interrupted
+    completion. Only already-completed turns enable the historical usage-signature
+    fallback for legacy callers without an identity.
     """
     if usage is None:
         return
     if dedupe:
-        prior = (
-            e
-            for e in read_events(vault_root, run_id)
-            if isinstance(e, SpendRecorded) and e.turn_id == turn_id
-        )
+        prior: list[SpendRecorded] = []
+        for event in read_events(vault_root, run_id):
+            if (
+                provider_call_id is None
+                and isinstance(event, TurnDiscarded)
+                and event.turn_id == turn_id
+            ):
+                prior.clear()
+            elif isinstance(event, SpendRecorded) and event.turn_id == turn_id:
+                prior.append(event)
         if provider_call_id is not None:
             if any(e.provider_call_id == provider_call_id for e in prior):
                 return
@@ -641,10 +646,11 @@ def _record_spec(
         completed_at=now,
     )
     record = write_turn_body(vault_root, run_id, record)
-    append(vault_root, run_id, TurnCompleted(record=record))
     # Attorney-gate decisions (plan P-28): every draft/bolster turn may imply gates.
-    if isinstance(output, DraftOutput):
-        decisions.derive_and_store(vault_root, run_id, spec, output, units)
+    if OUTPUT_SCHEMAS.get(record.spec.output_schema_name) is DraftOutput:
+        decisions.derive_and_store(
+            vault_root, run_id, record.spec, DraftOutput.model_validate(record.output), units
+        )
     _book_spend(
         vault_root,
         run_id,
@@ -652,8 +658,10 @@ def _record_spec(
         usage,
         spec.model,
         now,
+        dedupe=provider_call_id is not None,
         provider_call_id=provider_call_id,
     )
+    append(vault_root, run_id, TurnCompleted(record=record))
 
     # Final rubric gate: aggregate the decorrelated panel once the last seat lands.
     _maybe_emit_rubric_gate(vault_root, run_id, spec, binding, units, run_context)
@@ -767,25 +775,12 @@ def operative_draft_turn_ids(vault_root: Path | str, run_id: str) -> dict[str, s
     the one whose text would actually be served, not every draft the run ever made.
     """
     run_context = load_run_context(vault_root, run_id)
-    binding = run_context.binding
     state = load_state(vault_root, run_id)
-    units = run_context.units
-    facts = run_context.facts
-    out: dict[str, str] = {}
-    for i in range(len(units)):
-        ctx = _context_for(
-            run_id,
-            state,
-            binding,
-            units,
-            facts,
-            i,
-            run_context.manifest.resolved_config.max_attempts,
-        )
-        record = ctx.operative_draft()
-        if record is not None:
-            out[str(units[i].request_id)] = record.spec.turn_id
-    return out
+    return {
+        str(item.request_id): record.spec.turn_id
+        for item, record in operative_draft_records(run_id, run_context, state)
+        if record is not None
+    }
 
 
 def operative_drafts(
@@ -794,23 +789,30 @@ def operative_drafts(
     """Each request paired with its operative (final, post-restructure) draft, or None
     if the request never produced one. The export builders read from here (plan Phase 7)."""
     run_context = load_run_context(vault_root, run_id)
-    binding = run_context.binding
     state = load_state(vault_root, run_id)
+    return [
+        (item, DraftOutput.model_validate(record.output) if record else None)
+        for item, record in operative_draft_records(run_id, run_context, state)
+    ]
+
+
+def operative_draft_records(
+    run_id: str, run_context: RunContext, state: RunState
+) -> list[tuple[RequestItem, TurnRecord | None]]:
+    """Select drafts once from one read's inputs, retaining StageContext isolation."""
     units = run_context.units
-    facts = run_context.facts
-    out: list[tuple[RequestItem, DraftOutput | None]] = []
+    out: list[tuple[RequestItem, TurnRecord | None]] = []
     for i in range(len(units)):
         ctx = _context_for(
             run_id,
             state,
-            binding,
+            run_context.binding,
             units,
-            facts,
+            run_context.facts,
             i,
             run_context.manifest.resolved_config.max_attempts,
         )
-        record = ctx.operative_draft()
-        out.append((units[i], DraftOutput.model_validate(record.output) if record else None))
+        out.append((units[i], ctx.operative_draft()))
     return out
 
 
@@ -905,6 +907,17 @@ def _maybe_emit_rubric_gate(
         run_context.manifest.resolved_config.max_attempts,
     )
     if not RubricGateStage().is_complete(ctx):
+        return
+    panel_ids = {
+        ctx.layout.turn_id(ctx.layout.rubric_final(m))
+        for m in range(1, binding.config.panels.rubric_judges + 1)
+    }
+    if any(
+        isinstance(event, GateEvaluated)
+        and event.result.gate == "rubric"
+        and event.turn_id in panel_ids
+        for event in read_events(vault_root, run_id)
+    ):
         return
     panel: list[dict[str, int]] = []
     for m in range(1, binding.config.panels.rubric_judges + 1):
@@ -1089,6 +1102,19 @@ def _finalize(
         run_context.manifest.resolved_config.max_attempts,
     ):
         return
+    # Recover post-completion effects before publishing the final deliverable.
+    decisions.derive_drafts_and_store(
+        vault_root,
+        run_id,
+        (
+            (record.spec, DraftOutput.model_validate(record.output))
+            for record in state.completed_turns.values()
+            if OUTPUT_SCHEMAS.get(record.spec.output_schema_name) is DraftOutput
+        ),
+    )
+    for record in state.completed_turns.values():
+        if record.spec.stage == RUBRIC_GATE_STAGE:
+            _maybe_emit_rubric_gate(vault_root, run_id, record.spec, binding, units, run_context)
     # The md-master is a DRAFT until attestation; assemble it now so it exists for the
     # gate ledger and attestation hash even while decisions are pending.
     _assemble(vault_root, run_id, state, run_context)

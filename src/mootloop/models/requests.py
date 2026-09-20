@@ -8,6 +8,7 @@ keys on these, so they never encode our set number — that rides as a field.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from enum import StrEnum
 
 from pydantic import Field
@@ -104,3 +105,23 @@ class ParseReport(StrictModel):
 
     request_set: RequestSet
     warnings: list[str] = Field(default_factory=list)
+
+
+def validate_request_identity(request_sets: Sequence[RequestSet]) -> None:
+    """Reject identities that the current request-ID keyed pipeline cannot distinguish."""
+    labels: set[tuple[RequestType, int]] = set()
+    ids: set[RequestId] = set()
+    for request_set in request_sets:
+        label = (request_set.request_type, request_set.set_number)
+        if label in labels:
+            raise ValueError("ambiguous request identity: duplicate served-set label")
+        labels.add(label)
+        for item in request_set.items:
+            if item.request_id in ids:
+                raise ValueError(
+                    f"ambiguous request identity: {item.request_id!r} occurs more than once; "
+                    "run overlapping served sets separately"
+                )
+            if item.set_number != request_set.set_number:
+                raise ValueError("ambiguous request identity: item and served-set numbers differ")
+            ids.add(item.request_id)

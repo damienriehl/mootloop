@@ -1,0 +1,1513 @@
+{
+  "actual_provider_spend_usd": 0,
+  "cases": {
+    "eighteen_requests": {
+      "completed_turns": 216,
+      "decisions": 8,
+      "events": 746,
+      "export_ready": false,
+      "journal_bytes": 1111848,
+      "requests": 18,
+      "samples": {
+        "parser_cold": [
+          {
+            "operative_drafts_ms": 218.51302694994956,
+            "total_ms": 479.3921960517764
+          },
+          {
+            "operative_drafts_ms": 207.6739139156416,
+            "total_ms": 456.7261750344187
+          },
+          {
+            "operative_drafts_ms": 197.90197804104537,
+            "total_ms": 431.25299899838865
+          },
+          {
+            "operative_drafts_ms": 224.03949906583875,
+            "total_ms": 471.78014600649476
+          },
+          {
+            "operative_drafts_ms": 237.57462797220796,
+            "total_ms": 444.9216809589416
+          },
+          {
+            "operative_drafts_ms": 235.96558696590364,
+            "total_ms": 434.26854198332876
+          },
+          {
+            "operative_drafts_ms": 216.6016340488568,
+            "total_ms": 419.35437789652497
+          },
+          {
+            "operative_drafts_ms": 196.91348006017506,
+            "total_ms": 426.454394008033
+          },
+          {
+            "operative_drafts_ms": 188.56101611163467,
+            "total_ms": 432.0344669977203
+          },
+          {
+            "operative_drafts_ms": 190.2811808977276,
+            "total_ms": 430.4515509866178
+          },
+          {
+            "operative_drafts_ms": 205.98573505412787,
+            "total_ms": 435.3177809389308
+          },
+          {
+            "operative_drafts_ms": 240.86537898983806,
+            "total_ms": 486.4983009174466
+          },
+          {
+            "operative_drafts_ms": 251.46881607361138,
+            "total_ms": 480.54272891022265
+          },
+          {
+            "operative_drafts_ms": 242.71784292068332,
+            "total_ms": 460.0643969606608
+          },
+          {
+            "operative_drafts_ms": 234.08749501686543,
+            "total_ms": 460.35823691636324
+          }
+        ],
+        "warm": [
+          {
+            "operative_drafts_ms": 208.8264289777726,
+            "total_ms": 454.89639590959996
+          },
+          {
+            "operative_drafts_ms": 213.0101079819724,
+            "total_ms": 467.3325309995562
+          },
+          {
+            "operative_drafts_ms": 189.41069301217794,
+            "total_ms": 428.00029600039124
+          },
+          {
+            "operative_drafts_ms": 213.3900059852749,
+            "total_ms": 451.14795898552984
+          },
+          {
+            "operative_drafts_ms": 225.0656420364976,
+            "total_ms": 428.2555809477344
+          },
+          {
+            "operative_drafts_ms": 221.29175905138254,
+            "total_ms": 429.953231010586
+          },
+          {
+            "operative_drafts_ms": 225.8997680619359,
+            "total_ms": 418.83562109433115
+          },
+          {
+            "operative_drafts_ms": 228.24384504929185,
+            "total_ms": 424.6791589539498
+          },
+          {
+            "operative_drafts_ms": 197.12380797136575,
+            "total_ms": 437.05207703169435
+          },
+          {
+            "operative_drafts_ms": 196.2680290453136,
+            "total_ms": 431.93722097203135
+          },
+          {
+            "operative_drafts_ms": 193.36131098680198,
+            "total_ms": 425.15496106352657
+          },
+          {
+            "operative_drafts_ms": 194.04878304339945,
+            "total_ms": 416.61394701804966
+          },
+          {
+            "operative_drafts_ms": 231.91053804475814,
+            "total_ms": 439.78552892804146
+          },
+          {
+            "operative_drafts_ms": 228.1465269625187,
+            "total_ms": 457.8100059879944
+          },
+          {
+            "operative_drafts_ms": 241.18398502469063,
+            "total_ms": 447.05402106046677
+          }
+        ]
+      },
+      "summary": {
+        "parser_cold": {
+          "median_operative_drafts_percent": 47.48811516598973,
+          "operative_drafts": {
+            "max_ms": 251.46881607361138,
+            "median_ms": 218.51302694994956,
+            "min_ms": 188.56101611163467
+          },
+          "total": {
+            "max_ms": 486.4983009174466,
+            "median_ms": 444.9216809589416,
+            "min_ms": 419.35437789652497
+          }
+        },
+        "warm": {
+          "median_operative_drafts_percent": 47.29933976984238,
+          "operative_drafts": {
+            "max_ms": 241.18398502469063,
+            "median_ms": 213.3900059852749,
+            "min_ms": 189.41069301217794
+          },
+          "total": {
+            "max_ms": 467.3325309995562,
+            "median_ms": 431.93722097203135,
+            "min_ms": 416.61394701804966
+          }
+        }
+      },
+      "vault_bytes_unchanged": true,
+      "warm_profile": [
+        {
+          "calls": 3,
+          "file": "journal.py",
+          "function": "fold",
+          "inclusive_ms": 5.614807,
+          "self_ms": 2.2419320000000003
+        },
+        {
+          "calls": 7,
+          "file": "journal.py",
+          "function": "read_events",
+          "inclusive_ms": 9.936049,
+          "self_ms": 0.127192
+        },
+        {
+          "calls": 1,
+          "file": "orchestrator.py",
+          "function": "operative_draft_turn_ids",
+          "inclusive_ms": 841.7430220000001,
+          "self_ms": 7.043870000000001
+        },
+        {
+          "calls": 1,
+          "file": "orchestrator.py",
+          "function": "operative_drafts",
+          "inclusive_ms": 909.7116470000001,
+          "self_ms": 7.789648000000001
+        },
+        {
+          "calls": 3,
+          "file": "context.py",
+          "function": "load_run_context",
+          "inclusive_ms": 14.304248000000001,
+          "self_ms": 0.23315300000000003
+        },
+        {
+          "calls": 3,
+          "file": "journal.py",
+          "function": "load_state",
+          "inclusive_ms": 10.064321000000001,
+          "self_ms": 0.023527
+        },
+        {
+          "calls": 36,
+          "file": "orchestrator.py",
+          "function": "_context_for",
+          "inclusive_ms": 1718.561151,
+          "self_ms": 0.17573500000000003
+        }
+      ],
+      "warm_profile_top_self": [
+        {
+          "calls": 1387236,
+          "file": "copy.py",
+          "function": "deepcopy",
+          "inclusive_ms": 1717.043709,
+          "self_ms": 782.3471040000001
+        },
+        {
+          "calls": 109551,
+          "file": "copy.py",
+          "function": "_deepcopy_dict",
+          "inclusive_ms": 1716.4479760000002,
+          "self_ms": 271.33727600000003
+        },
+        {
+          "calls": 2807550,
+          "file": "~",
+          "function": "<method 'get' of 'dict' objects>",
+          "inclusive_ms": 217.69951400000002,
+          "self_ms": 217.69951400000002
+        },
+        {
+          "calls": 262731,
+          "file": "copy.py",
+          "function": "_keep_alive",
+          "inclusive_ms": 142.77227000000002,
+          "self_ms": 108.51041900000001
+        },
+        {
+          "calls": 1885047,
+          "file": "~",
+          "function": "<built-in method builtins.id>",
+          "inclusive_ms": 104.118328,
+          "self_ms": 104.118328
+        },
+        {
+          "calls": 124848,
+          "file": "copy.py",
+          "function": "_deepcopy_list",
+          "inclusive_ms": 1076.4803060000002,
+          "self_ms": 63.956672000000005
+        },
+        {
+          "calls": 1115985,
+          "file": "copy.py",
+          "function": "_deepcopy_atomic",
+          "inclusive_ms": 51.749656,
+          "self_ms": 51.749656
+        },
+        {
+          "calls": 28446,
+          "file": "main.py",
+          "function": "__deepcopy__",
+          "inclusive_ms": 1718.0174180000001,
+          "self_ms": 50.20336
+        },
+        {
+          "calls": 350546,
+          "file": "~",
+          "function": "<method 'append' of 'list' objects>",
+          "inclusive_ms": 26.373164000000003,
+          "self_ms": 26.373164000000003
+        },
+        {
+          "calls": 28446,
+          "file": "copy.py",
+          "function": "copy",
+          "inclusive_ms": 18.150018,
+          "self_ms": 10.315242000000001
+        },
+        {
+          "calls": 109570,
+          "file": "~",
+          "function": "<method 'items' of 'dict' objects>",
+          "inclusive_ms": 10.28059,
+          "self_ms": 10.28059
+        },
+        {
+          "calls": 1,
+          "file": "orchestrator.py",
+          "function": "operative_drafts",
+          "inclusive_ms": 909.7116470000001,
+          "self_ms": 7.789648000000001
+        }
+      ]
+    },
+    "eighteen_requests_unfinished_no_decisions": {
+      "completed_turns": 0,
+      "decisions": 0,
+      "events": 1,
+      "export_ready": false,
+      "journal_bytes": 414,
+      "requests": 18,
+      "samples": {
+        "parser_cold": [
+          {
+            "operative_drafts_ms": 4.609991097822785,
+            "total_ms": 10.915125021710992
+          },
+          {
+            "operative_drafts_ms": 4.8625359777361155,
+            "total_ms": 11.0439860727638
+          },
+          {
+            "operative_drafts_ms": 4.014392965473235,
+            "total_ms": 10.643391986377537
+          },
+          {
+            "operative_drafts_ms": 4.119392018765211,
+            "total_ms": 10.259691975079477
+          },
+          {
+            "operative_drafts_ms": 4.125760053284466,
+            "total_ms": 10.171791072934866
+          },
+          {
+            "operative_drafts_ms": 4.3485830537974834,
+            "total_ms": 10.443937964737415
+          },
+          {
+            "operative_drafts_ms": 4.1993759805336595,
+            "total_ms": 10.370182921178639
+          },
+          {
+            "operative_drafts_ms": 4.750136053189635,
+            "total_ms": 10.880412999540567
+          },
+          {
+            "operative_drafts_ms": 4.43287193775177,
+            "total_ms": 10.51205093972385
+          },
+          {
+            "operative_drafts_ms": 4.201759002171457,
+            "total_ms": 10.053221019916236
+          },
+          {
+            "operative_drafts_ms": 4.312059027142823,
+            "total_ms": 10.939768981188536
+          },
+          {
+            "operative_drafts_ms": 3.936856985092163,
+            "total_ms": 9.591358015313745
+          },
+          {
+            "operative_drafts_ms": 3.899235976859927,
+            "total_ms": 10.886399075388908
+          },
+          {
+            "operative_drafts_ms": 4.847545991651714,
+            "total_ms": 10.732813971117139
+          },
+          {
+            "operative_drafts_ms": 4.300134954974055,
+            "total_ms": 11.699734022840858
+          }
+        ],
+        "warm": [
+          {
+            "operative_drafts_ms": 4.39292099326849,
+            "total_ms": 10.699904058128595
+          },
+          {
+            "operative_drafts_ms": 4.636129946447909,
+            "total_ms": 12.049296987242997
+          },
+          {
+            "operative_drafts_ms": 4.050610004924238,
+            "total_ms": 10.027776937931776
+          },
+          {
+            "operative_drafts_ms": 4.128930973820388,
+            "total_ms": 10.127107030712068
+          },
+          {
+            "operative_drafts_ms": 4.3336859671399,
+            "total_ms": 10.578601970337331
+          },
+          {
+            "operative_drafts_ms": 4.169074003584683,
+            "total_ms": 10.047757998108864
+          },
+          {
+            "operative_drafts_ms": 4.885988077148795,
+            "total_ms": 13.899058103561401
+          },
+          {
+            "operative_drafts_ms": 3.8039369974285364,
+            "total_ms": 9.478131076321006
+          },
+          {
+            "operative_drafts_ms": 4.263938986696303,
+            "total_ms": 10.829246020875871
+          },
+          {
+            "operative_drafts_ms": 4.048734903335571,
+            "total_ms": 10.580933070741594
+          },
+          {
+            "operative_drafts_ms": 4.138162941671908,
+            "total_ms": 10.04857406951487
+          },
+          {
+            "operative_drafts_ms": 5.149059114046395,
+            "total_ms": 11.42758596688509
+          },
+          {
+            "operative_drafts_ms": 4.215644905343652,
+            "total_ms": 10.424445034004748
+          },
+          {
+            "operative_drafts_ms": 4.266045987606049,
+            "total_ms": 10.615551960654557
+          },
+          {
+            "operative_drafts_ms": 4.243622999638319,
+            "total_ms": 10.358596919104457
+          }
+        ]
+      },
+      "summary": {
+        "parser_cold": {
+          "median_operative_drafts_percent": 41.04587670282459,
+          "operative_drafts": {
+            "max_ms": 4.8625359777361155,
+            "median_ms": 4.300134954974055,
+            "min_ms": 3.899235976859927
+          },
+          "total": {
+            "max_ms": 11.699734022840858,
+            "median_ms": 10.643391986377537,
+            "min_ms": 9.591358015313745
+          }
+        },
+        "warm": {
+          "median_operative_drafts_percent": 40.439993607258074,
+          "operative_drafts": {
+            "max_ms": 5.149059114046395,
+            "median_ms": 4.243622999638319,
+            "min_ms": 3.8039369974285364
+          },
+          "total": {
+            "max_ms": 13.899058103561401,
+            "median_ms": 10.578601970337331,
+            "min_ms": 9.478131076321006
+          }
+        }
+      },
+      "vault_bytes_unchanged": true,
+      "warm_profile": [
+        {
+          "calls": 3,
+          "file": "journal.py",
+          "function": "fold",
+          "inclusive_ms": 0.051427,
+          "self_ms": 0.009708000000000001
+        },
+        {
+          "calls": 7,
+          "file": "journal.py",
+          "function": "read_events",
+          "inclusive_ms": 1.275138,
+          "self_ms": 0.052438
+        },
+        {
+          "calls": 1,
+          "file": "orchestrator.py",
+          "function": "operative_draft_turn_ids",
+          "inclusive_ms": 16.507391,
+          "self_ms": 0.11850100000000001
+        },
+        {
+          "calls": 1,
+          "file": "orchestrator.py",
+          "function": "operative_drafts",
+          "inclusive_ms": 16.312187,
+          "self_ms": 0.11064500000000001
+        },
+        {
+          "calls": 3,
+          "file": "context.py",
+          "function": "load_run_context",
+          "inclusive_ms": 9.637887000000001,
+          "self_ms": 0.09462000000000001
+        },
+        {
+          "calls": 3,
+          "file": "journal.py",
+          "function": "load_state",
+          "inclusive_ms": 0.615388,
+          "self_ms": 0.010114
+        },
+        {
+          "calls": 36,
+          "file": "orchestrator.py",
+          "function": "_context_for",
+          "inclusive_ms": 24.906969,
+          "self_ms": 0.064856
+        }
+      ],
+      "warm_profile_top_self": [
+        {
+          "calls": 25428,
+          "file": "copy.py",
+          "function": "deepcopy",
+          "inclusive_ms": 28.793149,
+          "self_ms": 13.524602
+        },
+        {
+          "calls": 52336,
+          "file": "~",
+          "function": "<method 'get' of 'dict' objects>",
+          "inclusive_ms": 3.772923,
+          "self_ms": 3.772923
+        },
+        {
+          "calls": 1839,
+          "file": "copy.py",
+          "function": "_deepcopy_dict",
+          "inclusive_ms": 28.321841,
+          "self_ms": 3.3150570000000004
+        },
+        {
+          "calls": 31767,
+          "file": "~",
+          "function": "<built-in method builtins.id>",
+          "inclusive_ms": 1.762674,
+          "self_ms": 1.762674
+        },
+        {
+          "calls": 1230,
+          "file": "main.py",
+          "function": "__deepcopy__",
+          "inclusive_ms": 25.013193000000005,
+          "self_ms": 1.7249750000000001
+        },
+        {
+          "calls": 6,
+          "file": "decoder.py",
+          "function": "raw_decode",
+          "inclusive_ms": 1.1259850000000002,
+          "self_ms": 1.1259850000000002
+        },
+        {
+          "calls": 21297,
+          "file": "copy.py",
+          "function": "_deepcopy_atomic",
+          "inclusive_ms": 0.994417,
+          "self_ms": 0.994417
+        },
+        {
+          "calls": 3387,
+          "file": "copy.py",
+          "function": "_keep_alive",
+          "inclusive_ms": 1.421989,
+          "self_ms": 0.950326
+        },
+        {
+          "calls": 456,
+          "file": "copy.py",
+          "function": "_deepcopy_tuple",
+          "inclusive_ms": 3.5252820000000002,
+          "self_ms": 0.6939580000000001
+        },
+        {
+          "calls": 432,
+          "file": "copy.py",
+          "function": "_deepcopy_list",
+          "inclusive_ms": 12.269372,
+          "self_ms": 0.6032860000000001
+        },
+        {
+          "calls": 24,
+          "file": "~",
+          "function": "<method 'validate_python' of 'pydantic_core._pydantic_core.SchemaValidator' objects>",
+          "inclusive_ms": 0.762834,
+          "self_ms": 0.5701290000000001
+        },
+        {
+          "calls": 5523,
+          "file": "~",
+          "function": "<method 'append' of 'list' objects>",
+          "inclusive_ms": 0.438524,
+          "self_ms": 0.438524
+        }
+      ]
+    },
+    "gate_history_20x": {
+      "completed_turns": 216,
+      "decisions": 8,
+      "events": 14920,
+      "export_ready": false,
+      "journal_bytes": 2812728,
+      "requests": 18,
+      "samples": {
+        "parser_cold": [
+          {
+            "operative_drafts_ms": 242.24642594344914,
+            "total_ms": 599.9701319960877
+          },
+          {
+            "operative_drafts_ms": 284.9600629415363,
+            "total_ms": 633.5964900208637
+          },
+          {
+            "operative_drafts_ms": 276.2446909910068,
+            "total_ms": 588.8580200262368
+          },
+          {
+            "operative_drafts_ms": 287.1527150273323,
+            "total_ms": 618.3897940209135
+          },
+          {
+            "operative_drafts_ms": 251.78766006138176,
+            "total_ms": 632.8456701012328
+          },
+          {
+            "operative_drafts_ms": 227.04176895786077,
+            "total_ms": 597.5269649643451
+          },
+          {
+            "operative_drafts_ms": 224.81049702037126,
+            "total_ms": 593.4703419916332
+          },
+          {
+            "operative_drafts_ms": 262.3736390378326,
+            "total_ms": 604.9511949531734
+          },
+          {
+            "operative_drafts_ms": 279.3645610800013,
+            "total_ms": 577.4362779920921
+          },
+          {
+            "operative_drafts_ms": 274.4192610261962,
+            "total_ms": 570.4951600637287
+          },
+          {
+            "operative_drafts_ms": 224.78055697865784,
+            "total_ms": 573.7717460142449
+          },
+          {
+            "operative_drafts_ms": 220.3797330148518,
+            "total_ms": 561.2773180473596
+          },
+          {
+            "operative_drafts_ms": 219.4194809999317,
+            "total_ms": 566.2806989857927
+          },
+          {
+            "operative_drafts_ms": 269.1677779657766,
+            "total_ms": 612.8250400070101
+          },
+          {
+            "operative_drafts_ms": 285.016029025428,
+            "total_ms": 596.3730310322717
+          }
+        ],
+        "warm": [
+          {
+            "operative_drafts_ms": 232.0163050899282,
+            "total_ms": 545.8133809734136
+          },
+          {
+            "operative_drafts_ms": 248.332885093987,
+            "total_ms": 546.3190929731354
+          },
+          {
+            "operative_drafts_ms": 278.4892439376563,
+            "total_ms": 543.9082130324095
+          },
+          {
+            "operative_drafts_ms": 308.51478001568466,
+            "total_ms": 575.2635870594531
+          },
+          {
+            "operative_drafts_ms": 237.73600801359862,
+            "total_ms": 548.7561309710145
+          },
+          {
+            "operative_drafts_ms": 224.51839805580676,
+            "total_ms": 518.908069934696
+          },
+          {
+            "operative_drafts_ms": 240.48758193384856,
+            "total_ms": 532.5661050155759
+          },
+          {
+            "operative_drafts_ms": 225.1596200512722,
+            "total_ms": 524.0737480344251
+          },
+          {
+            "operative_drafts_ms": 265.17562300432473,
+            "total_ms": 515.8954580547288
+          },
+          {
+            "operative_drafts_ms": 274.91145697422326,
+            "total_ms": 523.7557051004842
+          },
+          {
+            "operative_drafts_ms": 217.76721789501607,
+            "total_ms": 517.4509040080011
+          },
+          {
+            "operative_drafts_ms": 232.04631207045168,
+            "total_ms": 524.0190170006827
+          },
+          {
+            "operative_drafts_ms": 239.29968499578536,
+            "total_ms": 522.3154720151797
+          },
+          {
+            "operative_drafts_ms": 228.52539899758995,
+            "total_ms": 525.8045209338889
+          },
+          {
+            "operative_drafts_ms": 280.0114609999582,
+            "total_ms": 535.4799639899284
+          }
+        ]
+      },
+      "summary": {
+        "parser_cold": {
+          "median_operative_drafts_percent": 43.371042362870575,
+          "operative_drafts": {
+            "max_ms": 287.1527150273323,
+            "median_ms": 262.3736390378326,
+            "min_ms": 219.4194809999317
+          },
+          "total": {
+            "max_ms": 633.5964900208637,
+            "median_ms": 596.3730310322717,
+            "min_ms": 561.2773180473596
+          }
+        },
+        "warm": {
+          "median_operative_drafts_percent": 45.15638146494791,
+          "operative_drafts": {
+            "max_ms": 308.51478001568466,
+            "median_ms": 239.29968499578536,
+            "min_ms": 217.76721789501607
+          },
+          "total": {
+            "max_ms": 575.2635870594531,
+            "median_ms": 525.8045209338889,
+            "min_ms": 515.8954580547288
+          }
+        }
+      },
+      "vault_bytes_unchanged": true,
+      "warm_profile": [
+        {
+          "calls": 3,
+          "file": "journal.py",
+          "function": "fold",
+          "inclusive_ms": 82.916878,
+          "self_ms": 35.567627
+        },
+        {
+          "calls": 7,
+          "file": "journal.py",
+          "function": "read_events",
+          "inclusive_ms": 25.016367000000002,
+          "self_ms": 1.437769
+        },
+        {
+          "calls": 1,
+          "file": "orchestrator.py",
+          "function": "operative_draft_turn_ids",
+          "inclusive_ms": 914.914533,
+          "self_ms": 7.348587
+        },
+        {
+          "calls": 1,
+          "file": "orchestrator.py",
+          "function": "operative_drafts",
+          "inclusive_ms": 930.4473230000001,
+          "self_ms": 6.987474000000001
+        },
+        {
+          "calls": 3,
+          "file": "context.py",
+          "function": "load_run_context",
+          "inclusive_ms": 26.216438,
+          "self_ms": 2.6101310000000004
+        },
+        {
+          "calls": 3,
+          "file": "journal.py",
+          "function": "load_state",
+          "inclusive_ms": 94.20497300000001,
+          "self_ms": 0.49255000000000004
+        },
+        {
+          "calls": 36,
+          "file": "orchestrator.py",
+          "function": "_context_for",
+          "inclusive_ms": 1749.414551,
+          "self_ms": 0.189034
+        }
+      ],
+      "warm_profile_top_self": [
+        {
+          "calls": 1387236,
+          "file": "copy.py",
+          "function": "deepcopy",
+          "inclusive_ms": 1748.1005790000002,
+          "self_ms": 743.192729
+        },
+        {
+          "calls": 109551,
+          "file": "copy.py",
+          "function": "_deepcopy_dict",
+          "inclusive_ms": 1747.4843340000002,
+          "self_ms": 330.550752
+        },
+        {
+          "calls": 2864246,
+          "file": "~",
+          "function": "<method 'get' of 'dict' objects>",
+          "inclusive_ms": 218.003203,
+          "self_ms": 218.003203
+        },
+        {
+          "calls": 262731,
+          "file": "copy.py",
+          "function": "_keep_alive",
+          "inclusive_ms": 163.944967,
+          "self_ms": 129.852514
+        },
+        {
+          "calls": 1885047,
+          "file": "~",
+          "function": "<built-in method builtins.id>",
+          "inclusive_ms": 103.068319,
+          "self_ms": 103.068319
+        },
+        {
+          "calls": 124848,
+          "file": "copy.py",
+          "function": "_deepcopy_list",
+          "inclusive_ms": 1019.178065,
+          "self_ms": 60.993611
+        },
+        {
+          "calls": 1115985,
+          "file": "copy.py",
+          "function": "_deepcopy_atomic",
+          "inclusive_ms": 50.87471,
+          "self_ms": 50.87471
+        },
+        {
+          "calls": 674153,
+          "file": "~",
+          "function": "<built-in method builtins.isinstance>",
+          "inclusive_ms": 49.513328,
+          "self_ms": 49.499094
+        },
+        {
+          "calls": 28446,
+          "file": "main.py",
+          "function": "__deepcopy__",
+          "inclusive_ms": 1748.640278,
+          "self_ms": 48.688011
+        },
+        {
+          "calls": 3,
+          "file": "journal.py",
+          "function": "fold",
+          "inclusive_ms": 82.916878,
+          "self_ms": 35.567627
+        },
+        {
+          "calls": 350546,
+          "file": "~",
+          "function": "<method 'append' of 'list' objects>",
+          "inclusive_ms": 26.185782,
+          "self_ms": 26.185782
+        },
+        {
+          "calls": 23,
+          "file": "~",
+          "function": "<built-in method _hashlib.openssl_sha256>",
+          "inclusive_ms": 19.159882,
+          "self_ms": 19.159882
+        }
+      ]
+    },
+    "gate_history_5x": {
+      "completed_turns": 216,
+      "decisions": 8,
+      "events": 3730,
+      "export_ready": false,
+      "journal_bytes": 1469928,
+      "requests": 18,
+      "samples": {
+        "parser_cold": [
+          {
+            "operative_drafts_ms": 235.84387602750212,
+            "total_ms": 511.82195893488824
+          },
+          {
+            "operative_drafts_ms": 253.59695800580084,
+            "total_ms": 546.4490539161488
+          },
+          {
+            "operative_drafts_ms": 225.1218049786985,
+            "total_ms": 524.1061289561912
+          },
+          {
+            "operative_drafts_ms": 243.14789299387485,
+            "total_ms": 529.591646976769
+          },
+          {
+            "operative_drafts_ms": 252.06739199347794,
+            "total_ms": 547.8526710066944
+          },
+          {
+            "operative_drafts_ms": 214.85165902413428,
+            "total_ms": 468.2558560743928
+          },
+          {
+            "operative_drafts_ms": 234.43955602124333,
+            "total_ms": 491.0483610583469
+          },
+          {
+            "operative_drafts_ms": 271.5915850130841,
+            "total_ms": 519.8062729323283
+          },
+          {
+            "operative_drafts_ms": 239.0214770566672,
+            "total_ms": 532.8460059827194
+          },
+          {
+            "operative_drafts_ms": 260.28063893318176,
+            "total_ms": 542.6206550328061
+          },
+          {
+            "operative_drafts_ms": 269.251088029705,
+            "total_ms": 513.4160419693217
+          },
+          {
+            "operative_drafts_ms": 245.12691900599748,
+            "total_ms": 537.408209987916
+          },
+          {
+            "operative_drafts_ms": 287.26068302057683,
+            "total_ms": 615.5744281131774
+          },
+          {
+            "operative_drafts_ms": 241.0494890064001,
+            "total_ms": 463.0875630537048
+          },
+          {
+            "operative_drafts_ms": 199.9923390103504,
+            "total_ms": 467.6680809352547
+          }
+        ],
+        "warm": [
+          {
+            "operative_drafts_ms": 226.5560548985377,
+            "total_ms": 498.79691400565207
+          },
+          {
+            "operative_drafts_ms": 246.05652899481356,
+            "total_ms": 545.354665024206
+          },
+          {
+            "operative_drafts_ms": 235.42567191179842,
+            "total_ms": 516.6714310180396
+          },
+          {
+            "operative_drafts_ms": 220.3049559611827,
+            "total_ms": 514.3717899918556
+          },
+          {
+            "operative_drafts_ms": 267.47936801984906,
+            "total_ms": 494.79284102562815
+          },
+          {
+            "operative_drafts_ms": 241.59607500769198,
+            "total_ms": 469.06650403980166
+          },
+          {
+            "operative_drafts_ms": 250.39266096428037,
+            "total_ms": 463.25565595179796
+          },
+          {
+            "operative_drafts_ms": 265.55730507243425,
+            "total_ms": 521.6943209525198
+          },
+          {
+            "operative_drafts_ms": 231.80318903177977,
+            "total_ms": 509.2902050819248
+          },
+          {
+            "operative_drafts_ms": 238.27859398443252,
+            "total_ms": 537.7956120064482
+          },
+          {
+            "operative_drafts_ms": 254.96452406514436,
+            "total_ms": 505.37060701753944
+          },
+          {
+            "operative_drafts_ms": 277.24042802583426,
+            "total_ms": 513.3410639828071
+          },
+          {
+            "operative_drafts_ms": 243.35137801244855,
+            "total_ms": 469.57107400521636
+          },
+          {
+            "operative_drafts_ms": 245.617376989685,
+            "total_ms": 470.68346408195794
+          },
+          {
+            "operative_drafts_ms": 206.95836597587913,
+            "total_ms": 455.8773289900273
+          }
+        ]
+      },
+      "summary": {
+        "parser_cold": {
+          "median_operative_drafts_percent": 46.079280482279025,
+          "operative_drafts": {
+            "max_ms": 287.26068302057683,
+            "median_ms": 243.14789299387485,
+            "min_ms": 199.9923390103504
+          },
+          "total": {
+            "max_ms": 615.5744281131774,
+            "median_ms": 524.1061289561912,
+            "min_ms": 463.0875630537048
+          }
+        },
+        "warm": {
+          "median_operative_drafts_percent": 50.45099982561818,
+          "operative_drafts": {
+            "max_ms": 277.24042802583426,
+            "median_ms": 243.35137801244855,
+            "min_ms": 206.95836597587913
+          },
+          "total": {
+            "max_ms": 545.354665024206,
+            "median_ms": 505.37060701753944,
+            "min_ms": 455.8773289900273
+          }
+        }
+      },
+      "vault_bytes_unchanged": true,
+      "warm_profile": [
+        {
+          "calls": 3,
+          "file": "journal.py",
+          "function": "fold",
+          "inclusive_ms": 22.315779,
+          "self_ms": 9.360818
+        },
+        {
+          "calls": 7,
+          "file": "journal.py",
+          "function": "read_events",
+          "inclusive_ms": 12.858582,
+          "self_ms": 0.33379300000000006
+        },
+        {
+          "calls": 1,
+          "file": "orchestrator.py",
+          "function": "operative_draft_turn_ids",
+          "inclusive_ms": 889.098465,
+          "self_ms": 7.286040000000001
+        },
+        {
+          "calls": 1,
+          "file": "orchestrator.py",
+          "function": "operative_drafts",
+          "inclusive_ms": 887.181776,
+          "self_ms": 7.045007000000001
+        },
+        {
+          "calls": 3,
+          "file": "context.py",
+          "function": "load_run_context",
+          "inclusive_ms": 16.717903000000003,
+          "self_ms": 0.6799580000000001
+        },
+        {
+          "calls": 3,
+          "file": "journal.py",
+          "function": "load_state",
+          "inclusive_ms": 27.877905000000002,
+          "self_ms": 0.082514
+        },
+        {
+          "calls": 36,
+          "file": "orchestrator.py",
+          "function": "_context_for",
+          "inclusive_ms": 1730.9053620000002,
+          "self_ms": 0.185651
+        }
+      ],
+      "warm_profile_top_self": [
+        {
+          "calls": 1387236,
+          "file": "copy.py",
+          "function": "deepcopy",
+          "inclusive_ms": 1729.36794,
+          "self_ms": 783.58455
+        },
+        {
+          "calls": 109551,
+          "file": "copy.py",
+          "function": "_deepcopy_dict",
+          "inclusive_ms": 1728.7546230000003,
+          "self_ms": 309.255479
+        },
+        {
+          "calls": 2819486,
+          "file": "~",
+          "function": "<method 'get' of 'dict' objects>",
+          "inclusive_ms": 219.06678300000002,
+          "self_ms": 219.06678300000002
+        },
+        {
+          "calls": 1885047,
+          "file": "~",
+          "function": "<built-in method builtins.id>",
+          "inclusive_ms": 104.73677400000001,
+          "self_ms": 104.73677400000001
+        },
+        {
+          "calls": 262731,
+          "file": "copy.py",
+          "function": "_keep_alive",
+          "inclusive_ms": 116.92401000000001,
+          "self_ms": 82.30105700000001
+        },
+        {
+          "calls": 124848,
+          "file": "copy.py",
+          "function": "_deepcopy_list",
+          "inclusive_ms": 1016.8582660000001,
+          "self_ms": 61.726372000000005
+        },
+        {
+          "calls": 1115985,
+          "file": "copy.py",
+          "function": "_deepcopy_atomic",
+          "inclusive_ms": 51.494037000000006,
+          "self_ms": 51.494037000000006
+        },
+        {
+          "calls": 28446,
+          "file": "main.py",
+          "function": "__deepcopy__",
+          "inclusive_ms": 1730.1664700000001,
+          "self_ms": 50.289807
+        },
+        {
+          "calls": 350546,
+          "file": "~",
+          "function": "<method 'append' of 'list' objects>",
+          "inclusive_ms": 26.613921,
+          "self_ms": 26.613921
+        },
+        {
+          "calls": 159413,
+          "file": "~",
+          "function": "<built-in method builtins.isinstance>",
+          "inclusive_ms": 12.259416,
+          "self_ms": 12.247653000000001
+        },
+        {
+          "calls": 28446,
+          "file": "copy.py",
+          "function": "copy",
+          "inclusive_ms": 18.369084,
+          "self_ms": 10.492168000000001
+        },
+        {
+          "calls": 109570,
+          "file": "~",
+          "function": "<method 'items' of 'dict' objects>",
+          "inclusive_ms": 10.302763,
+          "self_ms": 10.302763
+        }
+      ]
+    },
+    "single_request": {
+      "completed_turns": 12,
+      "decisions": 1,
+      "events": 49,
+      "export_ready": false,
+      "journal_bytes": 32387,
+      "requests": 1,
+      "samples": {
+        "parser_cold": [
+          {
+            "operative_drafts_ms": 1.7259679734706879,
+            "total_ms": 5.152802099473774
+          },
+          {
+            "operative_drafts_ms": 1.7494800267741084,
+            "total_ms": 5.120343994349241
+          },
+          {
+            "operative_drafts_ms": 1.7707919469103217,
+            "total_ms": 5.271986010484397
+          },
+          {
+            "operative_drafts_ms": 1.8968499498441815,
+            "total_ms": 5.732415011152625
+          },
+          {
+            "operative_drafts_ms": 1.884220982901752,
+            "total_ms": 7.061737938784063
+          },
+          {
+            "operative_drafts_ms": 1.609424944035709,
+            "total_ms": 5.008546984754503
+          },
+          {
+            "operative_drafts_ms": 1.754462020471692,
+            "total_ms": 5.054697976447642
+          },
+          {
+            "operative_drafts_ms": 1.7088910099118948,
+            "total_ms": 5.078660906292498
+          },
+          {
+            "operative_drafts_ms": 2.150408923625946,
+            "total_ms": 5.356081994250417
+          },
+          {
+            "operative_drafts_ms": 1.6673180507496,
+            "total_ms": 4.936264012940228
+          },
+          {
+            "operative_drafts_ms": 1.595325069501996,
+            "total_ms": 4.833310027606785
+          },
+          {
+            "operative_drafts_ms": 1.7067589797079563,
+            "total_ms": 5.039797048084438
+          },
+          {
+            "operative_drafts_ms": 1.7423279350623488,
+            "total_ms": 4.935781937092543
+          },
+          {
+            "operative_drafts_ms": 1.75068702083081,
+            "total_ms": 5.213520955294371
+          },
+          {
+            "operative_drafts_ms": 1.7946609295904636,
+            "total_ms": 5.4876330541446805
+          }
+        ],
+        "warm": [
+          {
+            "operative_drafts_ms": 1.7570019699633121,
+            "total_ms": 4.72224794793874
+          },
+          {
+            "operative_drafts_ms": 1.68701505754143,
+            "total_ms": 4.8370599979534745
+          },
+          {
+            "operative_drafts_ms": 1.780601916834712,
+            "total_ms": 4.807949997484684
+          },
+          {
+            "operative_drafts_ms": 1.7743200296536088,
+            "total_ms": 4.907062044367194
+          },
+          {
+            "operative_drafts_ms": 1.4889179728925228,
+            "total_ms": 4.568042932078242
+          },
+          {
+            "operative_drafts_ms": 1.6464460641145706,
+            "total_ms": 4.763002973049879
+          },
+          {
+            "operative_drafts_ms": 1.8925659824162722,
+            "total_ms": 5.274811992421746
+          },
+          {
+            "operative_drafts_ms": 1.7448009457439184,
+            "total_ms": 4.740425036288798
+          },
+          {
+            "operative_drafts_ms": 1.6384259797632694,
+            "total_ms": 4.881168948486447
+          },
+          {
+            "operative_drafts_ms": 1.7780630150809884,
+            "total_ms": 4.784846096299589
+          },
+          {
+            "operative_drafts_ms": 1.8644710071384907,
+            "total_ms": 4.759759991429746
+          },
+          {
+            "operative_drafts_ms": 1.698208972811699,
+            "total_ms": 4.960236023180187
+          },
+          {
+            "operative_drafts_ms": 2.0609049824997783,
+            "total_ms": 5.110505968332291
+          },
+          {
+            "operative_drafts_ms": 1.992817036807537,
+            "total_ms": 5.791399977169931
+          },
+          {
+            "operative_drafts_ms": 1.6742770094424486,
+            "total_ms": 4.708366002887487
+          }
+        ]
+      },
+      "summary": {
+        "parser_cold": {
+          "median_operative_drafts_percent": 33.58870724218062,
+          "operative_drafts": {
+            "max_ms": 2.150408923625946,
+            "median_ms": 1.7494800267741084,
+            "min_ms": 1.595325069501996
+          },
+          "total": {
+            "max_ms": 7.061737938784063,
+            "median_ms": 5.120343994349241,
+            "min_ms": 4.833310027606785
+          }
+        },
+        "warm": {
+          "median_operative_drafts_percent": 35.87930688591929,
+          "operative_drafts": {
+            "max_ms": 2.0609049824997783,
+            "median_ms": 1.7570019699633121,
+            "min_ms": 1.4889179728925228
+          },
+          "total": {
+            "max_ms": 5.791399977169931,
+            "median_ms": 4.807949997484684,
+            "min_ms": 4.568042932078242
+          }
+        }
+      },
+      "vault_bytes_unchanged": true,
+      "warm_profile": [
+        {
+          "calls": 3,
+          "file": "journal.py",
+          "function": "fold",
+          "inclusive_ms": 0.40323800000000004,
+          "self_ms": 0.15204900000000002
+        },
+        {
+          "calls": 7,
+          "file": "journal.py",
+          "function": "read_events",
+          "inclusive_ms": 1.396554,
+          "self_ms": 0.048982000000000005
+        },
+        {
+          "calls": 1,
+          "file": "orchestrator.py",
+          "function": "operative_draft_turn_ids",
+          "inclusive_ms": 5.245405000000001,
+          "self_ms": 0.027346000000000002
+        },
+        {
+          "calls": 1,
+          "file": "orchestrator.py",
+          "function": "operative_drafts",
+          "inclusive_ms": 5.256701,
+          "self_ms": 0.020218000000000003
+        },
+        {
+          "calls": 3,
+          "file": "context.py",
+          "function": "load_run_context",
+          "inclusive_ms": 7.621282,
+          "self_ms": 0.09161600000000002
+        },
+        {
+          "calls": 3,
+          "file": "journal.py",
+          "function": "load_state",
+          "inclusive_ms": 1.037527,
+          "self_ms": 0.010172
+        },
+        {
+          "calls": 2,
+          "file": "orchestrator.py",
+          "function": "_context_for",
+          "inclusive_ms": 4.632578,
+          "self_ms": 0.00903
+        }
+      ],
+      "warm_profile_top_self": [
+        {
+          "calls": 7329,
+          "file": "copy.py",
+          "function": "deepcopy",
+          "inclusive_ms": 8.30977,
+          "self_ms": 3.906245
+        },
+        {
+          "calls": 15193,
+          "file": "~",
+          "function": "<method 'get' of 'dict' objects>",
+          "inclusive_ms": 1.1268070000000001,
+          "self_ms": 1.1268070000000001
+        },
+        {
+          "calls": 631,
+          "file": "copy.py",
+          "function": "_deepcopy_dict",
+          "inclusive_ms": 8.255642,
+          "self_ms": 1.118649
+        },
+        {
+          "calls": 6,
+          "file": "decoder.py",
+          "function": "raw_decode",
+          "inclusive_ms": 0.729866,
+          "self_ms": 0.729866
+        },
+        {
+          "calls": 9622,
+          "file": "~",
+          "function": "<built-in method builtins.id>",
+          "inclusive_ms": 0.5270360000000001,
+          "self_ms": 0.5270360000000001
+        },
+        {
+          "calls": 25,
+          "file": "~",
+          "function": "<method 'validate_python' of 'pydantic_core._pydantic_core.SchemaValidator' objects>",
+          "inclusive_ms": 0.631135,
+          "self_ms": 0.48403700000000005
+        },
+        {
+          "calls": 172,
+          "file": "~",
+          "function": "<built-in method posix.lstat>",
+          "inclusive_ms": 0.328789,
+          "self_ms": 0.328789
+        },
+        {
+          "calls": 1202,
+          "file": "copy.py",
+          "function": "_keep_alive",
+          "inclusive_ms": 0.479997,
+          "self_ms": 0.314763
+        },
+        {
+          "calls": 192,
+          "file": "main.py",
+          "function": "__deepcopy__",
+          "inclusive_ms": 5.559404000000001,
+          "self_ms": 0.295607
+        },
+        {
+          "calls": 23,
+          "file": "~",
+          "function": "<built-in method _hashlib.openssl_sha256>",
+          "inclusive_ms": 0.283517,
+          "self_ms": 0.283517
+        },
+        {
+          "calls": 6039,
+          "file": "copy.py",
+          "function": "_deepcopy_atomic",
+          "inclusive_ms": 0.28336400000000006,
+          "self_ms": 0.28336400000000006
+        },
+        {
+          "calls": 391,
+          "file": "copy.py",
+          "function": "_deepcopy_list",
+          "inclusive_ms": 3.585011,
+          "self_ms": 0.28296899999999997
+        }
+      ]
+    }
+  },
+  "harness_sha256": "271e04cfb86f5f59babb6133c89dceeaefe6712700cbb954a165007238bf6e33",
+  "measurement_date": "2026-09-20",
+  "platform": "Linux",
+  "python": "3.12.12",
+  "repair_commit": "73833b4",
+  "repeats_per_mode": 15,
+  "schema_version": "1.0",
+  "source_head": "ceb99d0"
+}

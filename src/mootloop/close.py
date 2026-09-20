@@ -18,7 +18,9 @@ load-bearing guarantee is registration in this inventory, which the invariant en
 
 from __future__ import annotations
 
+import os
 import shutil
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -49,7 +51,12 @@ from mootloop.models.evidence import RunEvidencePack, RunStatusSidecar, TraceTre
 from mootloop.models.facts import Fact
 from mootloop.models.judge_profiles import JudgeProfile
 from mootloop.models.learnings import FirmLearningEvent, LearningImportBundle, LearningReview
-from mootloop.models.lifecycle import CloseRecord, DestructionLimitation, DestructionStore
+from mootloop.models.lifecycle import (
+    CloseIntent,
+    CloseRecord,
+    DestructionLimitation,
+    DestructionStore,
+)
 from mootloop.models.matter import MatterConfig, Retention
 from mootloop.models.matters import MatterSummary
 from mootloop.models.oracles import PersonaOracleAnswerKey
@@ -59,16 +66,18 @@ from mootloop.models.production import ProductionSuggestionBundle, ProductionSug
 from mootloop.models.requests import RequestSet
 from mootloop.models.task import TaskAdapterConfig
 from mootloop.models.taskspec import TaskSpec, TaskSpecLock
-from mootloop.persistence import append_fsync_line
+from mootloop.persistence import append_fsync_line, complete_jsonl_lines
 from mootloop.registry import MatterRegistry
 from mootloop.vault import (
     RunLock,
     _is_within,
     _real,
     atomic_write_text,
+    fsync_file_and_parent,
     load_matter,
     safe_vault_path,
     validate_id,
+    vault_creation_lock,
 )
 
 
@@ -332,6 +341,7 @@ MATTER_SCOPED_STORES: tuple[MatterScopedStore, ...] = (
 # Concrete `VersionedModel`s that are deliberately NOT matter-scoped-purgeable, each
 # with the reason the invariant records instead of demanding a store.
 EXEMPT_MODELS: dict[type[VersionedModel], str] = {
+    CloseIntent: "Off-vault prepared close evidence; survives partial destructive operations.",
     PersonaOracleAnswerKey: (
         "Synthetic answer keys are versioned test-only repo fixtures, never matter data or "
         "runtime prompt context."
@@ -487,8 +497,7 @@ def _enforce_retention_policy(vault_root: Path, now: str) -> Retention:
         raise CloseError(f"invalid close timestamp: {now!r}") from exc
     if close_date < retention.destruction_date:
         raise CloseError(
-            "matter is not eligible for destruction until "
-            f"{retention.destruction_date.isoformat()}"
+            f"matter is not eligible for destruction until {retention.destruction_date.isoformat()}"
         )
     return retention
 
@@ -543,6 +552,9 @@ def _append_tombstone(matters_root: Path, tombstone: AccessAuditEntry) -> None:
     closed_dir = safe_vault_path(matters_root, CLOSED_DIRNAME)
     closed_dir.mkdir(parents=True, exist_ok=True)
     path = safe_vault_path(matters_root, CLOSED_DIRNAME, TOMBSTONES_FILE)
+    for line in complete_jsonl_lines(path):
+        if AccessAuditEntry.model_validate_json(line).entry_hash == tombstone.entry_hash:
+            return
     append_fsync_line(path, tombstone.model_dump_json())
 
 
@@ -550,10 +562,94 @@ def _write_close_record(matters_root: Path, record: CloseRecord) -> Path:
     path = safe_vault_path(matters_root, CLOSED_DIRNAME, f"{record.source_matter_id}.json")
     path.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_text(path, record.model_dump_json(indent=2) + "\n")
+    fsync_file_and_parent(path)
     return path
 
 
 def close_matter(
+    matters_root: Path | str,
+    matter_id: str,
+    *,
+    actor: str,
+    now: str,
+    backup_dir: Path | str | None,
+    skip_backup: bool = False,
+    acknowledge_skip_backup: bool = False,
+) -> CloseRecord:
+    validate_id(matter_id, kind="matter_id")
+    root = Path(matters_root)
+    vault = safe_vault_path(root, matter_id)
+    with vault_creation_lock(vault):
+        intent_path = safe_vault_path(root, CLOSED_DIRNAME, f"{matter_id}.pending.json")
+        if intent_path.exists():
+            intent = CloseIntent.model_validate_json(intent_path.read_text(encoding="utf-8"))
+            if intent.record.source_matter_id != matter_id:
+                raise CloseError("close intent identity does not match the requested matter")
+            fsync_file_and_parent(intent_path)
+            fsync_file_and_parent(intent_path.parent)
+            quarantine = _quarantine_path(root, intent)
+            if quarantine.exists():
+                identity = quarantine.stat()
+                if (identity.st_dev, identity.st_ino) != (intent.vault_device, intent.vault_inode):
+                    raise CloseError("close recovery refuses a replacement quarantine")
+                fsync_file_and_parent(quarantine)
+                fsync_file_and_parent(root)
+                intent = intent.model_copy(update={"detached": True})
+                _write_close_intent(intent_path, intent)
+                _purge_vault(quarantine.parent, quarantine.name)
+                return _finish_close(root, intent, intent_path)
+            if intent.detached:
+                return _finish_close(root, intent, intent_path)
+            if vault.exists():
+                identity = vault.stat()
+                if (identity.st_dev, identity.st_ino) != (intent.vault_device, intent.vault_inode):
+                    raise CloseError("close recovery refuses a replacement vault")
+                # Still active: retention, backup, and inventory may have changed.
+            else:
+                raise CloseError("prepared close lost its original vault before detachment")
+        if not vault.exists():
+            final_path = safe_vault_path(root, CLOSED_DIRNAME, f"{matter_id}.json")
+            if final_path.is_file():
+                record = CloseRecord.model_validate_json(final_path.read_text(encoding="utf-8"))
+                if record.source_matter_id != matter_id:
+                    raise CloseError("close record identity does not match the requested matter")
+                return record
+        return _close_matter_locked(
+            root,
+            matter_id,
+            actor=actor,
+            now=now,
+            backup_dir=backup_dir,
+            skip_backup=skip_backup,
+            acknowledge_skip_backup=acknowledge_skip_backup,
+        )
+
+
+def _quarantine_path(root: Path, intent: CloseIntent) -> Path:
+    validate_id(intent.quarantine_id, kind="close quarantine")
+    return safe_vault_path(root, CLOSED_DIRNAME, "pending-vaults", intent.quarantine_id)
+
+
+def _write_close_intent(path: Path, intent: CloseIntent) -> None:
+    atomic_write_text(path, intent.model_dump_json(indent=2) + "\n")
+    fsync_file_and_parent(path)
+    fsync_file_and_parent(path.parent)
+
+
+def _finish_close(root: Path, intent: CloseIntent, intent_path: Path) -> CloseRecord:
+    quarantine = _quarantine_path(root, intent)
+    if not intent.detached or quarantine.exists():
+        raise CloseError("post-close verification failed: vault residue remains")
+    fsync_file_and_parent(quarantine.parent)
+    record = intent.record
+    _append_tombstone(root, record.tombstone)
+    _write_close_record(root, record)
+    intent_path.unlink(missing_ok=True)
+    fsync_file_and_parent(intent_path.parent)
+    return record
+
+
+def _close_matter_locked(
     matters_root: Path | str,
     matter_id: str,
     *,
@@ -604,9 +700,7 @@ def close_matter(
                 from mootloop.engine.backup import backup_matter
 
                 try:
-                    backup_ref = str(
-                        backup_matter(vault, backup_dir, now, _held_lock=close_lock)
-                    )
+                    backup_ref = str(backup_matter(vault, backup_dir, now, _held_lock=close_lock))
                 except (MootloopError, OSError) as exc:
                     raise CloseError(
                         f"cannot close because the required backup failed: {exc}"
@@ -614,35 +708,46 @@ def close_matter(
 
             prev_hash = _audit_head(vault)
             removed_counts = _inventory_counts(vault)
-            _purge_vault(matters_root_path, matter_id)
+            tombstone = AccessAuditEntry.create(
+                ts=now,
+                actor=actor,
+                action="matter-closed",
+                matter_id=matter_id,
+                resource="",
+                prev_hash=prev_hash,
+            )
+            record = CloseRecord(
+                source_matter_id=MatterId(matter_id),
+                closed_at=now,
+                closed_by=actor,
+                backup_ref=backup_ref,
+                retention_class=retention.retention_class,
+                destruction_date=retention.destruction_date,
+                limitations=DESTRUCTION_LIMITATIONS,
+                stores=_destruction_stores(removed_counts),
+                removed_counts=removed_counts,
+                tombstone=tombstone,
+            )
+            identity = vault.stat()
+            intent = CloseIntent(
+                record=record,
+                vault_device=identity.st_dev,
+                vault_inode=identity.st_ino,
+                quarantine_id=f"close-{uuid.uuid4().hex}",
+            )
+            intent_path = safe_vault_path(
+                matters_root_path, CLOSED_DIRNAME, f"{matter_id}.pending.json"
+            )
+            quarantine = _quarantine_path(matters_root_path, intent)
+            quarantine.parent.mkdir(parents=True, exist_ok=True)
+            _write_close_intent(intent_path, intent)
+            os.replace(vault, quarantine)
+            fsync_file_and_parent(quarantine)
+            fsync_file_and_parent(matters_root_path)
+            intent = intent.model_copy(update={"detached": True})
+            _write_close_intent(intent_path, intent)
+            _purge_vault(quarantine.parent, quarantine.name)
     except LockHeldError as exc:
         raise CloseError(f"cannot close: a live run holds the matter lock ({exc})") from exc
 
-    if _real(matters_root_path).joinpath(matter_id).exists():
-        raise CloseError(
-            f"post-close verification failed: residue remains for matter {matter_id!r}"
-        )
-
-    tombstone = AccessAuditEntry.create(
-        ts=now,
-        actor=actor,
-        action="matter-closed",
-        matter_id=matter_id,
-        resource="",
-        prev_hash=prev_hash,
-    )
-    record = CloseRecord(
-        source_matter_id=MatterId(matter_id),
-        closed_at=now,
-        closed_by=actor,
-        backup_ref=backup_ref,
-        retention_class=retention.retention_class,
-        destruction_date=retention.destruction_date,
-        limitations=DESTRUCTION_LIMITATIONS,
-        stores=_destruction_stores(removed_counts),
-        removed_counts=removed_counts,
-        tombstone=tombstone,
-    )
-    _append_tombstone(matters_root_path, tombstone)
-    _write_close_record(matters_root_path, record)
-    return record
+    return _finish_close(matters_root_path, intent, intent_path)

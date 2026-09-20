@@ -188,7 +188,7 @@ def build_demo_vault(dest_dir: Path | str) -> Path:
     matter = MatterConfig.model_validate(
         yaml.safe_load((FIXTURE_DIR / "matter.yaml").read_text(encoding="utf-8"))
     )
-    vault = init_vault(dest, matter, registry_path=dest / "canaries.json")
+    vault = init_vault(dest, matter, registry_path=dest.with_name(dest.name + ".canaries.json"))
 
     # Corpus + facts + served sets — the same arc a real matter follows.
     ingest_folder(

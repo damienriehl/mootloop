@@ -53,7 +53,7 @@ from mootloop.models.common import MatterId
 from mootloop.models.events import TurnIntent
 from mootloop.models.run import TurnSpec
 from mootloop.privacy import serialize_outbound
-from mootloop.vault import validate_id
+from mootloop.vault import RunLock, validate_id
 
 logger = logging.getLogger("mootloop.engine.worker")
 
@@ -104,6 +104,7 @@ class Worker:
     ) -> None:
         self.now_fn = now_fn
         self.matters_root = Path(matters_root)
+        validate_id(worker_id.lower(), kind="worker_id")
         self.worker_id = worker_id
         self.queue = queue
         self.provider_factory = provider_factory
@@ -361,7 +362,8 @@ class Worker:
 
             specs = orchestrator.plan_next(vault, run_id)
             if not specs:
-                # Nothing schedulable: the run is finished / paused / blocked.
+                with RunLock(vault, run_id):
+                    orchestrator.finalize_if_ready(vault, run_id, now.isoformat())
                 self.queue.complete(item.item_id, self.worker_id)
                 return True
             spec = specs[0]

@@ -10,7 +10,7 @@ several draft/bolster turns per request each pass through here.
 
 from __future__ import annotations
 
-import os
+from collections.abc import Iterable
 from pathlib import Path
 
 from mootloop.context import load_run_context
@@ -32,6 +32,7 @@ from mootloop.models.events import DecisionRecorded
 from mootloop.models.matter import GateMode, MatterConfig
 from mootloop.models.requests import RequestItem, code_from_request_id
 from mootloop.models.run import DraftOutput, TurnSpec
+from mootloop.persistence import append_fsync_line, complete_jsonl_lines
 from mootloop.vault import RunLock, atomic_write_text, safe_vault_path
 
 DECISIONS_JSONL = "decisions.jsonl"
@@ -49,13 +50,7 @@ class DecisionStore:
         self._path = safe_vault_path(vault_root, "runs", run_id, "decisions", DECISIONS_JSONL)
 
     def _records(self) -> list[Decision]:
-        if not self._path.is_file():
-            return []
-        records: list[Decision] = []
-        for line in self._path.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                records.append(Decision.model_validate_json(line))
-        return records
+        return [Decision.model_validate_json(line) for line in complete_jsonl_lines(self._path)]
 
     def folded(self) -> dict[str, Decision]:
         state: dict[str, Decision] = {}
@@ -74,11 +69,7 @@ class DecisionStore:
 
     def append(self, decision: Decision) -> None:
         """Append one record; write the sidecar once (the immutable proposal copy)."""
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        with self._path.open("a", encoding="utf-8") as handle:
-            handle.write(decision.model_dump_json() + "\n")
-            handle.flush()
-            os.fsync(handle.fileno())
+        append_fsync_line(self._path, decision.model_dump_json())
         sidecar = safe_vault_path(
             self.vault_root, "runs", self.run_id, "decisions", f"{decision.decision_id}.json"
         )
@@ -351,25 +342,35 @@ def derive_and_store(
 ) -> list[Decision]:
     """Generate the attorney-gate decisions a recorded draft implies, skipping any that
     already exist (idempotent per logical gate). Returns the newly-stored decisions."""
-    code = code_from_request_id(str(spec.request_id)) if spec.request_id else "all"
+    return derive_drafts_and_store(vault_root, run_id, [(spec, draft)])
+
+
+def derive_drafts_and_store(
+    vault_root: Path | str,
+    run_id: str,
+    drafts: Iterable[tuple[TurnSpec, DraftOutput]],
+) -> list[Decision]:
+    """Recover draft gates using one decision-log fold under the caller's run lock."""
     store = DecisionStore(vault_root, run_id)
     existing = store.list_all()
     seen = {d.dedupe_key for d in existing}
     seq = len(existing)
     created: list[Decision] = []
-    for kind, request_id, proposal in _proposals_for_draft(spec, draft, code):
-        key = (kind.value, proposal.summary)
-        if key in seen:
-            continue
-        seen.add(key)
-        decision = Decision(
-            decision_id=make_decision_id(run_id, seq),
-            run_id=run_id,
-            request_id=request_id,  # type: ignore[arg-type]
-            kind=kind,
-            proposal=proposal,
-        )
-        store.append(decision)
-        created.append(decision)
-        seq += 1
+    for spec, draft in drafts:
+        code = code_from_request_id(str(spec.request_id)) if spec.request_id else "all"
+        for kind, request_id, proposal in _proposals_for_draft(spec, draft, code):
+            key = (kind.value, proposal.summary)
+            if key in seen:
+                continue
+            seen.add(key)
+            decision = Decision(
+                decision_id=make_decision_id(run_id, seq),
+                run_id=run_id,
+                request_id=request_id,  # type: ignore[arg-type]
+                kind=kind,
+                proposal=proposal,
+            )
+            store.append(decision)
+            created.append(decision)
+            seq += 1
     return created

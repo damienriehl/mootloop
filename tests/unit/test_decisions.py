@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from mootloop.decisions import (
     DecisionStore,
@@ -138,6 +139,36 @@ def test_generation_is_idempotent_across_draft_turns(tmp_path: Path) -> None:
     decisions = DecisionStore(vault, run_id).list_all()
     keys = [d.dedupe_key for d in decisions]
     assert len(keys) == len(set(keys))
+
+
+def test_resolution_recovers_an_interrupted_decision_append(tmp_path: Path) -> None:
+    vault = _vault(tmp_path, RequestType.INTERROGATORY, 1, facts=False)
+    run_id = start_run(vault, "discovery-responses", NOW, run_id="dec-torn")
+    run_with_provider(vault, run_id, FakeLLMProvider(), NOW)
+    store = DecisionStore(vault, run_id)
+    decision = store.list_open()[0]
+    path = vault / "runs" / run_id / "decisions" / "decisions.jsonl"
+    with path.open("ab") as handle:
+        handle.write(b'{"decision_id":')
+    before = path.read_bytes()
+    assert store.get(decision.decision_id) == decision
+    assert path.read_bytes() == before
+    resolved = resolve(
+        vault, run_id, decision.decision_id, "approve", None, "ok", "Atty", "human", NOW
+    )
+    assert store.get(decision.decision_id) == resolved
+    assert resolve(
+        vault, run_id, decision.decision_id, "approve", None, "ok", "Atty", "human", NOW
+    ) == resolved
+
+
+def test_decision_store_rejects_complete_corrupt_records(tmp_path: Path) -> None:
+    path = tmp_path / "runs" / "run" / "decisions" / "decisions.jsonl"
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b'{"decision_id":"broken"}\n')
+    with pytest.raises(ValidationError):
+        DecisionStore(tmp_path, "run").list_all()
+    assert path.read_bytes() == b'{"decision_id":"broken"}\n'
 
 
 def test_gate_mode_taxonomy(tmp_path: Path) -> None:

@@ -53,7 +53,7 @@ def _cited_bolster(spec: Any, prompt: str) -> dict[str, Any]:
         "candidate_citations": [],
         "fact_ids_used": fact_ids[:1],
         "attorney_gate_items": [] if fact_ids else ["verify factual basis"],
-        "rfa_disposition": None,
+        "rfa_disposition": "deny" if str(spec.request_id).startswith("RFA-") else None,
         "self_assessment": "Grounded in the record.",
     }
 
@@ -184,8 +184,9 @@ def test_full_export_flow(tmp_path: Path) -> None:
     assert "::: {#resp-ROG-3}" in master_text
     assert "OBJECTION (relevance):" in master_text
     assert "subject to and without waiving" not in master_text.lower()
-    # RFP withheld statement + RFA disposition rendered.
-    assert "withheld on the basis" in master_text.lower()
+    # Preserve the authored response; objections do not establish actual withholding.
+    assert "Defendant responds to the request as stated." in master_text
+    assert "Responsive materials are being withheld on the basis" not in master_text
 
     # verification.md: MN's EXACT perjury declaration (rog set present).
     assert result.verification is not None

@@ -37,7 +37,7 @@ from mootloop.models.events import RunMode, RunStarted
 from mootloop.models.facts import Fact
 from mootloop.models.matter import MatterConfig
 from mootloop.models.pipeline import ResolvedPipeline
-from mootloop.models.requests import RequestItem, RequestSet
+from mootloop.models.requests import RequestItem, RequestSet, validate_request_identity
 from mootloop.models.rubric import Rubric, sha256_hex
 from mootloop.models.task import TaskAdapterConfig
 from mootloop.models.taskspec import TaskSpec, TaskSpecLock
@@ -301,7 +301,15 @@ def _load_request_sets(vault_root: Path | str) -> tuple[list[RequestSet], list[C
             )
         )
     sets.sort(key=lambda request_set: (request_set.set_number, request_set.request_type.value))
+    validate_run_request_identity(sets)
     return sets, sources
+
+
+def validate_run_request_identity(request_sets: Sequence[RequestSet]) -> None:
+    try:
+        validate_request_identity(request_sets)
+    except ValueError as exc:
+        raise OrchestratorError(str(exc)) from exc
 
 
 def _load_facts(vault_root: Path | str) -> tuple[list[Fact], bytes]:
@@ -557,6 +565,7 @@ def build_run_context(
 def _materialize(
     manifest: RunContextManifest, corpus_snapshot: CorpusSnapshot | None = None
 ) -> RunContext:
+    validate_run_request_identity(manifest.request_sets)
     if corpus_snapshot is not None:
         _validate_corpus_snapshot(manifest, corpus_snapshot)
     adapter = FrozenTaskAdapter(

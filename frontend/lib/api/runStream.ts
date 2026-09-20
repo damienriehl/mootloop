@@ -60,6 +60,8 @@ function usd(n: number): string {
 
 /** Fold one validated event into the timeline state (pure). */
 export function reduceRunEvent(state: RunStreamState, event: RunEvent): RunStreamState {
+  // The server replays from the journal's beginning after every reconnect.
+  if (event.kind === "run_started") state = initialRunStreamState();
   const seq = state.seq + 1;
   const base = { ...state, seq };
   const line = (partial: Omit<TimelineLine, "id" | "kind" | "stage" | "persona">): TimelineLine => ({

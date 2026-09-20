@@ -199,7 +199,6 @@ def _record_completed_check(
                 completed_at=now,
             ),
         )
-        append(vault_root, run_id, TurnCompleted(record=record))
         orchestrator._book_spend(
             vault_root,
             run_id,
@@ -207,8 +206,10 @@ def _record_completed_check(
             usage,
             spec.model,
             now,
+            dedupe=True,
             provider_call_id=provider_call_id,
         )
+        append(vault_root, run_id, TurnCompleted(record=record))
     ledger = PropositionLedger(vault_root)
     if (
         ledger.get(

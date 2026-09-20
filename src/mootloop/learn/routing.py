@@ -203,8 +203,6 @@ def review_learning_proposal(
     current = store.get(proposal_id)
     if current is None:
         raise LearningImportError(f"unknown learning proposal {proposal_id!r}")
-    if action in ("accept", "reject") and current.status != "needs_review":
-        raise LearningImportError("learning proposal already has a final review")
     if action == "promote" and current.status != "accepted":
         raise LearningImportError("learning proposal must be accepted before promotion")
     scrubbed_text: PublicText | None = None
@@ -270,7 +268,16 @@ def review_learning_proposal(
         if locked_current is None:
             raise LearningImportError(f"unknown learning proposal {proposal_id!r}")
         if action in ("accept", "reject") and locked_current.status != "needs_review":
-            raise LearningImportError("learning proposal already has a final review")
+            original = next(
+                (r for r in locked_current.review_history if r.action in ("accept", "reject")),
+                None,
+            )
+            retry_fields = {"review_id", "recorded_at"}
+            if original is None or original.model_dump(exclude=retry_fields) != review.model_dump(
+                exclude=retry_fields
+            ):
+                raise LearningImportError("learning proposal already has a final review")
+            review = original
         if action == "promote" and locked_current.status != "accepted":
             raise LearningImportError("learning proposal must be accepted before promotion")
         if action == "promote":
