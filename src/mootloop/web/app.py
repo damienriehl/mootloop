@@ -67,9 +67,7 @@ def _run_id(vault: Path) -> str:
 def _matter_summary(matter: MatterConfig) -> dict[str, Any]:
     """The sanitized public view of the (synthetic) matter."""
     attorney = (
-        {"name": matter.attorney.name, "firm": matter.attorney.firm}
-        if matter.attorney
-        else None
+        {"name": matter.attorney.name, "firm": matter.attorney.firm} if matter.attorney else None
     )
     return {
         "matter_id": matter.matter_id,
@@ -78,7 +76,9 @@ def _matter_summary(matter: MatterConfig) -> dict[str, Any]:
             "case_number": matter.caption.case_number,
             "county": matter.caption.county,
             "judge_name": matter.caption.judge_name,
-        },
+        }
+        if matter.caption
+        else None,
         "jurisdiction": {
             "state": matter.jurisdiction.state,
             "forum": matter.jurisdiction.forum,
@@ -201,9 +201,7 @@ def api_request_turns(request_id: str) -> list[dict[str, Any]]:
             "model": r.spec.model,
             "completed_at": r.completed_at,
             "output": r.output,
-            "gates": [
-                {"gate": g.gate, "status": g.status} for g in r.gate_results
-            ],
+            "gates": [{"gate": g.gate, "status": g.status} for g in r.gate_results],
         }
         for r in records
     ]
@@ -303,9 +301,7 @@ def api_deliverable(name: str) -> PlainTextResponse:
     media_type = _SERVABLE_SUFFIXES.get(candidate.suffix)
     if media_type is None or not candidate.is_file():
         raise HTTPException(status_code=404, detail=f"unknown deliverable {name!r}")
-    return PlainTextResponse(
-        candidate.read_text(encoding="utf-8"), media_type=media_type
-    )
+    return PlainTextResponse(candidate.read_text(encoding="utf-8"), media_type=media_type)
 
 
 @app.get("/api/sets")

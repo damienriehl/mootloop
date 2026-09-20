@@ -1,0 +1,212 @@
+schema_version: '1.0'
+entries:
+- schema_version: '1.0'
+  demo_id: supplier-discovery
+  title: Supplier contract dispute
+  introduction: A fictional scenario tracing work product through adversarial review.
+  collection: synthetic
+  practice_area: Commercial contracts
+  work_product: Discovery responses
+  jurisdiction: Minnesota
+  court_level: state-trial
+  task: discovery-responses
+- schema_version: '1.0'
+  demo_id: employment-retaliation
+  title: Employment retaliation
+  introduction: A fictional scenario tracing work product through adversarial review.
+  collection: synthetic
+  practice_area: Employment
+  work_product: Complaint
+  jurisdiction: New York
+  court_level: state-trial
+  task: complaint
+- schema_version: '1.0'
+  demo_id: product-liability
+  title: Product liability
+  introduction: A fictional scenario tracing work product through adversarial review.
+  collection: synthetic
+  practice_area: Products and torts
+  work_product: Summary-judgment motion
+  jurisdiction: Texas
+  court_level: federal-trial
+  task: motion
+- schema_version: '1.0'
+  demo_id: land-use-appeal
+  title: Land-use dispute
+  introduction: A fictional scenario tracing work product through adversarial review.
+  collection: synthetic
+  practice_area: Property and land use
+  work_product: Appellate brief
+  jurisdiction: California
+  court_level: state-appellate
+  task: appellate-brief
+- schema_version: '1.0'
+  demo_id: civil-rights-argument
+  title: Civil-rights claim
+  introduction: A fictional scenario tracing work product through adversarial review.
+  collection: synthetic
+  practice_area: Civil rights
+  work_product: Oral-argument preparation and Q&A
+  jurisdiction: Seventh Circuit
+  court_level: federal-appellate
+  task: oral-argument
+- schema_version: '1.0'
+  demo_id: musk-openai
+  title: Musk v. Altman / OpenAI
+  introduction: Historical counterfactual strategy exercise.
+  collection: public-record
+  practice_area: Nonprofit governance
+  work_product: Preliminary-injunction motion
+  jurisdiction: Northern District of California
+  court_level: federal-trial
+  task: motion
+  cutoff: '2025-02-03'
+  represented_side: Applicants
+- schema_version: '1.0'
+  demo_id: dominion-fox
+  title: Dominion v. Fox
+  introduction: Historical counterfactual strategy exercise.
+  collection: public-record
+  practice_area: Defamation
+  work_product: Summary-judgment strategy
+  jurisdiction: Delaware
+  court_level: state-trial
+  task: motion
+  cutoff: '2023-03-21'
+  represented_side: Fox News Network
+- schema_version: '1.0'
+  demo_id: epic-apple
+  title: Epic v. Apple
+  introduction: Historical counterfactual strategy exercise.
+  collection: public-record
+  practice_area: Competition
+  work_product: Appellate brief
+  jurisdiction: Ninth Circuit
+  court_level: federal-appellate
+  task: appellate-brief
+  cutoff: '2022-11-13'
+  represented_side: Epic
+- schema_version: '1.0'
+  demo_id: tesla-tornetta
+  title: Tesla compensation / Tornetta
+  introduction: Historical counterfactual strategy exercise.
+  collection: public-record
+  practice_area: Corporate governance
+  work_product: Appellate remedial strategy
+  jurisdiction: Delaware
+  court_level: state-appellate
+  task: appellate-brief
+  cutoff: '2025-10-14'
+  represented_side: Shareholder appellee
+- schema_version: '1.0'
+  demo_id: google-oracle
+  title: Google v. Oracle
+  introduction: Historical counterfactual strategy exercise.
+  collection: public-record
+  practice_area: Copyright
+  work_product: Oral-argument preparation and Q&A
+  jurisdiction: U.S. Supreme Court
+  court_level: supreme
+  task: oral-argument
+  cutoff: '2020-10-06'
+  represented_side: Oracle
+- schema_version: '1.0'
+  demo_id: supplier-termination
+  title: Can we terminate this supplier?
+  introduction: A fictional scenario tracing work product through adversarial review.
+  collection: business
+  practice_area: Commercial contracts
+  work_product: Contract analysis and notice
+  jurisdiction: Minnesota
+  court_level: advisory
+  task: business-advice
+- schema_version: '1.0'
+  demo_id: liability-cap
+  title: Our customer demands unlimited liability
+  introduction: A fictional scenario tracing work product through adversarial review.
+  collection: business
+  practice_area: Commercial contracts
+  work_product: Negotiation positions and revised clause
+  jurisdiction: New York
+  court_level: advisory
+  task: business-advice
+- schema_version: '1.0'
+  demo_id: ai-customer-data
+  title: Can we use customer data for this AI feature?
+  introduction: A fictional scenario tracing work product through adversarial review.
+  collection: business
+  practice_area: Privacy and technology
+  work_product: Privacy and contractual risk assessment
+  jurisdiction: California / U.S. federal
+  court_level: advisory
+  task: business-advice
+- schema_version: '1.0'
+  demo_id: worker-classification
+  title: Can we classify these workers as contractors?
+  introduction: A fictional scenario tracing work product through adversarial review.
+  collection: business
+  practice_area: Employment
+  work_product: Classification analysis and checklist
+  jurisdiction: California / U.S. federal
+  court_level: advisory
+  task: business-advice
+- schema_version: '1.0'
+  demo_id: competitor-recruitment
+  title: A competitor recruited our sales team
+  introduction: A fictional scenario tracing work product through adversarial review.
+  collection: business
+  practice_area: Employment and trade secrets
+  work_product: Covenant and trade-secret assessment
+  jurisdiction: Massachusetts
+  court_level: advisory
+  task: business-advice
+- schema_version: '1.0'
+  demo_id: comparative-advertising
+  title: Can we say our product is better?
+  introduction: A fictional scenario tracing work product through adversarial review.
+  collection: business
+  practice_area: Advertising
+  work_product: Advertising review and proposed revisions
+  jurisdiction: New York / U.S. federal
+  court_level: advisory
+  task: business-advice
+- schema_version: '1.0'
+  demo_id: open-source-release
+  title: We found open-source code. Can we ship?
+  introduction: A fictional scenario tracing work product through adversarial review.
+  collection: business
+  practice_area: Intellectual property
+  work_product: License analysis and release conditions
+  jurisdiction: U.S. copyright
+  court_level: advisory
+  task: business-advice
+- schema_version: '1.0'
+  demo_id: distributor-restrictions
+  title: Exclusive territory and minimum resale prices?
+  introduction: A fictional scenario tracing work product through adversarial review.
+  collection: business
+  practice_area: Competition
+  work_product: Competition review and alternatives
+  jurisdiction: California / U.S. federal
+  court_level: advisory
+  task: business-advice
+- schema_version: '1.0'
+  demo_id: customer-data-incident
+  title: We may have exposed customer information
+  introduction: A fictional scenario tracing work product through adversarial review.
+  collection: business
+  practice_area: Privacy and security
+  work_product: Incident response and notification analysis
+  jurisdiction: California / New York
+  court_level: advisory
+  task: business-advice
+- schema_version: '1.0'
+  demo_id: acquisition-diligence
+  title: Which legal issues could derail this acquisition?
+  introduction: A fictional scenario tracing work product through adversarial review.
+  collection: business
+  practice_area: Corporate transactions
+  work_product: Diligence priorities and deal protections
+  jurisdiction: Delaware / U.S. federal
+  court_level: advisory
+  task: business-advice

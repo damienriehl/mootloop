@@ -3068,6 +3068,20 @@
             "title": "Created At",
             "type": "string"
           },
+          "document_input_refs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Document Input Refs",
+            "type": "array"
+          },
+          "document_input_sha256": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Document Input Sha256",
+            "type": "object"
+          },
           "folio_iri": {
             "anyOf": [
               {

@@ -47,6 +47,15 @@ from mootloop.models.context import (
 from mootloop.models.conversion import ConversionReceipt
 from mootloop.models.corpus import Manifest
 from mootloop.models.decisions import Decision
+from mootloop.models.demo import (
+    DemoCatalog,
+    DemoDescriptor,
+    DemoSnapshot,
+    LocalInputBundle,
+    PublicationReview,
+    SourceReference,
+)
+from mootloop.models.document_task import DocumentTaskInput
 from mootloop.models.evidence import RunEvidencePack, RunStatusSidecar, TraceTree
 from mootloop.models.facts import Fact
 from mootloop.models.judge_profiles import JudgeProfile
@@ -105,6 +114,12 @@ class MatterScopedStore(BaseModel):
 # vault subtree is purged, and each row is resolved via `safe_vault_path` first to
 # prove containment and to count what was removed.
 MATTER_SCOPED_STORES: tuple[MatterScopedStore, ...] = (
+    MatterScopedStore(
+        name="document-inputs",
+        glob="documents/*.json",
+        description="Frozen document-task preparation inputs.",
+        model=DocumentTaskInput,
+    ),
     MatterScopedStore(
         name="matter-config",
         glob="matter.yaml",
@@ -341,6 +356,12 @@ MATTER_SCOPED_STORES: tuple[MatterScopedStore, ...] = (
 # Concrete `VersionedModel`s that are deliberately NOT matter-scoped-purgeable, each
 # with the reason the invariant records instead of demanding a store.
 EXEMPT_MODELS: dict[type[VersionedModel], str] = {
+    DemoCatalog: "Reviewed public release projection, never an active matter store.",
+    DemoDescriptor: "Public catalog metadata, contains no confidential matter data.",
+    DemoSnapshot: "Reviewed public work-product projection, stored outside active vaults.",
+    LocalInputBundle: "Reviewed public input package, not an imported active vault.",
+    PublicationReview: "Public artifact digest receipt; does not confer legal approval.",
+    SourceReference: "Public source metadata; original case packets remain external.",
     CloseIntent: "Off-vault prepared close evidence; survives partial destructive operations.",
     PersonaOracleAnswerKey: (
         "Synthetic answer keys are versioned test-only repo fixtures, never matter data or "

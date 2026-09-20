@@ -127,8 +127,8 @@ class MatterRegistry:
     def _summarize(matter: MatterConfig, rel_path: str) -> MatterSummary:
         return MatterSummary(
             matter_id=MatterId(matter.matter_id),
-            display_name=matter.caption.court_name,
-            case_number=matter.caption.case_number,
+            display_name=matter.caption.court_name if matter.caption else (matter.client or ""),
+            case_number=matter.caption.case_number if matter.caption else "",
             rel_path=rel_path,
             loaded=True,
         )

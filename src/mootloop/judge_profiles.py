@@ -49,11 +49,61 @@ _DISPOSITIONS = (
 )
 _US_JURISDICTIONS = frozenset(
     {
-        "AK", "AL", "AR", "AS", "AZ", "CA", "CO", "CT", "DC", "DE", "FL",
-        "GA", "GU", "HI", "IA", "ID", "IL", "IN", "KS", "KY", "LA", "MA",
-        "MD", "ME", "MI", "MN", "MO", "MP", "MS", "MT", "NC", "ND", "NE",
-        "NH", "NJ", "NM", "NV", "NY", "OH", "OK", "OR", "PA", "PR", "RI",
-        "SC", "SD", "TN", "TX", "UT", "VA", "VI", "VT", "WA", "WI", "WV",
+        "AK",
+        "AL",
+        "AR",
+        "AS",
+        "AZ",
+        "CA",
+        "CO",
+        "CT",
+        "DC",
+        "DE",
+        "FL",
+        "GA",
+        "GU",
+        "HI",
+        "IA",
+        "ID",
+        "IL",
+        "IN",
+        "KS",
+        "KY",
+        "LA",
+        "MA",
+        "MD",
+        "ME",
+        "MI",
+        "MN",
+        "MO",
+        "MP",
+        "MS",
+        "MT",
+        "NC",
+        "ND",
+        "NE",
+        "NH",
+        "NJ",
+        "NM",
+        "NV",
+        "NY",
+        "OH",
+        "OK",
+        "OR",
+        "PA",
+        "PR",
+        "RI",
+        "SC",
+        "SD",
+        "TN",
+        "TX",
+        "UT",
+        "VA",
+        "VI",
+        "VT",
+        "WA",
+        "WI",
+        "WV",
         "WY",
     }
 )
@@ -128,9 +178,7 @@ def calibrate_judge_profile(
     training_labels: list[str] = []
     holdout_labels: list[str] = []
     for index, (snapshot, disposition) in enumerate(labeled, start=1):
-        split: Literal["training", "holdout"] = (
-            "holdout" if index % 5 == 0 else "training"
-        )
+        split: Literal["training", "holdout"] = "holdout" if index % 5 == 0 else "training"
         if split == "training":
             training_labels.append(disposition)
         else:
@@ -317,9 +365,7 @@ class JudgeProfileStore:
             if same_evidence != profile:
                 raise CitationError("content-addressed judge profile conflicts") from None
             body = existing_body
-        atomic_write_text(
-            safe_vault_path(self.vault_root, *PROFILE_DIR, "current.json"), body
-        )
+        atomic_write_text(safe_vault_path(self.vault_root, *PROFILE_DIR, "current.json"), body)
         return path
 
     def latest(self) -> JudgeProfile:
@@ -338,9 +384,7 @@ class JudgeProfileStore:
         archive_path = self._archive_path(profile.profile_id)
         if not archive_path.is_file():
             raise CitationError("current judge profile has no write-once archive")
-        archived = JudgeProfile.model_validate_json(
-            archive_path.read_text(encoding="utf-8")
-        )
+        archived = JudgeProfile.model_validate_json(archive_path.read_text(encoding="utf-8"))
         if archived != profile:
             raise CitationError("current judge profile does not match its archive")
         return profile
@@ -374,10 +418,11 @@ def profile_context_contribution(
 
 def profile_matches_matter(profile: JudgeProfile, matter: MatterConfig) -> bool:
     """Match a stored profile using the same canonical identity used at build time."""
-    judge_name = matter.caption.judge_name
+    judge_name = matter.caption.judge_name if matter.caption else None
     return bool(
         judge_name
         and profile.judge_name == _normalized_name(judge_name)
+        and matter.caption is not None
         and profile.court_name == matter.caption.court_name
         and profile.jurisdiction_state == matter.jurisdiction.state.strip()
     )
@@ -392,8 +437,8 @@ def build_assigned_judge_profile(
     heartbeat: Callable[[], None] | None = None,
 ) -> JudgeProfileBuildResult:
     """Build and store an honest profile, or emit an explicit human-research item."""
-    judge_name = matter.caption.judge_name
-    if not judge_name:
+    judge_name = matter.caption.judge_name if matter.caption else None
+    if not judge_name or matter.caption is None:
         reason = "matter caption has no assigned judge"
         return JudgeProfileBuildResult(
             None,

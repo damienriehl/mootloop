@@ -188,6 +188,24 @@ def _contribution_items(
         )
 
 
+def _document_items(manifest: RunContextManifest) -> Iterable[AssembledContextItem]:
+    for document in manifest.document_inputs:
+        for source in document.evidence:
+            text = f"[{source.classification}; available {source.available_on}]\n{source.text}"
+            yield AssembledContextItem(
+                context_id=f"document:{document.input_id}:{source.source_id}",
+                kind="corpus_passage",
+                text=text,
+                sha256=_sha(text),
+                provenance_locator=f"documents/{document.input_id}.json#{source.source_id}",
+                source_matter_id=manifest.matter_id,
+                task_scope=(manifest.task,),
+                persona_scope=tuple(PersonaName) if source.public else (),
+                trust="untrusted_data",
+                permission="matter_confidential",
+            )
+
+
 def assemble_context(
     manifest: RunContextManifest, snapshot: CorpusSnapshot
 ) -> tuple[AssembledContextItem, ...]:
@@ -197,6 +215,9 @@ def assemble_context(
         *_corpus_items(manifest, snapshot),
         *_contribution_items(manifest),
     ]
+    if manifest.adapter_config.input_family == "document":
+        # Historical strategy contexts never inherit unrelated corpus/facts/memory.
+        items = list(_document_items(manifest))
     items.sort(key=lambda item: (_KIND_ORDER[item.kind], item.context_id))
     if len(items) > MAX_CONTEXT_ITEMS:
         raise OrchestratorError(

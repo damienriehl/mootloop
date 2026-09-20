@@ -123,9 +123,7 @@ def test_registry_rejects_unknown_future_version() -> None:
         ),
     ],
 )
-def test_registry_rejects_invalid_migration_output(
-    migration: Any, message: str
-) -> None:
+def test_registry_rejects_invalid_migration_output(migration: Any, message: str) -> None:
     registry = MigrationRegistry()
     registry.register(ExampleRecord, "1.0", "2.0", migration)
     registry.register(ExampleRecord, "2.0", "3.0", _upgrade_2_to_3)
@@ -210,6 +208,7 @@ def test_run_context_v1_0_migrates_from_captured_fields_without_rewriting(
     legacy_adapter = payload["adapter_config"]
     legacy_adapter.pop("overridable")
     legacy_adapter.pop("pipeline_strategies")
+    legacy_adapter.pop("input_family")
     legacy_raw = (json.dumps(payload, indent=2) + "\n").encode()
     manifest_path.write_bytes(legacy_raw)
 
@@ -230,7 +229,7 @@ def test_run_context_v1_0_migrates_from_captured_fields_without_rewriting(
     migrated = load_run_context(vault, run_id)
 
     assert manifest_path.read_bytes() == legacy_raw
-    assert migrated.manifest.schema_version == "1.5"
+    assert migrated.manifest.schema_version == "1.6"
     assert migrated.manifest.task_spec_lock is None
     assert migrated.manifest.context_contributions == []
     assert migrated.manifest.context_exclusions == []

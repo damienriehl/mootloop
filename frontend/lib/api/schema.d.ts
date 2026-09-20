@@ -2340,6 +2340,12 @@ export interface components {
         TaskSpec: {
             /** Created At */
             created_at: string;
+            /** Document Input Refs */
+            document_input_refs?: string[];
+            /** Document Input Sha256 */
+            document_input_sha256?: {
+                [key: string]: string;
+            };
             /** Folio Iri */
             folio_iri?: string | null;
             /** Folio Label */

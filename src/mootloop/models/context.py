@@ -18,6 +18,7 @@ from mootloop.models.common import (
 )
 from mootloop.models.config import ResolvedRunConfig
 from mootloop.models.corpus import Manifest
+from mootloop.models.document_task import DocumentTaskInput
 from mootloop.models.facts import Fact
 from mootloop.models.matter import MatterConfig
 from mootloop.models.pipeline import ResolvedPipeline
@@ -27,7 +28,7 @@ from mootloop.models.run import PersonaName
 from mootloop.models.task import TaskAdapterConfig
 from mootloop.models.taskspec import TaskSpec, TaskSpecLock
 
-SCHEMA_VERSION = "1.5"
+SCHEMA_VERSION = "1.6"
 CORPUS_SNAPSHOT_SCHEMA_VERSION = "1.0"
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _CONTRIBUTION_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._:-]{0,127}$")
@@ -38,6 +39,7 @@ ContextSourceKind = Literal[
     "rubric_lock",
     "fact_repository",
     "request_set",
+    "document_input",
     "task_spec",
     "task_spec_lock",
     "corpus_manifest",
@@ -220,6 +222,7 @@ class RunContextManifest(VersionedModel):
     adapter_behavior: AdapterBehavior
     persona_bodies: dict[PersonaName, str]
     rubric: Rubric
+    document_inputs: list[DocumentTaskInput] = Field(default_factory=list)
     request_sets: list[RequestSet] = Field(default_factory=list)
     facts: list[Fact] = Field(default_factory=list)
     corpus_manifest: Manifest = Field(default_factory=Manifest)
@@ -231,6 +234,24 @@ class RunContextManifest(VersionedModel):
     max_attempts: int = Field(ge=1)
     tier_models: dict[str, str]
     sources: list[ContextSource]
+
+    @model_validator(mode="after")
+    def validate_input_family(self) -> RunContextManifest:
+        if self.adapter_config.input_family == "document":
+            if self.request_sets or not self.document_inputs:
+                raise ValueError(
+                    "document task requires document inputs without discovery requests"
+                )
+            if any(item.task != self.task for item in self.document_inputs):
+                raise ValueError("document input task does not match manifest")
+            identities = [u.unit_id for item in self.document_inputs for u in item.units]
+            if len(set(identities)) != len(identities):
+                raise ValueError("duplicate document unit identity")
+            if len({item.strategy_id for item in self.document_inputs}) != 1:
+                raise ValueError("document context cannot mix strategy identities")
+        elif self.document_inputs:
+            raise ValueError("discovery context cannot contain document inputs")
+        return self
 
     @model_validator(mode="after")
     def validate_task_spec_lock_identity(self) -> RunContextManifest:
