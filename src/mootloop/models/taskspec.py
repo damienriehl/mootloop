@@ -43,7 +43,11 @@ def canonical_sha256(value: object) -> str:
 
 def task_spec_sha256(spec: TaskSpec) -> str:
     """Digest the complete canonical TaskSpec, including its schema version."""
-    return canonical_sha256(spec.model_dump(mode="json"))
+    payload = spec.model_dump(mode="json")
+    if not spec.document_input_refs and not spec.document_input_sha256:
+        payload.pop("document_input_refs")
+        payload.pop("document_input_sha256")
+    return canonical_sha256(payload)
 
 
 class TaskSpec(VersionedModel):
@@ -65,6 +69,8 @@ class TaskSpec(VersionedModel):
     folio_label: str | None = None
     utbms: str | None = None
     request_set_refs: list[str] = Field(default_factory=list)
+    document_input_refs: list[str] = Field(default_factory=list)
+    document_input_sha256: dict[str, str] = Field(default_factory=dict)
     created_at: str
 
     @property

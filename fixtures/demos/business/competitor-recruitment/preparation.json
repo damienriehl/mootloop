@@ -1,0 +1,188 @@
+{
+  "schema_version": "1.0",
+  "descriptor": {
+    "schema_version": "1.0",
+    "demo_id": "competitor-recruitment",
+    "title": "A competitor recruited our sales team",
+    "introduction": "Can a competitor hire our sales team and use its files? A fictional business decision with a reviewed action document.",
+    "collection": "business",
+    "practice_area": "Employment and trade secrets",
+    "work_product": "Covenant and trade-secret assessment",
+    "jurisdiction": "Massachusetts",
+    "court_level": "advisory",
+    "task": "business-advice"
+  },
+  "strategies": [
+    {
+      "strategy_id": "reviewed-advice",
+      "title": "Advice tested against business and legal risks",
+      "input_ids": [
+        "advice"
+      ],
+      "input_summary": "Fictional Baylight Analytics employs six Massachusetts sales staff. Three resign for a competitor on September 18, 2026. Their 2023 agreements include confidentiality clauses and a customer nonsolicitation clause; no employee noncompetition covenant is supplied. A log shows one employee downloaded a 400-row customer pricing file two days before departure, but downloads also occurred during normal sales work. Baylight has not found evidence of competitor use or customer diversion. The file combines public customer names with nonpublic renewal dates and individually negotiated pricing. HR wants to threaten immediate litigation against the competitor and tell all customers the departing staff stole trade secrets.",
+      "assumptions": [
+        "All business facts and organizations in this scenario are fictional.",
+        "Missing facts must remain unresolved rather than assumed favorable."
+      ],
+      "source_ids": [
+        "ma-noncompete",
+        "ma-trade-secret"
+      ],
+      "outputs": {
+        "advice": {
+          "initial": {
+            "response_text": "## Recommendation\nThe downloads prove theft. Send the competitor a demand to fire the recruits and announce the theft to customers because the noncompetition statute bars their work.\n\n## Proposed action\nProceed on that recommendation using the supplied business objective; this initial draft has not yet addressed the opposing critique.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "ma-noncompete",
+              "ma-trade-secret"
+            ],
+            "attorney_gate_items": [
+              "Verify missing facts, governing legal requirements and the secondary document before use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted demonstration, not an independent model or attorney opinion."
+          },
+          "revised": {
+            "response_text": "## Recommendation\nPreserve evidence and investigate access, retention and actual use before accusing anyone of theft. Request return or deletion of company confidential information through a measured counsel letter, while preserving litigation evidence and allowing lawful employment. Assess the precise nonsolicitation language separately; do not manufacture a noncompete that the agreements do not contain.\n\n## Risks\nThe pricing compilation may qualify for protection only if the statutory elements and reasonable secrecy measures are supported. Public names alone do not establish a secret; nonpublic pricing and renewal data may have different significance. A legitimate work download is an adverse explanation that must be tested. Section 24L is not a general prohibition on employee mobility and does not decide every confidentiality or nonsolicitation dispute.\n\n## Options\nA confidential preservation and return request can stop avoidable dissemination without prematurely alleging theft. A negotiated information firewall at the competitor may help if supported by evidence and workable controls. Emergency relief should be considered only after identifying protected material, wrongful conduct, urgency and proportionate relief; it may fail if the only evidence is ordinary access.\n\n## Next Steps\nIT should preserve audit logs and relevant devices without accessing personal accounts unlawfully. Legal should map each disputed file to secrecy controls, authorized access and observed activity. HR should collect signed agreements and onboarding/exit notices. Sales should monitor factual account developments without disparaging former employees. Counsel should approve any demand or court filing.\n\n## Secondary Deliverable\n**Preservation and return request — draft**\nWe understand that former Baylight employees have joined your business. Baylight does not object to lawful employment or competition. Its review has identified downloads of company pricing materials near departure; we are investigating their context and do not represent that misuse has been established. Please preserve potentially relevant records and take reasonable steps to prevent any Baylight confidential material from entering your systems or being used. Through counsel, please coordinate an evidence-preserving review and return or secure quarantine of any identified Baylight material. Do not delete potentially relevant evidence before an agreed preservation protocol. We propose discussing a narrowly tailored information firewall. This request does not seek competitors’ independent work or public information.\n\n## Source boundary\nLaw-as-of preparation: September 20, 2026. Source summaries and links are in the input packet. This draft does not establish citation currency or attorney approval.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "ma-noncompete",
+              "ma-trade-secret"
+            ],
+            "attorney_gate_items": [
+              "Verify missing facts, governing legal requirements and the secondary document before use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted demonstration, not an independent model or attorney opinion."
+          },
+          "critique": {
+            "verdict": "revise",
+            "critiques": [
+              "No noncompete is supplied; recruitment and competition alone are not misappropriation.",
+              "A download is a lead, not proof of improper acquisition, retention or use. Separate public customer names from protected information.",
+              "Public accusations can create new claims and destroy a proportionate investigation."
+            ],
+            "instructions": [
+              "Replace the initial recommendation with the supported alternatives and missing-fact analysis.",
+              "Include the complete action document and identify its unresolved prerequisites."
+            ],
+            "self_assessment": "Scripted adversarial review; these objections remain inspectable after revision."
+          },
+          "assessment": {
+            "disposition": "revise",
+            "reasons": [
+              "The revised response could preserve evidence and reduce dissemination while avoiding an unsupported accusation. If no retention or misuse is found, litigation may offer little benefit. If use and protected status are documented, targeted relief becomes more credible; recruitment itself remains lawful unless a separate enforceable constraint applies."
+            ],
+            "limitations": [
+              "This is a fictional, agent-authored scenario replayed without model calls.",
+              "Unresolved factual and legal questions require qualified counsel; this is not attorney approval."
+            ],
+            "self_assessment": "A qualified assessment of the revised approach, not a predicted outcome."
+          },
+          "initial_rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 1,
+                "evidence": "No noncompete is supplied; recruitment and competition alone are not misappropriation."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 1,
+                "evidence": "A download is a lead, not proof of improper acquisition, retention or use. Separate public customer names from protected information."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 1,
+                "evidence": "Public accusations can create new claims and destroy a proportionate investigation."
+              }
+            ],
+            "overall_notes": "Prepared editorial scores of this scripted draft, not a success probability or independent legal validation.",
+            "self_assessment": "Initial gaps require revision."
+          },
+          "rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 4,
+                "evidence": "Preserve evidence and investigate access, retention and actual use before accusing anyone of theft. Request return or deletion of company confidential information through a measured counsel letter, while preserving litigation evidence and allowing lawful employment. Assess the precise nonsolicitation language separately; do not manufacture a noncompete that the agreements do not contain."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 4,
+                "evidence": "The pricing compilation may qualify for protection only if the statutory elements and reasonable secrecy measures are supported. Public names alone do not establish a secret; nonpublic pricing and renewal data may have different significance. A legitimate work download is an adverse explanation that must be tested. Section 24L is not a general prohibition on employee mobility and does not decide every confidentiality or nonsolicitation dispute."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 4,
+                "evidence": "The revised response could preserve evidence and reduce dissemination while avoiding an unsupported accusation. If no retention or misuse is found, litigation may offer little benefit. If use and protected status are documented, targeted relief becomes more credible; recruitment itself remains lawful unless a separate enforceable constraint applies."
+              }
+            ],
+            "overall_notes": "Prepared editorial scores of this scripted draft, not a success probability or independent legal validation.",
+            "self_assessment": "The revision addresses the scripted critique; factual and legal limits remain."
+          }
+        }
+      }
+    }
+  ],
+  "sources": [
+    {
+      "schema_version": "1.0",
+      "source_id": "ma-noncompete",
+      "title": "Massachusetts General Laws149§24L",
+      "url": "https://malegislature.gov/Laws/GeneralLaws/PartI/TitleXXI/Chapter149/Section24L",
+      "available_on": "2026-09-20",
+      "filed_on": null,
+      "effective_on": null,
+      "retrieved_on": "2026-09-20",
+      "sha256": "7dc650081c037465141bc4fde779ebf320b9104740935b1e50d7a2e9f82e1810",
+      "locator": "Subsections(a) definitions, (b) conditions, (c) exclusions",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Link to the acquired primary authority; local inputs contain concise original summaries, not wholesale source copies. Availability date records confirmed public availability at preparation."
+    },
+    {
+      "schema_version": "1.0",
+      "source_id": "ma-trade-secret",
+      "title": "Massachusetts General Laws93§42",
+      "url": "https://malegislature.gov/Laws/GeneralLaws/PartI/TitleXV/Chapter93/Section42",
+      "available_on": "2026-09-20",
+      "filed_on": null,
+      "effective_on": null,
+      "retrieved_on": "2026-09-20",
+      "sha256": "fc38221b4afedd0dfc021a6e4fb25eaaf3faa47c007511f9fe9485bff9f2f3da",
+      "locator": "Definitions of improper means, misappropriation and trade secret",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Link to primary authority; only original summaries included in example inputs."
+    }
+  ],
+  "claims": [
+    {
+      "claim": "Massachusetts section 24L addresses employee noncompetition agreements and expressly distinguishes specified other agreements; do not assume every nonsolicitation or confidentiality term is governed identically.",
+      "source_ids": [
+        "ma-noncompete"
+      ],
+      "locator": "Subsections(a) definitions, (b) conditions, (c) exclusions",
+      "classification": "law"
+    },
+    {
+      "claim": "Massachusetts trade-secret protection depends on statutory secrecy/value and reasonable protective measures, with misappropriation requiring more than lawful recruitment.",
+      "source_ids": [
+        "ma-trade-secret"
+      ],
+      "locator": "Definitions of improper means, misappropriation and trade secret",
+      "classification": "law"
+    }
+  ],
+  "limitations": [
+    "Fictional business facts; no actual client data.",
+    "Prepared scripts and editorial scoring, with zero live model calls.",
+    "Sources were checked for this bounded preparation on September 20, 2026; no exhaustive legal review or attorney approval."
+  ]
+}

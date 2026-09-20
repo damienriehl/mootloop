@@ -95,9 +95,7 @@ class TaskSpecStore:
                 spec = TaskSpec.model_validate_json(line)
                 key = str(spec.task_spec_id)
                 if key in seen:
-                    raise TaskSpecError(
-                        f"TaskSpec store integrity failure: duplicate id {key!r}"
-                    )
+                    raise TaskSpecError(f"TaskSpec store integrity failure: duplicate id {key!r}")
                 seen.add(key)
                 specs.append(spec)
         return specs
@@ -149,11 +147,7 @@ class TaskSpecLockStore:
         return records
 
     def latest(self, task_spec_id: str) -> TaskSpecLock | None:
-        records = [
-            record
-            for record in self.list_all()
-            if str(record.task_spec_id) == task_spec_id
-        ]
+        records = [record for record in self.list_all() if str(record.task_spec_id) == task_spec_id]
         return records[-1] if records else None
 
     def append(self, record: TaskSpecLock) -> None:
@@ -181,8 +175,7 @@ def _lock_material(
     lock_file = rubric_file.with_suffix(".sha256")
     if not binding.rubric.locked:
         raise TaskSpecError(
-            f"TaskSpec task {task!r} uses rubric {binding.rubric.rubric_id!r} "
-            "that is not locked"
+            f"TaskSpec task {task!r} uses rubric {binding.rubric.rubric_id!r} that is not locked"
         )
     try:
         first = (
@@ -234,6 +227,23 @@ def _same_approval(
     )
 
 
+def validate_document_refs(vault_root: Path | str, spec: TaskSpec) -> None:
+    if not spec.document_input_refs and not spec.document_input_sha256:
+        return
+    from mootloop.context import load_document_inputs
+    from mootloop.errors import OrchestratorError
+
+    if spec.task is None or set(spec.document_input_refs) != set(spec.document_input_sha256):
+        raise TaskSpecError("document input references require exact approved digests")
+    try:
+        _, sources = load_document_inputs(vault_root, spec.task, spec.document_input_refs)
+    except OrchestratorError as exc:
+        raise TaskSpecError(str(exc)) from exc
+    actual = {Path(source.locator).stem: source.sha256 for source in sources}
+    if actual != spec.document_input_sha256:
+        raise TaskSpecError("document input changed after TaskSpec approval; create a new spec")
+
+
 def lock_task_spec(
     vault_root: Path | str,
     matter_id: str,
@@ -281,6 +291,7 @@ def lock_task_spec(
                 lock_locator,
                 binding,
             ) = _lock_material(spec.task)
+            validate_document_refs(vault_root, spec)
             confirmed_spec = spec_store.get(task_spec_id)
             if confirmed_spec != spec:
                 raise TaskSpecError(
@@ -353,6 +364,7 @@ def require_current_lock(
         raise TaskSpecError(
             f"TaskSpec {spec.task_spec_id!r} lock has the wrong matter/task identity; re-lock it"
         )
+    validate_document_refs(vault_root, spec)
     checks = (
         (record.task_spec_sha256, task_spec_sha256(spec), "TaskSpec source"),
         (record.adapter_sha256, _sha256(adapter_raw), "adapter source"),

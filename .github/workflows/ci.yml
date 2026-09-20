@@ -71,3 +71,32 @@ jobs:
         run: npm run openapi:check
       - name: Build
         run: npm run build
+
+  public-demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - name: Sync dependencies
+        run: uv sync --extra web
+      - name: Fetch the pinned public release outside the checkout
+        run: |
+          mkdir -p "$RUNNER_TEMP/demo-release"
+          RELEASE_URL=$(python -c 'import json; print(json.load(open("config/demos/release.json"))["url"])')
+          curl --fail --location --proto '=https' --tlsv1.2 "$RELEASE_URL" -o "$RUNNER_TEMP/demo-release/release.tar"
+          uv run python tools/validate_demo_release.py "$RUNNER_TEMP/demo-release/release.tar" --pin config/demos/release.json --stage "$RUNNER_TEMP/demo-public"
+      - name: Replay every published strategy without model calls
+        run: |
+          RELEASE_ID=$(python -c 'import json; print(json.load(open("config/demos/release.json"))["release_id"])')
+          uv run python tools/check_demo_replays.py "$RUNNER_TEMP/demo-public/releases/$RELEASE_ID" "$RUNNER_TEMP/demo-replay-check"
+      - name: Build the public reader image
+        run: docker build --build-context demo_release="$RUNNER_TEMP/demo-release" -t mootloop-demo:test .
+      - name: Check the image without network or writable application files
+        run: |
+          docker run -d --name demo-smoke --network none --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m --cap-drop ALL --security-opt no-new-privileges mootloop-demo:test
+          docker exec -i demo-smoke python < tools/smoke_demo_runtime.py
+      - name: Remove smoke container
+        if: always()
+        run: docker rm -f demo-smoke || true

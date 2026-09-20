@@ -3,23 +3,37 @@ and the fail-closed deliverable-name handling (path traversal never escapes)."""
 
 from __future__ import annotations
 
-from pathlib import Path
+import json
 
 import pytest
 from fastapi.testclient import TestClient
 
-from mootloop.web.app import VAULT_ENV, app
+from mootloop.web.app import PUBLIC_ENV, app
 from mootloop.web.bake import DEMO_RUN_ID
+from mootloop.web.legacy_prepare import project_legacy
+from tests.unit.test_demo_publication import prepared_release
+
+
+@pytest.fixture(scope="module")
+def legacy_public(demo_vault, tmp_path_factory):
+    root = tmp_path_factory.mktemp("legacy-public")
+    release = prepared_release(root / "releases/release-1")
+    digest = project_legacy(demo_vault, release / "legacy.json")
+    catalog = json.loads((release / "catalog.json").read_text())
+    catalog["legacy_sha256"] = digest
+    (release / "catalog.json").write_text(json.dumps(catalog))
+    (root / "CURRENT").write_text("release-1\n")
+    return root
 
 
 @pytest.fixture
-def client(demo_vault: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
-    monkeypatch.setenv(VAULT_ENV, str(demo_vault))
+def client(legacy_public, monkeypatch):
+    monkeypatch.setenv(PUBLIC_ENV, str(legacy_public))
     return TestClient(app)
 
 
 def test_health_needs_no_vault(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv(VAULT_ENV, "/nonexistent")
+    monkeypatch.setenv(PUBLIC_ENV, "/nonexistent")
     body = TestClient(app).get("/health").json()
     assert body["status"] == "ok" and "version" in body
 

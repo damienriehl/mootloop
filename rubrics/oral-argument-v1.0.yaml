@@ -1,0 +1,55 @@
+rubric_id: oral-argument-v1.0
+version: '1.0'
+locked: true
+criteria:
+- id: document-section-position
+  name: Position
+  description: Contains a substantive position section.
+  kind: present
+  weight: 1
+  applies_to: all
+- id: document-section-questions
+  name: Questions
+  description: Contains a substantive questions section.
+  kind: present
+  weight: 1
+  applies_to: all
+- id: document-section-answers
+  name: Answers
+  description: Contains a substantive answers section.
+  kind: present
+  weight: 1
+  applies_to: all
+- id: document-section-concessions
+  name: Concessions
+  description: Contains a substantive concessions section.
+  kind: present
+  weight: 1
+  applies_to: all
+- id: document-section-closing
+  name: Closing
+  description: Contains a substantive closing section.
+  kind: present
+  weight: 1
+  applies_to: all
+- id: task-analysis
+  name: Task analysis
+  description: Evaluate hard bench questions, responsive answers, concessions, and
+    record support.
+  kind: correct
+  weight: 1
+  applies_to: all
+- id: record-grounding
+  name: Record grounding
+  description: Trace material assertions to eligible evidence; identify assumptions
+    and unresolved support.
+  kind: correct
+  weight: 1
+  applies_to: all
+- id: adversarial-response
+  name: Adversarial response
+  description: Answer the strongest counterarguments without overstating certainty
+    or outcome predictions.
+  kind: correct
+  weight: 1
+  applies_to: all

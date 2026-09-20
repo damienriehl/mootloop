@@ -34,6 +34,7 @@ def _commit_launch(
     run_id: str,
     mode: RunMode | None = None,
     task_spec_id: str | None = None,
+    document_input_refs: list[str] | None = None,
     idempotent: bool = True,
     queue: Queue | None = None,
     matter_id: MatterId | None = None,
@@ -74,6 +75,7 @@ def _commit_launch(
         run_id=run_id,
         mode=mode,
         task_spec_id=task_spec_id,
+        document_input_refs=document_input_refs,
         idempotent=idempotent,
         firm_preferences_path=configured_firm_preferences_path(),
         context_contributions=tuple(contributions),
@@ -92,6 +94,7 @@ def launch_run(
     run_id: str,
     mode: RunMode | None = None,
     task_spec_id: str | None = None,
+    document_input_refs: list[str] | None = None,
     idempotent: bool = True,
     queue: Queue | None = None,
     expected_matter_id: MatterId | None = None,
@@ -115,6 +118,7 @@ def launch_run(
         run_id=run_id,
         mode=mode,
         task_spec_id=task_spec_id,
+        document_input_refs=document_input_refs,
         idempotent=idempotent,
         queue=queue,
         matter_id=matter_id,
@@ -129,6 +133,7 @@ def launch_run_from_path(
     run_id: str,
     mode: RunMode | None = None,
     task_spec_id: str | None = None,
+    document_input_refs: list[str] | None = None,
     idempotent: bool = True,
     registry: MatterRegistry | None = None,
 ) -> str:
@@ -141,6 +146,7 @@ def launch_run_from_path(
         run_id=run_id,
         mode=mode,
         task_spec_id=task_spec_id,
+        document_input_refs=document_input_refs,
         idempotent=idempotent,
         queue=queue,
         matter_id=MatterId(matter.matter_id) if queue is not None else None,
@@ -172,8 +178,7 @@ def classify_vault_for_queue(
             queue = None
         else:
             raise VaultBoundaryError(
-                f"vault {vault_real} does not match registered matter "
-                f"path {registered.resolve()}"
+                f"vault {vault_real} does not match registered matter path {registered.resolve()}"
             )
     if queue is not None and registered.resolve() != vault_real:
         raise VaultBoundaryError(

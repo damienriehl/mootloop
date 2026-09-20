@@ -1,0 +1,63 @@
+{
+  "schema_version": "1.0",
+  "input_id": "advice",
+  "task": "business-advice",
+  "represented_side": "In-house counsel to the fictional business",
+  "jurisdiction": "California / U.S. federal",
+  "court_level": "advisory",
+  "cutoff": "2026-09-20",
+  "strategy_id": "reviewed-advice",
+  "assumptions": [
+    "All business facts and organizations in this scenario are fictional.",
+    "Missing facts must remain unresolved rather than assumed favorable."
+  ],
+  "preservation_constraints": [
+    "The packet is bounded to the listed authorities and facts; no comprehensive current-law clearance is implied."
+  ],
+  "units": [
+    {
+      "unit_id": "advice",
+      "title": "Can our regular installers remain contractors?",
+      "instructions": "Can our regular installers remain contractors? Analyze the supplied facts, alternatives, adverse consequences and missing information. Produce advice and the concrete secondary action document identified in the scenario. Required work product: Classification analysis and checklist.",
+      "issues": [
+        "Installation is part of Signal’s ordinary business, creating a serious ABC prong-B problem if the ABC test applies.",
+        "Paper licensing or a nominal customer does not change control and economic dependence.",
+        "Separate California exceptions and federal analysis; do not call a proposed federal rule binding law."
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "source_id": "scenario",
+      "text": "Fictional Signal Home sells and installs residential sensors in California. Twelve installers work year-round, receive routes and required 8 a.m.–5 p.m. availability from Signal, wear its logo, and use company diagnostic tools. Signal sets customer prices and pays installers a fixed amount per completed visit. The installers may decline weekend jobs but ordinarily work only for Signal. Contracts call them independent businesses; no separate customer base, advertising or qualifying statutory exception has been documented. Operations proposes renewing the same arrangement with new independent-contractor acknowledgments. Payroll cost estimates exclude overtime and past exposure.",
+      "sha256": "edac2f062e95e9415ea685338b0e26cb4434bbabb5cbb81c21dbdf2f8c7ce2fb",
+      "available_on": "2026-09-20",
+      "classification": "hypothetical",
+      "public": true
+    },
+    {
+      "source_id": "ca-worker",
+      "text": "Authority summary: California guidance describes the ABC test, the hiring entity’s burden, and exceptions requiring separate analysis; a contract label alone is not decisive.",
+      "sha256": "65ba24212ff81b592177bda5be8ed3514dc0a51de0fdca951056de3f14e3e2ec",
+      "available_on": "2026-09-20",
+      "classification": "record",
+      "public": true
+    },
+    {
+      "source_id": "dol-economic-reality",
+      "text": "Authority summary: Federal wage-and-hour classification examines economic dependence and the actual working relationship, separately from state law.",
+      "sha256": "db0fa131ca00e3293114a851ad5934a67c3504ebc0e29cc16f0e759d5b7c557e",
+      "available_on": "2026-09-20",
+      "classification": "record",
+      "public": true
+    },
+    {
+      "source_id": "dol-2026-proposal",
+      "text": "Authority summary: The inspected agency page describes a 2026 proposed rule; a proposal is not itself an operative final rule.",
+      "sha256": "33015901ca96408f82b67e5fac973f1918c19e6c1df513f4fb8b2e56ee5ef4fa",
+      "available_on": "2026-09-20",
+      "classification": "record",
+      "public": true
+    }
+  ]
+}

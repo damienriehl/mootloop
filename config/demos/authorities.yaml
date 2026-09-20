@@ -1,0 +1,432 @@
+schema_version: '1.0'
+law_as_of: '2026-09-20'
+policy: Primary authorities checked during preparation. Acquired artifacts remain
+  external; digests normally identify raw bytes, with extracted-text exceptions explicitly
+  stated per source. Only links and original summaries enter demo bundles. Review
+  is not attorney approval.
+sources:
+- schema_version: '1.0'
+  source_id: mn-installments
+  title: Minnesota Statutes336.2-612
+  url: https://www.revisor.mn.gov/statutes/cite/336.2-612
+  available_on: '2026-09-20'
+  filed_on: null
+  effective_on: null
+  retrieved_on: '2026-09-20'
+  sha256: 1c3027754396b865c639b0f5b46f6002eda03f1ec5a4b2d3c0c8af90c229f750
+  locator: 'Subsections2–3: installment and whole-contract breach'
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Link to the acquired primary authority; local inputs contain
+    concise original summaries, not wholesale source copies. Availability date records
+    confirmed public availability at preparation.
+- schema_version: '1.0'
+  source_id: mn-assurances
+  title: Minnesota Statutes336.2-609
+  url: https://www.revisor.mn.gov/statutes/cite/336.2-609
+  available_on: '2026-09-20'
+  filed_on: null
+  effective_on: null
+  retrieved_on: '2026-09-20'
+  sha256: 4f76f3bc0eca8d1913b946e93fd36c751d494eafcae06501b3f57989b1a8d795
+  locator: 'Subsections1–4: adequate assurance'
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Link to the acquired primary authority; local inputs contain
+    concise original summaries, not wholesale source copies. Availability date records
+    confirmed public availability at preparation.
+- schema_version: '1.0'
+  source_id: ny-liability
+  title: Matter of Part60 Put-Back Litigation, NY Court of Appeals2020
+  url: https://www.nycourts.gov/reporter/3dseries/2020/2020_07687.htm
+  available_on: '2026-09-20'
+  filed_on: null
+  effective_on: null
+  retrieved_on: '2026-09-20'
+  sha256: 923834a4293d9358d7f4a54c52300e4e02a5b3649d2eb387808ece8eede8fb87
+  locator: Opinion discussion of remedy limitation and exculpation
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Link to the acquired primary authority; local inputs contain
+    concise original summaries, not wholesale source copies. Availability date records
+    confirmed public availability at preparation.
+- schema_version: '1.0'
+  source_id: ca-privacy
+  title: California Attorney General CCPA guidance
+  url: https://www.oag.ca.gov/privacy/ccpa
+  available_on: '2026-09-20'
+  filed_on: null
+  effective_on: null
+  retrieved_on: '2026-09-20'
+  sha256: 74e1a2e06df14c7f4d8964a9cd7c8611fdb825742f855faee12eaf9c91d9a00e
+  locator: Business scope, consumer rights, service providers
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Link to the acquired primary authority; local inputs contain
+    concise original summaries, not wholesale source copies. Availability date records
+    confirmed public availability at preparation.
+- schema_version: '1.0'
+  source_id: ca-worker
+  title: California Labor Commissioner contractor FAQ
+  url: https://www.dir.ca.gov/dlse/faq_independentcontractor.htm
+  available_on: '2026-09-20'
+  filed_on: null
+  effective_on: null
+  retrieved_on: '2026-09-20'
+  sha256: 48a0141bb6781fac17645af9996bc814bfd1b6ce9b6a8a0605aedc1a7174b498
+  locator: ABC test and exceptions
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Link to the acquired primary authority; local inputs contain
+    concise original summaries, not wholesale source copies. Availability date records
+    confirmed public availability at preparation.
+- schema_version: '1.0'
+  source_id: ftc-comparative
+  title: FTC comparative-advertising policy
+  url: https://www.ftc.gov/legal-library/browse/statement-policy-regarding-comparative-advertising
+  available_on: '2026-09-20'
+  filed_on: null
+  effective_on: null
+  retrieved_on: '2026-09-20'
+  sha256: 11ea957abb183b73c107fcdda2c87d9224795962448fa992e42d1b592a89ad3a
+  locator: Comparative claims and deception
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Link to the acquired primary authority; local inputs contain
+    concise original summaries, not wholesale source copies. Availability date records
+    confirmed public availability at preparation.
+- schema_version: '1.0'
+  source_id: ftc-advertising
+  title: FTC advertising FAQs
+  url: https://www.ftc.gov/business-guidance/resources/advertising-faqs-guide-small-business
+  available_on: '2026-09-20'
+  filed_on: null
+  effective_on: null
+  retrieved_on: '2026-09-20'
+  sha256: 14c51bbb6d9552bc79bab1b5692df189d71ba59951a5face480a0bda3cab18a9
+  locator: Substantiation and misleading claims
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Link to the acquired primary authority; local inputs contain
+    concise original summaries, not wholesale source copies. Availability date records
+    confirmed public availability at preparation.
+- schema_version: '1.0'
+  source_id: apache-license
+  title: Apache License2.0
+  url: https://www.apache.org/licenses/LICENSE-2.0
+  available_on: '2026-09-20'
+  filed_on: null
+  effective_on: null
+  retrieved_on: '2026-09-20'
+  sha256: cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30
+  locator: 'Sections3–4: patents and redistribution'
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Link to the acquired primary authority; local inputs contain
+    concise original summaries, not wholesale source copies. Availability date records
+    confirmed public availability at preparation.
+- schema_version: '1.0'
+  source_id: ftc-distributor
+  title: FTC manufacturer-imposed requirements guidance
+  url: https://www.ftc.gov/advice-guidance/competition-guidance/guide-antitrust-laws/dealings-supply-chain/manufacturer-imposed-requirements
+  available_on: '2026-09-20'
+  filed_on: null
+  effective_on: null
+  retrieved_on: '2026-09-20'
+  sha256: d4166317984bb59cac9db3ace769af28b72811c0f746e14aee5562b8c0a212a9
+  locator: Federal treatment and state-law qualification
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Link to the acquired primary authority; local inputs contain
+    concise original summaries, not wholesale source copies. Availability date records
+    confirmed public availability at preparation.
+- schema_version: '1.0'
+  source_id: ny-breach
+  title: New York Attorney General breach reporting
+  url: https://ag.ny.gov/resources/organizations/data-breach-reporting
+  available_on: '2026-09-20'
+  filed_on: null
+  effective_on: null
+  retrieved_on: '2026-09-20'
+  sha256: f076191fc7d069ef8ee0db3fe2df3a9ed745b6c2a8660d21cf2ea92b0d1cc844
+  locator: Reporting duties and incident-response considerations
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Link to the acquired primary authority; local inputs contain
+    concise original summaries, not wholesale source copies. Availability date records
+    confirmed public availability at preparation.
+- schema_version: '1.0'
+  source_id: ca-breach
+  title: California Attorney General breach reporting
+  url: https://oag.ca.gov/privacy/databreach/reporting
+  available_on: '2026-09-20'
+  filed_on: null
+  effective_on: null
+  retrieved_on: '2026-09-20'
+  sha256: f53e27f8768cc35008b5a88aa2937fd751eed7e9b34e5478774c7f09c4377df7
+  locator: Resident notice and sample notice submission
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Link to the acquired primary authority; local inputs contain
+    concise original summaries, not wholesale source copies. Availability date records
+    confirmed public availability at preparation.
+- schema_version: '1.0'
+  source_id: de-merger
+  title: Delaware General Corporation Law§251
+  url: https://www.delcode.delaware.gov/title8/c001/sc09/
+  available_on: '2026-09-20'
+  filed_on: null
+  effective_on: null
+  retrieved_on: '2026-09-20'
+  sha256: 8131fc01dc1671e8d5bb805488b88fbbc920b55e54cb5e1dc24f27d5fae65712
+  locator: Board agreement and stockholder approval; structure-specific exceptions
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Link to the acquired primary authority; local inputs contain
+    concise original summaries, not wholesale source copies. Availability date records
+    confirmed public availability at preparation.
+- schema_version: '1.0'
+  source_id: ca-writ
+  title: California Code of Civil Procedure1094.5
+  url: https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=CCP&sectionNum=1094.5.
+  available_on: '2026-09-20'
+  filed_on: null
+  effective_on: null
+  retrieved_on: '2026-09-20'
+  sha256: ed0a91aef1b5c5acb951914cdfed157c0110b7b0423aafa5bb1924fb59550a99
+  locator: Subsections(b), (c), (e), (f)
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Link to the acquired primary authority; local inputs contain
+    concise original summaries, not wholesale source copies. Availability date records
+    confirmed public availability at preparation.
+- schema_version: '1.0'
+  source_id: tx-products
+  title: Texas Civil Practice and Remedies Code82.005
+  url: https://tcss.legis.texas.gov/resources/CP/htm/CP.82.htm
+  available_on: '2026-09-20'
+  filed_on: null
+  effective_on: null
+  retrieved_on: '2026-09-20'
+  sha256: 25384fba36aad9fcae4a70efdc312cef373d94e8e4aa4f61ddb60443277acfd3
+  locator: 'Subsections(a)–(b): alternative design and causation'
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Link to the acquired primary authority; local inputs contain
+    concise original summaries, not wholesale source copies. Availability date records
+    confirmed public availability at preparation.
+- schema_version: '1.0'
+  source_id: tolan
+  title: Tolan v. Cotton, 572U.S.650(2014)
+  url: https://www.law.cornell.edu/supremecourt/text/13-551
+  available_on: '2026-09-20'
+  filed_on: null
+  effective_on: null
+  retrieved_on: '2026-09-20'
+  sha256: fddbc68c77dd48fd634772658a5126de4dd06a3b81fbba93eccb3057316bd1a2
+  locator: Per curiam opinion, summary-judgment fact treatment
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Link to the acquired primary authority; local inputs contain
+    concise original summaries, not wholesale source copies. Availability date records
+    confirmed public availability at preparation.
+- schema_version: '1.0'
+  source_id: frcp
+  title: Federal Rules of Civil Procedure, December1,2025
+  url: https://www.uscourts.gov/sites/default/files/document/federal-rules-of-civil-procedure.pdf
+  available_on: '2026-09-20'
+  filed_on: null
+  effective_on: null
+  retrieved_on: '2026-09-20'
+  sha256: bd8705fc038d87e4fe222a7ea2e4324222c9430e2373fce56826bd2dfa2f8baf
+  locator: 'Rule56(a), (c), (d): summary judgment'
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Link to the acquired primary authority; local inputs contain
+    concise original summaries, not wholesale source copies. Availability date records
+    confirmed public availability at preparation.
+- schema_version: '1.0'
+  source_id: ma-noncompete
+  title: Massachusetts General Laws149§24L
+  url: https://malegislature.gov/Laws/GeneralLaws/PartI/TitleXXI/Chapter149/Section24L
+  available_on: '2026-09-20'
+  filed_on: null
+  effective_on: null
+  retrieved_on: '2026-09-20'
+  sha256: 7dc650081c037465141bc4fde779ebf320b9104740935b1e50d7a2e9f82e1810
+  locator: Subsections(a) definitions, (b) conditions, (c) exclusions
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Link to the acquired primary authority; local inputs contain
+    concise original summaries, not wholesale source copies. Availability date records
+    confirmed public availability at preparation.
+- schema_version: '1.0'
+  source_id: ny-retaliation
+  title: New York Labor Department Labor Law740 notice
+  url: https://dol.ny.gov/system/files/documents/2022/02/ls740_1.pdf
+  available_on: '2026-09-20'
+  filed_on: null
+  effective_on: null
+  retrieved_on: '2026-09-20'
+  sha256: 81565b695a9d2210cf4e4acea72487606e9d81460273855ebc92192683a52af1
+  locator: Statutory protections, employer notice, remedies
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Link to the acquired primary authority; local inputs contain
+    concise original summaries, not wholesale source copies. Availability date records
+    confirmed public availability at preparation.
+- schema_version: '1.0'
+  source_id: ca-purpose
+  title: California Civil Code1798.100
+  url: https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=CIV&sectionNum=1798.100.
+  available_on: '2026-09-20'
+  filed_on: null
+  effective_on: null
+  retrieved_on: '2026-09-20'
+  sha256: 605e2d46699cee0a3dc0d04fb04c3a11d867b2a9dccefda3a7d19f42f5216053
+  locator: 'Subsections(a), (c), (d): notice, purpose limits, agreements'
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Link to primary authority; only original summaries included
+    in example inputs.
+- schema_version: '1.0'
+  source_id: ma-trade-secret
+  title: Massachusetts General Laws93§42
+  url: https://malegislature.gov/Laws/GeneralLaws/PartI/TitleXV/Chapter93/Section42
+  available_on: '2026-09-20'
+  filed_on: null
+  effective_on: null
+  retrieved_on: '2026-09-20'
+  sha256: fc38221b4afedd0dfc021a6e4fb25eaaf3faa47c007511f9fe9485bff9f2f3da
+  locator: Definitions of improper means, misappropriation and trade secret
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Link to primary authority; only original summaries included
+    in example inputs.
+- schema_version: '1.0'
+  source_id: mit-license
+  title: MIT License, Open Source Initiative
+  url: https://opensource.org/license/mit
+  available_on: '2026-09-20'
+  filed_on: null
+  effective_on: null
+  retrieved_on: '2026-09-20'
+  sha256: 50bc1b7e87bdaa48f2ab04eb75c2e0ab8e34a6bd22d9ccbfdaf8c79793fb6db6
+  locator: Permission and copyright-notice condition
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Link to primary authority; only original summaries included
+    in example inputs.
+- schema_version: '1.0'
+  source_id: mn-rule-33
+  title: Minnesota Rule of Civil Procedure33
+  url: https://www.revisor.mn.gov/court_rules/cp/id/33/
+  available_on: '2026-09-20'
+  filed_on: null
+  effective_on: null
+  retrieved_on: '2026-09-20'
+  sha256: cee23e5baf760b6312c8dc18039131b061a19b98e26d40f459206cb957d7d80b
+  locator: 'Rule33: response and objection requirements'
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Link to primary court rule; original concise summaries only.
+- schema_version: '1.0'
+  source_id: mn-rule-34
+  title: Minnesota Rule of Civil Procedure34
+  url: https://www.revisor.mn.gov/court_rules/cp/id/34/
+  available_on: '2026-09-20'
+  filed_on: null
+  effective_on: null
+  retrieved_on: '2026-09-20'
+  sha256: 7fc303cfd3275ac413ec16775f3f49b9c28aa93e947e7b16cca2d02905fd73ef
+  locator: 'Rule34: response and objection requirements'
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Link to primary court rule; original concise summaries only.
+- schema_version: '1.0'
+  source_id: mn-rule-36
+  title: Minnesota Rule of Civil Procedure36
+  url: https://www.revisor.mn.gov/court_rules/cp/id/36/
+  available_on: '2026-09-20'
+  filed_on: null
+  effective_on: null
+  retrieved_on: '2026-09-20'
+  sha256: 018ec27dac1047c8a4c8118b87b3065314c0c3b819a4314f9b2b8530d337bc68
+  locator: 'Rule36: response and objection requirements'
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Link to primary court rule; original concise summaries only.
+- schema_version: '1.0'
+  source_id: dol-economic-reality
+  title: U.S. Department of Labor, independent-contractor compliance guide
+  url: https://www.dol.gov/agencies/whd/flsa/misclassification/small-entity-compliance-guide
+  available_on: '2026-09-20'
+  retrieved_on: '2026-09-20'
+  sha256: d05a07a103c942b61e5907d5c5b1f6deee106d8ee4a9349ade7be890d7eed2a4
+  locator: Economic dependence and totality-of-circumstances discussion
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Link and original short summary of inspected federal agency
+    guidance; availability date is preparation access date.
+- schema_version: '1.0'
+  source_id: dol-2026-proposal
+  title: U.S. Department of Labor, 2026 proposed-rule questions
+  url: https://www.dol.gov/agencies/whd/flsa/misclassification/2026rulemaking/faqs
+  available_on: '2026-09-20'
+  retrieved_on: '2026-09-20'
+  sha256: cc53a7d28cc15eb6bd82e94cf5d19feaf43cc46ba8182e53abf1039e2dd2ba53
+  locator: Proposal status; not a final rule
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Link and original short summary of inspected federal agency
+    guidance; availability date is preparation access date.
+- schema_version: '1.0'
+  source_id: ca-breach-statute
+  title: California Civil Code1798.82, effective January1,2026
+  url: https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=CIV&sectionNum=1798.82
+  available_on: '2026-09-20'
+  retrieved_on: '2026-09-20'
+  sha256: 4e71636d8bbb060590d5262783f707b6c3f6279bde9656dbaaa63305c596e001
+  locator: 'Subdivisions(a),(b),(f),(h): triggers,30-day consumer notice,15-day AG
+    submission'
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Primary authority inspected; only original summaries and links
+    redistributed. Availability is preparation access date.
+- schema_version: '1.0'
+  source_id: ny-shield
+  title: New York Attorney General SHIELD Act guidance
+  url: https://ag.ny.gov/resources/organizations/data-breach-reporting/shield-act
+  available_on: '2026-09-20'
+  retrieved_on: '2026-09-20'
+  sha256: 3186d8965a05b69d411c6f642a2b49f8fd8b7cb3f7aeb6f791a77608447df0c2
+  locator: Scope, data types and safeguards; use current statute for timing
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Primary authority inspected; only original summaries and links
+    redistributed. Availability is preparation access date.
+- schema_version: '1.0'
+  source_id: ny-breach-statute
+  title: New York General Business Law899-aa
+  url: https://www.nysenate.gov/legislation/laws/GBS/899-AA
+  available_on: '2026-09-20'
+  retrieved_on: '2026-09-20'
+  sha256: f0a996b46b112941a9da1bcf169d90ed5e6d1da2f64d7c94807ab41f8d635098
+  locator: Subdivisions1–4 and8; digest identifies the web tool’s dated text extraction,
+    not raw HTML
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Official statute read through the web tool; direct HTML retrieval
+    returned403. Digest pins the preserved extracted text. Only original summaries
+    and links redistributed.
+- schema_version: '1.0'
+  source_id: topanga
+  title: Topanga Assn. for a Scenic Community v. County of Los Angeles,11Cal.3d506(1974)
+  url: https://scocal.stanford.edu/opinion/topanga-assn-scenic-community-v-county-los-angeles-27785/
+  available_on: '2026-09-20'
+  retrieved_on: '2026-09-20'
+  sha256: f4c601674177bc93687899cf8dfd4918c1ca8c9b17d429f4d532a806b627a430
+  locator: 'Pages514–517: findings, evidence and reviewable agency reasoning'
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Linked court opinion; only a concise original summary redistributed.

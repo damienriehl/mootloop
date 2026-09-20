@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "request_type": "rfa",
+  "set_number": 1,
+  "title": "Fictional first rfa set",
+  "items": [
+    {
+      "request_id": "RFA-1",
+      "set_number": 1,
+      "number": 1,
+      "text": "Admit that Granite did not deliver 500 housings to Northfield by June 1,2026.",
+      "source_doc": "synthetic-served-set"
+    }
+  ]
+}

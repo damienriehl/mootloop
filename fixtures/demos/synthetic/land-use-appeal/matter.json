@@ -1,0 +1,29 @@
+{
+  "schema_version": "1.0",
+  "matter_id": "2026-09-20-land-use-appeal",
+  "caption": {
+    "court_name": "California Court of Appeal",
+    "case_number": "FICTIONAL-DEMO",
+    "county": "CA"
+  },
+  "jurisdiction": {
+    "state": "CA",
+    "forum": "state"
+  },
+  "parties": [
+    {
+      "name": "Ridge Nursery LLC",
+      "role": "plaintiff"
+    },
+    {
+      "name": "Fictional Valley County",
+      "role": "defendant"
+    }
+  ],
+  "our_side": "plaintiff",
+  "retention": {
+    "retention_class": "public-fictional-demo"
+  },
+  "pipeline_strategy": "thin-full",
+  "run_mode": "autonomous"
+}

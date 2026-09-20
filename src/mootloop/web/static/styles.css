@@ -732,3 +732,5 @@ td.num { font-family: var(--mono); font-size: 0.85rem; }
   .deliverables-layout { grid-template-columns: 1fr; }
   .persona::after { content: none; }
 }
+
+.load-error { color: var(--fail); }

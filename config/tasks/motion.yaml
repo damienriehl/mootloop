@@ -1,0 +1,67 @@
+schema_version: '1.0'
+task: motion
+stages:
+- associate_draft
+- partner_loop
+- oc_attack
+- bolster
+- narrative_assessment
+- rubric_gate
+- assemble
+loop_caps:
+  associate_partner: 2
+  oc: 1
+  bolster: 1
+  restructure: 0
+panels:
+  judges: 1
+  jury: false
+  jurors: 0
+  rubric_judges: 3
+convergence:
+  score_delta_floor: 0.02
+  material_change_floor: 0.1
+  coverage_floor: 0.8
+gates:
+- degeneracy
+- completeness
+- fabrication
+- rubric
+rubric_id: motion-v1.0
+rubric_threshold: 0.75
+restructure_threshold: 0.5
+deliverables:
+- draft-motion.md
+overridable: []
+pipeline_strategies:
+  thin-full:
+    stages:
+    - associate_draft
+    - partner_loop
+    - oc_attack
+    - bolster
+    - narrative_assessment
+    - rubric_gate
+    - assemble
+    associate_partner_cap: 2
+  deep-core:
+    stages:
+    - associate_draft
+    - partner_loop
+    - oc_attack
+    - bolster
+    - narrative_assessment
+    - rubric_gate
+    - assemble
+    associate_partner_cap: 3
+  adversarial-first:
+    stages:
+    - associate_draft
+    - oc_attack
+    - bolster
+    - partner_loop
+    - narrative_assessment
+    - rubric_gate
+    - assemble
+    associate_partner_cap: 2
+input_family: document

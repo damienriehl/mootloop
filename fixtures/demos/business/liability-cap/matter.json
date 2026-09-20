@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.1",
+  "matter_kind": "advisory",
+  "matter_id": "2026-09-20-liability-cap",
+  "client": "Fictional business described in the scenario",
+  "objective": "What should we offer instead of unlimited liability?",
+  "jurisdiction": {
+    "state": "NY",
+    "forum": "state"
+  },
+  "pipeline_strategy": "thin-full",
+  "run_mode": "autonomous",
+  "retention": {
+    "retention_class": "public-fictional-demo"
+  }
+}

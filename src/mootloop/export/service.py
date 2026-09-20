@@ -128,19 +128,26 @@ def _export_run_locked(
             return existing
         return _render_draft_from_sealed(existing, reference_doc)
     prebuild_attestation = attest.attestation_state(vault_root, run_id)
-    attested_master = attest.master_deliverable_path(
-        vault_root, run_id, run_context=run_context
-    )
+    attested_master = attest.master_deliverable_path(vault_root, run_id, run_context=run_context)
     master = (
         attested_master
         if prebuild_attestation.status == "valid" and attested_master is not None
         else build_court_master(vault_root, run_id, now, run_context=run_context)
     )
-    verification = build_verification_page(vault_root, run_id, now, run_context=run_context)
+    document = run_context.binding.config.input_family == "document"
+    verification = (
+        None
+        if document
+        else build_verification_page(vault_root, run_id, now, run_context=run_context)
+    )
     privilege = build_privilege_log(vault_root, run_id, run_context=run_context)
     memo = build_strategy_memo(vault_root, run_id, now)
     audit = build_audit_log(vault_root, run_id, now)
-    set_masters = build_set_masters(vault_root, run_id, now, run_context=run_context)
+    set_masters = (
+        [("document", master)]
+        if document
+        else build_set_masters(vault_root, run_id, now, run_context=run_context)
+    )
 
     ready, blockers = gate_ledger.export_ready(vault_root, run_id)
     attestation = attest.attestation_state(vault_root, run_id)
@@ -173,6 +180,12 @@ def _export_run_locked(
     )
 
     docx_dir = deliverables_dir(vault_root, run_id) / "docx"
+    if document:
+        # Document masters are review copies; discovery court templates do not apply.
+        result.is_draft = True
+        result.docx_skipped_reason = "document tasks support Markdown draft review copies only"
+        _retire_clean_docx(docx_dir)
+        return result
     # Retire stale clean copies BEFORE the pandoc check: a missing pandoc must not
     # leave a previously-rendered clean DOCX standing behind a now-DRAFT export.
     if not qualifies_clean:
@@ -221,11 +234,13 @@ def _existing_sealed_result(vault_root: Path | str, run_id: str) -> ExportResult
         privilege_log=root / "privilege-log.md",
         memo=root / "strategy-memo.md",
         audit_log=root / "audit-log.json",
-        set_masters=sorted((root / "sets").glob("*.md")),
+        set_masters=(
+            [master]
+            if load_run_context(vault_root, run_id).binding.config.input_family == "document"
+            else sorted((root / "sets").glob("*.md"))
+        ),
         docx=sorted(
-            path
-            for path in (root / "docx").glob("*.docx")
-            if ".draft." not in path.name.lower()
+            path for path in (root / "docx").glob("*.docx") if ".draft." not in path.name.lower()
         ),
         is_draft=False,
         export_ready=True,

@@ -1,0 +1,162 @@
+{
+  "schema_version": "1.0",
+  "descriptor": {
+    "schema_version": "1.0",
+    "demo_id": "acquisition-diligence",
+    "title": "Which legal issues could derail this acquisition?",
+    "introduction": "What must we resolve before buying this startup? A fictional business decision with a reviewed action document.",
+    "collection": "business",
+    "practice_area": "Corporate transactions",
+    "work_product": "Diligence priorities and deal protections",
+    "jurisdiction": "Delaware / U.S. federal",
+    "court_level": "advisory",
+    "task": "business-advice"
+  },
+  "strategies": [
+    {
+      "strategy_id": "reviewed-advice",
+      "title": "Advice tested against business and legal risks",
+      "input_ids": [
+        "advice"
+      ],
+      "input_summary": "Fictional Alder Systems proposes a $12 million acquisition of Delaware corporation Spruce Workflow. The term sheet says “stock acquisition or merger, structure to be agreed,” with a 30-day exclusivity period. The draft cap table omits two convertible notes. A founding contractor wrote the core scheduling engine before signing an assignment that names a different project. Spruce’s largest customer supplies 38% of recurring revenue; its contract has a change-of-control consent clause. A data-processing agreement limits customer data to service delivery. The financial model assumes immediate use of all target data to train Alder’s model. Two engineers are labeled contractors but work full time under management control. The term sheet is not a signed definitive acquisition agreement.",
+      "assumptions": [
+        "All business facts and organizations in this scenario are fictional.",
+        "Missing facts must remain unresolved rather than assumed favorable."
+      ],
+      "source_ids": [
+        "de-merger"
+      ],
+      "outputs": {
+        "advice": {
+          "initial": {
+            "response_text": "## Recommendation\nProceed to closing once the CEO signs: the target is a Delaware corporation, the term sheet sets the price, and buying all shares transfers all IP and unrestricted rights to the data.\n\n## Proposed action\nProceed on that recommendation using the supplied business objective; this initial draft has not yet addressed the opposing critique.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "de-merger"
+            ],
+            "attorney_gate_items": [
+              "Verify missing facts, governing legal requirements and the secondary document before use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted demonstration, not an independent model or attorney opinion."
+          },
+          "revised": {
+            "response_text": "## Recommendation\nDo not treat the term sheet as closing authority. Resolve structure and approvals, reconcile fully diluted ownership, cure the core-IP chain and obtain or appropriately condition the major-customer consent before committing to the modeled valuation. Remove unrestricted data-training synergies from the base case unless contractual and legal authority is established.\n\n## Risks\nThe acquisition structure determines what transfers, approvals, taxes and liabilities require analysis. Section 251 is a merger anchor, not clearance of every structure. Omitted convertible notes can alter consideration and consent needs. The defective project description may leave essential code ownership unresolved. Worker classification, data restrictions, competition review and other federal issues require separate facts and counsel; the $12 million headline price alone is not a universal exemption.\n\n## Options\nProceed with a structure-specific definitive agreement containing evidence-based closing conditions and allocated risks. Reprice or defer consideration for unresolved IP/customer risks if commercially acceptable, recognizing that indemnity is only as useful as recovery. Exclude assets or data uses where a workable structure allows it. Walk away if title to essential code or the 38%-revenue customer relationship cannot be secured at an acceptable price.\n\n## Next Steps\nCorporate counsel: choose structure and map board, stockholder, noteholder and other required approvals. Finance: reconcile cap table, notes and consideration waterfall. IP counsel: inspect contribution history and obtain effective assignments from actual owners. Commercial/privacy teams: review consent and data-use terms. Employment and regulatory specialists: scope classification and transaction-specific federal review. Record each unresolved item in the investment committee’s decision.\n\n## Secondary Deliverable\n**Priority diligence request and draft closing conditions**\nP0 ownership: charter, bylaws, securities ledger, all notes/options/warrants, approval records and a reconciled fully diluted waterfall.\nP0 technology: contractor agreements, code contribution history, licenses and an executed assignment accurately covering the core engine from each necessary owner.\nP0 revenue: largest-customer agreement, amendments and required written change-of-control consent or an approved structure-specific alternative.\nP1 data/workforce: processing terms, data inventory, proposed post-close uses, worker duties, hours and agreements.\nDraft condition concepts: evidence of required approvals for the chosen structure; agreed capitalization accuracy; satisfactory essential-IP title; required material-customer consent; no unsupported reliance on expanded data rights.\nProposed risk allocation: specific representations and indemnities or price adjustments for identified risks, with negotiated survival, caps, recovery source and disclosure schedules. These concepts require definitive drafting; none is satisfied by the term sheet alone.\n\n## Source boundary\nLaw-as-of preparation: September 20, 2026. Source summaries and links are in the input packet. This draft does not establish citation currency or attorney approval.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "de-merger"
+            ],
+            "attorney_gate_items": [
+              "Verify missing facts, governing legal requirements and the secondary document before use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted demonstration, not an independent model or attorney opinion."
+          },
+          "critique": {
+            "verdict": "revise",
+            "critiques": [
+              "Structure is undecided; section 251 merger mechanics do not substitute for stock-purchase analysis or required approvals.",
+              "Share ownership does not repair a missing IP assignment or override customer data-use restrictions.",
+              "The omitted notes and major-customer consent can change price, ownership and the ability to close."
+            ],
+            "instructions": [
+              "Replace the initial recommendation with the supported alternatives and missing-fact analysis.",
+              "Include the complete action document and identify its unresolved prerequisites."
+            ],
+            "self_assessment": "Scripted adversarial review; these objections remain inspectable after revision."
+          },
+          "assessment": {
+            "disposition": "revise",
+            "reasons": [
+              "The revised diligence priorities could prevent paying for ownership, customer continuity or data rights the target cannot deliver. They may delay or end the transaction; that is a possible successful risk decision, not an acquisition failure. Even completed checklists do not establish that every liability has been found."
+            ],
+            "limitations": [
+              "This is a fictional, agent-authored scenario replayed without model calls.",
+              "Unresolved factual and legal questions require qualified counsel; this is not attorney approval."
+            ],
+            "self_assessment": "A qualified assessment of the revised approach, not a predicted outcome."
+          },
+          "initial_rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 1,
+                "evidence": "Structure is undecided; section 251 merger mechanics do not substitute for stock-purchase analysis or required approvals."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 1,
+                "evidence": "Share ownership does not repair a missing IP assignment or override customer data-use restrictions."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 1,
+                "evidence": "The omitted notes and major-customer consent can change price, ownership and the ability to close."
+              }
+            ],
+            "overall_notes": "Prepared editorial scores of this scripted draft, not a success probability or independent legal validation.",
+            "self_assessment": "Initial gaps require revision."
+          },
+          "rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 4,
+                "evidence": "Do not treat the term sheet as closing authority. Resolve structure and approvals, reconcile fully diluted ownership, cure the core-IP chain and obtain or appropriately condition the major-customer consent before committing to the modeled valuation. Remove unrestricted data-training synergies from the base case unless contractual and legal authority is established."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 4,
+                "evidence": "The acquisition structure determines what transfers, approvals, taxes and liabilities require analysis. Section 251 is a merger anchor, not clearance of every structure. Omitted convertible notes can alter consideration and consent needs. The defective project description may leave essential code ownership unresolved. Worker classification, data restrictions, competition review and other federal issues require separate facts and counsel; the $12 million headline price alone is not a universal exemption."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 4,
+                "evidence": "The revised diligence priorities could prevent paying for ownership, customer continuity or data rights the target cannot deliver. They may delay or end the transaction; that is a possible successful risk decision, not an acquisition failure. Even completed checklists do not establish that every liability has been found."
+              }
+            ],
+            "overall_notes": "Prepared editorial scores of this scripted draft, not a success probability or independent legal validation.",
+            "self_assessment": "The revision addresses the scripted critique; factual and legal limits remain."
+          }
+        }
+      }
+    }
+  ],
+  "sources": [
+    {
+      "schema_version": "1.0",
+      "source_id": "de-merger",
+      "title": "Delaware General Corporation Law§251",
+      "url": "https://www.delcode.delaware.gov/title8/c001/sc09/",
+      "available_on": "2026-09-20",
+      "filed_on": null,
+      "effective_on": null,
+      "retrieved_on": "2026-09-20",
+      "sha256": "8131fc01dc1671e8d5bb805488b88fbbc920b55e54cb5e1dc24f27d5fae65712",
+      "locator": "Board agreement and stockholder approval; structure-specific exceptions",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Link to the acquired primary authority; local inputs contain concise original summaries, not wholesale source copies. Availability date records confirmed public availability at preparation."
+    }
+  ],
+  "claims": [
+    {
+      "claim": "Delaware General Corporation Law section 251 governs specified merger agreement and approval mechanics; a stock purchase and other structures require their own analysis rather than automatic application of one merger checklist.",
+      "source_ids": [
+        "de-merger"
+      ],
+      "locator": "Board agreement and stockholder approval; structure-specific exceptions",
+      "classification": "law"
+    }
+  ],
+  "limitations": [
+    "Fictional business facts; no actual client data.",
+    "Prepared scripts and editorial scoring, with zero live model calls.",
+    "Sources were checked for this bounded preparation on September 20, 2026; no exhaustive legal review or attorney approval."
+  ]
+}

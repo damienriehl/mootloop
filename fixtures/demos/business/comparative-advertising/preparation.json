@@ -1,0 +1,188 @@
+{
+  "schema_version": "1.0",
+  "descriptor": {
+    "schema_version": "1.0",
+    "demo_id": "comparative-advertising",
+    "title": "Can we say our product is better?",
+    "introduction": "Can we advertise “twice as fast as the market leader”? A fictional business decision with a reviewed action document.",
+    "collection": "business",
+    "practice_area": "Advertising",
+    "work_product": "Advertising review and proposed revisions",
+    "jurisdiction": "New York / U.S. federal",
+    "court_level": "advisory",
+    "task": "business-advice"
+  },
+  "strategies": [
+    {
+      "strategy_id": "reviewed-advice",
+      "title": "Advice tested against business and legal risks",
+      "input_ids": [
+        "advice"
+      ],
+      "input_summary": "Fictional Lumen Search plans a New York-based national business-software campaign stating “twice as fast as the market leader—guaranteed.” Its lab ran 30 queries on one static 100,000-record dataset using Lumen version 3 and Rival version 8 with default settings. Median latency was 0.8 seconds for Lumen and 1.7 seconds for Rival, but five Lumen queries were slower. No tests measured ingestion, accuracy, uptime, other hardware or current Rival version 9. Marketing proposes a small footnote linking a study summary. Engineering can rerun a defined benchmark within two weeks; the public launch is tomorrow.",
+      "assumptions": [
+        "All business facts and organizations in this scenario are fictional.",
+        "Missing facts must remain unresolved rather than assumed favorable."
+      ],
+      "source_ids": [
+        "ftc-comparative",
+        "ftc-advertising"
+      ],
+      "outputs": {
+        "advice": {
+          "initial": {
+            "response_text": "## Recommendation\nApprove the headline because 1.7 divided by 0.8 exceeds two. The footnote can explain that the guarantee only means median query latency in the lab.\n\n## Proposed action\nProceed on that recommendation using the supplied business objective; this initial draft has not yet addressed the opposing critique.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "ftc-comparative",
+              "ftc-advertising"
+            ],
+            "attorney_gate_items": [
+              "Verify missing facts, governing legal requirements and the secondary document before use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted demonstration, not an independent model or attorney opinion."
+          },
+          "revised": {
+            "response_text": "## Recommendation\nDo not publish the proposed headline or guarantee. Either delay the comparative campaign for an updated, documented test or use a tightly qualified factual benchmark statement that matches the actual study and prominently identifies its limitations. The business benefit is credible comparison, not a ratio detached from the tested conditions.\n\n## Risks\nOne median does not establish general speed, accuracy or user experience. Rival version 9 may change the comparison; the record supplies no result for it. FTC substantiation principles require support for the conveyed objective claim before publication. This bounded packet does not separately resolve Lanham Act competitor litigation or every New York consumer-protection issue; disputed market-leader status and intended audience also require support.\n\n## Options\nDelay and retest the current versions across pre-specified representative workloads. Publish a noncomparative feature claim supported by existing evidence. If publishing the historical test result, make version, dataset, metric and date integral to the message, with a readily available method and variability disclosure; avoid a universal speed guarantee.\n\n## Next Steps\nEngineering should preserve scripts, raw runs, hardware, configuration and selection criteria; rerun current versions without cherry-picking. Marketing should inventory implied claims in graphics and demonstrations. Legal should review the full impression, competitor identification and state/federal causes of action. Customer support must not repeat the rejected guarantee orally.\n\n## Secondary Deliverable\n**Claims review and revised copy**\nRejected: “Twice as fast as the market leader—guaranteed.” Unsupported scope: all performance, current competitor product and every-user result.\nConditional historical-test copy: “In our September 2026 lab test of 30 specified queries on one 100,000-record dataset, Lumen 3 had median query latency of 0.8 seconds versus 1.7 seconds for Rival 8 on the same configured hardware. Lumen was slower on 5 queries. Results depend on workload and configuration; Rival 9 was not tested.”\nPlace these qualifications with the comparison, not behind a generic guarantee. Publish the full method and all results, subject to rights review. Preferred launch copy until retesting: describe verified product features without the comparative speed claim. No version-9 comparison is approved by this draft.\n\n## Source boundary\nLaw-as-of preparation: September 20, 2026. Source summaries and links are in the input packet. This draft does not establish citation currency or attorney approval.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "ftc-comparative",
+              "ftc-advertising"
+            ],
+            "attorney_gate_items": [
+              "Verify missing facts, governing legal requirements and the secondary document before use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted demonstration, not an independent model or attorney opinion."
+          },
+          "critique": {
+            "verdict": "revise",
+            "critiques": [
+              "The headline implies broad performance and every-user assurance not measured by this single benchmark.",
+              "The tested competitor version is stale and five queries were slower; identify how those facts limit the message.",
+              "A distant footnote cannot turn an unqualified guarantee into a narrow measured claim."
+            ],
+            "instructions": [
+              "Replace the initial recommendation with the supported alternatives and missing-fact analysis.",
+              "Include the complete action document and identify its unresolved prerequisites."
+            ],
+            "self_assessment": "Scripted adversarial review; these objections remain inspectable after revision."
+          },
+          "assessment": {
+            "disposition": "revise",
+            "reasons": [
+              "The revised copy could reduce the gap between evidence and consumer takeaway, but it may be commercially less persuasive and still unsuitable if the historical comparison misleads the target audience. Updated representative testing could support a different claim; it cannot retroactively substantiate tomorrow’s unsupported guarantee."
+            ],
+            "limitations": [
+              "This is a fictional, agent-authored scenario replayed without model calls.",
+              "Unresolved factual and legal questions require qualified counsel; this is not attorney approval."
+            ],
+            "self_assessment": "A qualified assessment of the revised approach, not a predicted outcome."
+          },
+          "initial_rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 1,
+                "evidence": "The headline implies broad performance and every-user assurance not measured by this single benchmark."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 1,
+                "evidence": "The tested competitor version is stale and five queries were slower; identify how those facts limit the message."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 1,
+                "evidence": "A distant footnote cannot turn an unqualified guarantee into a narrow measured claim."
+              }
+            ],
+            "overall_notes": "Prepared editorial scores of this scripted draft, not a success probability or independent legal validation.",
+            "self_assessment": "Initial gaps require revision."
+          },
+          "rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 4,
+                "evidence": "Do not publish the proposed headline or guarantee. Either delay the comparative campaign for an updated, documented test or use a tightly qualified factual benchmark statement that matches the actual study and prominently identifies its limitations. The business benefit is credible comparison, not a ratio detached from the tested conditions."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 4,
+                "evidence": "One median does not establish general speed, accuracy or user experience. Rival version 9 may change the comparison; the record supplies no result for it. FTC substantiation principles require support for the conveyed objective claim before publication. This bounded packet does not separately resolve Lanham Act competitor litigation or every New York consumer-protection issue; disputed market-leader status and intended audience also require support."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 4,
+                "evidence": "The revised copy could reduce the gap between evidence and consumer takeaway, but it may be commercially less persuasive and still unsuitable if the historical comparison misleads the target audience. Updated representative testing could support a different claim; it cannot retroactively substantiate tomorrow’s unsupported guarantee."
+              }
+            ],
+            "overall_notes": "Prepared editorial scores of this scripted draft, not a success probability or independent legal validation.",
+            "self_assessment": "The revision addresses the scripted critique; factual and legal limits remain."
+          }
+        }
+      }
+    }
+  ],
+  "sources": [
+    {
+      "schema_version": "1.0",
+      "source_id": "ftc-comparative",
+      "title": "FTC comparative-advertising policy",
+      "url": "https://www.ftc.gov/legal-library/browse/statement-policy-regarding-comparative-advertising",
+      "available_on": "2026-09-20",
+      "filed_on": null,
+      "effective_on": null,
+      "retrieved_on": "2026-09-20",
+      "sha256": "11ea957abb183b73c107fcdda2c87d9224795962448fa992e42d1b592a89ad3a",
+      "locator": "Comparative claims and deception",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Link to the acquired primary authority; local inputs contain concise original summaries, not wholesale source copies. Availability date records confirmed public availability at preparation."
+    },
+    {
+      "schema_version": "1.0",
+      "source_id": "ftc-advertising",
+      "title": "FTC advertising FAQs",
+      "url": "https://www.ftc.gov/business-guidance/resources/advertising-faqs-guide-small-business",
+      "available_on": "2026-09-20",
+      "filed_on": null,
+      "effective_on": null,
+      "retrieved_on": "2026-09-20",
+      "sha256": "14c51bbb6d9552bc79bab1b5692df189d71ba59951a5face480a0bda3cab18a9",
+      "locator": "Substantiation and misleading claims",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Link to the acquired primary authority; local inputs contain concise original summaries, not wholesale source copies. Availability date records confirmed public availability at preparation."
+    }
+  ],
+  "claims": [
+    {
+      "claim": "FTC policy supports truthful, nondeceptive comparative advertising with a clear basis for the comparison.",
+      "source_ids": [
+        "ftc-comparative"
+      ],
+      "locator": "Comparative claims and deception",
+      "classification": "law"
+    },
+    {
+      "claim": "Advertisers need substantiation for objective express and implied claims before dissemination; disclosures cannot reliably cure a contradictory headline.",
+      "source_ids": [
+        "ftc-advertising"
+      ],
+      "locator": "Substantiation and misleading claims",
+      "classification": "law"
+    }
+  ],
+  "limitations": [
+    "Fictional business facts; no actual client data.",
+    "Prepared scripts and editorial scoring, with zero live model calls.",
+    "Sources were checked for this bounded preparation on September 20, 2026; no exhaustive legal review or attorney approval."
+  ]
+}

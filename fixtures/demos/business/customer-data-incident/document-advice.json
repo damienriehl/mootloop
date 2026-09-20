@@ -1,0 +1,71 @@
+{
+  "schema_version": "1.0",
+  "input_id": "advice",
+  "task": "business-advice",
+  "represented_side": "In-house counsel to the fictional business",
+  "jurisdiction": "California / New York",
+  "court_level": "advisory",
+  "cutoff": "2026-09-20",
+  "strategy_id": "reviewed-advice",
+  "assumptions": [
+    "All business facts and organizations in this scenario are fictional.",
+    "Missing facts must remain unresolved rather than assumed favorable."
+  ],
+  "preservation_constraints": [
+    "The packet is bounded to the listed authorities and facts; no comprehensive current-law clearance is implied."
+  ],
+  "units": [
+    {
+      "unit_id": "advice",
+      "title": "What must we do after customer data is exposed?",
+      "instructions": "What must we do after customer data is exposed? Analyze the supplied facts, alternatives, adverse consequences and missing information. Produce advice and the concrete secondary action document identified in the scenario. Required work product: Incident response and notification analysis.",
+      "issues": [
+        "The unknown download contradicts an assurance of no access; misuse is not necessarily the legal notification trigger.",
+        "Token capability, possible bank data, encryption and residency need immediate verification.",
+        "There is no supplied basis for one nationwide 72-hour deadline; contracts and applicable state rules must be mapped separately."
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "source_id": "scenario",
+      "text": "Fictional Copper Ledger discovers an exposed cloud export at 9 a.m. September 20, 2026. It contains 2,000 customer records, including names, email addresses and password-reset tokens; a separate column may contain bank-account numbers for some customers, but the security team has not verified it. Residency flags list 1,200 California and 800 New York residents and may be stale. Access logs show one unknown IP downloaded an object overnight; encryption and key-access facts remain unresolved. The public link was disabled at 10 a.m. Contracts require prompt notice of security incidents but their exact timing provisions have not been collected. The CEO wants to announce “no sensitive data was accessed” by noon.",
+      "sha256": "9c44110814ec413f2cff46eed2adb25d4c2c2cdfd31b2a42d31f76c0b99aebcb",
+      "available_on": "2026-09-20",
+      "classification": "hypothetical",
+      "public": true
+    },
+    {
+      "source_id": "ca-breach",
+      "text": "Authority summary: California Attorney General guidance explains breach-notification analysis and reporting for affected California residents; apply statutory data and trigger requirements rather than a generic nationwide deadline.",
+      "sha256": "e77efd863ce4c98f56aa9463de9c1c98688ce7715eac7127cd9e93df1dbc4c76",
+      "available_on": "2026-09-20",
+      "classification": "record",
+      "public": true
+    },
+    {
+      "source_id": "ny-shield",
+      "text": "Authority summary: New York Attorney General guidance describes state breach reporting and affected-person obligations; unauthorized access/acquisition, covered data, residency and exceptions require investigation.",
+      "sha256": "d7c6c1d9db3b9dc17d3d9cbcafcaadcf098f9dd3dab1fcf96734dba9ba114105",
+      "available_on": "2026-09-20",
+      "classification": "record",
+      "public": true
+    },
+    {
+      "source_id": "ca-breach-statute",
+      "text": "Authority summary: California section1798.82 specifies conditional30-calendar-day consumer notice and a15-day AG sample-submission period after consumer notice when more than500 residents require notice, with statutory qualifications.",
+      "sha256": "49e9a47dbaa0bf457297094010440dedc35455c9a62882bfefada1928483913d",
+      "available_on": "2026-09-20",
+      "classification": "record",
+      "public": true
+    },
+    {
+      "source_id": "ny-breach-statute",
+      "text": "Authority summary: New York section899-aa requires expedited qualifying notice within30 days after discovery, subject to its law-enforcement exception; access and acquisition both matter.",
+      "sha256": "d5947d12d1c8f1690b35314458935fd92e1128698320c0e41775173b393c545e",
+      "available_on": "2026-09-20",
+      "classification": "record",
+      "public": true
+    }
+  ]
+}

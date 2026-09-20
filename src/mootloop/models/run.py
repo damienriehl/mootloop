@@ -12,7 +12,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from mootloop.models.common import RequestId, RunId, StrictModel, TurnId
 from mootloop.models.gates import GateResult
@@ -59,6 +59,7 @@ _PERSONA_ROLE: dict[PersonaName, str] = {
 SCHEMA_DRAFT = "draft"
 SCHEMA_CRITIQUE = "critique"
 SCHEMA_JUDGE = "judge"
+SCHEMA_NARRATIVE = "narrative_assessment"
 SCHEMA_JUROR = "juror"
 SCHEMA_RUBRIC = "rubric_score"
 SCHEMA_CITE_CHECK = "cite_check"
@@ -135,6 +136,20 @@ class JudgeOutput(StrictModel):
     self_assessment: str
 
 
+class NarrativeAssessment(StrictModel):
+    disposition: Literal["supported", "revise", "not_supported"]
+    reasons: list[str] = Field(min_length=1)
+    limitations: list[str] = Field(min_length=1)
+    self_assessment: str = Field(min_length=1)
+
+    @field_validator("reasons", "limitations")
+    @classmethod
+    def nonempty_reasons(cls, values: list[str]) -> list[str]:
+        if any(not value.strip() for value in values):
+            raise ValueError("assessment reasons and limitations must be substantive")
+        return values
+
+
 class JurorOutput(StrictModel):
     """A bounded lay-reader signal, never a legal conclusion or outcome prediction."""
 
@@ -180,6 +195,7 @@ OUTPUT_SCHEMAS: dict[str, type[StrictModel]] = {
     SCHEMA_DRAFT: DraftOutput,
     SCHEMA_CRITIQUE: CritiqueOutput,
     SCHEMA_JUDGE: JudgeOutput,
+    SCHEMA_NARRATIVE: NarrativeAssessment,
     SCHEMA_JUROR: JurorOutput,
     SCHEMA_RUBRIC: RubricScoreOutput,
     SCHEMA_CITE_CHECK: CiteCheckOutput,
@@ -189,6 +205,7 @@ TurnOutput = (
     DraftOutput
     | CritiqueOutput
     | JudgeOutput
+    | NarrativeAssessment
     | JurorOutput
     | RubricScoreOutput
     | CiteCheckOutput

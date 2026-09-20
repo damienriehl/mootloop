@@ -85,3 +85,44 @@ def test_bake_is_importable_but_separate(app_imports: tuple[set[str], set[str]])
     names, modules = app_imports
     assert "build_demo_vault" not in names
     assert not any(m.startswith("mootloop.web.bake") for m in modules)
+
+
+def test_catalog_reader_has_no_transitive_vault_or_writer_imports() -> None:
+    source_root = APP_PATH.parents[1]
+    visited: set[str] = set()
+    pending = ["mootloop.web.catalog", "mootloop.web.app"]
+    allowed = {
+        "mootloop",
+        "mootloop.web",
+        "mootloop.models",
+        "mootloop.models.matter",
+        "mootloop.models.config",
+        "mootloop.web.app",
+        "mootloop.web.catalog",
+        "mootloop.models.demo",
+        "mootloop.models.common",
+    }
+    while pending:
+        module = pending.pop()
+        if module in visited:
+            continue
+        visited.add(module)
+        parts = module.split(".")
+        pending.extend(".".join(parts[:i]) for i in range(1, len(parts)))
+        assert module in allowed, f"public reader imports operational module: {module}"
+        path = source_root.joinpath(*module.split(".")[1:])
+        path = path / "__init__.py" if path.is_dir() else path.with_suffix(".py")
+        tree = ast.parse(path.read_text())
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.ImportFrom)
+                and node.module
+                and (node.module == "mootloop" or node.module.startswith("mootloop."))
+            ):
+                pending.append(node.module)
+            elif isinstance(node, ast.Import):
+                pending.extend(
+                    alias.name
+                    for alias in node.names
+                    if alias.name == "mootloop" or alias.name.startswith("mootloop.")
+                )

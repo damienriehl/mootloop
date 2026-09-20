@@ -33,6 +33,7 @@ from mootloop.models.context import (
     RunContextManifest,
 )
 from mootloop.models.corpus import MANIFEST_PATH, Manifest
+from mootloop.models.document_task import DocumentTaskInput, DocumentUnit
 from mootloop.models.events import RunMode, RunStarted
 from mootloop.models.facts import Fact
 from mootloop.models.matter import MatterConfig
@@ -82,6 +83,12 @@ class RunContext:
     units: list[RequestItem]
     facts: list[dict[str, str]]
     corpus_snapshot: CorpusSnapshot | None = None
+
+    @property
+    def task_units(self) -> list[RequestItem | DocumentUnit]:
+        if self.manifest.adapter_config.input_family == "document":
+            return [unit for item in self.manifest.document_inputs for unit in item.units]
+        return list(self.units)
 
 
 def resolve_launch_pipeline(
@@ -138,7 +145,9 @@ def config_digest(config: ResolvedRunConfig) -> str:
 def _legacy_config_digest(config: TaskAdapterConfig) -> str:
     """Digest written by v1.0 RunStarted events; retained only for migration replay."""
     return _sha256(
-        config.model_dump_json(exclude={"overridable", "pipeline_strategies"}).encode("utf-8")
+        config.model_dump_json(
+            exclude={"overridable", "pipeline_strategies", "input_family"}
+        ).encode("utf-8")
     )[:16]
 
 
@@ -231,9 +240,7 @@ def resolve_launch_config(
     if max_attempts is not None:
         invocation["max_attempts"] = max_attempts
     invocation_flags = (
-        ConfigLayerInput.from_mapping("invocation:start_run", invocation)
-        if invocation
-        else None
+        ConfigLayerInput.from_mapping("invocation:start_run", invocation) if invocation else None
     )
     return resolve_run_config(
         defaults=default_config_layer(),
@@ -255,9 +262,7 @@ def _corpus_payload(snapshot: CorpusSnapshot) -> str:
     return payload
 
 
-def _validate_corpus_snapshot(
-    manifest: RunContextManifest, snapshot: CorpusSnapshot
-) -> None:
+def _validate_corpus_snapshot(manifest: RunContextManifest, snapshot: CorpusSnapshot) -> None:
     expected = [
         (str(doc.doc_id), doc.normalized_path)
         for doc in manifest.corpus_manifest.docs
@@ -303,6 +308,41 @@ def _load_request_sets(vault_root: Path | str) -> tuple[list[RequestSet], list[C
     sets.sort(key=lambda request_set: (request_set.set_number, request_set.request_type.value))
     validate_run_request_identity(sets)
     return sets, sources
+
+
+def load_document_inputs(
+    vault_root: Path | str,
+    task: str,
+    refs: Sequence[str] | None = None,
+) -> tuple[list[DocumentTaskInput], list[ContextSource]]:
+    root = safe_vault_path(vault_root, "documents")
+    names = (
+        list(refs)
+        if refs is not None
+        else (sorted(path.stem for path in root.glob("*.json")) if root.exists() else [])
+    )
+    inputs: list[DocumentTaskInput] = []
+    sources: list[ContextSource] = []
+    from mootloop.vault import validate_id
+
+    for name in names:
+        validate_id(name, kind="document input")
+        path = safe_vault_path(vault_root, "documents", f"{name}.json")
+        try:
+            raw = path.read_bytes()
+            item = DocumentTaskInput.model_validate_json(raw)
+        except (OSError, ValidationError) as exc:
+            raise OrchestratorError(f"invalid document input {name!r}: {exc}") from exc
+        if item.task != task or item.input_id != name:
+            raise OrchestratorError("document input identity/task does not match launch")
+        inputs.append(item)
+        sources.append(_source("document_input", f"documents/{name}.json", raw))
+    ids = [unit.unit_id for item in inputs for unit in item.units]
+    if not inputs or len(set(ids)) != len(ids):
+        raise OrchestratorError("document launch requires nonempty, unique units")
+    if len({item.strategy_id for item in inputs}) != 1:
+        raise OrchestratorError("document launch cannot mix strategy identities")
+    return inputs, sources
 
 
 def validate_run_request_identity(request_sets: Sequence[RequestSet]) -> None:
@@ -367,9 +407,7 @@ def _load_corpus(
         try:
             text = raw.decode("utf-8")
         except UnicodeDecodeError as exc:
-            raise OrchestratorError(
-                f"corpus document {doc.doc_id!r} is not valid UTF-8"
-            ) from exc
+            raise OrchestratorError(f"corpus document {doc.doc_id!r} is not valid UTF-8") from exc
         digest = _sha256(raw)
         texts.append(
             CorpusTextSnapshot(
@@ -427,13 +465,38 @@ def build_run_context(
     task_spec_id: str | None,
     firm_preferences_path: Path | str | None = None,
     context_contributions: Sequence[ContextContribution] = (),
+    *,
+    document_input_refs: Sequence[str] | None = None,
 ) -> RunContext:
-    task_spec = _validate_task_spec(
-        vault_root, task_spec_id, task, str(matter_config.matter_id)
-    )
-    request_sets, request_sources = _load_request_sets(vault_root)
+    task_spec = _validate_task_spec(vault_root, task_spec_id, task, str(matter_config.matter_id))
+    if document_input_refs is not None:
+        if binding.config.input_family != "document":
+            raise OrchestratorError("document input selection requires a document task")
+        if task_spec is not None and list(document_input_refs) != task_spec.document_input_refs:
+            raise OrchestratorError("document input selection differs from approved TaskSpec")
+    document_inputs: list[DocumentTaskInput] = []
+    if binding.config.input_family == "document":
+        if (task == "business-advice") != (matter_config.matter_kind == "advisory"):
+            raise OrchestratorError("document task is incompatible with matter kind")
+        document_inputs, request_sources = load_document_inputs(
+            vault_root,
+            task,
+            task_spec.document_input_refs if task_spec else document_input_refs,
+        )
+        if task_spec is not None:
+            captured_digests = {
+                Path(source.locator).stem: source.sha256 for source in request_sources
+            }
+            if captured_digests != task_spec.document_input_sha256:
+                raise OrchestratorError("captured document inputs differ from approved TaskSpec")
+        request_sets: list[RequestSet] = []
+    else:
+        request_sets, request_sources = _load_request_sets(vault_root)
     facts, facts_raw = _load_facts(vault_root)
     corpus_manifest, corpus_texts, corpus_sources = _load_corpus(vault_root)
+    if binding.config.input_family == "document":
+        facts, facts_raw = [], b""
+        corpus_manifest, corpus_texts, corpus_sources = Manifest(), [], []
     corpus_snapshot = CorpusSnapshot(documents=corpus_texts)
     resolved_config = resolve_launch_config(
         vault_root,
@@ -548,6 +611,7 @@ def build_run_context(
         persona_bodies=persona_bodies,
         rubric=captured_rubric,
         request_sets=request_sets,
+        document_inputs=document_inputs,
         facts=facts,
         corpus_manifest=corpus_manifest,
         corpus_snapshot_sha256=_sha256(_corpus_payload(corpus_snapshot).encode("utf-8")),
@@ -586,10 +650,9 @@ def _materialize(
         if item.subpart is None
     ]
     units.sort(key=lambda item: (item.set_number, item.number))
-    facts = [
-        {"fact_id": str(fact.fact_id), "statement": fact.statement}
-        for fact in manifest.facts
-    ]
+    facts = [{"fact_id": str(fact.fact_id), "statement": fact.statement} for fact in manifest.facts]
+    if manifest.adapter_config.input_family == "document":
+        facts = []
     if corpus_snapshot is not None:
         assemble_context(manifest, corpus_snapshot)
     return RunContext(
@@ -623,18 +686,14 @@ def write_run_context(vault_root: Path | str, context: RunContext) -> str:
     return _sha256(payload.encode())
 
 
-def _check_retained_corpus_quota(
-    vault_root: Path | str, target: Path, incoming_bytes: int
-) -> None:
+def _check_retained_corpus_quota(vault_root: Path | str, target: Path, incoming_bytes: int) -> None:
     runs_dir = safe_vault_path(vault_root, "runs")
     retained = 0
     if runs_dir.is_dir():
         for run_dir in runs_dir.iterdir():
             if not run_dir.is_dir():
                 continue
-            candidate = safe_vault_path(
-                vault_root, "runs", run_dir.name, *CORPUS_SNAPSHOT_SUBPATH
-            )
+            candidate = safe_vault_path(vault_root, "runs", run_dir.name, *CORPUS_SNAPSHOT_SUBPATH)
             if candidate == target:
                 continue
             try:
@@ -717,7 +776,7 @@ def load_run_context(vault_root: Path | str, run_id: str) -> RunContext:
     raw_payload = json.loads(raw)
     raw_schema_version = raw_payload.get("schema_version")
     legacy_manifest = raw_schema_version == "1.0"
-    if raw_schema_version == RUN_CONTEXT_SCHEMA_VERSION:
+    if tuple(int(v) for v in raw_schema_version.split(".")) >= (1, 5):
         matter_sources = [source for source in manifest.sources if source.kind == "matter_config"]
         adapter_sources = [source for source in manifest.sources if source.kind == "task_adapter"]
         if len(matter_sources) != 1 or len(adapter_sources) != 1:
@@ -768,16 +827,12 @@ def load_run_context(vault_root: Path | str, run_id: str) -> RunContext:
             f"run {run_id!r} context manifest TaskSpec does not match RunStarted"
         )
     manifest_lock_id = (
-        manifest.task_spec_lock.task_spec_lock_id
-        if manifest.task_spec_lock is not None
-        else None
+        manifest.task_spec_lock.task_spec_lock_id if manifest.task_spec_lock is not None else None
     )
     manifest_lock_sha256 = (
-        manifest.task_spec_lock.record_sha256
-        if manifest.task_spec_lock is not None
-        else None
+        manifest.task_spec_lock.record_sha256 if manifest.task_spec_lock is not None else None
     )
-    current_lock_contract = raw_payload.get("schema_version") == RUN_CONTEXT_SCHEMA_VERSION
+    current_lock_contract = tuple(int(v) for v in raw_schema_version.split(".")) >= (1, 5)
     if (
         manifest_lock_id != event.task_spec_lock_id
         or manifest_lock_sha256 != event.task_spec_lock_sha256
@@ -830,8 +885,6 @@ def load_run_corpus(vault_root: Path | str, context: RunContext) -> CorpusSnapsh
     try:
         corpus_snapshot = CorpusSnapshot.model_validate_json(corpus_raw)
     except ValidationError as exc:
-        raise OrchestratorError(
-            f"run {run_id!r} corpus snapshot failed validation: {exc}"
-        ) from exc
+        raise OrchestratorError(f"run {run_id!r} corpus snapshot failed validation: {exc}") from exc
     _validate_corpus_snapshot(context.manifest, corpus_snapshot)
     return corpus_snapshot

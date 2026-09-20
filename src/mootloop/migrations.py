@@ -338,6 +338,21 @@ DEFAULT_MIGRATIONS.register(
 )
 
 
+def _migrate_run_context_1_5_to_1_6(payload: MigrationPayload) -> MigrationPayload:
+    migrated = deepcopy(payload)
+    migrated["schema_version"] = "1.6"
+    migrated["document_inputs"] = []
+    return migrated
+
+
+DEFAULT_MIGRATIONS.register(
+    RunContextManifest,
+    "1.5",
+    "1.6",
+    _migrate_run_context_1_5_to_1_6,
+)
+
+
 def load_versioned_json[JsonModelT: VersionedModel](
     raw: bytes,
     model_type: type[JsonModelT],

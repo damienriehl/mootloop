@@ -1,0 +1,188 @@
+{
+  "schema_version": "1.0",
+  "descriptor": {
+    "schema_version": "1.0",
+    "demo_id": "open-source-release",
+    "title": "We found open-source code. Can we ship?",
+    "introduction": "Can we ship our modified open-source components? A fictional business decision with a reviewed action document.",
+    "collection": "business",
+    "practice_area": "Intellectual property",
+    "work_product": "License analysis and release conditions",
+    "jurisdiction": "U.S. copyright",
+    "court_level": "advisory",
+    "task": "business-advice"
+  },
+  "strategies": [
+    {
+      "strategy_id": "reviewed-advice",
+      "title": "Advice tested against business and legal risks",
+      "input_ids": [
+        "advice"
+      ],
+      "input_summary": "Fictional Forgeboard will distribute a desktop binary and SDK on October 1, 2026. Its inventory identifies ParserKit 2.1 under Apache License 2.0 with an upstream NOTICE file and two modified source files, and TinyTable 1.4 under an MIT license bearing a 2022 copyright notice. Engineers copied both into the application; the planned installer omits license files and notices. The SDK includes modified ParserKit source. No GPL or other copyleft component has been identified, but transitive dependencies, contributors’ assignments and trademark permissions have not been audited. Product asks whether calling the whole package proprietary eliminates attribution requirements.",
+      "assumptions": [
+        "All business facts and organizations in this scenario are fictional.",
+        "Missing facts must remain unresolved rather than assumed favorable."
+      ],
+      "source_ids": [
+        "apache-license",
+        "mit-license"
+      ],
+      "outputs": {
+        "advice": {
+          "initial": {
+            "response_text": "## Recommendation\nShip the proprietary installer with a link to the GitHub projects. Permissive licenses do not require us to distribute source or notices, and their patent grants remove patent risk.\n\n## Proposed action\nProceed on that recommendation using the supplied business objective; this initial draft has not yet addressed the opposing critique.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "apache-license",
+              "mit-license"
+            ],
+            "attorney_gate_items": [
+              "Verify missing facts, governing legal requirements and the secondary document before use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted demonstration, not an independent model or attorney opinion."
+          },
+          "revised": {
+            "response_text": "## Recommendation\nShip only after the distribution package includes the required license, copyright and attribution materials and clearly marks Apache-covered modifications. Keep Forgeboard’s own proprietary terms distinct from third-party terms. The two supplied licenses do not require opening all proprietary source merely because these components are distributed, but that conclusion is limited to this inventory and these license texts.\n\n## Risks\nThe incomplete dependency inventory could reveal different obligations. Apache’s patent language has limits and a termination condition; it is not a freedom-to-operate opinion. The MIT text must not be described as providing Apache’s express patent grant. Neither component license grants a blanket trademark endorsement, and contributor ownership remains a separate diligence question.\n\n## Options\nComplete notices and ship the identified components under their licenses. Remove or replace a component if compliance cannot be completed, then verify that the replacement is actually absent from binaries and SDKs. Delay only the affected deliverable if packaging can be separated safely; a website acknowledgment alone is insufficient for the proposed distribution.\n\n## Next Steps\nEngineering should freeze versions and scan the actual installer and SDK, including transitive dependencies. Legal should compare exact upstream licenses and NOTICE against packaged copies. Release management should test installation and locate notices offline. IP counsel should review contributor rights and any specific patent concern rather than infer clearance from license labels.\n\n## Secondary Deliverable\n**Release checklist**\n- Package a complete Apache-2.0 license copy with ParserKit distributions.\n- Mark each modified Apache-covered file prominently as changed.\n- Preserve applicable copyright, patent, trademark and attribution notices; carry required NOTICE content in an allowed readable location, excluding irrelevant material only after review.\n- Include TinyTable’s copyright and permission notice with distributed copies or substantial portions.\n- Add a third-party notices index naming component versions and the exact included licenses; do not substitute the index for required texts.\n- Confirm proprietary terms do not purport to take away third-party license rights.\n- Audit transitive dependencies, source maps, SDK samples, contributor ownership and use of project names/logos.\n- Store package hashes and screenshots of offline notice access as release evidence.\nBlocked items today: installer notices, Apache change markings, dependency audit and ownership review.\n\n## Source boundary\nLaw-as-of preparation: September 20, 2026. Source summaries and links are in the input packet. This draft does not establish citation currency or attorney approval.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "apache-license",
+              "mit-license"
+            ],
+            "attorney_gate_items": [
+              "Verify missing facts, governing legal requirements and the secondary document before use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted demonstration, not an independent model or attorney opinion."
+          },
+          "critique": {
+            "verdict": "revise",
+            "critiques": [
+              "Permissive does not mean condition-free: a project link does not replace required license and notice material.",
+              "Identify Apache modified-file and upstream NOTICE duties for the actual distribution.",
+              "The Apache patent license is bounded, MIT does not provide the same express patent clause, and neither clears unrelated patents or trademarks."
+            ],
+            "instructions": [
+              "Replace the initial recommendation with the supported alternatives and missing-fact analysis.",
+              "Include the complete action document and identify its unresolved prerequisites."
+            ],
+            "self_assessment": "Scripted adversarial review; these objections remain inspectable after revision."
+          },
+          "assessment": {
+            "disposition": "revise",
+            "reasons": [
+              "The revised package could satisfy the identified licenses’ notice conditions without forcing a blanket open-source release. It remains blocked until the built artifacts, dependency inventory and ownership evidence are checked. A newly discovered component under another license would require its own analysis."
+            ],
+            "limitations": [
+              "This is a fictional, agent-authored scenario replayed without model calls.",
+              "Unresolved factual and legal questions require qualified counsel; this is not attorney approval."
+            ],
+            "self_assessment": "A qualified assessment of the revised approach, not a predicted outcome."
+          },
+          "initial_rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 1,
+                "evidence": "Permissive does not mean condition-free: a project link does not replace required license and notice material."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 1,
+                "evidence": "Identify Apache modified-file and upstream NOTICE duties for the actual distribution."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 1,
+                "evidence": "The Apache patent license is bounded, MIT does not provide the same express patent clause, and neither clears unrelated patents or trademarks."
+              }
+            ],
+            "overall_notes": "Prepared editorial scores of this scripted draft, not a success probability or independent legal validation.",
+            "self_assessment": "Initial gaps require revision."
+          },
+          "rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 4,
+                "evidence": "Ship only after the distribution package includes the required license, copyright and attribution materials and clearly marks Apache-covered modifications. Keep Forgeboard’s own proprietary terms distinct from third-party terms. The two supplied licenses do not require opening all proprietary source merely because these components are distributed, but that conclusion is limited to this inventory and these license texts."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 4,
+                "evidence": "The incomplete dependency inventory could reveal different obligations. Apache’s patent language has limits and a termination condition; it is not a freedom-to-operate opinion. The MIT text must not be described as providing Apache’s express patent grant. Neither component license grants a blanket trademark endorsement, and contributor ownership remains a separate diligence question."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 4,
+                "evidence": "The revised package could satisfy the identified licenses’ notice conditions without forcing a blanket open-source release. It remains blocked until the built artifacts, dependency inventory and ownership evidence are checked. A newly discovered component under another license would require its own analysis."
+              }
+            ],
+            "overall_notes": "Prepared editorial scores of this scripted draft, not a success probability or independent legal validation.",
+            "self_assessment": "The revision addresses the scripted critique; factual and legal limits remain."
+          }
+        }
+      }
+    }
+  ],
+  "sources": [
+    {
+      "schema_version": "1.0",
+      "source_id": "apache-license",
+      "title": "Apache License2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0",
+      "available_on": "2026-09-20",
+      "filed_on": null,
+      "effective_on": null,
+      "retrieved_on": "2026-09-20",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "locator": "Sections3–4: patents and redistribution",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Link to the acquired primary authority; local inputs contain concise original summaries, not wholesale source copies. Availability date records confirmed public availability at preparation."
+    },
+    {
+      "schema_version": "1.0",
+      "source_id": "mit-license",
+      "title": "MIT License, Open Source Initiative",
+      "url": "https://opensource.org/license/mit",
+      "available_on": "2026-09-20",
+      "filed_on": null,
+      "effective_on": null,
+      "retrieved_on": "2026-09-20",
+      "sha256": "50bc1b7e87bdaa48f2ab04eb75c2e0ab8e34a6bd22d9ccbfdaf8c79793fb6db6",
+      "locator": "Permission and copyright-notice condition",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Link to primary authority; only original summaries included in example inputs."
+    }
+  ],
+  "claims": [
+    {
+      "claim": "Apache License 2.0 section 4 sets redistribution conditions including license, modified-file notices, applicable attribution and NOTICE treatment; section 3 addresses the patent license and termination condition.",
+      "source_ids": [
+        "apache-license"
+      ],
+      "locator": "Sections3–4: patents and redistribution",
+      "classification": "law"
+    },
+    {
+      "claim": "The MIT license conditions permission on including its copyright and permission notice in copies or substantial portions.",
+      "source_ids": [
+        "mit-license"
+      ],
+      "locator": "Permission and copyright-notice condition",
+      "classification": "law"
+    }
+  ],
+  "limitations": [
+    "Fictional business facts; no actual client data.",
+    "Prepared scripts and editorial scoring, with zero live model calls.",
+    "Sources were checked for this bounded preparation on September 20, 2026; no exhaustive legal review or attorney approval."
+  ]
+}

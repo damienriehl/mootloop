@@ -1,0 +1,234 @@
+{
+  "schema_version": "1.0",
+  "descriptor": {
+    "schema_version": "1.0",
+    "demo_id": "customer-data-incident",
+    "title": "We may have exposed customer information",
+    "introduction": "What must we do after customer data is exposed? A fictional business decision with a reviewed action document.",
+    "collection": "business",
+    "practice_area": "Privacy and security",
+    "work_product": "Incident response and notification analysis",
+    "jurisdiction": "California / New York",
+    "court_level": "advisory",
+    "task": "business-advice"
+  },
+  "strategies": [
+    {
+      "strategy_id": "reviewed-advice",
+      "title": "Advice tested against business and legal risks",
+      "input_ids": [
+        "advice"
+      ],
+      "input_summary": "Fictional Copper Ledger discovers an exposed cloud export at 9 a.m. September 20, 2026. It contains 2,000 customer records, including names, email addresses and password-reset tokens; a separate column may contain bank-account numbers for some customers, but the security team has not verified it. Residency flags list 1,200 California and 800 New York residents and may be stale. Access logs show one unknown IP downloaded an object overnight; encryption and key-access facts remain unresolved. The public link was disabled at 10 a.m. Contracts require prompt notice of security incidents but their exact timing provisions have not been collected. The CEO wants to announce “no sensitive data was accessed” by noon.",
+      "assumptions": [
+        "All business facts and organizations in this scenario are fictional.",
+        "Missing facts must remain unresolved rather than assumed favorable."
+      ],
+      "source_ids": [
+        "ca-breach",
+        "ny-shield",
+        "ca-breach-statute",
+        "ny-breach-statute"
+      ],
+      "outputs": {
+        "advice": {
+          "initial": {
+            "response_text": "## Recommendation\nSince the link is disabled, tell customers no sensitive data was accessed and wait for confirmed misuse before considering notices. We have a standard 72-hour deadline everywhere.\n\n## Proposed action\nProceed on that recommendation using the supplied business objective; this initial draft has not yet addressed the opposing critique.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "ca-breach",
+              "ny-shield",
+              "ca-breach-statute",
+              "ny-breach-statute"
+            ],
+            "attorney_gate_items": [
+              "Verify missing facts, governing legal requirements and the secondary document before use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted demonstration, not an independent model or attorney opinion."
+          },
+          "revised": {
+            "response_text": "## Recommendation\nContain and preserve evidence now, activate the incident team, and use an accurate holding statement. Treat notification as a parallel legal workstream, not something postponed until fraud appears. Counsel should determine each applicable trigger, deadline, recipient and content requirement from verified facts and current authority, including contractual and sector obligations.\n\n## Risks\nThe record does not establish the exact exposed fields, token usability, residency, encryption protection or attacker access to keys. These facts can change the notification analysis. A public claim of no sensitive access would exceed the evidence and may need correction. California and New York reporting thresholds and requirements differ; the matrix gives conditional statutory periods, not a conclusion that every listed record triggers notice.\n\n## Options\nUse a narrow factual holding statement while forensic work continues. Deliver contractually required incident information when due, distinguishing it from statutory breach notices. Prepare conditional state notice drafts in parallel, updating them as facts resolve. Delaying all work until misuse is proven risks missing obligations and leaves customers unable to protect accounts.\n\n## Next Steps\nSecurity: preserve cloud logs and the original export under controlled access, revoke exposed tokens, scope downloads and confirm fields/encryption. Legal: collect customer contracts, insurance conditions and statutory sources; create a deadline matrix with discovery/awareness dates and escalation owners. Communications: approve a single factual update channel. Privacy: validate residency and minimize further handling of the exposed records.\n\n## Secondary Deliverable\n**Triage checklist and notification decision matrix**\nImmediate: disable public access; invalidate usable tokens; preserve logs; identify the downloaded object; restrict incident evidence to the response team.\nCalifornia row: confirm covered data and acquisition first. Section1798.82(a) generally sets30 calendar days from discovery/notification, with specified delay grounds; maintainer-to-owner notice is immediate under(b). If more than500 residents require notice, submit the AG sample within15 calendar days after consumer notice under(f).\nNew York row: confirm private information and unauthorized access/acquisition. Section899-aa(2) requires the most expedient notice without unreasonable delay and within30 days after discovery, subject to the statutory law-enforcement exception. Map owner/maintainer roles and agency recipients separately. If September20 starts the applicable30-day clock, provisionally calendar October20; counsel must validate triggers and earlier duties today.\nContract row: legal owner obtains each incident clause, starts its required clock and records recipient/method. Sector/insurance row: identify additional duties independently.\n**Holding statement:** “We identified and disabled an unintended public link to a customer-data export on September 20. We are investigating the information involved and access to it, and have taken steps to secure affected systems. We will provide further information and any required notices as facts are confirmed.”\nDo not add “no sensitive data” or “no access” without evidence.\n\n## Source boundary\nLaw-as-of preparation: September 20, 2026. Source summaries and links are in the input packet. This draft does not establish citation currency or attorney approval.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "ca-breach",
+              "ny-shield",
+              "ca-breach-statute",
+              "ny-breach-statute"
+            ],
+            "attorney_gate_items": [
+              "Verify missing facts, governing legal requirements and the secondary document before use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted demonstration, not an independent model or attorney opinion."
+          },
+          "critique": {
+            "verdict": "revise",
+            "critiques": [
+              "The unknown download contradicts an assurance of no access; misuse is not necessarily the legal notification trigger.",
+              "Token capability, possible bank data, encryption and residency need immediate verification.",
+              "There is no supplied basis for one nationwide 72-hour deadline; contracts and applicable state rules must be mapped separately."
+            ],
+            "instructions": [
+              "Replace the initial recommendation with the supported alternatives and missing-fact analysis.",
+              "Include the complete action document and identify its unresolved prerequisites."
+            ],
+            "self_assessment": "Scripted adversarial review; these objections remain inspectable after revision."
+          },
+          "assessment": {
+            "disposition": "revise",
+            "reasons": [
+              "The revised plan could prevent continued token misuse and avoid premature factual assurances while preserving time for notices. It does not decide notification eligibility or deadlines without the missing data. Containment is evidence of response, not proof that exposure caused no harm."
+            ],
+            "limitations": [
+              "This is a fictional, agent-authored scenario replayed without model calls.",
+              "Unresolved factual and legal questions require qualified counsel; this is not attorney approval."
+            ],
+            "self_assessment": "A qualified assessment of the revised approach, not a predicted outcome."
+          },
+          "initial_rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 1,
+                "evidence": "The unknown download contradicts an assurance of no access; misuse is not necessarily the legal notification trigger."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 1,
+                "evidence": "Token capability, possible bank data, encryption and residency need immediate verification."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 1,
+                "evidence": "There is no supplied basis for one nationwide 72-hour deadline; contracts and applicable state rules must be mapped separately."
+              }
+            ],
+            "overall_notes": "Prepared editorial scores of this scripted draft, not a success probability or independent legal validation.",
+            "self_assessment": "Initial gaps require revision."
+          },
+          "rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 4,
+                "evidence": "Contain and preserve evidence now, activate the incident team, and use an accurate holding statement. Treat notification as a parallel legal workstream, not something postponed until fraud appears. Counsel should determine each applicable trigger, deadline, recipient and content requirement from verified facts and current authority, including contractual and sector obligations."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 4,
+                "evidence": "The record does not establish the exact exposed fields, token usability, residency, encryption protection or attacker access to keys. These facts can change the notification analysis. A public claim of no sensitive access would exceed the evidence and may need correction. California and New York reporting thresholds and requirements differ; this packet intentionally supplies no single universal deadline or conclusion that every listed record triggers notice."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 4,
+                "evidence": "The revised plan could prevent continued token misuse and avoid premature factual assurances while preserving time for notices. It does not decide notification eligibility or deadlines without the missing data. Containment is evidence of response, not proof that exposure caused no harm."
+              }
+            ],
+            "overall_notes": "Prepared editorial scores of this scripted draft, not a success probability or independent legal validation.",
+            "self_assessment": "The revision addresses the scripted critique; factual and legal limits remain."
+          }
+        }
+      }
+    }
+  ],
+  "sources": [
+    {
+      "schema_version": "1.0",
+      "source_id": "ca-breach",
+      "title": "California Attorney General breach reporting",
+      "url": "https://oag.ca.gov/privacy/databreach/reporting",
+      "available_on": "2026-09-20",
+      "filed_on": null,
+      "effective_on": null,
+      "retrieved_on": "2026-09-20",
+      "sha256": "f53e27f8768cc35008b5a88aa2937fd751eed7e9b34e5478774c7f09c4377df7",
+      "locator": "Resident notice and sample notice submission",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Link to the acquired primary authority; local inputs contain concise original summaries, not wholesale source copies. Availability date records confirmed public availability at preparation."
+    },
+    {
+      "schema_version": "1.0",
+      "source_id": "ny-shield",
+      "title": "New York Attorney General SHIELD Act guidance",
+      "url": "https://ag.ny.gov/resources/organizations/data-breach-reporting/shield-act",
+      "available_on": "2026-09-20",
+      "retrieved_on": "2026-09-20",
+      "sha256": "3186d8965a05b69d411c6f642a2b49f8fd8b7cb3f7aeb6f791a77608447df0c2",
+      "locator": "Scope, data types and safeguards; use current statute for timing",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Primary authority inspected; only original summaries and links redistributed. Availability is preparation access date."
+    },
+    {
+      "schema_version": "1.0",
+      "source_id": "ca-breach-statute",
+      "title": "California Civil Code1798.82, effective January1,2026",
+      "url": "https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=CIV&sectionNum=1798.82",
+      "available_on": "2026-09-20",
+      "retrieved_on": "2026-09-20",
+      "sha256": "4e71636d8bbb060590d5262783f707b6c3f6279bde9656dbaaa63305c596e001",
+      "locator": "Subdivisions(a),(b),(f),(h): triggers,30-day consumer notice,15-day AG submission",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Primary authority inspected; only original summaries and links redistributed. Availability is preparation access date."
+    },
+    {
+      "schema_version": "1.0",
+      "source_id": "ny-breach-statute",
+      "title": "New York General Business Law899-aa",
+      "url": "https://www.nysenate.gov/legislation/laws/GBS/899-AA",
+      "available_on": "2026-09-20",
+      "retrieved_on": "2026-09-20",
+      "sha256": "f0a996b46b112941a9da1bcf169d90ed5e6d1da2f64d7c94807ab41f8d635098",
+      "locator": "Subdivisions1–4 and8; digest identifies the web tool’s dated text extraction, not raw HTML",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Official statute read through the web tool; direct HTML retrieval returned403. Digest pins the preserved extracted text. Only original summaries and links redistributed."
+    }
+  ],
+  "claims": [
+    {
+      "claim": "California Attorney General guidance explains breach-notification analysis and reporting for affected California residents; apply statutory data and trigger requirements rather than a generic nationwide deadline.",
+      "source_ids": [
+        "ca-breach"
+      ],
+      "locator": "Resident notice and sample notice submission",
+      "classification": "law"
+    },
+    {
+      "claim": "New York Attorney General guidance describes state breach reporting and affected-person obligations; unauthorized access/acquisition, covered data, residency and exceptions require investigation.",
+      "source_ids": [
+        "ny-shield"
+      ],
+      "locator": "Scope, data types and safeguards; use current statute for timing",
+      "classification": "law"
+    },
+    {
+      "claim": "California section1798.82 specifies conditional30-calendar-day consumer notice and a15-day AG sample-submission period after consumer notice when more than500 residents require notice, with statutory qualifications.",
+      "source_ids": [
+        "ca-breach-statute"
+      ],
+      "locator": "Subdivisions(a),(b),(f),(h): triggers,30-day consumer notice,15-day AG submission",
+      "classification": "law"
+    },
+    {
+      "claim": "New York section899-aa requires expedited qualifying notice within30 days after discovery, subject to its law-enforcement exception; access and acquisition both matter.",
+      "source_ids": [
+        "ny-breach-statute"
+      ],
+      "locator": "Subdivisions1–4 and8; digest identifies the web tool’s dated text extraction, not raw HTML",
+      "classification": "law"
+    }
+  ],
+  "limitations": [
+    "Fictional business facts; no actual client data.",
+    "Prepared scripts and editorial scoring, with zero live model calls.",
+    "Sources were checked for this bounded preparation on September 20, 2026; no exhaustive legal review or attorney approval."
+  ]
+}

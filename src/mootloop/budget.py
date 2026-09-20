@@ -232,6 +232,8 @@ def estimate_run(
             plan.append((stage, "personas", oc, oc))
         elif stage == "bolster":
             plan.append((stage, "personas", bolster, bolster))
+        elif stage == "narrative_assessment":
+            plan.append((stage, "judges", judges, judges))
         elif stage == "judge_panel":
             plan.append((stage, "judges", judges * obj, judges * obj))
         elif stage == "restructure":

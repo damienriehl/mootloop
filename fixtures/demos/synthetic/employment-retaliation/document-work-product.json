@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0",
+  "input_id": "work-product",
+  "task": "complaint",
+  "represented_side": "Jordan Vale",
+  "jurisdiction": "New York",
+  "court_level": "trial",
+  "cutoff": "2026-09-20",
+  "strategy_id": "record-bounded",
+  "assumptions": [
+    "All parties, facts and record locators are fictional."
+  ],
+  "preservation_constraints": [
+    "Use only the supplied fictional record and the stated procedural assumptions; do not invent evidence, authority or preservation."
+  ],
+  "units": [
+    {
+      "unit_id": "work-product",
+      "title": "Employment retaliation",
+      "instructions": "Draft Complaint for Jordan Vale. Apply the supplied record, preserve adverse evidence, identify missing support and request only procedurally available relief.",
+      "issues": [
+        "Timing supports an inference, not conclusive causation; acknowledge the documented April attendance warning and investigate the complete attendance record.",
+        "Plead the factual basis for reasonable belief and the specific protected internal objection; do not promise proof of an actual violation or invent an unidentified safety rule.",
+        "Separate firsthand documents from the unconfirmed coworker account and request only supported remedies. Do not add a government report that never occurred."
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "source_id": "scenario",
+      "text": "Every person, company and record is fictional. Jordan Vale worked as a quality technician for Keystone in Monroe County, New York, from 2023 until August 28, 2026. On August 12, Vale emailed supervisor Lee Park that three instrument-calibration certificates omitted failed pressure readings; Vale attached the raw readings and said shipping the tested devices could expose users to unsafe pressure. Park replied that shipment should proceed and directed Vale not to delay it. Vale objected internally again on August 15 and refused to sign a certificate reporting all tests passed. On August 20, Park removed Vale from testing duties; on August 28, Keystone terminated Vale, citing attendance. An April warning recorded two late arrivals. Payroll records show no further late arrival through August; the employer has not supplied its complete attendance system. A coworker recalls Park complaining that Vale was holding up shipments, but has not signed a statement. Vale seeks lost wages and reinstatement. No government report or public disclosure is alleged. The proposed complaint is prepared September 20, 2026; all events and documents are invented.",
+      "sha256": "af34de27394e9ec829232010f7759f7dfc27a574288eaee1bdc27ed157a89feb",
+      "available_on": "2026-09-20",
+      "classification": "hypothetical",
+      "public": true
+    },
+    {
+      "source_id": "ny-retaliation",
+      "text": "Authority summary: New York Labor Law 740 protects specified disclosures or objections based on a reasonable belief of legal violation or substantial specific public danger; the current statute includes a two-year action period, defenses and remedies.",
+      "sha256": "fdeb17af6188c361b7ba52131ebc2e882d16d7262f03068bfa26d37a76154ef3",
+      "available_on": "2026-09-20",
+      "classification": "record",
+      "public": true
+    }
+  ]
+}

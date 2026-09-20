@@ -1,0 +1,187 @@
+{
+  "schema_version": "1.0",
+  "descriptor": {
+    "schema_version": "1.0",
+    "demo_id": "civil-rights-argument",
+    "title": "Civil-rights claim",
+    "introduction": "A fictional oral-argument preparation and q&a tested against the record, adverse arguments and procedural limits.",
+    "collection": "synthetic",
+    "practice_area": "Civil rights",
+    "work_product": "Oral-argument preparation and Q&A",
+    "jurisdiction": "Seventh Circuit",
+    "court_level": "federal-appellate",
+    "task": "oral-argument"
+  },
+  "strategies": [
+    {
+      "strategy_id": "record-bounded",
+      "title": "Revise within the supplied record",
+      "input_ids": [
+        "work-product"
+      ],
+      "input_summary": "All people, quotations and record references are fictional. In an Illinois federal civil-rights case, Morgan Hale alleges excessive force during a May 2023 porch encounter. Hale testified at deposition pages 18–22 that both hands were visible and empty, Hale stood still after an instruction, and Officer Ellis struck Hale before any warning of force. Ellis testified at pages 30–34 that Hale reached toward a waistband and advanced. A nearby camera captures the sidewalk but not Hale’s hands or the porch; audio is indistinct. The district court entered final summary judgment for Ellis on qualified-immunity grounds, relying on a statement that Hale advanced with a concealed hand. Hale’s opposition, pages 7–10, cited the conflicting sworn testimony and disputed the video’s coverage. The appeal challenges that factual treatment. The packet supplies Tolan v. Cotton on summary-judgment methodology but does not establish a sufficiently analogous clearly-established-law authority for the May 2023 incident. The exercise assumes appellate jurisdiction and preservation but does not assume that correcting the facts defeats qualified immunity.",
+      "assumptions": [
+        "All parties, facts and record locators are fictional."
+      ],
+      "source_ids": [
+        "tolan",
+        "frcp"
+      ],
+      "outputs": {
+        "work-product": {
+          "initial": {
+            "response_text": "## Position\nThe officer lied and must lose immunity.\n\n## Questions\nWhy should the panel reverse?\n\n## Answers\nThe plaintiff says no threat existed, so that settles both liability and clearly established law.\n\n## Concessions\nNone.\n\n## Closing\nReverse and order judgment for Hale.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "tolan",
+              "frcp"
+            ],
+            "attorney_gate_items": [
+              "Verify factual support, authority, procedural posture and relief before any use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted legal demonstration; no independent model or attorney approval."
+          },
+          "revised": {
+            "response_text": "## Position\nMay it please the Court. The district court resolved a disputed factual premise against the nonmovant: whether Hale advanced while concealing a hand. Hale’s deposition supplies a contrary account, and the camera does not depict the decisive area. We request reconsideration under the proper factual framework, not judgment that Ellis used unlawful force.\n\n## Questions\n1. Isn’t Hale’s account self-serving?\n2. Doesn’t the video resolve the dispute?\n3. What precisely would change if we accepted your facts?\n4. Which case clearly established this right in May 2023?\n5. Why remand if we can affirm on the legal immunity prong?\n6. Are you asking us to decide the officer is dishonest?\n\n## Answers\n1. The relevant question is whether the sworn account creates a supported material dispute, not whether the witness has an interest. At deposition 18–22, Hale described visible empty hands, a stationary position and a strike before a force warning. Ellis’s contrary pages 30–34 cannot displace that version solely by credibility preference.\n2. No. The assumed camera covers the sidewalk, not the porch or hands, and its audio is indistinct. We concede that a recording conclusively resolving a material fact could change the analysis, but this packet does not supply one. We ask the panel to inspect its actual limits.\n3. Under Hale’s version the immediate threat and movement premises differ from those used below. That may alter the force analysis; it does not automatically establish liability. Tolan supplies the methodological objection to treating disputed inferences as settled against the nonmovant.\n4. This packet does not supply a sufficiently analogous pre-incident authority. We cannot responsibly invent one or describe Tolan as automatically settling every force scenario. That is a serious weakness requiring research and preserved briefing. The panel must evaluate the actual authorities and specificity of the claimed right before ruling on that prong.\n5. If an adequately preserved, independent legal ground supports affirmance even on Hale’s favorable facts, correcting the factual error may make no difference. Our remand request is strongest only if the error affected the legal analysis and the panel cannot properly resolve the remaining issue on the existing record.\n6. No. We ask for the proper summary-judgment treatment of competing testimony, not a credibility finding against Ellis. A factfinder could ultimately accept Ellis’s account.\n\n## Concessions\nWe concede that force must be assessed in context; that the video is incomplete rather than affirmative proof of Hale’s account; that qualified immunity requires separate legal analysis; and that a correct alternative ground may sustain the judgment. We withdraw the request for judgment establishing Hale’s liability claim on this record.\n\n## Closing\nVacate and remand if the unsupported factual choice affected the ruling and no proper independent ground supports affirmance. At minimum, analyze immunity on the supported nonmovant version before deciding the legal issue. This is written oral-argument preparation and a scripted bench exchange, not a recording of an actual hearing or a prediction of the panel’s vote.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "tolan",
+              "frcp"
+            ],
+            "attorney_gate_items": [
+              "Verify factual support, authority, procedural posture and relief before any use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted legal demonstration; no independent model or attorney approval."
+          },
+          "critique": {
+            "verdict": "revise",
+            "critiques": [
+              "Do not accuse a witness of lying or ask the appellate court to choose credibility; identify the supported favorable version and what the camera cannot show.",
+              "Separate the factual-error argument from the clearly-established-law requirement at the incident date. Tolan alone may not supply a fact-specific right.",
+              "Offer responsive concessions and a limited disposition, including what happens if the panel can affirm on an independent legal basis."
+            ],
+            "instructions": [
+              "Use the actual procedural standard and supplied record.",
+              "Revise the work product and requested relief to address each stated objection without assuming new evidence."
+            ],
+            "self_assessment": "A scripted adverse reading, not an actual opponent submission."
+          },
+          "assessment": {
+            "disposition": "revise",
+            "reasons": [
+              "The revised answers expose the strongest weakness instead of obscuring it: a factual-error argument alone may not defeat qualified immunity. Remand could change the analysis if the mistaken facts were decisive, but the panel could affirm on clearly-established law. Missing authority remains a blocker to a confident merits recommendation."
+            ],
+            "limitations": [
+              "Fictional record and agent-authored scripts.",
+              "No attorney approval, independent model evaluation or outcome probability."
+            ],
+            "self_assessment": "Preserve the adverse conclusion and uncertainty."
+          },
+          "initial_rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 1,
+                "evidence": "Do not accuse a witness of lying or ask the appellate court to choose credibility; identify the supported favorable version and what the camera cannot show."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 1,
+                "evidence": "Separate the factual-error argument from the clearly-established-law requirement at the incident date. Tolan alone may not supply a fact-specific right."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 1,
+                "evidence": "Offer responsive concessions and a limited disposition, including what happens if the panel can affirm on an independent legal basis."
+              }
+            ],
+            "overall_notes": "Prepared qualitative rubric illustration; these scores are not win probabilities or attorney approval.",
+            "self_assessment": "Unresolved weaknesses remain visible, including any failed threshold."
+          },
+          "rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 3,
+                "evidence": "The revised answers expose the strongest weakness instead of obscuring it: a factual-error argument alone may not defeat qualified immunity. Remand could change the analysis if the mistaken facts were decisive, but the panel could affirm on clearly-established law. Missing authority remains a blocker to a confident merits recommendation."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 4,
+                "evidence": "The revised record section distinguishes supplied facts, assumptions and missing evidence."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 4,
+                "evidence": "Offer responsive concessions and a limited disposition, including what happens if the panel can affirm on an independent legal basis. The revision now addresses this limitation explicitly."
+              }
+            ],
+            "overall_notes": "Prepared qualitative rubric illustration; these scores are not win probabilities or attorney approval.",
+            "self_assessment": "Unresolved weaknesses remain visible, including any failed threshold."
+          }
+        }
+      }
+    }
+  ],
+  "sources": [
+    {
+      "schema_version": "1.0",
+      "source_id": "tolan",
+      "title": "Tolan v. Cotton, 572U.S.650(2014)",
+      "url": "https://www.law.cornell.edu/supremecourt/text/13-551",
+      "available_on": "2026-09-20",
+      "filed_on": null,
+      "effective_on": null,
+      "retrieved_on": "2026-09-20",
+      "sha256": "fddbc68c77dd48fd634772658a5126de4dd06a3b81fbba93eccb3057316bd1a2",
+      "locator": "Per curiam opinion, summary-judgment fact treatment",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Link to the acquired primary authority; local inputs contain concise original summaries, not wholesale source copies. Availability date records confirmed public availability at preparation."
+    },
+    {
+      "schema_version": "1.0",
+      "source_id": "frcp",
+      "title": "Federal Rules of Civil Procedure, December1,2025",
+      "url": "https://www.uscourts.gov/sites/default/files/document/federal-rules-of-civil-procedure.pdf",
+      "available_on": "2026-09-20",
+      "filed_on": null,
+      "effective_on": null,
+      "retrieved_on": "2026-09-20",
+      "sha256": "bd8705fc038d87e4fe222a7ea2e4324222c9430e2373fce56826bd2dfa2f8baf",
+      "locator": "Rule56(a), (c), (d): summary judgment",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Link to the acquired primary authority; local inputs contain concise original summaries, not wholesale source copies. Availability date records confirmed public availability at preparation."
+    }
+  ],
+  "claims": [
+    {
+      "claim": "Tolan v. Cotton requires proper treatment of supported factual disputes in qualified-immunity summary judgment; correcting that error does not itself resolve every immunity element.",
+      "source_ids": [
+        "tolan"
+      ],
+      "locator": "Per curiam opinion, summary-judgment fact treatment",
+      "classification": "law"
+    },
+    {
+      "claim": "Rule 56 distinguishes genuine material factual disputes from permissible judgment as a matter of law; credibility cannot be decided merely by preferring the moving witness.",
+      "source_ids": [
+        "frcp"
+      ],
+      "locator": "Rule56(a), (c), (d): summary judgment",
+      "classification": "law"
+    }
+  ],
+  "limitations": [
+    "All parties, events and record references are invented.",
+    "Prepared scripts are replayed without live model calls.",
+    "Authority review is bounded to this educational exercise; filing and attorney-approval gates remain unresolved."
+  ]
+}

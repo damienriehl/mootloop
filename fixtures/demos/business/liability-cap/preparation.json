@@ -1,0 +1,162 @@
+{
+  "schema_version": "1.0",
+  "descriptor": {
+    "schema_version": "1.0",
+    "demo_id": "liability-cap",
+    "title": "Our customer demands unlimited liability",
+    "introduction": "What should we offer instead of unlimited liability? A fictional business decision with a reviewed action document.",
+    "collection": "business",
+    "practice_area": "Commercial contracts",
+    "work_product": "Negotiation positions and revised clause",
+    "jurisdiction": "New York",
+    "court_level": "advisory",
+    "task": "business-advice"
+  },
+  "strategies": [
+    {
+      "strategy_id": "reviewed-advice",
+      "title": "Advice tested against business and legal risks",
+      "input_ids": [
+        "advice"
+      ],
+      "input_summary": "Fictional Harbor Metrics offers business analytics software to Beacon Retail for $120,000 annually on a two-year New York-law agreement. Beacon proposes uncapped liability for every breach, all consequential damages, and indemnity for any customer loss. Harbor carries a $2 million cyber policy with a $100,000 retention; policy exclusions and erosion by other claims have not been reviewed. Harbor’s standard contract caps all claims at the preceding 12 months’ fees and excludes lost profits. Beacon processes order history, business contacts and support tickets; payment-card processing is excluded. Sales can obtain a 15% premium for a risk-adjusted offer but cannot price unlimited exposure. Neither party has supplied its complete indemnity language.",
+      "assumptions": [
+        "All business facts and organizations in this scenario are fictional.",
+        "Missing facts must remain unresolved rather than assumed favorable."
+      ],
+      "source_ids": [
+        "ny-liability"
+      ],
+      "outputs": {
+        "advice": {
+          "initial": {
+            "response_text": "## Recommendation\nAccept unlimited confidentiality and data liability because the $2 million policy will cover it. Keep a one-year fee cap for ordinary claims and describe the cap as fully enforceable under New York law.\n\n## Proposed action\nProceed on that recommendation using the supplied business objective; this initial draft has not yet addressed the opposing critique.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "ny-liability"
+            ],
+            "attorney_gate_items": [
+              "Verify missing facts, governing legal requirements and the secondary document before use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted demonstration, not an independent model or attorney opinion."
+          },
+          "revised": {
+            "response_text": "## Recommendation\nOffer a $120,000 ordinary aggregate cap, a negotiated $360,000 aggregate supercap for specified confidentiality and covered data-security breaches, and narrowly drafted treatment of fraud, willful misconduct and liabilities that cannot lawfully be limited. Price the higher exposure at the proposed premium only after finance and insurance review. Do not accept an indemnity for any loss merely because the customer labels it a breach.\n\n## Risks\nA $2 million policy is a coverage fact to verify, not a $2 million contractual commitment. The retention, exclusions, defense-cost treatment and shared aggregate may leave Harbor funding a claim. Lost-profit exclusions may conflict with agreed recovery for a particular incident. New York law requires analysis of the precise limitation, claims and conduct; Part 60 does not establish that every cap is enforceable, or that labeling a claim gross negligence automatically defeats every remedy limitation.\n\n## Options\nOpening position: ordinary cap at one year’s fees, targeted three-times-fee supercap, mutual exclusions and clear claim aggregation. Fallback: two years’ fees as the ordinary cap with narrower indemnities, priced and approved. Walk-away point: uncapped ordinary breach or first-party business losses outside reasonably quantifiable exposure. Beacon may reasonably require greater recovery if the service becomes mission-critical; revisit the scope and price rather than conceal that risk in exceptions.\n\n## Next Steps\nLegal should map every indemnity and damages exclusion to the two caps, including third-party defense costs and whether related events aggregate. Risk should obtain a broker’s coverage analysis without warranting insurer payment. Finance should model a retained loss and premium. Sales should confirm whether data categories or service criticality will expand during the term.\n\n## Secondary Deliverable\n**Negotiation draft — liability allocation**\nExcept for the Excluded Liabilities below, each party’s aggregate liability arising out of or relating to this Agreement will not exceed $120,000. For liability arising from a party’s breach of its express confidentiality obligations or the specifically identified data-security obligations in Schedule D, that party’s total aggregate liability for all such claims together will instead be subject to a $360,000 limit, inclusive of amounts paid under the ordinary limit and without double recovery. Related events and differently labeled causes of action do not create additional limits. These limits apply to indemnification obligations only to the extent expressly stated in the applicable indemnity. Excluded Liabilities are fraud, willful misconduct, and liability to the extent applicable law prohibits its limitation. No clause represents that insurance covers a claim. The parties must reconcile consequential-damage exclusions, gross-negligence treatment, payment obligations and each indemnity before signature.\n**Negotiation note:** Dollar figures are proposed commercial terms, not statutory limits. Do not send the bracket-free clause as execution-ready until the noted reconciliation is completed.\n\n## Source boundary\nLaw-as-of preparation: September 20, 2026. Source summaries and links are in the input packet. This draft does not establish citation currency or attorney approval.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "ny-liability"
+            ],
+            "attorney_gate_items": [
+              "Verify missing facts, governing legal requirements and the secondary document before use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted demonstration, not an independent model or attorney opinion."
+          },
+          "critique": {
+            "verdict": "revise",
+            "critiques": [
+              "Insurance limits do not promise coverage for a particular claim or create a per-customer pool; identify retention, exclusions and aggregate erosion.",
+              "Define overlapping indemnity, confidentiality and data claims so a broad label cannot swallow the ordinary cap.",
+              "Do not guarantee enforceability or assume all gross-negligence treatment is identical to an exculpatory clause."
+            ],
+            "instructions": [
+              "Replace the initial recommendation with the supported alternatives and missing-fact analysis.",
+              "Include the complete action document and identify its unresolved prerequisites."
+            ],
+            "self_assessment": "Scripted adversarial review; these objections remain inspectable after revision."
+          },
+          "assessment": {
+            "disposition": "revise",
+            "reasons": [
+              "A targeted supercap makes the negotiation more priceable and may satisfy the customer’s concern about low fee-based recovery. Beacon could reject it if foreseeable losses materially exceed $360,000; insurance alone does not cure that mismatch. The revised language narrows ambiguity but remains a negotiation draft, with enforceability and indemnity scope unresolved."
+            ],
+            "limitations": [
+              "This is a fictional, agent-authored scenario replayed without model calls.",
+              "Unresolved factual and legal questions require qualified counsel; this is not attorney approval."
+            ],
+            "self_assessment": "A qualified assessment of the revised approach, not a predicted outcome."
+          },
+          "initial_rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 1,
+                "evidence": "Insurance limits do not promise coverage for a particular claim or create a per-customer pool; identify retention, exclusions and aggregate erosion."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 1,
+                "evidence": "Define overlapping indemnity, confidentiality and data claims so a broad label cannot swallow the ordinary cap."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 1,
+                "evidence": "Do not guarantee enforceability or assume all gross-negligence treatment is identical to an exculpatory clause."
+              }
+            ],
+            "overall_notes": "Prepared editorial scores of this scripted draft, not a success probability or independent legal validation.",
+            "self_assessment": "Initial gaps require revision."
+          },
+          "rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 4,
+                "evidence": "Offer a $120,000 ordinary aggregate cap, a negotiated $360,000 aggregate supercap for specified confidentiality and covered data-security breaches, and narrowly drafted treatment of fraud, willful misconduct and liabilities that cannot lawfully be limited. Price the higher exposure at the proposed premium only after finance and insurance review. Do not accept an indemnity for any loss merely because the customer labels it a breach."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 4,
+                "evidence": "A $2 million policy is a coverage fact to verify, not a $2 million contractual commitment. The retention, exclusions, defense-cost treatment and shared aggregate may leave Harbor funding a claim. Lost-profit exclusions may conflict with agreed recovery for a particular incident. New York law requires analysis of the precise limitation, claims and conduct; Part 60 does not establish that every cap is enforceable, or that labeling a claim gross negligence automatically defeats every remedy limitation."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 4,
+                "evidence": "A targeted supercap makes the negotiation more priceable and may satisfy the customer’s concern about low fee-based recovery. Beacon could reject it if foreseeable losses materially exceed $360,000; insurance alone does not cure that mismatch. The revised language narrows ambiguity but remains a negotiation draft, with enforceability and indemnity scope unresolved."
+              }
+            ],
+            "overall_notes": "Prepared editorial scores of this scripted draft, not a success probability or independent legal validation.",
+            "self_assessment": "The revision addresses the scripted critique; factual and legal limits remain."
+          }
+        }
+      }
+    }
+  ],
+  "sources": [
+    {
+      "schema_version": "1.0",
+      "source_id": "ny-liability",
+      "title": "Matter of Part60 Put-Back Litigation, NY Court of Appeals2020",
+      "url": "https://www.nycourts.gov/reporter/3dseries/2020/2020_07687.htm",
+      "available_on": "2026-09-20",
+      "filed_on": null,
+      "effective_on": null,
+      "retrieved_on": "2026-09-20",
+      "sha256": "923834a4293d9358d7f4a54c52300e4e02a5b3649d2eb387808ece8eede8fb87",
+      "locator": "Opinion discussion of remedy limitation and exculpation",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Link to the acquired primary authority; local inputs contain concise original summaries, not wholesale source copies. Availability date records confirmed public availability at preparation."
+    }
+  ],
+  "claims": [
+    {
+      "claim": "New York’s Part 60 Put-Back decision distinguishes a limitation of contractual remedies from complete exculpation; gross-negligence arguments require attention to the clause and claim rather than a blanket enforceability assertion.",
+      "source_ids": [
+        "ny-liability"
+      ],
+      "locator": "Opinion discussion of remedy limitation and exculpation",
+      "classification": "law"
+    }
+  ],
+  "limitations": [
+    "Fictional business facts; no actual client data.",
+    "Prepared scripts and editorial scoring, with zero live model calls.",
+    "Sources were checked for this bounded preparation on September 20, 2026; no exhaustive legal review or attorney approval."
+  ]
+}

@@ -1,0 +1,187 @@
+{
+  "schema_version": "1.0",
+  "descriptor": {
+    "schema_version": "1.0",
+    "demo_id": "product-liability",
+    "title": "Product liability",
+    "introduction": "A fictional summary-judgment motion tested against the record, adverse arguments and procedural limits.",
+    "collection": "synthetic",
+    "practice_area": "Products and torts",
+    "work_product": "Summary-judgment motion",
+    "jurisdiction": "Texas",
+    "court_level": "federal-trial",
+    "task": "motion"
+  },
+  "strategies": [
+    {
+      "strategy_id": "record-bounded",
+      "title": "Revise within the supplied record",
+      "input_ids": [
+        "work-product"
+      ],
+      "input_summary": "All parties, exhibits and procedural events are fictional. Alex Rowan alleges that a 2022 Prairie industrial press lacked an interlocked access guard and caused a hand injury in June 2025. The federal case is in the Northern District of Texas, with Texas substantive law assumed applicable and discovery complete for this exercise. ExhibitA is the manufacturing specification showing a fixed bolted guard and available electrical input for a stop interlock in 2022. ExhibitB is plaintiff engineer Chen’s report proposing an interlocked access guard, estimating an $85 component cost and describing a pre-2022 prototype test; Chen has not supplied a complete production-cost analysis. ExhibitC is defense engineer Moss’s report that the proposed guard could interfere with maintenance access and that no production-unit test is in the packet. ExhibitD is Rowan’s testimony that the fixed guard was removed by a supervisor before the accident. The parties dispute causation, feasibility and effect on utility. No court has excluded either report. Prairie wants summary judgment on all claims solely because the alternative design was never sold on this model.",
+      "assumptions": [
+        "All parties, facts and record locators are fictional."
+      ],
+      "source_ids": [
+        "tx-products",
+        "frcp"
+      ],
+      "outputs": {
+        "work-product": {
+          "initial": {
+            "response_text": "## Relief\nDismiss every product-liability claim.\n\n## Grounds\nThe alternative guard was never commercially sold, so Texas law necessarily bars recovery.\n\n## Record\nMoss disputes utility and Rowan admits the original guard was removed.\n\n## Argument\nThe court should believe Moss rather than Chen and find Rowan’s supervisor solely responsible.\n\n## Limitations\nNo further evidence is necessary.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "tx-products",
+              "frcp"
+            ],
+            "attorney_gate_items": [
+              "Verify factual support, authority, procedural posture and relief before any use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted legal demonstration; no independent model or attorney approval."
+          },
+          "revised": {
+            "response_text": "## Relief\nPrairie requests judgment on the design-defect theory only if, after the court applies Rule 56 to the admissible record, the plaintiff lacks sufficient evidence of a feasible safer alternative design under Texas CPRC 82.005. Prairie withdraws the proposition that absence of commercial sales alone decides the issue. It does not request dismissal of distinct warning or manufacturing theories on this packet.\n\n## Grounds\nSection 82.005 requires proof of the identified statutory design and causation elements. The proposed interlock must be evaluated for risk reduction, utility and economic/technological feasibility at the relevant time. The motion must identify a missing evidentiary element rather than ask the court to resolve a genuine expert conflict for the movant.\n\n## Record\nExhibitA identifies a 2022 stop-interlock input. ExhibitB, Chen’s report, describes a pre-2022 prototype and an $85 component estimate; its production-cost analysis is incomplete. ExhibitC, Moss’s report, raises maintenance-access and testing concerns. ExhibitD records removal of the original guard. These are fictional exhibit summaries, not sworn trial evidence. Neither expert has been excluded.\n\n## Argument\nPrairie’s strongest bounded point is that a component price does not by itself demonstrate an economically feasible completed design that preserves utility. The plaintiff must connect the proposal to the statutory requirements. Prairie should identify precisely which portions of Chen’s report omit that connection and any properly supported evidentiary objection.\nBut the supplied record also contains evidence favoring the plaintiff: a prototype predating manufacture and a compatible control input. If Chen’s admissible explanation permits a reasonable factfinder to infer feasibility and adequate utility, Moss’s disagreement presents a trial issue. The court cannot accept Moss merely because Prairie calls the alternative unproven. Absence of a production-unit test or prior commercial sale is relevant to the analysis, not an automatic dispositive rule.\nGuard removal supports a defense account of causation. The opposing account is that an interlock could have interrupted operation despite access. The packet does not establish either account conclusively. Prairie therefore cannot obtain judgment on causation by treating disputed inferences as conceded facts. If full design-defect judgment is denied, Prairie may ask the court to identify genuinely undisputed facts under Rule 56(g), only to the extent their scope is agreed or supported; it should not repackage contested feasibility as such a fact.\n\n## Limitations\nThis is a deliberately vulnerable motion. On the supplied competing reports, denial is a substantial possibility and may be the sound result. Counsel should evaluate the complete reports, declarations and applicable expert-evidence procedures, including preservation and timing, before deciding whether to file. No exclusion argument or new expert evidence is assumed granted. The revised motion identifies the remaining dispute rather than claiming a manufactured win.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "tx-products",
+              "frcp"
+            ],
+            "attorney_gate_items": [
+              "Verify factual support, authority, procedural posture and relief before any use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted legal demonstration; no independent model or attorney approval."
+          },
+          "critique": {
+            "verdict": "revise",
+            "critiques": [
+              "Commercial sale is not the statutory definition of a safer alternative design; address feasibility when the product left control.",
+              "Chen’s report and the electrical-input specification supply contrary evidence. No exclusion order allows you simply to ignore them.",
+              "Guard removal may support a causation defense but does not automatically eliminate a design claim about foreseeable access. Narrow relief or acknowledge that summary judgment may fail."
+            ],
+            "instructions": [
+              "Use the actual procedural standard and supplied record.",
+              "Revise the work product and requested relief to address each stated objection without assuming new evidence."
+            ],
+            "self_assessment": "A scripted adverse reading, not an actual opponent submission."
+          },
+          "assessment": {
+            "disposition": "not_supported",
+            "reasons": [
+              "The narrower motion corrects the initial legal error but does not remove Chen’s contrary evidence. If that evidence is admissible and sufficient, summary judgment should be denied. The exercise demonstrates that adversarial revision can narrow an unsound filing rather than produce victory; additional record or admissibility findings cannot be invented."
+            ],
+            "limitations": [
+              "Fictional record and agent-authored scripts.",
+              "No attorney approval, independent model evaluation or outcome probability."
+            ],
+            "self_assessment": "Preserve the adverse conclusion and uncertainty."
+          },
+          "initial_rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 1,
+                "evidence": "Commercial sale is not the statutory definition of a safer alternative design; address feasibility when the product left control."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 1,
+                "evidence": "Chen’s report and the electrical-input specification supply contrary evidence. No exclusion order allows you simply to ignore them."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 1,
+                "evidence": "Guard removal may support a causation defense but does not automatically eliminate a design claim about foreseeable access. Narrow relief or acknowledge that summary judgment may fail."
+              }
+            ],
+            "overall_notes": "Prepared qualitative rubric illustration; these scores are not win probabilities or attorney approval.",
+            "self_assessment": "Unresolved weaknesses remain visible, including any failed threshold."
+          },
+          "rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 2,
+                "evidence": "The narrower motion corrects the initial legal error but does not remove Chen’s contrary evidence. If that evidence is admissible and sufficient, summary judgment should be denied. The exercise demonstrates that adversarial revision can narrow an unsound filing rather than produce victory; additional record or admissibility findings cannot be invented."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 4,
+                "evidence": "The revised record section distinguishes supplied facts, assumptions and missing evidence."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 4,
+                "evidence": "Guard removal may support a causation defense but does not automatically eliminate a design claim about foreseeable access. Narrow relief or acknowledge that summary judgment may fail. The revision now addresses this limitation explicitly."
+              }
+            ],
+            "overall_notes": "Prepared qualitative rubric illustration; these scores are not win probabilities or attorney approval.",
+            "self_assessment": "Unresolved weaknesses remain visible, including any failed threshold."
+          }
+        }
+      }
+    }
+  ],
+  "sources": [
+    {
+      "schema_version": "1.0",
+      "source_id": "tx-products",
+      "title": "Texas Civil Practice and Remedies Code82.005",
+      "url": "https://tcss.legis.texas.gov/resources/CP/htm/CP.82.htm",
+      "available_on": "2026-09-20",
+      "filed_on": null,
+      "effective_on": null,
+      "retrieved_on": "2026-09-20",
+      "sha256": "25384fba36aad9fcae4a70efdc312cef373d94e8e4aa4f61ddb60443277acfd3",
+      "locator": "Subsections(a)–(b): alternative design and causation",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Link to the acquired primary authority; local inputs contain concise original summaries, not wholesale source copies. Availability date records confirmed public availability at preparation."
+    },
+    {
+      "schema_version": "1.0",
+      "source_id": "frcp",
+      "title": "Federal Rules of Civil Procedure, December1,2025",
+      "url": "https://www.uscourts.gov/sites/default/files/document/federal-rules-of-civil-procedure.pdf",
+      "available_on": "2026-09-20",
+      "filed_on": null,
+      "effective_on": null,
+      "retrieved_on": "2026-09-20",
+      "sha256": "bd8705fc038d87e4fe222a7ea2e4324222c9430e2373fce56826bd2dfa2f8baf",
+      "locator": "Rule56(a), (c), (d): summary judgment",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Link to the acquired primary authority; local inputs contain concise original summaries, not wholesale source copies. Availability date records confirmed public availability at preparation."
+    }
+  ],
+  "claims": [
+    {
+      "claim": "Texas CPRC 82.005 sets safer-alternative-design and producing-cause requirements, including feasible risk reduction without substantial utility impairment.",
+      "source_ids": [
+        "tx-products"
+      ],
+      "locator": "Subsections(a)–(b): alternative design and causation",
+      "classification": "law"
+    },
+    {
+      "claim": "Federal Rule 56 requires no genuine dispute of material fact for judgment as a matter of law; supported competing evidence cannot be resolved merely by choosing the movant’s expert.",
+      "source_ids": [
+        "frcp"
+      ],
+      "locator": "Rule56(a), (c), (d): summary judgment",
+      "classification": "law"
+    }
+  ],
+  "limitations": [
+    "All parties, events and record references are invented.",
+    "Prepared scripts are replayed without live model calls.",
+    "Authority review is bounded to this educational exercise; filing and attorney-approval gates remain unresolved."
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "schema_version": "1.0",
+  "matter_id": "2026-09-20-civil-rights-argument",
+  "caption": {
+    "court_name": "United States Court of Appeals for the Seventh Circuit",
+    "case_number": "FICTIONAL-DEMO",
+    "county": "IL"
+  },
+  "jurisdiction": {
+    "state": "IL",
+    "forum": "federal"
+  },
+  "parties": [
+    {
+      "name": "Morgan Hale",
+      "role": "plaintiff"
+    },
+    {
+      "name": "Officer Ellis, in an individual capacity",
+      "role": "defendant"
+    }
+  ],
+  "our_side": "plaintiff",
+  "retention": {
+    "retention_class": "public-fictional-demo"
+  },
+  "pipeline_strategy": "thin-full",
+  "run_mode": "autonomous"
+}

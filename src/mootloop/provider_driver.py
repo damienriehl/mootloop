@@ -118,7 +118,7 @@ def run_with_provider(
             state = load_state(vault_root, run_id)
             if state.finished:
                 break
-            units = run_context.units
+            units = run_context.task_units
             if orchestrator._over_cap(state, run_context):
                 orchestrator._cap_transition(vault_root, run_id, run_context)
                 break
@@ -155,7 +155,7 @@ def run_with_provider(
                 # concurrent context mutation cannot ride a stale in-memory manifest.
                 run_context = load_run_context(vault_root, run_id)
                 binding = run_context.binding
-                units = run_context.units
+                units = run_context.task_units
                 orchestrator._record_spec(
                     vault_root,
                     run_id,
@@ -217,7 +217,7 @@ def _render_status_md(
 
     matter = run_context.manifest.matter_config
     binding = run_context.binding
-    units = run_context.units
+    units = run_context.task_units
     facts = run_context.facts
     lines = [
         f"# Run status — `{run_id}`",
@@ -259,15 +259,21 @@ def assemble(
     run_id: str,
     state: RunState,
     run_context: RunContext,
+    now: str = "",
 ) -> Path:
     """Write the markdown deliverable with one fenced anchor per request."""
     from mootloop import orchestrator
 
     binding = run_context.binding
-    units = run_context.units
+    if binding.config.input_family == "document":
+        from mootloop.export.document import build_document_master
+
+        return build_document_master(vault_root, run_id, now, run_context=run_context)
+    units = run_context.task_units
     facts = run_context.facts
+    title = "Discovery Responses"
     lines = [
-        f"# Discovery Responses — {binding.config.task}",
+        f"# {title} — {binding.config.task}",
         "",
         f"Run: `{run_id}` · Requests: {len(units)} · Rubric: {binding.config.rubric_id}",
         "",

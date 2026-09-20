@@ -22,6 +22,7 @@ import re
 from pathlib import Path
 
 from mootloop.models.corpus import Manifest
+from mootloop.models.document_task import DocumentEvidence
 from mootloop.models.facts import Fact
 from mootloop.models.gates import GateFail, GateFinding, GatePass, GatePending, GateResult
 from mootloop.models.run import DraftOutput
@@ -71,13 +72,20 @@ def build_corpus_text(vault_root: Path | str) -> str:
     return "\n".join(parts)
 
 
-def check(draft: DraftOutput, facts: list[Fact], corpus_text: str) -> GateResult:
+def check(
+    draft: DraftOutput,
+    facts: list[Fact],
+    corpus_text: str,
+    *,
+    evidence: tuple[DocumentEvidence, ...] = (),
+) -> GateResult:
     """Fabrication gate result for one draft (recorded, non-fatal at turn time)."""
     findings: list[GateFinding] = []
     by_id = {str(f.fact_id): f for f in facts}
 
+    source_ids = {source.source_id for source in evidence}
     for fid in draft.fact_ids_used:
-        if fid not in by_id:
+        if fid not in by_id and fid not in source_ids:
             findings.append(
                 GateFinding(
                     code="unknown_fact",
@@ -95,7 +103,10 @@ def check(draft: DraftOutput, facts: list[Fact], corpus_text: str) -> GateResult
         )
 
     cited = [by_id[fid] for fid in draft.fact_ids_used if fid in by_id]
-    supported_parts = [corpus_text]
+    supported_parts = [
+        corpus_text,
+        *[e.text for e in evidence if e.source_id in draft.fact_ids_used],
+    ]
     for fact in cited:
         supported_parts.append(fact.statement)
         supported_parts.extend(prov.quote for prov in fact.provenance)

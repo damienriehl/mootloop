@@ -1,78 +1,90 @@
-# Deploying the MootLoop demo server
+# Deploying the MootLoop demo library
 
-> **Deploying the matter (write) tier instead?** See `docs/deploy-matter.md` +
-> `docs/security-frontend.md` — the matter tier is governed by those, not this doc. The
-> HARD RULE below applies to **this demo tier**.
+The public tier serves only reviewed, immutable projections: twenty prepared demos
+and the original fictional discovery viewer. It has no active vault, uploads,
+provider execution, credentials or private-client records. Curated public-record
+summaries are permitted; private matter data remains outside this tier.
 
-The public demo is a **read-only** server over a synthetic vault **baked at image
-build time**. It has zero matter-data mechanisms: no uploads, no `~/Matters`
-access, no secrets, no LLM calls at runtime.
+The protected matter application is separate. See `docs/deploy-matter.md` and
+`docs/security-frontend.md`; do not change its containers for a demo-library rollout.
 
-> **HARD RULE — no matter data on servers.**
-> DEV and PROD host the pre-baked synthetic demo only. Real matters run
-> **locally** via Claude Code (see `docs/quickstart-live-matter.md`); their
-> vaults never leave the attorney's machine.
+## Build from the pinned external artifact
 
-## Image
-
-- `Dockerfile` at the repo root: `python:3.12-slim`, pandoc installed (DOCX
-  render at bake time), uv with the `web` extra, non-root user.
-- `RUN mootloop web bake /app/demo-vault` bakes the demo run at **build** time
-  — deterministic, offline, `FakeLLMProvider`.
-- Serves on `${PORT:-8000}`; `/health` returns `{"status": "ok", ...}`;
-  baked `HEALTHCHECK` curls it.
-
-Local smoke test:
+Download the `release.tar` identified by `config/demos/release.json` into an external
+folder. Never stage real-case artifacts inside the checkout, even in ignored paths.
+The Docker build requires the named context and verifies the archive's committed
+SHA-256 before validating and staging the complete release. Missing, mismatched or
+incomplete content fails the build; no source acquisition occurs at runtime.
 
 ```bash
-docker build -t mootloop-demo .
-docker run --rm -p 8000:8000 mootloop-demo
-curl http://localhost:8000/health
+docker build --build-context demo_release=/external/demo-release \
+  -t mootloop-demo:RELEASE_CODE_SHA .
+docker run --rm --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m \
+  --cap-drop ALL --security-opt no-new-privileges \
+  -p 127.0.0.1:8000:8000 mootloop-demo:RELEASE_CODE_SHA
 ```
 
-## Coolify (house recipe)
+The context must contain `release.tar`. The final image contains an explicit
+allowlist of public-reader modules, required schema/package files, static assets,
+locked dependencies and reviewed projections. It excludes the CLI, vault,
+provider, publisher and preparation modules. It runs as UID 10001. Public assets
+are readable by that user and not writable; the container can run read-only.
 
-One Coolify project **`mootloop`** on the dev box, one app per environment,
-each built from this repo's Dockerfile (dockerfile buildpack), port **8000**.
+`MOOTLOOP_PUBLIC_ROOT=/app/public` is baked into the image. The old
+`MOOTLOOP_DEMO_VAULT` variable is ignored; there is no vault fallback. The server
+listens on `${PORT:-8000}`.
 
-Operational notes (verified on the box):
+## Verify the built image
 
-- **Serial builds:** `concurrent_builds=1` — concurrent builds have OOM'd the
-  box.
-- **Disk:** was ~91% full — run `docker system prune -af` before builds.
-- **API token:** `~/.coolify-token` on the box; server UUID
-  `azqkiidl028fi9yqbf7wg7nc`.
-- **Env vars live only in Coolify** — never in this repo. (The demo needs
-  none; `MOOTLOOP_DEMO_VAULT` is baked into the image.)
+- `/health` is process liveness. `/ready` validates the complete active release and
+  its hashes, including the original demo projection; require `demos: 20` and the
+  expected release ID.
+- `/` redirects to `/demos/`. Verify catalog, direct demo URLs, strategy selection,
+  source links and revision-bound input downloads. Verify `/legacy` and its original
+  eighteen discovery requests.
+- Compare each download's SHA-256 with its catalog entry. Preserve source-support
+  and unresolved-gate disclosures; a prepared run is not attorney approval.
+- Run a smoke container with `--network none` and make loopback HTTP checks through
+  `docker exec`. Verify writer modules and provider credentials are absent. This
+  proves the image does not require outbound access.
+- Keep the release archive SHA-256 and built image identifier with the deployment
+  receipt. Promote the same image bytes from development to production.
 
-### DEV app
+## Existing deployment and rollback
 
-- Source: public repo `https://github.com/damienriehl/mootloop`, branch
-  `main`, dockerfile buildpack, port 8000.
-- Domain: `mootloop.dev.openlegalstandard.org`.
-- **Auto-deploy:** the Coolify GitHub App (`coolify-alea-dev`) covers only the
-  `alea-institute` org, *not* `damienriehl/mootloop`. Use the public-repo app
-  type plus a **plain GitHub webhook** pointed at the app's Coolify manual
-  webhook endpoint (webhook URL + secret from the Coolify app's settings).
+The current public apps run on `hetzner-dev`, on the `coolify` Docker network:
 
-### PROD app
+| Environment | Application ID | Public URL |
+| --- | --- | --- |
+| Development | `dxr2q6xt90kwo2x37ubhc3x5` | https://mootloop.dev.openlegalstandard.org/demos/ |
+| Production | `wx0ow6y0tfwnlxb5tupxg2dl` | https://mootloop.org/demos/ |
 
-- Domain: `mootloop.org`.
-- **Deploys are manual and ask-gated** — always confirm with Damien before a
-  prod deploy (house rule).
+Use serial builds and inspect disk space before transferring an image. Retain the
+previous image and deployment configuration; do not prune rollback images. The
+persisted Compose files are under `/data/coolify/applications/<application-id>/`.
+Do not print application environment values or API tokens while inspecting them.
 
-### DNS (Cloudflare)
+At preparation time, the existing Coolify API token returned 401. The authorized
+operator can use the existing SSH/Compose path, with a project-specific override
+that changes only the demo service's image, public-root setting, read-only runtime
+settings and readiness health check. Preserve its routing labels and network.
+The health check must use Python against `/ready`; this minimal image does not
+include curl or wget. Keep the override and previous image reference durably on the
+server. A Coolify source build also needs the external named build context; do not
+trigger an unconfigured source build and assume it will recreate the release.
 
-- A records for `mootloop.dev.openlegalstandard.org` and `mootloop.org` → the
-  box, **DNS-only** (grey cloud) so Coolify's Let's Encrypt flow issues
-  certificates directly.
+Deploy development first. Verify `/ready`, all twenty snapshots/downloads, original
+API responses and representative browser flows. Then promote the exact same image
+to production under the release operator's authorization. The current owner has
+authorized this rollout; future production deployments require their own authority.
 
-## Runtime contract
+For rollback, reapply the saved previous image/configuration to the same service,
+recreate it without building, and verify its expected routes and health. Roll back
+if readiness fails, content hashes differ, expected examples disappear, source
+text executes, or private/runtime state becomes reachable. A disclosed failed legal
+review gate is expected demo content and is not itself a deployment failure.
 
-| Aspect | Value |
-| --- | --- |
-| Port | `${PORT:-8000}` |
-| Health | `GET /health` |
-| Secrets | none |
-| Writes | none (bake happened at build time) |
-| Data | synthetic fixture matter only |
+Monitor readiness, HTTP 5xx responses and browser console errors during the first
+15 minutes after promotion. The release operator owns that check. Logs must not
+contain private matters or credentials. Restore the saved deployment if those
+checks show unintended harm; record the actual image and artifact digests.

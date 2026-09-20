@@ -32,6 +32,7 @@ PIPELINE_STAGE_NAMES = frozenset(
         "oc_attack",
         "bolster",
         "judge_panel",
+        "narrative_assessment",
         "restructure",
         "jury_panel",
         "rubric_gate",
@@ -55,20 +56,14 @@ def pipeline_turn_ceiling(config: TaskAdapterConfig, *, rubric_enabled: bool) ->
     """Maximum provider calls per request for an exact effective graph."""
     stages = set(config.stages)
     ap = config.loop_caps.associate_partner
-    partner_calls = (
-        2 * ap + (ap if rubric_enabled else 0) if "partner_loop" in stages else 1
-    )
+    partner_calls = 2 * ap + (ap if rubric_enabled else 0) if "partner_loop" in stages else 1
     return (
         partner_calls
         + (config.loop_caps.oc if "oc_attack" in stages else 0)
         + (config.loop_caps.bolster if "bolster" in stages else 0)
-        + (config.panels.judges if "judge_panel" in stages else 0)
+        + (config.panels.judges if stages & {"judge_panel", "narrative_assessment"} else 0)
         + (config.loop_caps.restructure if "restructure" in stages else 0)
-        + (
-            config.panels.jurors
-            if "jury_panel" in stages and config.panels.jury
-            else 0
-        )
+        + (config.panels.jurors if "jury_panel" in stages and config.panels.jury else 0)
         + (config.panels.rubric_judges if "rubric_gate" in stages else 0)
     )
 
@@ -132,7 +127,9 @@ class ResolvedPipeline(VersionedModel):
             raise ValueError("active partner has no owned partner_loop stage")
         if bool(self.oc_personas) != ("oc_attack" in stages):
             raise ValueError("opposing-counsel ownership does not match oc_attack stage")
-        if (PersonaName.JUDGE in self.active_personas) != ("judge_panel" in stages):
+        if (PersonaName.JUDGE in self.active_personas) != (
+            bool(stages & {"judge_panel", "narrative_assessment"})
+        ):
             raise ValueError("judge ownership does not match judge_panel stage")
         rubric_stage = "rubric_gate" in stages
         rubric_gate = "rubric" in self.effective_config.gates
@@ -147,7 +144,7 @@ class ResolvedPipeline(VersionedModel):
             ordered = self.effective_config.stages
             external = [
                 ordered.index(stage)
-                for stage in ("oc_attack", "judge_panel", "rubric_gate")
+                for stage in ("oc_attack", "judge_panel", "narrative_assessment", "rubric_gate")
                 if stage in stages
             ]
             if external and ordered.index("partner_loop") > min(external):

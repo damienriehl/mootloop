@@ -10,6 +10,7 @@ caps, panel counts, gates, locked rubric id, and deliverables. The *behavior* ha
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import Field, ValidationError, field_validator, model_validator
@@ -75,6 +76,7 @@ class TaskAdapterConfig(VersionedModel):
 
     schema_version: str = SCHEMA_VERSION
     task: str
+    input_family: Literal["discovery", "document"] = "discovery"
     stages: list[str]
     loop_caps: LoopCaps = Field(default_factory=LoopCaps)
     panels: PanelConfig = Field(default_factory=PanelConfig)

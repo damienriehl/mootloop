@@ -1,0 +1,162 @@
+{
+  "schema_version": "1.0",
+  "descriptor": {
+    "schema_version": "1.0",
+    "demo_id": "distributor-restrictions",
+    "title": "Exclusive territory and minimum resale prices?",
+    "introduction": "Can we control dealers’ territories and resale prices? A fictional business decision with a reviewed action document.",
+    "collection": "business",
+    "practice_area": "Competition",
+    "work_product": "Competition review and alternatives",
+    "jurisdiction": "California / U.S. federal",
+    "court_level": "advisory",
+    "task": "business-advice"
+  },
+  "strategies": [
+    {
+      "strategy_id": "reviewed-advice",
+      "title": "Advice tested against business and legal risks",
+      "input_ids": [
+        "advice"
+      ],
+      "input_summary": "Fictional Summit Pumps sells specialty irrigation pumps through independent California dealers and estimates an 8% share of a loosely defined regional category. It wants exclusive zip-code territories, a mandatory $900 minimum resale price, and termination for any online discount. Three competing dealers jointly requested the price floor and copied one another on emails complaining about a discounter. Summit has no reliable market-definition study or evidence that price restrictions fund additional services. Its stated goal is trained installation and reliable warranty support, which can be measured through service standards.",
+      "assumptions": [
+        "All business facts and organizations in this scenario are fictional.",
+        "Missing facts must remain unresolved rather than assumed favorable."
+      ],
+      "source_ids": [
+        "ftc-distributor"
+      ],
+      "outputs": {
+        "advice": {
+          "initial": {
+            "response_text": "## Recommendation\nApprove the mandatory price floor because our 8% share is small and federal law allows manufacturer-imposed restrictions. Use the same term for internet sales.\n\n## Proposed action\nProceed on that recommendation using the supplied business objective; this initial draft has not yet addressed the opposing critique.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "ftc-distributor"
+            ],
+            "attorney_gate_items": [
+              "Verify missing facts, governing legal requirements and the secondary document before use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted demonstration, not an independent model or attorney opinion."
+          },
+          "revised": {
+            "response_text": "## Recommendation\nRemove the mandatory minimum resale-price and automatic online-discount termination terms from the draft. Stop facilitating dealer exchanges about rivals’ prices. Pursue independently selected dealer prices and measurable installation, training and warranty requirements. Evaluate any territorial exclusivity separately with competition counsel; the current record does not support blanket approval.\n\n## Risks\nThe FTC’s federal discussion is not a California safe harbor. A low asserted market share does not cure inaccurate market definition or dealer coordination. A manufacturer policy described as unilateral may still carry legal risk depending on implementation and communications; renaming the proposed agreement is not a reliable solution. Territorial limits may impede intrabrand competition and require evidence of actual service benefits.\n\n## Options\nUse objective service certification, training support and warranty performance standards without controlling resale prices. Consider limited territorial investment protection only after market and state-law review. Use genuinely nonbinding suggested prices with independent dealer discretion, subject to counsel’s review of conduct. Do not solicit a dealer vote on prices or punish discounting through a disguised service score.\n\n## Next Steps\nLegal should preserve the joint dealer emails and investigate who coordinated with whom. Sales should halt group pricing discussions and train staff on independent decisions. Strategy should obtain market and interbrand alternatives data. Operations should document service problems and test less restrictive requirements. Counsel should review California-specific authority before any price-policy decision.\n\n## Secondary Deliverable\n**Proposed distribution terms and negotiation guidance**\n“Dealer independently determines its resale prices. Any suggested resale price is nonbinding. Dealer will maintain trained installation staff, documented commissioning checks and the warranty-response standards in Schedule S. Compliance will be assessed using those service measures, not adherence to suggested prices.”\nTerritory placeholder: “Any exclusivity is subject to a separately approved territory schedule, duration, performance terms and competition-law review; none is granted by this draft.”\nNegotiation instructions: reject joint dealer price recommendations; route complaints about service quality through documented facts; do not share one dealer’s future prices or plans with another. The draft does not approve a resale-price-maintenance or minimum-advertised-price program.\n\n## Source boundary\nLaw-as-of preparation: September 20, 2026. Source summaries and links are in the input packet. This draft does not establish citation currency or attorney approval.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "ftc-distributor"
+            ],
+            "attorney_gate_items": [
+              "Verify missing facts, governing legal requirements and the secondary document before use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted demonstration, not an independent model or attorney opinion."
+          },
+          "critique": {
+            "verdict": "revise",
+            "critiques": [
+              "An unsupported share of an undefined market is not antitrust clearance.",
+              "Federal treatment does not establish California legality of mandatory minimum resale pricing.",
+              "The joint dealer request raises a horizontal-coordination concern distinct from a manufacturer’s independent distribution decision."
+            ],
+            "instructions": [
+              "Replace the initial recommendation with the supported alternatives and missing-fact analysis.",
+              "Include the complete action document and identify its unresolved prerequisites."
+            ],
+            "self_assessment": "Scripted adversarial review; these objections remain inspectable after revision."
+          },
+          "assessment": {
+            "disposition": "revise",
+            "reasons": [
+              "Service-based requirements could advance the stated quality objective with less pricing restraint. They may not satisfy dealers seeking protection from price competition, and that disagreement is not evidence that a mandatory floor is lawful. Existing coordination evidence and California review remain unresolved."
+            ],
+            "limitations": [
+              "This is a fictional, agent-authored scenario replayed without model calls.",
+              "Unresolved factual and legal questions require qualified counsel; this is not attorney approval."
+            ],
+            "self_assessment": "A qualified assessment of the revised approach, not a predicted outcome."
+          },
+          "initial_rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 1,
+                "evidence": "An unsupported share of an undefined market is not antitrust clearance."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 1,
+                "evidence": "Federal treatment does not establish California legality of mandatory minimum resale pricing."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 1,
+                "evidence": "The joint dealer request raises a horizontal-coordination concern distinct from a manufacturer’s independent distribution decision."
+              }
+            ],
+            "overall_notes": "Prepared editorial scores of this scripted draft, not a success probability or independent legal validation.",
+            "self_assessment": "Initial gaps require revision."
+          },
+          "rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 4,
+                "evidence": "Remove the mandatory minimum resale-price and automatic online-discount termination terms from the draft. Stop facilitating dealer exchanges about rivals’ prices. Pursue independently selected dealer prices and measurable installation, training and warranty requirements. Evaluate any territorial exclusivity separately with competition counsel; the current record does not support blanket approval."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 4,
+                "evidence": "The FTC’s federal discussion is not a California safe harbor. A low asserted market share does not cure inaccurate market definition or dealer coordination. A manufacturer policy described as unilateral may still carry legal risk depending on implementation and communications; renaming the proposed agreement is not a reliable solution. Territorial limits may impede intrabrand competition and require evidence of actual service benefits."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 4,
+                "evidence": "Service-based requirements could advance the stated quality objective with less pricing restraint. They may not satisfy dealers seeking protection from price competition, and that disagreement is not evidence that a mandatory floor is lawful. Existing coordination evidence and California review remain unresolved."
+              }
+            ],
+            "overall_notes": "Prepared editorial scores of this scripted draft, not a success probability or independent legal validation.",
+            "self_assessment": "The revision addresses the scripted critique; factual and legal limits remain."
+          }
+        }
+      }
+    }
+  ],
+  "sources": [
+    {
+      "schema_version": "1.0",
+      "source_id": "ftc-distributor",
+      "title": "FTC manufacturer-imposed requirements guidance",
+      "url": "https://www.ftc.gov/advice-guidance/competition-guidance/guide-antitrust-laws/dealings-supply-chain/manufacturer-imposed-requirements",
+      "available_on": "2026-09-20",
+      "filed_on": null,
+      "effective_on": null,
+      "retrieved_on": "2026-09-20",
+      "sha256": "d4166317984bb59cac9db3ace769af28b72811c0f746e14aee5562b8c0a212a9",
+      "locator": "Federal treatment and state-law qualification",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Link to the acquired primary authority; local inputs contain concise original summaries, not wholesale source copies. Availability date records confirmed public availability at preparation."
+    }
+  ],
+  "claims": [
+    {
+      "claim": "Federal guidance distinguishes vertical restrictions and evaluates many under a rule-of-reason framework while warning that state law can differ; dealer coordination raises separate concerns.",
+      "source_ids": [
+        "ftc-distributor"
+      ],
+      "locator": "Federal treatment and state-law qualification",
+      "classification": "law"
+    }
+  ],
+  "limitations": [
+    "Fictional business facts; no actual client data.",
+    "Prepared scripts and editorial scoring, with zero live model calls.",
+    "Sources were checked for this bounded preparation on September 20, 2026; no exhaustive legal review or attorney approval."
+  ]
+}

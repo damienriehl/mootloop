@@ -1,0 +1,210 @@
+{
+  "schema_version": "1.0",
+  "descriptor": {
+    "schema_version": "1.0",
+    "demo_id": "worker-classification",
+    "title": "Can we classify these workers as contractors?",
+    "introduction": "Can our regular installers remain contractors? A fictional business decision with a reviewed action document.",
+    "collection": "business",
+    "practice_area": "Employment",
+    "work_product": "Classification analysis and checklist",
+    "jurisdiction": "California / U.S. federal",
+    "court_level": "advisory",
+    "task": "business-advice"
+  },
+  "strategies": [
+    {
+      "strategy_id": "reviewed-advice",
+      "title": "Advice tested against business and legal risks",
+      "input_ids": [
+        "advice"
+      ],
+      "input_summary": "Fictional Signal Home sells and installs residential sensors in California. Twelve installers work year-round, receive routes and required 8 a.m.–5 p.m. availability from Signal, wear its logo, and use company diagnostic tools. Signal sets customer prices and pays installers a fixed amount per completed visit. The installers may decline weekend jobs but ordinarily work only for Signal. Contracts call them independent businesses; no separate customer base, advertising or qualifying statutory exception has been documented. Operations proposes renewing the same arrangement with new independent-contractor acknowledgments. Payroll cost estimates exclude overtime and past exposure.",
+      "assumptions": [
+        "All business facts and organizations in this scenario are fictional.",
+        "Missing facts must remain unresolved rather than assumed favorable."
+      ],
+      "source_ids": [
+        "ca-worker",
+        "dol-economic-reality",
+        "dol-2026-proposal"
+      ],
+      "outputs": {
+        "advice": {
+          "initial": {
+            "response_text": "## Recommendation\nRenew the contractors because they signed acknowledgments and can reject weekend work. Obtain business licenses and a second customer reference to solve the classification issue.\n\n## Proposed action\nProceed on that recommendation using the supplied business objective; this initial draft has not yet addressed the opposing critique.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "ca-worker",
+              "dol-economic-reality",
+              "dol-2026-proposal"
+            ],
+            "attorney_gate_items": [
+              "Verify missing facts, governing legal requirements and the secondary document before use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted demonstration, not an independent model or attorney opinion."
+          },
+          "revised": {
+            "response_text": "## Recommendation\nPause renewal on unchanged contractor terms and prepare a prospective employee transition while counsel determines applicable tests and any genuine exception. The supplied facts strongly undermine independence: Signal controls schedules and tools, and installation is its own product offering. A business license or revised acknowledgment would not resolve those operational facts.\n\n## Risks\nCalifornia analysis begins with the applicable statutory framework and any supported exception, not a universal claim that every occupation uses ABC. On the supplied ordinary-installation facts, outside-usual-course work is particularly difficult to establish. Federal wage-and-hour analysis is separate and also examines the real relationship. The inspected 2026 agency proposal must not be treated as an enacted final rule. Prospective payroll conversion does not release wage, tax, benefit or reimbursement exposure for earlier work.\n\n## Options\nEmployee transition with realistic scheduling and pay modeling offers the clearest operational fit. A genuinely independent installation business could be evaluated separately if its actual operations and a supported legal framework justify it; outsourcing to a paper intermediary does not guarantee a result. Retaining the current arrangement solely to save payroll cost leaves the principal facts unchanged.\n\n## Next Steps\nHR and payroll should inventory hours, breaks, travel, expenses, dates and compensation without altering records. Legal should check exceptions and federal/state coverage as of the decision date, quantify past exposure and protect against retaliation. Finance should compare full employee cost with operational alternatives. Do not solicit backdated acknowledgments or promise that workers can waive statutory rights.\n\n## Secondary Deliverable\n**Classification checklist and remediation plan**\n1. Record who sets prices, schedules, methods and customer terms; collect actual documents and interviews.\n2. Confirm whether a California exception applies and what replacement test it invokes; identify evidence for every element.\n3. Analyze federal economic dependence independently, checking operative rules and relevant court law rather than relying on the pending proposal.\n4. Preserve historical time and expense data; calculate potential unpaid amounts with payroll counsel.\n5. Set a transition date, written compensation terms, training and timekeeping; communicate without threats or releases disguised as onboarding.\n6. Review the implemented relationship after 30 days. Owner: HR; legal signoff remains required before rollout.\n\n## Source boundary\nLaw-as-of preparation: September 20, 2026. Source summaries and links are in the input packet. This draft does not establish citation currency or attorney approval.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "ca-worker",
+              "dol-economic-reality",
+              "dol-2026-proposal"
+            ],
+            "attorney_gate_items": [
+              "Verify missing facts, governing legal requirements and the secondary document before use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted demonstration, not an independent model or attorney opinion."
+          },
+          "critique": {
+            "verdict": "revise",
+            "critiques": [
+              "Installation is part of Signal’s ordinary business, creating a serious ABC prong-B problem if the ABC test applies.",
+              "Paper licensing or a nominal customer does not change control and economic dependence.",
+              "Separate California exceptions and federal analysis; do not call a proposed federal rule binding law."
+            ],
+            "instructions": [
+              "Replace the initial recommendation with the supported alternatives and missing-fact analysis.",
+              "Include the complete action document and identify its unresolved prerequisites."
+            ],
+            "self_assessment": "Scripted adversarial review; these objections remain inspectable after revision."
+          },
+          "assessment": {
+            "disposition": "revise",
+            "reasons": [
+              "Reclassification could reduce continuing risk because it fits the company’s existing control structure. It does not prove historical liability or eliminate it. An exception supported by additional facts could alter the state test, but no such facts are supplied; a label-only strategy therefore remains unsupported."
+            ],
+            "limitations": [
+              "This is a fictional, agent-authored scenario replayed without model calls.",
+              "Unresolved factual and legal questions require qualified counsel; this is not attorney approval."
+            ],
+            "self_assessment": "A qualified assessment of the revised approach, not a predicted outcome."
+          },
+          "initial_rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 1,
+                "evidence": "Installation is part of Signal’s ordinary business, creating a serious ABC prong-B problem if the ABC test applies."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 1,
+                "evidence": "Paper licensing or a nominal customer does not change control and economic dependence."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 1,
+                "evidence": "Separate California exceptions and federal analysis; do not call a proposed federal rule binding law."
+              }
+            ],
+            "overall_notes": "Prepared editorial scores of this scripted draft, not a success probability or independent legal validation.",
+            "self_assessment": "Initial gaps require revision."
+          },
+          "rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 4,
+                "evidence": "Pause renewal on unchanged contractor terms and prepare a prospective employee transition while counsel determines applicable tests and any genuine exception. The supplied facts strongly undermine independence: Signal controls schedules and tools, and installation is its own product offering. A business license or revised acknowledgment would not resolve those operational facts."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 4,
+                "evidence": "California analysis begins with the applicable statutory framework and any supported exception, not a universal claim that every occupation uses ABC. On the supplied ordinary-installation facts, outside-usual-course work is particularly difficult to establish. Federal wage-and-hour analysis is separate and also examines the real relationship. The inspected 2026 agency proposal must not be treated as an enacted final rule. Prospective payroll conversion does not release wage, tax, benefit or reimbursement exposure for earlier work."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 4,
+                "evidence": "Reclassification could reduce continuing risk because it fits the company’s existing control structure. It does not prove historical liability or eliminate it. An exception supported by additional facts could alter the state test, but no such facts are supplied; a label-only strategy therefore remains unsupported."
+              }
+            ],
+            "overall_notes": "Prepared editorial scores of this scripted draft, not a success probability or independent legal validation.",
+            "self_assessment": "The revision addresses the scripted critique; factual and legal limits remain."
+          }
+        }
+      }
+    }
+  ],
+  "sources": [
+    {
+      "schema_version": "1.0",
+      "source_id": "ca-worker",
+      "title": "California Labor Commissioner contractor FAQ",
+      "url": "https://www.dir.ca.gov/dlse/faq_independentcontractor.htm",
+      "available_on": "2026-09-20",
+      "filed_on": null,
+      "effective_on": null,
+      "retrieved_on": "2026-09-20",
+      "sha256": "48a0141bb6781fac17645af9996bc814bfd1b6ce9b6a8a0605aedc1a7174b498",
+      "locator": "ABC test and exceptions",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Link to the acquired primary authority; local inputs contain concise original summaries, not wholesale source copies. Availability date records confirmed public availability at preparation."
+    },
+    {
+      "schema_version": "1.0",
+      "source_id": "dol-economic-reality",
+      "title": "U.S. Department of Labor, independent-contractor compliance guide",
+      "url": "https://www.dol.gov/agencies/whd/flsa/misclassification/small-entity-compliance-guide",
+      "available_on": "2026-09-20",
+      "retrieved_on": "2026-09-20",
+      "sha256": "d05a07a103c942b61e5907d5c5b1f6deee106d8ee4a9349ade7be890d7eed2a4",
+      "locator": "Economic dependence and totality-of-circumstances discussion",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Link and original short summary of inspected federal agency guidance; availability date is preparation access date."
+    },
+    {
+      "schema_version": "1.0",
+      "source_id": "dol-2026-proposal",
+      "title": "U.S. Department of Labor, 2026 proposed-rule questions",
+      "url": "https://www.dol.gov/agencies/whd/flsa/misclassification/2026rulemaking/faqs",
+      "available_on": "2026-09-20",
+      "retrieved_on": "2026-09-20",
+      "sha256": "cc53a7d28cc15eb6bd82e94cf5d19feaf43cc46ba8182e53abf1039e2dd2ba53",
+      "locator": "Proposal status; not a final rule",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Link and original short summary of inspected federal agency guidance; availability date is preparation access date."
+    }
+  ],
+  "claims": [
+    {
+      "claim": "California guidance describes the ABC test, the hiring entity’s burden, and exceptions requiring separate analysis; a contract label alone is not decisive.",
+      "source_ids": [
+        "ca-worker"
+      ],
+      "locator": "ABC test and exceptions",
+      "classification": "law"
+    },
+    {
+      "claim": "Federal wage-and-hour classification examines economic dependence and the actual working relationship, separately from state law.",
+      "source_ids": [
+        "dol-economic-reality"
+      ],
+      "locator": "Economic dependence and totality-of-circumstances discussion",
+      "classification": "law"
+    },
+    {
+      "claim": "The inspected agency page describes a 2026 proposed rule; a proposal is not itself an operative final rule.",
+      "source_ids": [
+        "dol-2026-proposal"
+      ],
+      "locator": "Proposal status; not a final rule",
+      "classification": "law"
+    }
+  ],
+  "limitations": [
+    "Fictional business facts; no actual client data.",
+    "Prepared scripts and editorial scoring, with zero live model calls.",
+    "Sources were checked for this bounded preparation on September 20, 2026; no exhaustive legal review or attorney approval."
+  ]
+}

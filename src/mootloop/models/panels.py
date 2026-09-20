@@ -16,6 +16,7 @@ from typing import Literal
 from pydantic import Field
 
 from mootloop.models.common import RequestId, StrictModel, VersionedModel
+from mootloop.models.run import NarrativeAssessment
 
 SCHEMA_VERSION = "1.0"
 
@@ -46,6 +47,13 @@ class JurySignal(StrictModel):
     directional_only: Literal[True] = True
 
 
+class NarrativeUnitAssessment(StrictModel):
+    unit_id: str
+    draft_turn_id: str
+    assessment_turn_id: str
+    assessment: NarrativeAssessment
+
+
 class PanelReport(VersionedModel):
     """The run's objection-survival distribution report (a derived view)."""
 
@@ -53,6 +61,7 @@ class PanelReport(VersionedModel):
     run_id: str
     results: list[PanelResult] = Field(default_factory=list)
     jury_signals: list[JurySignal] = Field(default_factory=list)
+    narrative_assessments: list[NarrativeUnitAssessment] = Field(default_factory=list)
 
     def for_request(self, request_id: str) -> list[PanelResult]:
         return [r for r in self.results if str(r.request_id) == request_id]

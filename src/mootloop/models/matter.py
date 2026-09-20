@@ -119,11 +119,23 @@ class Retention(_Model):
 class MatterConfig(VersionedModel):
     """Top-level `matter.yaml` schema. Extends VersionedModel (extra=forbid)."""
 
+    @model_validator(mode="before")
+    @classmethod
+    def require_litigation_fields(cls, value: object) -> object:
+        if isinstance(value, Mapping) and value.get("matter_kind", "litigation") == "litigation":
+            missing = [name for name in ("caption", "parties", "our_side") if name not in value]
+            if missing:
+                raise ValueError(f"litigation requires {', '.join(missing)}")
+        return value
+
+    matter_kind: Literal["litigation", "advisory"] = "litigation"
+    client: str | None = None
+    objective: str | None = None
     matter_id: MatterIdStr
-    caption: Caption
+    caption: Caption | None = None
     jurisdiction: Jurisdiction
-    parties: list[Party]
-    our_side: Side
+    parties: list[Party] = Field(default_factory=list)
+    our_side: Side | None = None
     deadlines: list[Deadline] = Field(default_factory=list)
     personas: Personas = Field(default_factory=Personas)
     pipeline_strategy: PipelineStrategy = "thin-full"
@@ -137,3 +149,26 @@ class MatterConfig(VersionedModel):
     # Runtime choices stay in a dedicated overlay; caption/parties/deadlines remain
     # case metadata and are never merged into run behavior.
     run_config: RunConfigOverlay | None = None
+
+    @model_validator(mode="after")
+    def validate_matter_kind(self) -> MatterConfig:
+        if self.schema_version not in ("1.0", "1.1"):
+            raise ValueError("unsupported matter schema version")
+        if self.matter_kind == "litigation":
+            if (
+                self.caption is None
+                or self.our_side is None
+                or "parties" not in self.model_fields_set
+            ):
+                raise ValueError("litigation requires caption and our_side")
+        elif (
+            self.schema_version != "1.1"
+            or not self.client
+            or not self.client.strip()
+            or not self.objective
+            or not self.objective.strip()
+        ):
+            raise ValueError("advisory requires schema 1.1, client and objective")
+        elif self.caption is not None or self.our_side is not None or self.parties:
+            raise ValueError("advisory matters cannot carry litigation roles or caption")
+        return self

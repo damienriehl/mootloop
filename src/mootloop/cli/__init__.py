@@ -60,7 +60,9 @@ judge_app = typer.Typer(help="Build and inspect assigned-judge profiles.", no_ar
 production_app = typer.Typer(help="Review RFP document suggestions.", no_args_is_help=True)
 learn_app = typer.Typer(help="Import edits and govern reviewed learnings.", no_args_is_help=True)
 decide_app = typer.Typer(help="Review and resolve attorney-gate decisions.", no_args_is_help=True)
-web_app = typer.Typer(help="Public demo web tier (synthetic matter only).", no_args_is_help=True)
+web_app = typer.Typer(
+    help="Prepare, publish, and reuse the read-only demo library.", no_args_is_help=True
+)
 matters_app = typer.Typer(
     help="Enumerate matter vaults under the matters-root (hosted tier).", no_args_is_help=True
 )

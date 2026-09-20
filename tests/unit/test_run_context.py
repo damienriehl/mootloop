@@ -146,15 +146,13 @@ def test_start_rejects_invalid_task_spec_binding(
 def test_start_commits_versioned_manifest_and_task_spec(tmp_path: Path) -> None:
     vault = _vault(tmp_path)
     spec = create_freeform(vault, "acme-v-widgets", "answer the discovery", NOW)
-    lock_task_spec(
-        vault, "acme-v-widgets", str(spec.task_spec_id), "test-attorney", NOW
-    )
+    lock_task_spec(vault, "acme-v-widgets", str(spec.task_spec_id), "test-attorney", NOW)
     run_id = start_run(vault, TASK, NOW, run_id="ctx-start", task_spec_id=str(spec.task_spec_id))
 
     started = next(event for event in read_events(vault, run_id) if isinstance(event, RunStarted))
     context = load_run_context(vault, run_id)
     assert started.context_manifest_sha256
-    assert context.manifest.schema_version == "1.5"
+    assert context.manifest.schema_version == "1.6"
     assert context.manifest.pipeline.strategy == "thin-full"
     assert context.manifest.task_spec == spec
     assert context.manifest.task_spec_lock is not None
@@ -241,9 +239,7 @@ def test_legacy_matter_runtime_is_fallback_below_firm_and_explicit_overlay(
     invocation_source = next(
         source for source in resolved.sources if source.layer == "invocation_flags"
     )
-    matter_source = next(
-        source for source in resolved.sources if source.layer == "matter_overlay"
-    )
+    matter_source = next(source for source in resolved.sources if source.layer == "matter_overlay")
     assert invocation_source.present is False
     assert matter_source.present is True
     assert matter_source.locator == "matter.yaml#runtime"
@@ -339,11 +335,16 @@ def test_idempotent_run_reuse_compares_persona_and_strategy_selection(tmp_path: 
     assert selected.oc_personas == (PersonaName.OC_PARTNER,)
 
 
-def test_pipeline_must_reproduce_from_captured_matter_and_adapter(tmp_path: Path) -> None:
+@pytest.mark.parametrize("schema_version", ["1.5", "1.6"])
+def test_pipeline_must_reproduce_from_captured_matter_and_adapter(
+    tmp_path: Path,
+    schema_version: str,
+) -> None:
     vault = _vault(tmp_path)
     run_id = start_run(vault, TASK, NOW, run_id="ctx-pipeline-derived")
     manifest_path = _manifest_path(vault, run_id)
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    payload["schema_version"] = schema_version
     payload["pipeline"]["strategy"] = "adversarial-first"
     payload["pipeline"]["effective_config"]["stages"] = [
         "associate_draft",
@@ -486,9 +487,7 @@ def test_start_recovers_identical_manifest_when_first_journal_append_failed(
     real_append = orchestrator.append
     calls = 0
 
-    def fail_first_append(
-        vault_root: Path | str, run_id: str, event: JournalEvent
-    ) -> None:
+    def fail_first_append(vault_root: Path | str, run_id: str, event: JournalEvent) -> None:
         nonlocal calls
         calls += 1
         if calls == 1:
@@ -504,9 +503,7 @@ def test_start_recovers_identical_manifest_when_first_journal_append_failed(
 
     assert start_run(vault, TASK, NOW, run_id="ctx-recover-start") == "ctx-recover-start"
     started = [
-        event
-        for event in read_events(vault, "ctx-recover-start")
-        if isinstance(event, RunStarted)
+        event for event in read_events(vault, "ctx-recover-start") if isinstance(event, RunStarted)
     ]
     assert len(started) == 1
 
@@ -564,9 +561,7 @@ def test_start_rejects_retained_corpus_snapshot_quota(
 
     vault = _vault(tmp_path)
     first = start_run(vault, TASK, NOW, run_id="ctx-retained-first")
-    first_size = (
-        vault / "runs" / first / "context" / "corpus.json"
-    ).stat().st_size
+    first_size = (vault / "runs" / first / "context" / "corpus.json").stat().st_size
     monkeypatch.setattr(
         context_module,
         "MAX_RETAINED_CORPUS_SNAPSHOT_BYTES",
@@ -751,12 +746,14 @@ def test_manifest_source_digests_match_captured_bytes(tmp_path: Path) -> None:
     assert context.manifest.persona_bodies[PersonaName.ASSOCIATE] == (
         standard_raw.decode().rstrip() + "\n\n" + associate_raw.decode().lstrip()
     )
-    assert sources[("persona_body", "personas/_standard.md")] == hashlib.sha256(
-        standard_raw
-    ).hexdigest()
-    assert sources[("persona_body", "personas/associate.md")] == hashlib.sha256(
-        associate_raw
-    ).hexdigest()
+    assert (
+        sources[("persona_body", "personas/_standard.md")]
+        == hashlib.sha256(standard_raw).hexdigest()
+    )
+    assert (
+        sources[("persona_body", "personas/associate.md")]
+        == hashlib.sha256(associate_raw).hexdigest()
+    )
 
 
 def test_lifecycle_fails_closed_when_corpus_snapshot_is_tampered(tmp_path: Path) -> None:
@@ -793,9 +790,7 @@ def test_status_reports_unreadable_corpus_as_context_blocker(
 
 
 @pytest.mark.parametrize("action", ["plan", "record", "resume"])
-def test_lifecycle_fails_closed_when_manifest_is_tampered(
-    tmp_path: Path, action: str
-) -> None:
+def test_lifecycle_fails_closed_when_manifest_is_tampered(tmp_path: Path, action: str) -> None:
     vault = _vault(tmp_path)
     run_id = start_run(vault, TASK, NOW, run_id=f"ctx-tamper-{action}")
     spec = plan_next(vault, run_id)[0]
@@ -834,9 +829,7 @@ def test_plan_fails_closed_when_manifest_is_missing(tmp_path: Path) -> None:
         ("mode", "gated"),
     ],
 )
-def test_loader_rejects_run_started_identity_drift(
-    tmp_path: Path, field: str, value: str
-) -> None:
+def test_loader_rejects_run_started_identity_drift(tmp_path: Path, field: str, value: str) -> None:
     vault = _vault(tmp_path)
     run_id = start_run(vault, TASK, NOW, run_id=f"ctx-event-{field}")
     journal = vault / "runs" / run_id / "journal.jsonl"
@@ -854,9 +847,7 @@ def test_loader_rejects_run_started_identity_drift(
 def test_loader_rejects_run_started_task_spec_drift(tmp_path: Path) -> None:
     vault = _vault(tmp_path)
     spec = create_freeform(vault, "acme-v-widgets", "answer the discovery", NOW)
-    lock_task_spec(
-        vault, "acme-v-widgets", str(spec.task_spec_id), "test-attorney", NOW
-    )
+    lock_task_spec(vault, "acme-v-widgets", str(spec.task_spec_id), "test-attorney", NOW)
     run_id = start_run(
         vault, TASK, NOW, run_id="ctx-event-task-spec", task_spec_id=str(spec.task_spec_id)
     )
@@ -871,9 +862,7 @@ def test_loader_rejects_run_started_task_spec_drift(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("target", ["corpus.json", "manifest.json"])
-def test_start_rejects_conflicting_preexisting_context_bytes(
-    tmp_path: Path, target: str
-) -> None:
+def test_start_rejects_conflicting_preexisting_context_bytes(tmp_path: Path, target: str) -> None:
     vault = _vault(tmp_path)
     context_dir = vault / "runs" / f"ctx-conflict-{target.removesuffix('.json')}" / "context"
     context_dir.mkdir(parents=True)
@@ -897,7 +886,7 @@ def test_derived_api_and_demo_views_replay_launch_inputs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from mootloop import gate_ledger
-    from mootloop.web import app as demo
+    from mootloop.web import legacy_prepare as demo
     from mootloop.web.api import readers
 
     vault = _vault(tmp_path)
@@ -913,9 +902,8 @@ def test_derived_api_and_demo_views_replay_launch_inputs(
     assert readers.run_status_summary(vault, run_id).hard_cap_usd is None
     assert set(gate_ledger.build_ledger(vault, run_id).gates) == {"ROG-1"}
 
-    monkeypatch.setenv(demo.VAULT_ENV, str(vault))
-    assert [row["request_id"] for row in demo.api_requests()] == ["ROG-1"]
-    assert demo.api_sets() == [
+    assert [row["request_id"] for row in demo.api_requests(vault)] == ["ROG-1"]
+    assert demo.api_sets(vault) == [
         {
             "request_type": "interrogatory",
             "set_number": 1,
@@ -923,9 +911,9 @@ def test_derived_api_and_demo_views_replay_launch_inputs(
             "requests": 1,
         }
     ]
-    assert demo.api_run()["stages"]
+    assert demo.api_run(vault)["stages"]
     with pytest.raises(HTTPException) as exc:
-        demo.api_request_turns("ROG-2")
+        demo.api_request_turns(vault, "ROG-2")
     assert exc.value.status_code == 404
 
 
@@ -962,11 +950,7 @@ def test_export_replays_launch_requests_and_matter(tmp_path: Path) -> None:
     matter["caption"]["case_number"] = "66-CV-26-9999"
     (vault / "matter.yaml").write_text(yaml.safe_dump(matter), encoding="utf-8")
     Manifest.load(vault).model_copy(
-        update={
-            "docs": [
-                Manifest.load(vault).docs[0].model_copy(update={"privileged": False})
-            ]
-        }
+        update={"docs": [Manifest.load(vault).docs[0].model_copy(update={"privileged": False})]}
     ).save(vault)
 
     result = export_run(vault, run_id, NOW)

@@ -226,8 +226,9 @@ function renderSurvival(panel) {
     div.innerHTML =
       `<span class="survival-basis">obj[${row.objection_index}] ${esc(row.objection_basis)}</span>` +
       `<div class="bar" role="img" aria-label="${pct}% of judges say this objection survives">` +
-      `<div class="bar-fill${weak ? " weak" : ""}" style="width:${pct}%"></div></div>` +
+      `<div class="bar-fill${weak ? " weak" : ""}"></div></div>` +
       `<span class="survival-count">${row.survive_votes}/${row.total_votes} survive (${pct}%)</span>`;
+    div.querySelector(".bar-fill").style.width = `${pct}%`;
     wrap.appendChild(div);
   }
 }
@@ -433,7 +434,7 @@ async function boot() {
   } catch (err) {
     document.querySelector("main").insertAdjacentHTML(
       "afterbegin",
-      `<p role="alert" style="color:var(--fail)">Could not load the demo run: ${esc(err.message)}</p>`,
+      `<p role="alert" class="load-error">Could not load the demo run: ${esc(err.message)}</p>`,
     );
   }
 }

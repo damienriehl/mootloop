@@ -1,0 +1,188 @@
+{
+  "schema_version": "1.0",
+  "descriptor": {
+    "schema_version": "1.0",
+    "demo_id": "supplier-termination",
+    "title": "Can we terminate this supplier?",
+    "introduction": "Can we terminate after three missed deliveries? A fictional business decision with a reviewed action document.",
+    "collection": "business",
+    "practice_area": "Commercial contracts",
+    "work_product": "Contract analysis and notice",
+    "jurisdiction": "Minnesota",
+    "court_level": "advisory",
+    "task": "business-advice"
+  },
+  "strategies": [
+    {
+      "strategy_id": "reviewed-advice",
+      "title": "Advice tested against business and legal risks",
+      "input_ids": [
+        "advice"
+      ],
+      "input_summary": "All companies and facts are fictional. North Shore Fabrication buys 500 housings monthly from Cedar Components under a Minnesota-law installment agreement requiring delivery on the first calendar day of each month. July delivery was 12 days late, August was 18 days late, and September remains undelivered on September 20, 2026. Section 9 permits termination for a material breach remaining uncured 15 calendar days after written notice delivered to contracts@cedar.example. Earlier complaints were telephone calls, not contractual notices. North Shore accepted July and August shipments, paid the undisputed invoices, and lost two production shifts. Cedar attributes September delay to a furnace failure and offers an October 2 recovery shipment. A backup supplier can cover half the October need at a 20% premium. There is no written force-majeure notice in the supplied record. Procurement wants to cancel immediately and withhold all outstanding invoices.",
+      "assumptions": [
+        "All business facts and organizations in this scenario are fictional.",
+        "Missing facts must remain unresolved rather than assumed favorable."
+      ],
+      "source_ids": [
+        "mn-installments",
+        "mn-assurances"
+      ],
+      "outputs": {
+        "advice": {
+          "initial": {
+            "response_text": "## Recommendation\nTerminate the full agreement now because three late deliveries establish material breach. Stop paying open invoices and move all orders to the backup supplier. Send a cancellation email today.\n\n## Proposed action\nProceed on that recommendation using the supplied business objective; this initial draft has not yet addressed the opposing critique.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "mn-installments",
+              "mn-assurances"
+            ],
+            "attorney_gate_items": [
+              "Verify missing facts, governing legal requirements and the secondary document before use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted demonstration, not an independent model or attorney opinion."
+          },
+          "revised": {
+            "response_text": "## Recommendation\nSend the contractual breach-and-cure notice now, confirm receipt, and reserve a later cancellation decision. Procurement should secure contingent replacement capacity without representing that the existing agreement is already ended. A whole-contract cancellation would require support beyond counting late installments: document how cumulative failures undermine the remaining bargain and examine acceptance, waiver, force majeure, and Cedar’s recovery proposal.\n\n## Risks\nThe 15-day contractual cure opportunity has not yet begun on these facts. If notice is received September 20 and the agreement excludes the receipt day when counting, October 5 would be the provisional cure endpoint; counsel must verify the counting and delivery terms before using a deadline. Minnesota’s installment-contract rule distinguishes rejection of an installment from cancellation of the entire contract. A separate adequate-assurance demand requires reasonable insecurity and a reasonable response period; do not misdescribe the contractual 15 days as a universal statutory assurance deadline. Pay undisputed amounts for accepted goods unless counsel confirms a lawful offset or suspension basis.\n\n## Options\n1. Cure plus contingent cover: preserves production and the contract position but may temporarily cost more.\n2. Negotiate an agreed exit and allocation of rush costs: improves certainty but requires Cedar’s assent.\n3. Cancel after supported, uncured whole-contract impairment: may recover damages, but premature cancellation invites a wrongful-termination claim. Cedar’s proposed October 2 shipment could weaken the third option if commercially adequate.\n\n## Next Steps\nProcurement: preserve schedules, receipts, communications, line-down logs and replacement quotations. Operations: assess whether October 2 actually prevents the next interruption. Finance: separate undisputed invoices from claimed losses. Counsel: review the full notice, waiver and force-majeure provisions, approve service and calendar receipt; reassess cure and adequate assurance independently.\n\n## Secondary Deliverable\n**Draft notice — for counsel review before sending**\nTo: Cedar Components, contractual notice address\nSubject: Notice of delivery breach; opportunity to cure\nNorth Shore identifies the July shipment due under the schedule and delivered 12 days late, the August shipment delivered 18 days late, and the September shipment still outstanding on September 20. These failures interrupted two production shifts. Under section 9, North Shore gives written notice and requests cure within the contractual 15-calendar-day period following effective receipt. Please confirm receipt and provide a dated recovery plan, shipment quantities and supporting capacity information. We will evaluate the proposed October 2 shipment against the agreed schedule and our documented needs. This letter does not declare immediate cancellation or refuse payment of undisputed invoices. North Shore reserves its rights concerning uncured breach and documented losses; this reservation does not itself reverse any prior waiver.\n\n## Source boundary\nLaw-as-of preparation: September 20, 2026. Source summaries and links are in the input packet. This draft does not establish citation currency or attorney approval.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "mn-installments",
+              "mn-assurances"
+            ],
+            "attorney_gate_items": [
+              "Verify missing facts, governing legal requirements and the secondary document before use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted demonstration, not an independent model or attorney opinion."
+          },
+          "critique": {
+            "verdict": "revise",
+            "critiques": [
+              "Three failures do not automatically establish substantial impairment of the entire installment contract. Explain the effect of accepting earlier deliveries.",
+              "The supplied agreement requires a written 15-day cure notice. Telephone complaints are not the specified notice, and the furnace explanation needs investigation.",
+              "Blanket nonpayment creates a counterclaim; distinguish disputed damages from payment for accepted goods. Separate cure from adequate assurance."
+            ],
+            "instructions": [
+              "Replace the initial recommendation with the supported alternatives and missing-fact analysis.",
+              "Include the complete action document and identify its unresolved prerequisites."
+            ],
+            "self_assessment": "Scripted adversarial review; these objections remain inspectable after revision."
+          },
+          "assessment": {
+            "disposition": "revise",
+            "reasons": [
+              "The revised approach could preserve a defensible termination option while avoiding an immediate notice defect. It does not establish that whole-contract cancellation will become available: timely adequate cure, waiver, or a supported contractual excuse could defeat it. The alternative supplier reduces operational exposure but does not prove recoverable damages."
+            ],
+            "limitations": [
+              "This is a fictional, agent-authored scenario replayed without model calls.",
+              "Unresolved factual and legal questions require qualified counsel; this is not attorney approval."
+            ],
+            "self_assessment": "A qualified assessment of the revised approach, not a predicted outcome."
+          },
+          "initial_rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 1,
+                "evidence": "Three failures do not automatically establish substantial impairment of the entire installment contract. Explain the effect of accepting earlier deliveries."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 1,
+                "evidence": "The supplied agreement requires a written 15-day cure notice. Telephone complaints are not the specified notice, and the furnace explanation needs investigation."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 1,
+                "evidence": "Blanket nonpayment creates a counterclaim; distinguish disputed damages from payment for accepted goods. Separate cure from adequate assurance."
+              }
+            ],
+            "overall_notes": "Prepared editorial scores of this scripted draft, not a success probability or independent legal validation.",
+            "self_assessment": "Initial gaps require revision."
+          },
+          "rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 4,
+                "evidence": "Send the contractual breach-and-cure notice now, confirm receipt, and reserve a later cancellation decision. Procurement should secure contingent replacement capacity without representing that the existing agreement is already ended. A whole-contract cancellation would require support beyond counting late installments: document how cumulative failures undermine the remaining bargain and examine acceptance, waiver, force majeure, and Cedar’s recovery proposal."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 4,
+                "evidence": "The 15-day contractual cure opportunity has not yet begun on these facts. If notice is received September 20 and the agreement excludes the receipt day when counting, October 5 would be the provisional cure endpoint; counsel must verify the counting and delivery terms before using a deadline. Minnesota’s installment-contract rule distinguishes rejection of an installment from cancellation of the entire contract. A separate adequate-assurance demand requires reasonable insecurity and a reasonable response period; do not misdescribe the contractual 15 days as a universal statutory assurance deadline. Pay undisputed amounts for accepted goods unless counsel confirms a lawful offset or suspension basis."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 4,
+                "evidence": "The revised approach could preserve a defensible termination option while avoiding an immediate notice defect. It does not establish that whole-contract cancellation will become available: timely adequate cure, waiver, or a supported contractual excuse could defeat it. The alternative supplier reduces operational exposure but does not prove recoverable damages."
+              }
+            ],
+            "overall_notes": "Prepared editorial scores of this scripted draft, not a success probability or independent legal validation.",
+            "self_assessment": "The revision addresses the scripted critique; factual and legal limits remain."
+          }
+        }
+      }
+    }
+  ],
+  "sources": [
+    {
+      "schema_version": "1.0",
+      "source_id": "mn-installments",
+      "title": "Minnesota Statutes336.2-612",
+      "url": "https://www.revisor.mn.gov/statutes/cite/336.2-612",
+      "available_on": "2026-09-20",
+      "filed_on": null,
+      "effective_on": null,
+      "retrieved_on": "2026-09-20",
+      "sha256": "1c3027754396b865c639b0f5b46f6002eda03f1ec5a4b2d3c0c8af90c229f750",
+      "locator": "Subsections2–3: installment and whole-contract breach",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Link to the acquired primary authority; local inputs contain concise original summaries, not wholesale source copies. Availability date records confirmed public availability at preparation."
+    },
+    {
+      "schema_version": "1.0",
+      "source_id": "mn-assurances",
+      "title": "Minnesota Statutes336.2-609",
+      "url": "https://www.revisor.mn.gov/statutes/cite/336.2-609",
+      "available_on": "2026-09-20",
+      "filed_on": null,
+      "effective_on": null,
+      "retrieved_on": "2026-09-20",
+      "sha256": "4f76f3bc0eca8d1913b946e93fd36c751d494eafcae06501b3f57989b1a8d795",
+      "locator": "Subsections1–4: adequate assurance",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Link to the acquired primary authority; local inputs contain concise original summaries, not wholesale source copies. Availability date records confirmed public availability at preparation."
+    }
+  ],
+  "claims": [
+    {
+      "claim": "Installment nonconformity and whole-contract cancellation require distinct substantial-impairment analysis; acceptance and subsequent conduct may matter.",
+      "source_ids": [
+        "mn-installments"
+      ],
+      "locator": "Subsections2–3: installment and whole-contract breach",
+      "classification": "law"
+    },
+    {
+      "claim": "Reasonable grounds for insecurity can support a written adequate-assurance demand and commercially reasonable suspension; the response period depends on circumstances and cannot exceed the statutory maximum.",
+      "source_ids": [
+        "mn-assurances"
+      ],
+      "locator": "Subsections1–4: adequate assurance",
+      "classification": "law"
+    }
+  ],
+  "limitations": [
+    "Fictional business facts; no actual client data.",
+    "Prepared scripts and editorial scoring, with zero live model calls.",
+    "Sources were checked for this bounded preparation on September 20, 2026; no exhaustive legal review or attorney approval."
+  ]
+}

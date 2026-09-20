@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "input_id": "advice",
+  "task": "business-advice",
+  "represented_side": "In-house counsel to the fictional business",
+  "jurisdiction": "U.S. copyright",
+  "court_level": "advisory",
+  "cutoff": "2026-09-20",
+  "strategy_id": "reviewed-advice",
+  "assumptions": [
+    "All business facts and organizations in this scenario are fictional.",
+    "Missing facts must remain unresolved rather than assumed favorable."
+  ],
+  "preservation_constraints": [
+    "The packet is bounded to the listed authorities and facts; no comprehensive current-law clearance is implied."
+  ],
+  "units": [
+    {
+      "unit_id": "advice",
+      "title": "Can we ship our modified open-source components?",
+      "instructions": "Can we ship our modified open-source components? Analyze the supplied facts, alternatives, adverse consequences and missing information. Produce advice and the concrete secondary action document identified in the scenario. Required work product: License analysis and release conditions.",
+      "issues": [
+        "Permissive does not mean condition-free: a project link does not replace required license and notice material.",
+        "Identify Apache modified-file and upstream NOTICE duties for the actual distribution.",
+        "The Apache patent license is bounded, MIT does not provide the same express patent clause, and neither clears unrelated patents or trademarks."
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "source_id": "scenario",
+      "text": "Fictional Forgeboard will distribute a desktop binary and SDK on October 1, 2026. Its inventory identifies ParserKit 2.1 under Apache License 2.0 with an upstream NOTICE file and two modified source files, and TinyTable 1.4 under an MIT license bearing a 2022 copyright notice. Engineers copied both into the application; the planned installer omits license files and notices. The SDK includes modified ParserKit source. No GPL or other copyleft component has been identified, but transitive dependencies, contributors’ assignments and trademark permissions have not been audited. Product asks whether calling the whole package proprietary eliminates attribution requirements.",
+      "sha256": "3e7ca8079f4d4a332b25c5ef8089d5404cfa5a6f273c3569a1764ba553c9b872",
+      "available_on": "2026-09-20",
+      "classification": "hypothetical",
+      "public": true
+    },
+    {
+      "source_id": "apache-license",
+      "text": "Authority summary: Apache License 2.0 section 4 sets redistribution conditions including license, modified-file notices, applicable attribution and NOTICE treatment; section 3 addresses the patent license and termination condition.",
+      "sha256": "b79f86ba913ef21a3c6bbe3e876727896610fab6963014518a3d2e628153af05",
+      "available_on": "2026-09-20",
+      "classification": "record",
+      "public": true
+    },
+    {
+      "source_id": "mit-license",
+      "text": "Authority summary: The MIT license conditions permission on including its copyright and permission notice in copies or substantial portions.",
+      "sha256": "746bf57bb62ae0536e7f405e1d4447d2a8ef958c9d9a08dc173f108cd969cac5",
+      "available_on": "2026-09-20",
+      "classification": "record",
+      "public": true
+    }
+  ]
+}

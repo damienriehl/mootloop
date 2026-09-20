@@ -60,6 +60,8 @@ _PLACEHOLDER_ATTORNEY = Attorney(name="[ATTORNEY NAME]")
 
 def _side_labels(matter: MatterConfig) -> tuple[str, str]:
     """(our-side, opposing-side) title-cased (``Defendant`` / ``Plaintiff``)."""
+    if matter.caption is None or matter.our_side is None:
+        raise ValueError("discovery export requires a litigation matter")
     ours = matter.our_side.capitalize()
     theirs = "Plaintiff" if matter.our_side == "defendant" else "Defendant"
     return ours, theirs
@@ -67,6 +69,8 @@ def _side_labels(matter: MatterConfig) -> tuple[str, str]:
 
 def _caption_block(matter: MatterConfig) -> list[str]:
     cap = matter.caption
+    if cap is None:
+        raise ValueError("court caption requires a litigation matter")
     plaintiffs = [p.name for p in matter.parties if p.role == "plaintiff"]
     defendants = [p.name for p in matter.parties if p.role == "defendant"]
     lines = [
@@ -274,6 +278,10 @@ def build_court_master(
 ) -> Path:
     """Assemble the court-formatted master and write ``deliverables/<run-id>/master.md``."""
     context = run_context or load_run_context(vault_root, run_id)
+    if context.binding.config.input_family == "document":
+        from mootloop.export.document import build_document_master
+
+        return build_document_master(vault_root, run_id, now, run_context=context)
     matter = context.manifest.matter_config
     request_sets = context.manifest.request_sets
     validate_run_request_identity(request_sets)
@@ -333,8 +341,12 @@ def build_verification_page(
     lines.append("")
     lines.append(MN_VERIFICATION_DECLARATION)
     lines.append("")
-    lines.append(f"Executed on ____________________, in the County of {matter.caption.county}, "
-                 f"State of {matter.jurisdiction.state}.")
+    if matter.caption is None:
+        raise ValueError("verification requires a litigation matter")
+    lines.append(
+        f"Executed on ____________________, in the County of {matter.caption.county}, "
+        f"State of {matter.jurisdiction.state}."
+    )
     lines.append("")
     lines.append("_______________________________")
     lines.append("Signature of responding party")

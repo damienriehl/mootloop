@@ -51,7 +51,7 @@ _COMMAND_TREE = {
         "trace",
     ],
     "tasks": ["freeform", "list", "lock"],
-    "web": ["bake"],
+    "web": ["bake", "import-demo", "prepare", "publish", "replay-script"],
 }
 _ROOT_COMMANDS = [
     "attest",

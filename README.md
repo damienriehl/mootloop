@@ -288,28 +288,25 @@ Every skill that can mutate a vault or spend model capacity requires explicit in
 `status` is the only read-only, model-invocable skill. The skills call the same service and
 CLI primitives as the API. Run `claude plugin validate .` to validate the package.
 
-## Demo
+## Demo library
 
-A public, **read-only** demo shows the full agentic arc on a synthetic matter —
-six personas drafting, attacking, and adjudicating discovery responses through
-rubric-gated loops, with the gate ledger, attorney-gate decisions, objection-survival
-panels, and finished deliverables all browsable:
+Explore twenty prepared, **read-only** demonstrations: five fictional litigation
+matters, five historical counterfactuals, and ten business questions for in-house
+counsel. Follow each initial draft through critique, revision and assessment.
+Historical cases compare two strategies while keeping actual outcomes separate.
 
-- **DEV:** <https://mootloop.dev.openlegalstandard.org>
-- **PROD:** <https://mootloop.org>
+- **Public library:** <https://mootloop.org/demos/>
+- **Development library:** <https://mootloop.dev.openlegalstandard.org/demos/>
+- **Original discovery demonstration:** <https://mootloop.org/legacy>
 
-The demo run is pre-baked at image build time with a deterministic fake model
-provider — zero LLM calls, zero secrets, zero matter-data mechanisms at runtime.
-The servers never host real matter data (see [`docs/deploy.md`](docs/deploy.md)).
+The examples are agent-authored scripts replayed deterministically, with zero live
+provider calls. Actual review gates and limitations remain visible; these examples
+have no attorney approval. The public service reads only reviewed projections,
+with no vault access, uploads, BYOK or execution endpoints.
 
-Run it locally:
-
-```bash
-uv sync --extra web
-uv run mootloop web bake /tmp/demo
-MOOTLOOP_DEMO_VAULT=/tmp/demo uv run uvicorn mootloop.web.app:app
-# open http://127.0.0.1:8000
-```
+[Install locally, download inputs and replay an example](docs/demos/local-use.md).
+[Preparation and source-review process](docs/demos/preparation.md).
+[Image packaging, deployment and rollback](docs/deploy.md).
 
 ## Hosted tier (FE-0)
 

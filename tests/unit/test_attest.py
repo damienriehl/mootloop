@@ -440,9 +440,7 @@ def test_reexport_preserves_attested_master_and_replaces_current_seal(
     assert missing.reason == "clean export has no export seal"
 
 
-def test_relative_vault_path_can_be_sealed(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_relative_vault_path_can_be_sealed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _enable_clean_docx_renderer(monkeypatch)
     vault = _finished_and_resolved(tmp_path, "att-relative")
     attest.attest(vault, "att-relative", "Jane", NOW)
@@ -559,3 +557,23 @@ def test_gate_ledger_json_written(tmp_path: Path) -> None:
     path = gate_ledger.write_ledger(vault, "gl-write")
     assert path.is_file()
     assert path.name == "gate-ledger.json"
+
+
+def test_document_attestation_binds_all_units(tmp_path: Path) -> None:
+    from mootloop.models.document_task import DocumentTaskInput, DocumentUnit
+    from tests.unit.test_document_tasks import document_vault
+
+    vault = document_vault(tmp_path, "business-advice")
+    path = vault / "documents" / "motion-a.json"
+    packet = DocumentTaskInput.model_validate_json(path.read_text())
+    packet.units += (DocumentUnit(unit_id="notice", title="Notice", instructions="Draft notice"),)
+    path.write_text(packet.model_dump_json())
+    start_run(vault, "business-advice", NOW, run_id="advisory")
+    run_with_provider(vault, "advisory", FakeLLMProvider(), NOW)
+    verify_run_citations(vault, "advisory", NOW)
+    attest.attest(vault, "advisory", "Jane", NOW)
+    master = attest.master_deliverable_path(vault, "advisory")
+    assert master is not None
+    assert attest.attestation_state(vault, "advisory").status == "valid"
+    master.write_text(master.read_text().replace("## Notice", "## Changed notice"))
+    assert attest.attestation_state(vault, "advisory").status == "invalidated"

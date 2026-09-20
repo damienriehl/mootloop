@@ -13,10 +13,11 @@ from mootloop.gates.runtime import (
     GateRunner,
     GateScope,
 )
+from mootloop.models.document_task import DocumentEvidence
 from mootloop.models.facts import Fact
-from mootloop.models.gates import GateResult
+from mootloop.models.gates import GateFail, GateFinding, GateResult
 from mootloop.models.rubric import Rubric
-from mootloop.models.run import DraftOutput, TurnOutput
+from mootloop.models.run import DraftOutput, RubricScoreOutput, TurnOutput
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,8 @@ class TurnGateContext:
     request_text: str
     facts: tuple[Fact, ...]
     corpus_text: str
+    document: bool = False
+    evidence: tuple[DocumentEvidence, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -39,7 +42,21 @@ class _DegeneracyGate:
         return True
 
     def evaluate(self, context: TurnGateContext) -> GateResult:
-        return degeneracy.evaluate(context.output)
+        result = degeneracy.evaluate(context.output, document=context.document)
+        if context.document and isinstance(context.output, RubricScoreOutput):
+            expected = {c.id for c in context.rubric.correctness_criteria(context.request_code)}
+            actual = [s.criterion_id for s in context.output.scores]
+            if set(actual) != expected or len(actual) != len(set(actual)):
+                return GateFail(
+                    gate="degeneracy",
+                    findings=[
+                        GateFinding(
+                            code="rubric_coverage",
+                            message="scores must cover every declared criterion exactly once",
+                        )
+                    ],
+                )
+        return result
 
 
 @dataclass(frozen=True)
@@ -68,7 +85,9 @@ class _FabricationGate:
 
     def evaluate(self, context: TurnGateContext) -> GateResult:
         draft = cast(DraftOutput, context.output)
-        return fabrication.check(draft, list(context.facts), context.corpus_text)
+        return fabrication.check(
+            draft, list(context.facts), context.corpus_text, evidence=context.evidence
+        )
 
 
 _TURN_GATES: tuple[Gate[TurnGateContext], ...] = (

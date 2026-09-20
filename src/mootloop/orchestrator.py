@@ -60,6 +60,7 @@ from mootloop.models.common import (
     TurnId,
 )
 from mootloop.models.context import AssembledContextItem, ContextContribution
+from mootloop.models.document_task import DocumentUnit
 from mootloop.models.events import (
     CapRaised,
     CheckpointCleared,
@@ -147,7 +148,7 @@ def _context_for(
     run_id: str,
     state: RunState,
     binding: TaskBinding,
-    units: list[RequestItem],
+    units: Sequence[RequestItem | DocumentUnit],
     facts: list[dict[str, str]],
     req_index: int,
     max_attempts: int,
@@ -176,7 +177,7 @@ def _plan(
     run_id: str,
     state: RunState,
     binding: TaskBinding,
-    units: list[RequestItem],
+    units: Sequence[RequestItem | DocumentUnit],
     facts: list[dict[str, str]],
     max_attempts: int,
     tier_models: dict[str, str] | None = None,
@@ -239,6 +240,7 @@ def start_run(
     run_id: str | None = None,
     mode: RunMode | None = None,
     task_spec_id: str | None = None,
+    document_input_refs: list[str] | None = None,
     max_attempts: int | None = None,
     idempotent: bool = False,
     firm_preferences_path: Path | str | None = None,
@@ -251,6 +253,8 @@ def start_run(
     (plan D12 precedence). ``task_spec_id`` records the on-ramp TaskSpec the run started
     from (plan FE-2.5), when any.
     """
+    if document_input_refs is not None and get_binding(task).config.input_family != "document":
+        raise OrchestratorError("document input selection requires a document task")
     resolved_id = run_id or f"{task}-{_compact_ts(now)}"
     with RunLock(vault_root, resolved_id):
         existing_events = read_events(vault_root, resolved_id)
@@ -287,8 +291,29 @@ def start_run(
                     matter_id=MatterId(matter.matter_id),
                     task=task,
                 )
+                same_document_inputs = True
+                if context.manifest.adapter_config.input_family == "document":
+                    from mootloop.context import load_document_inputs
+
+                    refs = (
+                        context.manifest.task_spec.document_input_refs
+                        if context.manifest.task_spec
+                        else document_input_refs
+                    )
+                    _, sources = load_document_inputs(vault_root, task, refs)
+                    original = [
+                        source
+                        for source in context.manifest.sources
+                        if source.kind == "document_input"
+                    ]
+                    same_document_inputs = sources == original
+                    if document_input_refs is not None:
+                        same_document_inputs = same_document_inputs and document_input_refs == [
+                            item.input_id for item in context.manifest.document_inputs
+                        ]
                 same_launch = (
-                    context.manifest.task == task
+                    same_document_inputs
+                    and context.manifest.task == task
                     and (
                         str(context.manifest.task_spec.task_spec_id)
                         if context.manifest.task_spec is not None
@@ -330,6 +355,7 @@ def start_run(
             task_spec_id,
             firm_preferences_path,
             context_contributions,
+            document_input_refs=document_input_refs,
         )
         resolved_config = run_context.manifest.resolved_config
         task_spec_lock = run_context.manifest.task_spec_lock
@@ -378,7 +404,7 @@ def plan_next(
     # A paused run schedules nothing and short-circuits the cap check (plan FE-1).
     if state.status == "paused":
         return []
-    units = run_context.units
+    units = run_context.task_units
     # Budget hard cap (plan D5): at/over cap, gracefully checkpoint before planning.
     if not state.finished and _over_cap(state, run_context):
         with RunLock(vault_root, run_id):
@@ -474,7 +500,7 @@ def record_turn(
             )
             _finalize(vault_root, run_id, now, run_context)
             return record
-        units = run_context.units
+        units = run_context.task_units
         facts = run_context.facts
         specs = _plan(
             run_id,
@@ -588,7 +614,7 @@ def _record_spec(
     usage: TokenUsage | None,
     now: str,
     binding: TaskBinding,
-    units: list[RequestItem],
+    units: Sequence[RequestItem | DocumentUnit],
     state: RunState,
     max_attempts: int,
     provider_call_id: str | None,
@@ -649,7 +675,12 @@ def _record_spec(
     # Attorney-gate decisions (plan P-28): every draft/bolster turn may imply gates.
     if OUTPUT_SCHEMAS.get(record.spec.output_schema_name) is DraftOutput:
         decisions.derive_and_store(
-            vault_root, run_id, record.spec, DraftOutput.model_validate(record.output), units
+            vault_root,
+            run_id,
+            record.spec,
+            DraftOutput.model_validate(record.output),
+            units,
+            document=binding.config.input_family == "document",
         )
     _book_spend(
         vault_root,
@@ -685,15 +716,16 @@ def _turn_gate_context(
     spec: TurnSpec,
     output: TurnOutput,
     binding: TaskBinding,
-    units: list[RequestItem],
+    units: Sequence[RequestItem | DocumentUnit],
     run_context: RunContext,
 ) -> TurnGateContext:
     request_id = str(spec.request_id) if spec.request_id else ""
-    code = code_from_request_id(request_id)
+    document = binding.config.input_family == "document"
+    code = "document" if document else code_from_request_id(request_id)
     unit = next((u for u in units if str(u.request_id) == request_id), None)
     req_text = unit.text if unit else ""
     corpus_text = ""
-    if isinstance(output, DraftOutput):
+    if isinstance(output, DraftOutput) and not document:
         snapshot = load_run_corpus(vault_root, run_context)
         corpus_text = "\n".join(item.text for item in snapshot.documents)
     return TurnGateContext(
@@ -703,6 +735,8 @@ def _turn_gate_context(
         request_text=req_text,
         facts=tuple(run_context.manifest.facts),
         corpus_text=corpus_text,
+        document=document,
+        evidence=tuple(e for item in run_context.manifest.document_inputs for e in item.evidence),
     )
 
 
@@ -714,7 +748,7 @@ def _operative_citations(vault_root: Path | str, run_id: str) -> list[Citation]:
     run_context = load_run_context(vault_root, run_id)
     binding = run_context.binding
     state = load_state(vault_root, run_id)
-    units = run_context.units
+    units = run_context.task_units
     facts = run_context.facts
     found: dict[str, Citation] = {}
     for i in range(len(units)):
@@ -745,7 +779,7 @@ def operative_citation_propositions(
     run_context = load_run_context(vault_root, run_id)
     binding = run_context.binding
     state = load_state(vault_root, run_id)
-    units = run_context.units
+    units = run_context.task_units
     found: dict[str, CitationProposition] = {}
     for index in range(len(units)):
         ctx = _context_for(
@@ -785,7 +819,7 @@ def operative_draft_turn_ids(vault_root: Path | str, run_id: str) -> dict[str, s
 
 def operative_drafts(
     vault_root: Path | str, run_id: str
-) -> list[tuple[RequestItem, DraftOutput | None]]:
+) -> list[tuple[RequestItem | DocumentUnit, DraftOutput | None]]:
     """Each request paired with its operative (final, post-restructure) draft, or None
     if the request never produced one. The export builders read from here (plan Phase 7)."""
     run_context = load_run_context(vault_root, run_id)
@@ -798,10 +832,10 @@ def operative_drafts(
 
 def operative_draft_records(
     run_id: str, run_context: RunContext, state: RunState
-) -> list[tuple[RequestItem, TurnRecord | None]]:
+) -> list[tuple[RequestItem | DocumentUnit, TurnRecord | None]]:
     """Select drafts once from one read's inputs, retaining StageContext isolation."""
-    units = run_context.units
-    out: list[tuple[RequestItem, TurnRecord | None]] = []
+    units = run_context.task_units
+    out: list[tuple[RequestItem | DocumentUnit, TurnRecord | None]] = []
     for i in range(len(units)):
         ctx = _context_for(
             run_id,
@@ -886,7 +920,7 @@ def _maybe_emit_rubric_gate(
     run_id: str,
     spec: TurnSpec,
     binding: TaskBinding,
-    units: list[RequestItem],
+    units: Sequence[RequestItem | DocumentUnit],
     run_context: RunContext,
 ) -> None:
     """When the final rubric seat lands, aggregate the panel (median-per-criterion,
@@ -1010,7 +1044,7 @@ def _write_gaps_report(
     run_context: RunContext,
 ) -> Path:
     binding = run_context.binding
-    units = run_context.units
+    units = run_context.task_units
     facts = run_context.facts
     cap = effective_cap(state, run_context)
     lines: list[str] = [
@@ -1063,7 +1097,7 @@ def _all_requests_complete(
     vault_root: Path | str,
     run_id: str,
     binding: TaskBinding,
-    units: list[RequestItem],
+    units: Sequence[RequestItem | DocumentUnit],
     state: RunState,
     facts: list[dict[str, str]],
     max_attempts: int,
@@ -1091,7 +1125,7 @@ def _finalize(
     if state.status not in ("running", "needs_decisions"):
         return  # finished / needs_attention / capped / checkpoint are handled elsewhere
     binding = run_context.binding
-    units = run_context.units
+    units = run_context.task_units
     if not _all_requests_complete(
         vault_root,
         run_id,
@@ -1111,13 +1145,14 @@ def _finalize(
             for record in state.completed_turns.values()
             if OUTPUT_SCHEMAS.get(record.spec.output_schema_name) is DraftOutput
         ),
+        document=binding.config.input_family == "document",
     )
     for record in state.completed_turns.values():
         if record.spec.stage == RUBRIC_GATE_STAGE:
             _maybe_emit_rubric_gate(vault_root, run_id, record.spec, binding, units, run_context)
     # The md-master is a DRAFT until attestation; assemble it now so it exists for the
     # gate ledger and attestation hash even while decisions are pending.
-    _assemble(vault_root, run_id, state, run_context)
+    _assemble(vault_root, run_id, state, run_context, now)
     matter = run_context.manifest.matter_config
     if decisions.open_by_taxonomy(vault_root, run_id, matter, "hard-human"):
         if state.status != "needs_decisions":
@@ -1146,7 +1181,12 @@ def finalize_if_ready(
 
 # Stage boundaries a gated run pauses before (after associate_draft completes ->
 # before partner_loop; before oc_attack; before judge_panel).
-_CHECKPOINT_STAGE_ORDER: tuple[str, ...] = ("partner_loop", "oc_attack", "judge_panel")
+_CHECKPOINT_STAGE_ORDER: tuple[str, ...] = (
+    "partner_loop",
+    "oc_attack",
+    "judge_panel",
+    "narrative_assessment",
+)
 
 # Run status -> the house STATE marker (plan Phase 5 / D12 convention).
 _STATE_MARKER: dict[str, str] = {
@@ -1176,7 +1216,7 @@ def _maybe_checkpoint(
     if state.mode != "gated" or state.status != "running":
         return
     binding = run_context.binding
-    units = run_context.units
+    units = run_context.task_units
     facts = run_context.facts
     max_attempts = run_context.manifest.resolved_config.max_attempts
     tier_models = run_context.manifest.tier_models
@@ -1385,7 +1425,7 @@ def status_summary(vault_root: Path | str, run_id: str) -> dict[str, object]:
     except OrchestratorError as exc:
         run_context = None
         context_blocker = str(exc)
-    units = run_context.units if run_context is not None else []
+    units = run_context.task_units if run_context is not None else []
     total_tokens = (
         state.total_input_tokens
         + state.total_cache_read
@@ -1450,8 +1490,14 @@ def estimate_run_cost(
         firm_preferences_path=None,
     )
     pipeline = resolve_launch_pipeline(vault_root, binding, matter, resolved_config)
-    units = load_request_units(vault_root)
-    return budget.estimate_run(len(units), pipeline.effective_config, tier, on)
+    if binding.config.input_family == "document":
+        from mootloop.context import load_document_inputs
+
+        documents, _ = load_document_inputs(vault_root, task)
+        count = sum(len(item.units) for item in documents)
+    else:
+        count = len(load_request_units(vault_root))
+    return budget.estimate_run(count, pipeline.effective_config, tier, on)
 
 
 def matter_tier(vault_root: Path | str) -> str:
