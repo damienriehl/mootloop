@@ -4,7 +4,8 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 
 it("keeps source markup inert and ignores late results after navigation", async () => {
-  document.body.innerHTML = '<main id="content" tabindex="-1"></main>';
+  document.body.innerHTML =
+    '<a href="#content">Skip to content</a><main id="content" tabindex="-1"></main>';
   window.history.replaceState(null, "", "/demos/");
   vi.spyOn(window, "scrollTo").mockImplementation(() => {});
   const descriptor = (id: string) => ({
@@ -26,7 +27,7 @@ it("keeps source markup inert and ignores late results after navigation", async 
     assumptions: ["Fictional"],
     stages: ["initial", "critique", "revised", "assessment"].map((kind) => ({
       kind,
-      text: `${kind}\n\n${malicious}`,
+      text: `${kind}\n\n**Prepared draft**\n\n**${malicious}**`,
     })),
     gate_state: {
       export_ready: false,
@@ -109,12 +110,38 @@ it("keeps source markup inert and ignores late results after navigation", async 
   expect(document.querySelector("img")).toBeNull();
   expect(document.querySelector('a[href^="javascript:"]')).toBeNull();
   expect(document.body.textContent).toContain(malicious);
+  expect(document.querySelector(".stage strong")?.textContent).toBe("Prepared draft");
+  Object.defineProperty(Element.prototype, "scrollIntoView", {
+    configurable: true,
+    value: vi.fn(),
+  });
+  const callsBeforeAnchor = calls.length;
+  fireEvent.click(screen.getByRole("link", { name: "Initial draft" }));
+  expect(document.querySelector<HTMLDetailsElement>("#initial")?.open).toBe(true);
+  expect(document.activeElement).toBe(document.querySelector("#initial summary"));
+  fireEvent.click(screen.getByRole("link", { name: "Adversarial critique" }));
+  expect(document.querySelector<HTMLDetailsElement>("#critique")?.open).toBe(true);
+  expect(document.querySelector<HTMLDetailsElement>("#initial")?.open).toBe(true);
+  window.history.pushState(null, "", "#initial");
+  window.dispatchEvent(new PopStateEvent("popstate"));
+  expect(document.querySelector<HTMLDetailsElement>("#critique")?.open).toBe(true);
+  expect(calls).toHaveLength(callsBeforeAnchor);
+  fireEvent.click(screen.getByRole("link", { name: "Skip to content" }));
+  expect(document.activeElement).toBe(document.querySelector("#content"));
+  document.querySelector<HTMLDetailsElement>("#initial")!.open = false;
+  fireEvent.click(screen.getByRole("link", { name: "Initial draft" }));
+  expect(document.querySelector<HTMLDetailsElement>("#initial")?.open).toBe(true);
   fireEvent.change(screen.getByLabelText("Choose a strategy"), {
     target: { value: "b" },
   });
   expect(window.location.search).toContain("strategy=b");
   expect(screen.getByRole("heading", { name: "Strategy b" })).toBeVisible();
+  window.history.pushState(null, "", "/demos/second?revision=r1&strategy=a#critique");
+  window.dispatchEvent(new PopStateEvent("popstate"));
+  await screen.findByRole("heading", { name: "Strategy a" });
+  expect(document.querySelector<HTMLDetailsElement>("#critique")?.open).toBe(true);
   expect(calls.every((url) => url.startsWith("/api/demos"))).toBe(true);
+  Reflect.deleteProperty(Element.prototype, "scrollIntoView");
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });

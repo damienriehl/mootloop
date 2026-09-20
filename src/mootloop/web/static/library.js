@@ -8,6 +8,20 @@
   };
   let navigation = 0;
   let controller;
+  let renderedPage;
+  function pageKey() {
+    return location.pathname + location.search;
+  }
+  function revealAnchor() {
+    const target = document.getElementById(location.hash.slice(1));
+    if (!target) return;
+    if (target.tagName === "DETAILS") target.open = true;
+    const focusTarget =
+      target.tagName === "DETAILS" ? target.querySelector("summary") : target;
+    if (focusTarget?.matches("summary, [tabindex]"))
+      focusTarget.focus({ preventScroll: true });
+    target.scrollIntoView();
+  }
   function el(tag, text, className) {
     const node = document.createElement(tag);
     if (text !== undefined) node.textContent = text;
@@ -34,14 +48,25 @@
     }
     return node;
   }
+  function paragraph(text) {
+    const node = el("p");
+    for (const part of text.split(/(\*\*[^*\n]+\*\*)/g)) {
+      node.append(
+        part.startsWith("**") && part.endsWith("**")
+          ? el("strong", part.slice(2, -2))
+          : document.createTextNode(part),
+      );
+    }
+    return node;
+  }
   function prose(text) {
     const body = el("div", undefined, "prose");
     for (const block of text.split(/\n\s*\n/)) {
       const heading = block.match(/^#{1,6}\s+([^\n]+)\n?([\s\S]*)$/);
       if (heading) {
         body.append(el("h3", heading[1]));
-        if (heading[2]) body.append(el("p", heading[2]));
-      } else body.append(el("p", block));
+        if (heading[2]) body.append(paragraph(heading[2]));
+      } else body.append(paragraph(block));
     }
     return body;
   }
@@ -248,6 +273,7 @@
           "",
           `/demos/${values.size ? "?" + values : ""}`,
         );
+        renderedPage = pageKey();
       }
     }
     layout.append(filters, results);
@@ -308,6 +334,7 @@
         url.searchParams.set("strategy", select.value);
         history.pushState(null, "", url);
         detailView(snapshot, select.value, token, signal);
+        renderedPage = pageKey();
         document.getElementById("strategy").focus();
       });
       picker.append(label, select);
@@ -488,6 +515,7 @@
     controller?.abort();
     controller = new AbortController();
     const signal = controller.signal;
+    renderedPage = undefined;
     main.replaceChildren(el("p", "Loading the demo library…"));
     main.firstChild.setAttribute("role", "status");
     try {
@@ -517,8 +545,10 @@
         }
         detailView(snapshot, params.get("strategy"), token, signal);
       }
-      if (token === navigation && location.hash)
-        document.getElementById(location.hash.slice(1))?.scrollIntoView();
+      if (token === navigation) {
+        renderedPage = pageKey();
+        revealAnchor();
+      }
     } catch (error) {
       if (error.name === "AbortError" || token !== navigation) return;
       const alert = el("p", error.message);
@@ -551,14 +581,21 @@
       url.pathname === location.pathname &&
       url.search === location.search &&
       url.hash
-    )
+    ) {
+      event.preventDefault();
+      if (url.hash !== location.hash) history.pushState(null, "", url);
+      revealAnchor();
       return;
+    }
     event.preventDefault();
     history.pushState(null, "", url);
     route();
     window.scrollTo(0, 0);
     main.focus();
   });
-  window.addEventListener("popstate", route);
+  window.addEventListener("popstate", () => {
+    if (renderedPage === pageKey()) revealAnchor();
+    else route();
+  });
   route();
 })();
