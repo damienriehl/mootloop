@@ -12,10 +12,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
+from mootloop import orchestrator
 from mootloop.budget import MODEL_OPUS
 from mootloop.journal import load_state, read_events
 from mootloop.llm import FakeLLMProvider, RawTurnResult, TokenUsage
-from mootloop.models.events import SpendRecorded
+from mootloop.models.events import JournalEvent, SpendRecorded
 from mootloop.models.run import DiscardedTurn
 from mootloop.orchestrator import assemble_prompt, plan_next, record_turn, start_run
 from tests.unit.test_orchestrator_planning import (
@@ -122,3 +125,46 @@ def test_success_after_discard_meters_identical_usage_without_call_id(tmp_path: 
     assert load_state(vault, run_id).total_spend_usd == EXPECTED_USD * 2
     record_turn(vault, run_id, spec.turn_id, result.text, USAGE, NOW)
     assert load_state(vault, run_id).total_spend_usd == EXPECTED_USD * 2
+
+
+@pytest.mark.parametrize("provider_call_id, expected_calls", [(None, 2), ("call-1", 1)])
+def test_spend_before_completion_crash_meters_fresh_legacy_call_or_replays_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    provider_call_id: str | None,
+    expected_calls: int,
+) -> None:
+    vault = _build_single_request_vault(tmp_path)
+    run_id = start_run(vault, "discovery-responses", NOW, run_id="spend-crash")
+    spec = plan_next(vault, run_id)[0]
+    provider = FakeLLMProvider()
+    turn = provider.run_turn(spec, assemble_prompt(vault, run_id, spec.turn_id))
+    real_append = orchestrator.append
+
+    def crash_after_spend(root: Path | str, run: str, event: JournalEvent) -> None:
+        real_append(root, run, event)
+        if isinstance(event, SpendRecorded):
+            raise OSError("interrupted after spend")
+
+    monkeypatch.setattr(orchestrator, "append", crash_after_spend)
+    with pytest.raises(OSError, match="interrupted after spend"):
+        record_turn(
+            vault, run_id, spec.turn_id, turn.text, USAGE, NOW, provider_call_id=provider_call_id
+        )
+    state = load_state(vault, run_id)
+    assert spec.turn_id not in state.completed_turns
+    assert state.total_spend_usd == EXPECTED_USD
+
+    monkeypatch.setattr(orchestrator, "append", real_append)
+    if provider_call_id is None:
+        spec = plan_next(vault, run_id)[0]
+        turn = provider.run_turn(spec, assemble_prompt(vault, run_id, spec.turn_id))
+    record_turn(
+        vault, run_id, spec.turn_id, turn.text, USAGE, NOW, provider_call_id=provider_call_id
+    )
+    state = load_state(vault, run_id)
+    assert spec.turn_id in state.completed_turns
+    assert state.total_spend_usd == EXPECTED_USD * expected_calls
+    assert state.total_input_tokens == USAGE.input_tokens * expected_calls
+    assert state.total_output_tokens == USAGE.output_tokens * expected_calls
+    assert len(_spend_events(vault, run_id)) == expected_calls

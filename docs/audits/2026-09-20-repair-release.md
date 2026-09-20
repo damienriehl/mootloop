@@ -86,3 +86,16 @@ or lost Access boundary; use the prior successful application revision for
 rollback where necessary. An intentional refusal to export unreviewed work is the
 expected repair behavior, not a rollback signal. No real workflow execution is
 needed to establish deployment health.
+
+## PR review follow-up
+
+PR #68 identified a spend-accounting gap between `SpendRecorded` and
+`TurnCompleted`: without a provider-call identity, a fresh invocation with identical
+usage could be mistaken for a replay. The follow-up limits deduplication on the
+incomplete-turn path to explicit call identities. Legacy calls are conservatively
+booked; replay of an already completed record retains its existing compatibility
+behavior. Fault-injection tests cover both anonymous fresh invocations and exact
+identified replays. The new legacy-call regression failed before the fix ($2 recorded instead of $4).
+After the fix, 13 targeted tests passed, followed by full `make check`: 1,280
+tests passed, one paid-oracle test deselected, strict mypy and Ruff passed, and
+coverage remained 91%. No justified code findings remain unresolved.

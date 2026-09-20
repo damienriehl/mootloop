@@ -524,10 +524,9 @@ def _book_spend(
     and its settlement can never be priced off two different keys; ``usage.model``
     still records what the provider reported.
 
-    ``dedupe`` guards the one path that can be reached without a fresh provider call:
-    re-recording an already-completed turn. New providers identify the invocation
-    directly. Legacy callers without an identity retain the historical usage-signature
-    fallback so old integrations and journals remain idempotent.
+    ``dedupe`` guards replay of an identified invocation, including interrupted
+    completion. Only already-completed turns enable the historical usage-signature
+    fallback for legacy callers without an identity.
     """
     if usage is None:
         return
@@ -659,7 +658,7 @@ def _record_spec(
         usage,
         spec.model,
         now,
-        dedupe=True,
+        dedupe=provider_call_id is not None,
         provider_call_id=provider_call_id,
     )
     append(vault_root, run_id, TurnCompleted(record=record))
