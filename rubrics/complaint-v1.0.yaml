@@ -1,0 +1,55 @@
+rubric_id: complaint-v1.0
+version: '1.0'
+locked: true
+criteria:
+- id: document-section-parties
+  name: Parties
+  description: Contains a substantive parties section.
+  kind: present
+  weight: 1
+  applies_to: all
+- id: document-section-jurisdiction
+  name: Jurisdiction
+  description: Contains a substantive jurisdiction section.
+  kind: present
+  weight: 1
+  applies_to: all
+- id: document-section-allegations
+  name: Allegations
+  description: Contains a substantive allegations section.
+  kind: present
+  weight: 1
+  applies_to: all
+- id: document-section-claims
+  name: Claims
+  description: Contains a substantive claims section.
+  kind: present
+  weight: 1
+  applies_to: all
+- id: document-section-relief
+  name: Relief
+  description: Contains a substantive relief section.
+  kind: present
+  weight: 1
+  applies_to: all
+- id: task-analysis
+  name: Task analysis
+  description: Evaluate each element and pleading sufficiency; distinguish allegations
+    from supported facts.
+  kind: correct
+  weight: 1
+  applies_to: all
+- id: record-grounding
+  name: Record grounding
+  description: Trace material assertions to eligible evidence; identify assumptions
+    and unresolved support.
+  kind: correct
+  weight: 1
+  applies_to: all
+- id: adversarial-response
+  name: Adversarial response
+  description: Answer the strongest counterarguments without overstating certainty
+    or outcome predictions.
+  kind: correct
+  weight: 1
+  applies_to: all

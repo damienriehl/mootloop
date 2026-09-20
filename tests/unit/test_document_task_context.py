@@ -144,12 +144,15 @@ def test_document_prompt_context_excludes_legacy_facts_and_scopes_public_evidenc
     manifest.document_inputs = [_input()]
     manifest.request_sets = []
     items = assemble_context(manifest, CorpusSnapshot())
-    assert len(items) == 1
+    assert len(items) == 2
     assert "A record fact." in items[0].text
     assert "original fact" not in items[0].text
     assert items_for_turn(items, task="motion", persona=PersonaName.OC_PARTNER) == items
     manifest.document_inputs[0].evidence[0].public = False
     private = assemble_context(manifest, CorpusSnapshot())
-    assert not items_for_turn(private, task="motion", persona=PersonaName.OC_PARTNER)
+    assert all(
+        "A record fact." not in item.text
+        for item in items_for_turn(private, task="motion", persona=PersonaName.OC_PARTNER)
+    )
     assert _materialize(manifest).facts == []
     assert _materialize(manifest).task_units == list(_input().units)

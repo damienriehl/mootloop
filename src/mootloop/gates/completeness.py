@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
+from functools import partial
 
+from mootloop.errors import TaskConfigError
 from mootloop.gates import has_hedge
 from mootloop.models.gates import GateFail, GateFinding, GatePass, GateResult
 from mootloop.models.rubric import Rubric
@@ -103,7 +105,60 @@ _CHECKS: dict[str, Callable[[DraftOutput, str], bool]] = {
 }
 
 
+_DOCUMENT_SECTIONS = (
+    "parties",
+    "jurisdiction",
+    "allegations",
+    "claims",
+    "relief",
+    "grounds",
+    "record",
+    "argument",
+    "limitations",
+    "issues",
+    "preservation",
+    "standard of review",
+    "position",
+    "questions",
+    "answers",
+    "concessions",
+    "closing",
+    "recommendation",
+    "risks",
+    "options",
+    "next steps",
+    "secondary deliverable",
+)
+
+
+def _section_present(name: str, draft: DraftOutput, req_text: str) -> bool:
+    match = re.search(r"(?im)^#{1,6}\s+" + re.escape(name) + r"\s*:?\s*$", draft.response_text)
+    if match is None:
+        return False
+    body = re.split(r"(?m)^#{1,6}\s", draft.response_text[match.end() :], maxsplit=1)[0]
+    return len(body.strip()) >= 12
+
+
+_CHECKS.update(
+    {
+        f"document-section-{name.replace(' ', '-')}": partial(_section_present, name)
+        for name in _DOCUMENT_SECTIONS
+    }
+)
+
+
+def validate_presence_criteria(rubric: Rubric) -> None:
+    unknown = [
+        criterion.id
+        for criterion in rubric.criteria
+        if criterion.kind == "present" and criterion.id not in _CHECKS
+    ]
+    if unknown:
+        raise TaskConfigError(f"unknown deterministic presence criteria: {', '.join(unknown)}")
+
+
 def _applicable(rubric: Rubric, code: str) -> list[tuple[str, Callable[[DraftOutput, str], bool]]]:
+    validate_presence_criteria(rubric)
     checks: list[tuple[str, Callable[[DraftOutput, str], bool]]] = []
     for crit in rubric.presence_criteria(code):
         check = _CHECKS.get(crit.id)

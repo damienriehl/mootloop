@@ -54,7 +54,7 @@ def legacy_fixed_pipeline(
         active_set.add(PersonaName.PARTNER)
     if "oc_attack" in stages:
         active_set.add(PersonaName.OC_ASSOCIATE)
-    if "judge_panel" in stages:
+    if stages & {"judge_panel", "narrative_assessment"}:
         active_set.add(PersonaName.JUDGE)
     if stages & {"partner_loop", "rubric_gate"}:
         active_set.add(PersonaName.RUBRIC_JUDGE)
@@ -64,9 +64,7 @@ def legacy_fixed_pipeline(
         strategy="thin-full",
         effective_config=adapter,
         drafting_persona=(
-            PersonaName.ASSOCIATE
-            if PersonaName.ASSOCIATE in active
-            else PersonaName.PARTNER
+            PersonaName.ASSOCIATE if PersonaName.ASSOCIATE in active else PersonaName.PARTNER
         ),
         oc_personas=(PersonaName.OC_ASSOCIATE,) if "oc_attack" in stages else (),
         active_personas=active,
@@ -99,6 +97,12 @@ def compile_pipeline(
     resolved_config: ResolvedRunConfig | None = None,
 ) -> ResolvedPipeline:
     """Return the sole stage/owner contract runtime code may execute."""
+    if adapter.input_family == "document":
+        graphs = [adapter.stages, *[list(s.stages) for s in adapter.pipeline_strategies.values()]]
+        if adapter.panels.jury or any(
+            set(g) & {"judge_panel", "restructure", "jury_panel"} for g in graphs
+        ):
+            raise PipelineConfigError("document tasks cannot execute discovery assessment stages")
     active = _selected_personas(matter)
     bypassed = tuple(persona for persona in ACTIVE_PIPELINE_PERSONAS if persona not in active)
     if not ({PersonaName.ASSOCIATE, PersonaName.PARTNER} & set(active)):
@@ -131,14 +135,17 @@ def compile_pipeline(
     if oc_personas:
         required.update({"oc_attack", "bolster"})
     if PersonaName.JUDGE in active:
-        required.update({"judge_panel", "restructure"})
+        required.update(
+            {"narrative_assessment"}
+            if adapter.input_family == "document"
+            else {"judge_panel", "restructure"}
+        )
     if PersonaName.RUBRIC_JUDGE in active:
         required.add("rubric_gate")
     missing = required - set(selected.stages)
     if missing:
         raise PipelineConfigError(
-            f"{strategy} pipeline leaves active persona work unowned: "
-            f"{', '.join(sorted(missing))}"
+            f"{strategy} pipeline leaves active persona work unowned: {', '.join(sorted(missing))}"
         )
     effective = adapter.model_copy(deep=True)
     if resolved_config is not None:
@@ -169,16 +176,16 @@ def compile_pipeline(
         effective.loop_caps.oc = 0
         effective.loop_caps.bolster = 0
     if PersonaName.JUDGE not in active:
-        effective.stages = _without(effective.stages, "judge_panel", "restructure")
+        effective.stages = _without(
+            effective.stages, "judge_panel", "narrative_assessment", "restructure"
+        )
         effective.loop_caps.restructure = 0
     if PersonaName.RUBRIC_JUDGE not in active:
         effective.stages = _without(effective.stages, "rubric_gate")
         effective.gates = [gate for gate in effective.gates if gate != "rubric"]
 
     drafting_persona = (
-        PersonaName.ASSOCIATE
-        if PersonaName.ASSOCIATE in active
-        else PersonaName.PARTNER
+        PersonaName.ASSOCIATE if PersonaName.ASSOCIATE in active else PersonaName.PARTNER
     )
     return ResolvedPipeline(
         strategy=strategy,

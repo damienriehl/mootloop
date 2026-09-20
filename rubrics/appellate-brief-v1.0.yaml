@@ -1,0 +1,55 @@
+rubric_id: appellate-brief-v1.0
+version: '1.0'
+locked: true
+criteria:
+- id: document-section-issues
+  name: Issues
+  description: Contains a substantive issues section.
+  kind: present
+  weight: 1
+  applies_to: all
+- id: document-section-preservation
+  name: Preservation
+  description: Contains a substantive preservation section.
+  kind: present
+  weight: 1
+  applies_to: all
+- id: document-section-standard-of-review
+  name: Standard Of Review
+  description: Contains a substantive standard of review section.
+  kind: present
+  weight: 1
+  applies_to: all
+- id: document-section-argument
+  name: Argument
+  description: Contains a substantive argument section.
+  kind: present
+  weight: 1
+  applies_to: all
+- id: document-section-relief
+  name: Relief
+  description: Contains a substantive relief section.
+  kind: present
+  weight: 1
+  applies_to: all
+- id: task-analysis
+  name: Task analysis
+  description: Evaluate preservation, standard of review, record limits, and the strongest
+    contrary authority.
+  kind: correct
+  weight: 1
+  applies_to: all
+- id: record-grounding
+  name: Record grounding
+  description: Trace material assertions to eligible evidence; identify assumptions
+    and unresolved support.
+  kind: correct
+  weight: 1
+  applies_to: all
+- id: adversarial-response
+  name: Adversarial response
+  description: Answer the strongest counterarguments without overstating certainty
+    or outcome predictions.
+  kind: correct
+  weight: 1
+  applies_to: all

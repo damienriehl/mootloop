@@ -132,7 +132,7 @@ def build_ledger(vault_root: Path | str, run_id: str) -> GateLedgerDoc:
         str(item.request_id): record.spec.turn_id for item, record in records if record is not None
     }
     per_request, superseded, citation_status = _turn_gate_status(events, state, operative_turn)
-    units = run_context.units
+    units = run_context.task_units
     configured_turn_gates = tuple(
         gate for gate in TURN_GATES if gate in run_context.binding.config.gates
     )

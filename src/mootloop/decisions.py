@@ -10,7 +10,7 @@ several draft/bolster turns per request each pass through here.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 
 from mootloop.context import load_run_context
@@ -28,6 +28,7 @@ from mootloop.models.decisions import (
     ResolutionSource,
     make_decision_id,
 )
+from mootloop.models.document_task import DocumentUnit
 from mootloop.models.events import DecisionRecorded
 from mootloop.models.matter import GateMode, MatterConfig
 from mootloop.models.requests import RequestItem, code_from_request_id
@@ -113,32 +114,33 @@ def _opt(key: str, label: str, consequence: str) -> DecisionOption:
 
 
 def _proposals_for_draft(
-    spec: TurnSpec, draft: DraftOutput, code: str
+    spec: TurnSpec, draft: DraftOutput, code: str, *, document: bool = False
 ) -> list[tuple[DecisionKind, str | None, DecisionProposal]]:
     """Every (kind, request_id, proposal) a single draft turn implies (plan P-28)."""
     request_id = str(spec.request_id) if spec.request_id else None
     out: list[tuple[DecisionKind, str | None, DecisionProposal]] = []
 
     # (c) One objection-posture call per request-type-set (not per request).
-    out.append(
-        (
-            DecisionKind.OBJECTION_POSTURE,
-            None,
-            DecisionProposal(
-                summary=f"Objection posture for {code.upper()} requests",
-                reasoning=(
-                    "Confirm the standing objection posture for this request type "
-                    "before the responses are served."
+    if not document:
+        out.append(
+            (
+                DecisionKind.OBJECTION_POSTURE,
+                None,
+                DecisionProposal(
+                    summary=f"Objection posture for {code.upper()} requests",
+                    reasoning=(
+                        "Confirm the standing objection posture for this request type "
+                        "before the responses are served."
+                    ),
+                    options=[
+                        _opt("assert", "Assert objections", "Objections are preserved as drafted."),
+                        _opt("narrow", "Narrow objections", "Keep only the strongest objections."),
+                        _opt("waive", "Waive objections", "Answer fully without objecting."),
+                    ],
+                    recommended="assert" if draft.objections else "waive",
                 ),
-                options=[
-                    _opt("assert", "Assert objections", "Objections are preserved as drafted."),
-                    _opt("narrow", "Narrow objections", "Keep only the strongest objections."),
-                    _opt("waive", "Waive objections", "Answer fully without objecting."),
-                ],
-                recommended="assert" if draft.objections else "waive",
-            ),
+            )
         )
-    )
 
     # (a) Every attorney-gate item -> an unsupported-assertion call.
     for item in draft.attorney_gate_items:
@@ -338,17 +340,21 @@ def derive_and_store(
     run_id: str,
     spec: TurnSpec,
     draft: DraftOutput,
-    units: list[RequestItem],
+    units: Sequence[RequestItem | DocumentUnit],
+    *,
+    document: bool = False,
 ) -> list[Decision]:
     """Generate the attorney-gate decisions a recorded draft implies, skipping any that
     already exist (idempotent per logical gate). Returns the newly-stored decisions."""
-    return derive_drafts_and_store(vault_root, run_id, [(spec, draft)])
+    return derive_drafts_and_store(vault_root, run_id, [(spec, draft)], document=document)
 
 
 def derive_drafts_and_store(
     vault_root: Path | str,
     run_id: str,
     drafts: Iterable[tuple[TurnSpec, DraftOutput]],
+    *,
+    document: bool = False,
 ) -> list[Decision]:
     """Recover draft gates using one decision-log fold under the caller's run lock."""
     store = DecisionStore(vault_root, run_id)
@@ -358,7 +364,9 @@ def derive_drafts_and_store(
     created: list[Decision] = []
     for spec, draft in drafts:
         code = code_from_request_id(str(spec.request_id)) if spec.request_id else "all"
-        for kind, request_id, proposal in _proposals_for_draft(spec, draft, code):
+        for kind, request_id, proposal in _proposals_for_draft(
+            spec, draft, code, document=document
+        ):
             key = (kind.value, proposal.summary)
             if key in seen:
                 continue

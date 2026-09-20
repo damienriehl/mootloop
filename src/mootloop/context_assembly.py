@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from collections.abc import Iterable, Sequence
 
@@ -190,6 +191,26 @@ def _contribution_items(
 
 def _document_items(manifest: RunContextManifest) -> Iterable[AssembledContextItem]:
     for document in manifest.document_inputs:
+        brief = json.dumps(document.model_dump(mode="json", exclude={"evidence"}), sort_keys=True)
+        yield AssembledContextItem(
+            context_id=f"document-brief:{document.input_id}",
+            kind="context_note",
+            text=brief,
+            sha256=_sha(brief),
+            provenance_locator=f"documents/{document.input_id}.json#instructions",
+            source_matter_id=manifest.matter_id,
+            task_scope=(manifest.task,),
+            persona_scope=(
+                PersonaName.ASSOCIATE,
+                PersonaName.PARTNER,
+                PersonaName.OC_ASSOCIATE,
+                PersonaName.OC_PARTNER,
+                PersonaName.JUDGE,
+                PersonaName.RUBRIC_JUDGE,
+            ),
+            trust="untrusted_data",
+            permission="matter_confidential",
+        )
         for source in document.evidence:
             text = f"[{source.classification}; available {source.available_on}]\n{source.text}"
             yield AssembledContextItem(
@@ -200,7 +221,16 @@ def _document_items(manifest: RunContextManifest) -> Iterable[AssembledContextIt
                 provenance_locator=f"documents/{document.input_id}.json#{source.source_id}",
                 source_matter_id=manifest.matter_id,
                 task_scope=(manifest.task,),
-                persona_scope=tuple(PersonaName) if source.public else (),
+                persona_scope=(
+                    PersonaName.ASSOCIATE,
+                    PersonaName.PARTNER,
+                    PersonaName.OC_ASSOCIATE,
+                    PersonaName.OC_PARTNER,
+                    PersonaName.JUDGE,
+                    PersonaName.RUBRIC_JUDGE,
+                )
+                if source.public
+                else (),
                 trust="untrusted_data",
                 permission="matter_confidential",
             )

@@ -168,3 +168,41 @@ def test_spend_before_completion_crash_meters_fresh_legacy_call_or_replays_ident
     assert state.total_input_tokens == USAGE.input_tokens * expected_calls
     assert state.total_output_tokens == USAGE.output_tokens * expected_calls
     assert len(_spend_events(vault, run_id)) == expected_calls
+
+
+def test_document_spend_crash_reconciles_reservation_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from mootloop.models.events import TurnIntent
+    from tests.unit.test_document_tasks import document_vault
+
+    vault = document_vault(tmp_path, "motion")
+    run_id = start_run(vault, "motion", NOW, run_id="document-spend")
+    spec = plan_next(vault, run_id)[0]
+    turn = FakeLLMProvider().run_turn(spec, assemble_prompt(vault, run_id, spec.turn_id))
+    intent = TurnIntent(
+        turn_id=spec.turn_id,
+        model=MODEL_OPUS,
+        billing_mode="api",
+        max_plausible_usd=EXPECTED_USD,
+    )
+    orchestrator.record_turn_intent(vault, run_id, intent)
+    original = orchestrator.append
+
+    def crash(root: Path | str, run: str, event: JournalEvent) -> None:
+        original(root, run, event)
+        if isinstance(event, SpendRecorded):
+            raise OSError("interrupted after document spend")
+
+    monkeypatch.setattr(orchestrator, "append", crash)
+    with pytest.raises(OSError, match="document spend"):
+        record_turn(
+            vault, run_id, spec.turn_id, turn.text, USAGE, NOW, provider_call_id="document-call"
+        )
+    monkeypatch.setattr(orchestrator, "append", original)
+    for _ in range(2):
+        record_turn(
+            vault, run_id, spec.turn_id, turn.text, USAGE, NOW, provider_call_id="document-call"
+        )
+    assert load_state(vault, run_id).total_spend_usd == EXPECTED_USD
+    assert len(_spend_events(vault, run_id)) == 1

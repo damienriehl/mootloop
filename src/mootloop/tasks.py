@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 from typing import TYPE_CHECKING, Protocol
 
 from mootloop.errors import TaskConfigError
@@ -37,6 +38,26 @@ class TaskAdapter(Protocol):
     def judge_question(self) -> str:
         """Task-specific framing for a judge-panel turn."""
         ...
+
+
+@dataclass(frozen=True)
+class DocumentAdapter:
+    task: str
+
+    def draft_directive(self) -> str:
+        return (
+            f"Prepare a {self.task} using the unit instructions and required rubric sections. "
+            "Use eligible evidence; distinguish allegations, disputes and hypothetical changes. "
+            "Cite source IDs in fact_ids_used; flag missing support in attorney_gate_items. "
+            "Include empty objections and null rfa_disposition. Do not invent facts or authority."
+        )
+
+    def judge_question(self) -> str:
+        return (
+            f"Assess the {self.task} on its merits and strongest counterarguments. "
+            "Give a narrative assessment with reasons and limitations; preserve adverse findings. "
+            "Do not provide an objection vote, success probability, or attorney approval."
+        )
 
 
 class DiscoveryResponsesAdapter:
@@ -82,6 +103,10 @@ class TaskBinding:
 # task name -> adapter factory. Add a task by registering here + shipping its YAML.
 _REGISTRY: dict[str, Callable[[], TaskAdapter]] = {
     DiscoveryResponsesAdapter.task: DiscoveryResponsesAdapter,
+    **{
+        name: partial(DocumentAdapter, name)
+        for name in ("complaint", "motion", "appellate-brief", "oral-argument", "business-advice")
+    },
 }
 
 
@@ -100,4 +125,7 @@ def get_binding(task: str) -> TaskBinding:
     config = load_task_config(task_config_path(task))
     DEFAULT_GATE_CATALOG.order(config.gates)
     rubric = load_rubric(rubric_path(config.rubric_id))
+    from mootloop.gates.completeness import validate_presence_criteria
+
+    validate_presence_criteria(rubric)
     return TaskBinding(config=config, adapter=factory(), rubric=rubric)

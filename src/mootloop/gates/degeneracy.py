@@ -19,6 +19,7 @@ from mootloop.models.run import (
     DraftOutput,
     JudgeOutput,
     JurorOutput,
+    NarrativeAssessment,
     RubricScoreOutput,
 )
 
@@ -37,7 +38,7 @@ def _placeholder_findings(text: str, locator: str) -> list[GateFinding]:
     ]
 
 
-def _check_draft(draft: DraftOutput) -> list[GateFinding]:
+def _check_draft(draft: DraftOutput, *, document: bool = False) -> list[GateFinding]:
     findings: list[GateFinding] = []
     if not draft.response_text.strip():
         findings.append(GateFinding(code="empty_response", message="response_text is empty"))
@@ -53,12 +54,19 @@ def _check_draft(draft: DraftOutput) -> list[GateFinding]:
     findings.extend(_placeholder_findings(draft.response_text, "response_text"))
     for idx, objection in enumerate(draft.objections):
         findings.extend(_placeholder_findings(objection.text, f"objections[{idx}].text"))
-    if has_hedge(draft.response_text, *(o.text for o in draft.objections)):
+    if not document and has_hedge(draft.response_text, *(o.text for o in draft.objections)):
         findings.append(
             GateFinding(
                 code="hedge_subject_to",
                 message=f"response hedges {HEDGE_DESCRIPTION}",
                 locator="response_text",
+            )
+        )
+    if document and (draft.objections or draft.rfa_disposition is not None):
+        findings.append(
+            GateFinding(
+                code="discovery_fields",
+                message="document drafts cannot contain objections or RFA dispositions",
             )
         )
     grounded = bool(draft.fact_ids_used) or bool(draft.attorney_gate_items)
@@ -80,11 +88,14 @@ def evaluate(
         | JurorOutput
         | RubricScoreOutput
         | CiteCheckOutput
+        | NarrativeAssessment
     ),
+    *,
+    document: bool = False,
 ) -> GateResult:
     """Evaluate the degeneracy gate against a validated turn output."""
     if isinstance(output, DraftOutput):
-        findings = _check_draft(output)
+        findings = _check_draft(output, document=document)
     else:
         findings = []
         if not output.self_assessment.strip():

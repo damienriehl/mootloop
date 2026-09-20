@@ -22,6 +22,7 @@ from mootloop.models.run import (
     SCHEMA_DRAFT,
     SCHEMA_JUDGE,
     SCHEMA_JUROR,
+    SCHEMA_NARRATIVE,
     SCHEMA_RUBRIC,
     TurnSpec,
 )
@@ -109,6 +110,19 @@ def _default_output(spec: TurnSpec) -> dict[str, Any]:
     ctx = spec.prompt_context
     if spec.output_schema_name == SCHEMA_DRAFT:
         fact_ids = list(ctx.get("fact_ids", []))
+        if ctx.get("input_family") == "document":
+            return {
+                "response_text": "\n\n".join(
+                    f"## {section}\nAnalysis for {spec.request_id}; review the eligible record."
+                    for section in ctx.get("required_sections", [])
+                ),
+                "objections": [],
+                "candidate_citations": [],
+                "fact_ids_used": fact_ids[:1],
+                "attorney_gate_items": [] if fact_ids else ["verify factual basis"],
+                "rfa_disposition": None,
+                "self_assessment": "Deterministic test fixture, not a substantive legal opinion.",
+            }
         # An RFA request carries a Rule 36 disposition (seeds the attorney gate, P-28).
         is_rfa = str(spec.request_id or "").upper().startswith("RFA")
         return {
@@ -126,6 +140,13 @@ def _default_output(spec: TurnSpec) -> dict[str, Any]:
             "critiques": [],
             "instructions": [],
             "self_assessment": "The draft is adequate.",
+        }
+    if spec.output_schema_name == SCHEMA_NARRATIVE:
+        return {
+            "disposition": "revise",
+            "reasons": ["The record warrants further analysis."],
+            "limitations": ["Deterministic test fixture; no outcome prediction."],
+            "self_assessment": "Retain adverse findings for attorney review.",
         }
     if spec.output_schema_name == SCHEMA_JUDGE:
         # Default: the objection survives (high survival -> no restructure). Tests that
@@ -155,8 +176,7 @@ def _default_output(spec: TurnSpec) -> dict[str, Any]:
         ids = [c["id"] for c in criteria if isinstance(c, dict) and "id" in c]
         return {
             "scores": [
-                {"criterion_id": cid, "score": 4, "evidence": "Meets the criterion."}
-                for cid in ids
+                {"criterion_id": cid, "score": 4, "evidence": "Meets the criterion."} for cid in ids
             ],
             "overall_notes": "Adequate against the injected criteria.",
             "self_assessment": "Scored each injected criterion.",

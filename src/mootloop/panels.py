@@ -131,8 +131,7 @@ def fold_jury_signal(
         run_id=run_id,
         request_id=RequestId(request_id),
         total_readers=count,
-        mean_comprehension=sum(output.comprehension_score for output in juror_outputs)
-        / count,
+        mean_comprehension=sum(output.comprehension_score for output in juror_outputs) / count,
         mean_persuasion=sum(output.persuasion_score for output in juror_outputs) / count,
         confusion_samples=confusion,
         credibility_samples=credibility,
@@ -153,9 +152,13 @@ def build_panel_report(vault_root: Path | str, run_id: str) -> PanelReport:
     run_context = load_run_context(vault_root, run_id)
     binding = run_context.binding
     state = load_state(vault_root, run_id)
-    units = run_context.units
+    units = run_context.task_units
     facts = run_context.facts
 
+    from mootloop.models.panels import NarrativeUnitAssessment
+    from mootloop.models.run import NarrativeAssessment
+
+    narratives: list[NarrativeUnitAssessment] = []
     results: list[PanelResult] = []
     jury_signals: list[JurySignal] = []
     for i in range(len(units)):
@@ -170,6 +173,19 @@ def build_panel_report(vault_root: Path | str, run_id: str) -> PanelReport:
         )
         draft_record = ctx.judged_draft()
         if draft_record is None:
+            continue
+        if binding.config.input_family == "document":
+            for j in range(1, ctx.config.panels.judges + 1):
+                seq = ctx.layout.judge_slot(j)
+                if ctx.done(seq):
+                    narratives.append(
+                        NarrativeUnitAssessment(
+                            unit_id=str(units[i].request_id),
+                            draft_turn_id=str(draft_record.spec.turn_id),
+                            assessment_turn_id=str(ctx.record(seq).spec.turn_id),
+                            assessment=NarrativeAssessment.model_validate(ctx.record(seq).output),
+                        )
+                    )
             continue
         draft = DraftOutput.model_validate(draft_record.output)
         judge_outputs: list[JudgeOutput] = []
@@ -194,7 +210,13 @@ def build_panel_report(vault_root: Path | str, run_id: str) -> PanelReport:
                     fold_jury_signal(run_id, str(units[i].request_id), juror_outputs)
                 )
 
-    report = PanelReport(run_id=run_id, results=results, jury_signals=jury_signals)
+    report = PanelReport(
+        schema_version="1.1" if binding.config.input_family == "document" else "1.0",
+        run_id=run_id,
+        results=results,
+        jury_signals=jury_signals,
+        narrative_assessments=narratives,
+    )
     path = safe_vault_path(vault_root, "runs", run_id, *PANEL_REPORT_PATH)
     atomic_write_text(path, report.model_dump_json(indent=2) + "\n")
     return report

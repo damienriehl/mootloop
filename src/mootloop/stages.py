@@ -36,6 +36,7 @@ from mootloop.errors import TaskConfigError
 from mootloop.gates import completeness
 from mootloop.models.common import RunId, TurnId
 from mootloop.models.context import AssembledContextItem
+from mootloop.models.document_task import DocumentUnit
 from mootloop.models.events import RunState
 from mootloop.models.panels import PanelResult
 from mootloop.models.pipeline import ResolvedPipeline
@@ -47,6 +48,7 @@ from mootloop.models.run import (
     SCHEMA_DRAFT,
     SCHEMA_JUDGE,
     SCHEMA_JUROR,
+    SCHEMA_NARRATIVE,
     SCHEMA_RUBRIC,
     DraftOutput,
     JudgeOutput,
@@ -152,7 +154,7 @@ class StageContext:
 
     run_id: str
     req_index: int
-    request: RequestItem
+    request: RequestItem | DocumentUnit
     facts: Sequence[Mapping[str, str]]
     config: TaskAdapterConfig
     adapter: TaskAdapter
@@ -207,7 +209,11 @@ class StageContext:
     @property
     def code(self) -> str:
         """The request family code (``rog`` / ``rfp`` / ``rfa``) for rubric scoping."""
-        return code_from_request_id(str(self.request.request_id))
+        return (
+            "document"
+            if isinstance(self.request, DocumentUnit)
+            else code_from_request_id(str(self.request.request_id))
+        )
 
     def done(self, seq: int) -> bool:
         return self.state.is_completed(self.layout.turn_id(seq))
@@ -219,6 +225,12 @@ class StageContext:
         return self.state.discarded.get(self.layout.turn_id(seq), 0) + 1
 
     def fact_ids(self) -> list[str]:
+        if self.config.input_family == "document":
+            return [
+                item.provenance_locator.rsplit("#", 1)[1]
+                for item in self.assembled_context
+                if item.context_id.startswith("document:")
+            ]
         return [f["fact_id"] for f in self.facts]
 
     def correctness_payload(self) -> list[dict[str, str]]:
@@ -235,6 +247,8 @@ class StageContext:
         context: dict[str, Any] = {
             "request_id": self.request.request_id,
             "request_text": self.request.text,
+            "input_family": self.config.input_family,
+            "required_sections": [c.name for c in self.rubric.presence_criteria(self.code)],
             "approved_context": [
                 item.model_dump(mode="json")
                 for item in items_for_turn(
@@ -306,6 +320,8 @@ class StageContext:
     # -- judge panel (plan Phase 6) --
     def panel_results(self) -> list[PanelResult]:
         """Fold this request's judge panel into per-objection survival distributions."""
+        if self.config.input_family == "document":
+            return []
         draft_record = self.judged_draft()
         if draft_record is None:
             return []
@@ -602,6 +618,16 @@ class JudgePanelStage:
         return specs
 
 
+class NarrativeAssessmentStage(JudgePanelStage):
+    name = "narrative_assessment"
+
+    def plan(self, ctx: StageContext) -> list[TurnSpec]:
+        return [
+            spec.model_copy(update={"output_schema_name": SCHEMA_NARRATIVE})
+            for spec in super().plan(ctx)
+        ]
+
+
 class RestructureStage:
     """A costed post-panel restructure pass (plan Phase 6). When the judge panel rules
     an objection would survive a motion to compel less often than the task's
@@ -613,9 +639,7 @@ class RestructureStage:
 
     def _weak(self, ctx: StageContext) -> list[PanelResult]:
         threshold = ctx.config.restructure_threshold
-        return [
-            r for r in ctx.panel_results() if r.total_votes > 0 and r.survival_rate < threshold
-        ]
+        return [r for r in ctx.panel_results() if r.total_votes > 0 and r.survival_rate < threshold]
 
     def is_complete(self, ctx: StageContext) -> bool:
         if not JudgePanelStage().is_complete(ctx):
@@ -678,8 +702,7 @@ class JuryPanelStage:
         if not ctx.config.panels.jury:
             return True
         return all(
-            ctx.done(ctx.layout.jury_slot(j))
-            for j in range(1, ctx.config.panels.jurors + 1)
+            ctx.done(ctx.layout.jury_slot(j)) for j in range(1, ctx.config.panels.jurors + 1)
         )
 
     def plan(self, ctx: StageContext) -> list[TurnSpec]:
@@ -771,6 +794,7 @@ _STAGES: dict[str, Stage] = {
         OCAttackStage(),
         BolsterStage(),
         JudgePanelStage(),
+        NarrativeAssessmentStage(),
         RestructureStage(),
         JuryPanelStage(),
         RubricGateStage(),
