@@ -6,7 +6,7 @@ from datetime import date
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
-from pydantic import Field, StringConstraints, field_validator, model_validator
+from pydantic import Field, JsonValue, StringConstraints, field_validator, model_validator
 
 from mootloop.models.common import MATTER_ID_PATTERN, StrictModel, VersionedModel
 
@@ -267,10 +267,36 @@ class CatalogEntry(StrictModel):
 class DemoCatalog(VersionedModel):
     schema_version: Literal["1.0"] = "1.0"
     release_id: Identity
+    legacy_sha256: Digest | None = None
     entries: tuple[CatalogEntry, ...] = Field(min_length=1)
 
     @model_validator(mode="after")
     def unique_demos(self) -> DemoCatalog:
         if len({e.descriptor.demo_id for e in self.entries}) != len(self.entries):
             raise ValueError("duplicate demo identity")
+        return self
+
+
+class LegacyProjection(VersionedModel):
+    """Enumerated API responses from the original fictional demonstration."""
+
+    schema_version: Literal["1.0"] = "1.0"
+    responses: dict[str, JsonValue]
+    deliverables: dict[str, str]
+
+    @model_validator(mode="after")
+    def required_views(self) -> LegacyProjection:
+        if (
+            not {"matter", "run", "requests", "decisions", "gates", "deliverables", "sets"}
+            <= self.responses.keys()
+        ):
+            raise ValueError("missing original demo views")
+        for name in self.deliverables:
+            if (
+                name.startswith("/")
+                or "\\" in name
+                or any(p in ("", ".", "..") for p in name.split("/"))
+                or not name.endswith((".md", ".json"))
+            ):
+                raise ValueError("invalid public deliverable name")
         return self

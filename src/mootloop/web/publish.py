@@ -18,7 +18,8 @@ from mootloop.vault import enclosing_git_repo
 from mootloop.web.catalog import PublicationError, PublicCatalog, read_regular, validate_release
 
 _CREDENTIAL = re.compile(
-    rb"(?:MOOTLOOP-CANARY-|sk-(?:proj-|ant-)?[A-Za-z0-9_-]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----)"
+    rb"(?:MOOTLOOP-CANARY-|(?<![A-Za-z0-9_-])sk-(?:proj-|ant-)?[A-Za-z0-9_-]{20,}|"
+    rb"-----BEGIN [A-Z ]*PRIVATE KEY-----)"
 )
 
 
@@ -45,6 +46,8 @@ def publish_release(source: Path, target: Path, *, manifest: DemoCatalog | None 
         if actual != wanted:
             raise PublicationError("descriptor does not match approved collection manifest")
     payloads = {"catalog.json": read_regular(source, "catalog.json")}
+    if catalog.legacy_sha256 is not None:
+        payloads["legacy.json"] = read_regular(source, "legacy.json")
     for entry in catalog.entries:
         for filename in ("snapshot.json", "inputs.json", "review.json"):
             parts = (entry.descriptor.demo_id, entry.revision, filename)

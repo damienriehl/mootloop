@@ -259,3 +259,13 @@ def test_production_manifest_cannot_be_replaced_by_twenty_wrong_descriptors(tmp_
     source = prepared_release(tmp_path / "source")
     with pytest.raises(PublicationError, match="approved collection"):
         publish_release(source, tmp_path / "public")
+
+
+def test_public_case_url_is_not_mistaken_for_an_api_key():
+    from mootloop.web.publish import _CREDENTIAL
+
+    assert (
+        _CREDENTIAL.search(b"https://example.org/musk-vs-altman-motion-preliminary-injunction.pdf")
+        is None
+    )
+    assert _CREDENTIAL.search(b'"key":"sk-proj-abcdefghijklmnopqrstuvwxyz"') is not None

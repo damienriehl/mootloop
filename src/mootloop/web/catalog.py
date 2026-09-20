@@ -9,7 +9,13 @@ from pathlib import Path
 
 from pydantic import BaseModel, ValidationError
 
-from mootloop.models.demo import DemoCatalog, DemoSnapshot, LocalInputBundle, PublicationReview
+from mootloop.models.demo import (
+    DemoCatalog,
+    DemoSnapshot,
+    LegacyProjection,
+    LocalInputBundle,
+    PublicationReview,
+)
 
 DEMO_IDS = frozenset(
     [
@@ -91,6 +97,9 @@ def release_catalog(root: Path) -> DemoCatalog:
 def validate_release(root: Path) -> DemoCatalog:
     catalog = release_catalog(root)
     expected = {"catalog.json"}
+    if catalog.legacy_sha256 is not None:
+        decode(LegacyProjection, read_regular(root, "legacy.json"), catalog.legacy_sha256)
+        expected.add("legacy.json")
     for entry in catalog.entries:
         prefix = (entry.descriptor.demo_id, entry.revision)
         expected.update(
@@ -176,6 +185,13 @@ class PublicCatalog:
         raw = self._artifact(demo_id, revision, "inputs.json")
         decode(LocalInputBundle, raw)
         return raw
+
+    def legacy(self) -> LegacyProjection:
+        root = self._release()
+        catalog = release_catalog(root)
+        if catalog.legacy_sha256 is None:
+            raise PublicationError("original demo projection is unavailable")
+        return decode(LegacyProjection, read_regular(root, "legacy.json"), catalog.legacy_sha256)
 
     def ready(self) -> DemoCatalog:
         return validate_release(self._release())

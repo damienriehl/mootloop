@@ -1,0 +1,293 @@
+body.library {
+  margin: 0;
+  color: var(--ink);
+  background: var(--paper);
+  font-family: system-ui, sans-serif;
+  line-height: 1.6;
+}
+.library a {
+  color: var(--accent);
+  text-underline-offset: 0.18em;
+}
+.library a:focus-visible,
+.library button:focus-visible,
+.library select:focus-visible,
+.library input:focus-visible,
+.library summary:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 4px;
+}
+.library .skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -6rem;
+  z-index: 10;
+  padding: 0.6rem;
+  background: var(--paper-raised);
+}
+.library .skip-link:focus {
+  top: 0.5rem;
+}
+.library-header {
+  max-width: 1320px;
+  margin: auto;
+  padding: 1.3rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--rule);
+}
+.library .wordmark {
+  font: 700 1.6rem var(--serif);
+  text-decoration: none;
+  color: var(--ink);
+}
+.library-header nav {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  font-size: 0.9rem;
+}
+.library main {
+  max-width: 1320px;
+  padding: 2.5rem 2rem 4rem;
+  margin: auto;
+  min-height: 65vh;
+}
+.library h1 {
+  font: 600 clamp(2rem, 4vw, 3.3rem) / 1.16 var(--serif);
+  margin: 0.6rem 0 1rem;
+  max-width: 24ch;
+}
+.library h2 {
+  font: 600 1.65rem/1.3 var(--serif);
+  margin: 1.6rem 0 0.8rem;
+}
+.library h3 {
+  font: 600 1.2rem/1.4 var(--serif);
+}
+.library p {
+  margin: 0.65rem 0 1rem;
+}
+.library .intro {
+  font: 1.2rem/1.6 var(--serif);
+  max-width: 72ch;
+}
+.library .disclosure {
+  padding: 0.8rem 1rem;
+  border-left: 4px solid var(--accent);
+  background: var(--accent-soft);
+  max-width: 78ch;
+}
+.library .metadata {
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+.library .catalog-layout {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  gap: 2.7rem;
+  margin-top: 2rem;
+}
+.library .filters {
+  align-self: start;
+  position: sticky;
+  top: 1rem;
+}
+.library label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin: 0 0 0.35rem;
+}
+.library input,
+.library select,
+.library button {
+  font: inherit;
+  color: var(--ink);
+  background: var(--paper-raised);
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  min-height: 44px;
+  padding: 0.55rem 0.65rem;
+  max-width: 100%;
+}
+.library input,
+.library select {
+  width: 100%;
+  margin-bottom: 1.1rem;
+}
+.library button {
+  cursor: pointer;
+}
+.library button:hover {
+  border-color: var(--accent);
+}
+.library .demo-list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.library .demo-list li {
+  padding: 1.15rem 0;
+  border-top: 1px solid var(--rule);
+}
+.library .demo-list a {
+  font: 600 1.3rem/1.4 var(--serif);
+}
+.library .demo-list p {
+  margin: 0.35rem 0 0;
+}
+.library .collection-group:first-of-type h2 {
+  margin-top: 0.1rem;
+}
+.library .result-count {
+  color: var(--ink-soft);
+  margin-top: 0;
+}
+.library .reader-layout {
+  display: grid;
+  grid-template-columns: 205px minmax(0, 1fr);
+  gap: 3rem;
+  margin-top: 2rem;
+}
+.library .reader-nav {
+  position: sticky;
+  top: 1rem;
+  align-self: start;
+}
+.library .reader-nav a {
+  display: block;
+  padding: 0.45rem 0;
+}
+.library .reading {
+  max-width: 78ch;
+  min-width: 0;
+}
+.library .prose {
+  font: 1.075rem/1.75 var(--serif);
+  overflow-wrap: anywhere;
+}
+.library .prose h3 {
+  margin: 1.3rem 0 0.4rem;
+}
+.library .prose p {
+  white-space: pre-line;
+}
+.library details {
+  margin: 0.9rem 0;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  background: var(--paper-raised);
+}
+.library summary {
+  cursor: pointer;
+  font-weight: 650;
+  padding: 0.25rem 0;
+}
+.library .stage {
+  padding: 1.1rem 1.4rem;
+}
+.library .stage[data-kind="revised"] {
+  border-left: 4px solid var(--accent);
+}
+.library .stage summary {
+  font: 600 1.35rem/1.4 var(--serif);
+}
+.library .strategy-picker {
+  max-width: 78ch;
+  margin-top: 1.5rem;
+}
+.library .gate-list {
+  padding-left: 1.25rem;
+  font-size: 0.9rem;
+}
+.library .source-list {
+  padding-left: 1.3rem;
+}
+.library .source-list li {
+  margin: 1rem 0 1.4rem;
+  overflow-wrap: anywhere;
+}
+.library .source-list p {
+  margin: 0.3rem 0;
+}
+.library pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: 0.85rem/1.65 var(--mono);
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  padding: 1rem;
+  border-radius: 4px;
+}
+.library .historical {
+  border-top: 3px solid var(--rule-strong);
+  padding-top: 0.7rem;
+  margin-top: 2rem;
+}
+.library section[id],
+.library details[id] {
+  scroll-margin-top: 1.5rem;
+}
+.library .local-use {
+  max-width: 78ch;
+  margin-top: 3rem;
+}
+.library-footer {
+  border-top: 1px solid var(--rule);
+  padding: 1.3rem 2rem;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+@media (max-width: 760px) {
+  .library-header {
+    padding: 1rem;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .library-header nav {
+    gap: 0.7rem 1rem;
+  }
+  .library main {
+    padding: 1.5rem 1rem 3rem;
+  }
+  .library .catalog-layout,
+  .library .reader-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+  }
+  .library .filters,
+  .library .reader-nav {
+    position: static;
+  }
+  .library .filters {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 1rem;
+  }
+  .library .filters .search-field {
+    grid-column: 1/-1;
+  }
+  .library .reader-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem 1rem;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 0.8rem;
+  }
+  .library .stage {
+    padding: 0.8rem;
+  }
+  .library h1 {
+    max-width: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .library * {
+    scroll-behavior: auto;
+    transition: none;
+  }
+}

@@ -886,7 +886,7 @@ def test_derived_api_and_demo_views_replay_launch_inputs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from mootloop import gate_ledger
-    from mootloop.web import app as demo
+    from mootloop.web import legacy_prepare as demo
     from mootloop.web.api import readers
 
     vault = _vault(tmp_path)
@@ -902,9 +902,8 @@ def test_derived_api_and_demo_views_replay_launch_inputs(
     assert readers.run_status_summary(vault, run_id).hard_cap_usd is None
     assert set(gate_ledger.build_ledger(vault, run_id).gates) == {"ROG-1"}
 
-    monkeypatch.setenv(demo.VAULT_ENV, str(vault))
-    assert [row["request_id"] for row in demo.api_requests()] == ["ROG-1"]
-    assert demo.api_sets() == [
+    assert [row["request_id"] for row in demo.api_requests(vault)] == ["ROG-1"]
+    assert demo.api_sets(vault) == [
         {
             "request_type": "interrogatory",
             "set_number": 1,
@@ -912,9 +911,9 @@ def test_derived_api_and_demo_views_replay_launch_inputs(
             "requests": 1,
         }
     ]
-    assert demo.api_run()["stages"]
+    assert demo.api_run(vault)["stages"]
     with pytest.raises(HTTPException) as exc:
-        demo.api_request_turns("ROG-2")
+        demo.api_request_turns(vault, "ROG-2")
     assert exc.value.status_code == 404
 
 
