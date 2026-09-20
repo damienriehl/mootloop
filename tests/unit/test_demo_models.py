@@ -91,3 +91,95 @@ def test_committed_collection_has_all_twenty_distinct_descriptors():
         "public-record": 5,
         "business": 10,
     }
+
+
+def _snapshot_with_claim(claim_classification, claim_source):
+    from mootloop.models.demo import DemoSnapshot
+
+    eligible = source(source_id="record", classification="record")
+    strategy = {
+        "strategy_id": "strategy-a",
+        "title": "A narrower request",
+        "run_id": "prepared-a",
+        "input_summary": "A bounded historical record.",
+        "assumptions": ["Hypothetical change in emphasis only."],
+        "stages": [
+            {"kind": kind, "title": kind, "text": "Prepared review text.", "turn_ids": [kind]}
+            for kind in ("initial", "critique", "revised", "assessment")
+        ],
+        "gate_state": {
+            "run_status": "finished",
+            "export_ready": False,
+            "blockers": ["attestation"],
+            "results": {"rubric": "pass"},
+        },
+        "source_ids": ["record"],
+    }
+    return DemoSnapshot.model_validate(
+        {
+            "descriptor": {
+                "demo_id": "example",
+                "title": "Example",
+                "introduction": "Historical exercise.",
+                "collection": "public-record",
+                "practice_area": "Contracts",
+                "work_product": "Motion",
+                "jurisdiction": "Federal",
+                "court_level": "federal-trial",
+                "task": "motion",
+                "cutoff": "2020-02-01",
+                "represented_side": "Applicant",
+            },
+            "revision": "r1",
+            "provenance": {
+                "preparation": "scripted-replay",
+                "authorship": "Agent editor",
+                "editorial_changes": "Prepared example",
+                "provider_calls": 0,
+                "limitations": ["No attorney approval"],
+            },
+            "strategies": [
+                strategy,
+                strategy | {"strategy_id": "strategy-b", "run_id": "prepared-b"},
+            ],
+            "sources": [
+                eligible,
+                claim_source,
+                source(source_id="outcome", classification="outcome"),
+            ],
+            "claims": [
+                {
+                    "claim": "A material proposition",
+                    "source_ids": [claim_source.source_id],
+                    "locator": "Page 4",
+                    "classification": claim_classification,
+                }
+            ],
+            "comparison": "Neither alternative guarantees relief.",
+            "actual_outcome": "The court denied relief.",
+            "outcome_source_ids": ["outcome"],
+            "local_instructions": "Import the permitted inputs.",
+            "bundle_sha256": "b" * 64,
+        }
+    )
+
+
+@pytest.mark.parametrize("available_on", [None, date(2020, 3, 1)])
+def test_ordinary_claim_cannot_launder_ineligible_source(available_on):
+    with pytest.raises(ValidationError, match="claim source is not eligible"):
+        _snapshot_with_claim("allegation", source(available_on=available_on))
+
+
+def test_contested_brief_cannot_be_only_support_for_record_fact():
+    with pytest.raises(ValidationError, match="record claim requires"):
+        _snapshot_with_claim("record", source(classification="allegation"))
+
+
+def test_outcome_claim_requires_outcome_source():
+    with pytest.raises(ValidationError, match="outcome claim requires"):
+        _snapshot_with_claim("outcome", source())
+
+
+def test_attributed_pre_cutoff_allegation_remains_publishable():
+    snapshot = _snapshot_with_claim("allegation", source())
+    assert snapshot.claims[0].classification == "allegation"

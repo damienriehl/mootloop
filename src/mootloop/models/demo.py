@@ -181,10 +181,25 @@ class DemoSnapshot(VersionedModel):
         for claim in self.claims:
             if not set(claim.source_ids) <= sources.keys():
                 raise ValueError("claim references unknown source")
+            support = [sources[key] for key in claim.source_ids]
+            if claim.classification == "outcome" and any(
+                item.classification != "outcome" for item in support
+            ):
+                raise ValueError("outcome claim requires outcome sources")
+            if claim.classification == "record" and not any(
+                item.classification == "record" for item in support
+            ):
+                raise ValueError("record claim requires record support, not only party allegations")
             if claim.classification != "outcome" and any(
                 sources[key].classification == "outcome" for key in claim.source_ids
             ):
                 raise ValueError("actual outcome cannot support an ordinary input claim")
+            if (
+                claim.classification not in {"outcome", "hypothetical"}
+                and self.descriptor.cutoff is not None
+                and any(not item.eligible_at(self.descriptor.cutoff) for item in support)
+            ):
+                raise ValueError("claim source is not eligible at cutoff")
         if any(
             key not in sources or sources[key].classification != "outcome"
             for key in self.outcome_source_ids
