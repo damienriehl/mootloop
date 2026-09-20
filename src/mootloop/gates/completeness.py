@@ -159,12 +159,7 @@ def validate_presence_criteria(rubric: Rubric) -> None:
 
 def _applicable(rubric: Rubric, code: str) -> list[tuple[str, Callable[[DraftOutput, str], bool]]]:
     validate_presence_criteria(rubric)
-    checks: list[tuple[str, Callable[[DraftOutput, str], bool]]] = []
-    for crit in rubric.presence_criteria(code):
-        check = _CHECKS.get(crit.id)
-        if check is not None:
-            checks.append((crit.id, check))
-    return checks
+    return [(criterion.id, _CHECKS[criterion.id]) for criterion in rubric.presence_criteria(code)]
 
 
 def evaluate(draft: DraftOutput, rubric: Rubric, code: str, req_text: str) -> GateResult:

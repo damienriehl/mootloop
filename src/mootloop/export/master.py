@@ -278,6 +278,10 @@ def build_court_master(
 ) -> Path:
     """Assemble the court-formatted master and write ``deliverables/<run-id>/master.md``."""
     context = run_context or load_run_context(vault_root, run_id)
+    if context.binding.config.input_family == "document":
+        from mootloop.export.document import build_document_master
+
+        return build_document_master(vault_root, run_id, now, run_context=context)
     matter = context.manifest.matter_config
     request_sets = context.manifest.request_sets
     validate_run_request_identity(request_sets)

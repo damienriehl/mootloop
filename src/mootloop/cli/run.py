@@ -32,6 +32,10 @@ def run_start(
     task_spec_id: Annotated[
         str | None, typer.Option("--task-spec-id", help="Approved TaskSpec id")
     ] = None,
+    document_inputs: Annotated[
+        list[str] | None,
+        typer.Option("--document-input", help="Document input ID; repeat for multiple inputs"),
+    ] = None,
     run_id: Annotated[
         str | None, typer.Option("--run-id", help="Stable run id (recommended for retries)")
     ] = None,
@@ -49,6 +53,7 @@ def run_start(
             run_id=resolved_id,
             mode=mode.value if mode else None,
             task_spec_id=task_spec_id,
+            document_input_refs=document_inputs,
             idempotent=run_id is not None,
         )
     except MootloopError as exc:
@@ -66,7 +71,9 @@ def run_continue(
         orchestrator.continue_run(vault_path, run_id)
     except MootloopError as exc:
         raise _fail(exc) from exc
-    typer.echo(f"cleared checkpoint for {run_id} — resume with `run drive --fake`")
+    typer.echo(
+        f"cleared checkpoint for {run_id} — inspect next turns with `run plan-next`"
+    )
 
 
 @run_app.command("pause")
@@ -153,7 +160,7 @@ def run_reopen(
     next_step = (
         "queued for the hosted driver"
         if queued
-        else "standalone vault: resume explicitly with `run drive --fake`"
+        else "standalone vault: resume explicitly with `run plan-next` or `run drive --replay FILE`"
     )
     typer.echo(f"reopened {run_id}: {state.status}{granted} — {next_step}")
 
@@ -367,18 +374,24 @@ def run_status(
 def run_drive(
     vault_path: Annotated[Path, typer.Argument(help="Path to the matter vault")],
     run_id: Annotated[str, typer.Argument(help="Run id")],
-    fake: Annotated[bool, typer.Option("--fake", help="Drive with the FakeLLMProvider")] = False,
+    fake: Annotated[bool, typer.Option("--fake", help="Structural test output only")] = False,
+    replay: Annotated[
+        Path | None,
+        typer.Option("--replay", help="Prepared response JSON; scripted replay, not inference"),
+    ] = None,
 ) -> None:
-    """Drive a run to completion. v1 only supports the fake provider (--fake)."""
-    if not fake:
-        raise _fail(
-            MootloopError("run drive currently requires --fake (no live provider in v1)")
-        ) from None
+    """Drive with structural test output or credential-free prepared replay."""
+    if fake == (replay is not None):
+        raise _fail(MootloopError("choose exactly one of --fake or --replay (no live provider)"))
     try:
-        state = orchestrator.run_with_provider(vault_path, run_id, FakeLLMProvider(), _now())
+        from mootloop.replay import ReplayProvider
+
+        provider = ReplayProvider(vault_path, run_id, replay) if replay else FakeLLMProvider()
+        state = orchestrator.run_with_provider(vault_path, run_id, provider, _now())
     except MootloopError as exc:
         raise _fail(exc) from exc
-    typer.echo(f"{run_id}: {state.status} ({len(state.completed_turns)} turns)")
+    method = "prepared scripted replay" if replay else "structural fake provider"
+    typer.echo(f"{run_id}: {state.status} ({len(state.completed_turns)} turns; {method})")
 
 
 @run_app.command("estimate")
@@ -418,4 +431,6 @@ def run_raise_cap(
         orchestrator.raise_cap(vault_path, run_id, to)
     except MootloopError as exc:
         raise _fail(exc) from exc
-    typer.echo(f"raised cap for {run_id} to ${to:.2f} — resume with `run drive --fake`")
+    typer.echo(
+        f"raised cap for {run_id} to ${to:.2f} — inspect next turns with `run plan-next`"
+    )

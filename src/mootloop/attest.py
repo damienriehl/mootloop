@@ -56,7 +56,7 @@ def canonicalize(text: str) -> str:
 def master_deliverable_path(
     vault_root: Path | str, run_id: str, *, run_context: RunContext | None = None
 ) -> Path | None:
-    """The court-formatted master reviewed by the attorney, if the run exists."""
+    """The complete task master reviewed by the attorney, if the run exists."""
     if load_state(vault_root, run_id).task is None:
         return None
     if run_context is None:
@@ -90,9 +90,7 @@ def current_master_sha256(
     if path is None or not path.is_file():
         return None
     canonical = canonicalize(_read_regular_file(path).decode("utf-8"))
-    return sha256_hex(
-        f"{canonical}\x1f{matter_sha256(vault_root, run_id, run_context=context)}"
-    )
+    return sha256_hex(f"{canonical}\x1f{matter_sha256(vault_root, run_id, run_context=context)}")
 
 
 def current_ledger_head_sha256(vault_root: Path | str) -> str:
@@ -130,9 +128,7 @@ def _read_regular_file(path: Path) -> bytes:
     return payload
 
 
-def _hash_regular_file_into(
-    path: Path, digest: _Digest, *, include_size: bool = False
-) -> int:
+def _hash_regular_file_into(path: Path, digest: _Digest, *, include_size: bool = False) -> int:
     """Hash one stable regular file through a no-follow descriptor and return its size."""
     flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     try:
@@ -341,9 +337,7 @@ def attest(vault_root: Path | str, run_id: str, reviewer: str, now: str) -> Atte
             ledger_head_sha256=current_ledger_head_sha256(vault_root),
             journal_sha256=current_journal_sha256(vault_root, run_id),
             decisions_sha256=current_decisions_sha256(vault_root, run_id),
-            fact_state_sha256=current_fact_state_sha256(
-                vault_root, run_id, run_context=context
-            ),
+            fact_state_sha256=current_fact_state_sha256(vault_root, run_id, run_context=context),
             access_audit_head_sha256=current_access_audit_head_sha256(vault_root),
             commitment_sha256="",
             reviewer=reviewer,
@@ -485,10 +479,7 @@ def check_attestation(vault_root: Path | str, run_id: str, now: str) -> Attestat
                 attestation_id=f"att-{run_id}-{seq:04d}",
                 run_id=RunId(run_id),
                 hash_scope=MASTER_HASH_SCOPE,
-                master_sha256=current_master_sha256(
-                    vault_root, run_id, run_context=context
-                )
-                or "",
+                master_sha256=current_master_sha256(vault_root, run_id, run_context=context) or "",
                 ledger_head_sha256=current_ledger_head_sha256(vault_root),
                 journal_sha256=current_journal_sha256(vault_root, run_id),
                 decisions_sha256=current_decisions_sha256(vault_root, run_id),

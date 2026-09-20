@@ -465,8 +465,15 @@ def build_run_context(
     task_spec_id: str | None,
     firm_preferences_path: Path | str | None = None,
     context_contributions: Sequence[ContextContribution] = (),
+    *,
+    document_input_refs: Sequence[str] | None = None,
 ) -> RunContext:
     task_spec = _validate_task_spec(vault_root, task_spec_id, task, str(matter_config.matter_id))
+    if document_input_refs is not None:
+        if binding.config.input_family != "document":
+            raise OrchestratorError("document input selection requires a document task")
+        if task_spec is not None and list(document_input_refs) != task_spec.document_input_refs:
+            raise OrchestratorError("document input selection differs from approved TaskSpec")
     document_inputs: list[DocumentTaskInput] = []
     if binding.config.input_family == "document":
         if (task == "business-advice") != (matter_config.matter_kind == "advisory"):
@@ -474,7 +481,7 @@ def build_run_context(
         document_inputs, request_sources = load_document_inputs(
             vault_root,
             task,
-            task_spec.document_input_refs if task_spec else None,
+            task_spec.document_input_refs if task_spec else document_input_refs,
         )
         if task_spec is not None:
             captured_digests = {

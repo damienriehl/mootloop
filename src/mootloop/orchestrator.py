@@ -240,6 +240,7 @@ def start_run(
     run_id: str | None = None,
     mode: RunMode | None = None,
     task_spec_id: str | None = None,
+    document_input_refs: list[str] | None = None,
     max_attempts: int | None = None,
     idempotent: bool = False,
     firm_preferences_path: Path | str | None = None,
@@ -252,6 +253,8 @@ def start_run(
     (plan D12 precedence). ``task_spec_id`` records the on-ramp TaskSpec the run started
     from (plan FE-2.5), when any.
     """
+    if document_input_refs is not None and get_binding(task).config.input_family != "document":
+        raise OrchestratorError("document input selection requires a document task")
     resolved_id = run_id or f"{task}-{_compact_ts(now)}"
     with RunLock(vault_root, resolved_id):
         existing_events = read_events(vault_root, resolved_id)
@@ -295,7 +298,7 @@ def start_run(
                     refs = (
                         context.manifest.task_spec.document_input_refs
                         if context.manifest.task_spec
-                        else None
+                        else document_input_refs
                     )
                     _, sources = load_document_inputs(vault_root, task, refs)
                     original = [
@@ -304,6 +307,10 @@ def start_run(
                         if source.kind == "document_input"
                     ]
                     same_document_inputs = sources == original
+                    if document_input_refs is not None:
+                        same_document_inputs = same_document_inputs and document_input_refs == [
+                            item.input_id for item in context.manifest.document_inputs
+                        ]
                 same_launch = (
                     same_document_inputs
                     and context.manifest.task == task
@@ -348,6 +355,7 @@ def start_run(
             task_spec_id,
             firm_preferences_path,
             context_contributions,
+            document_input_refs=document_input_refs,
         )
         resolved_config = run_context.manifest.resolved_config
         task_spec_lock = run_context.manifest.task_spec_lock
@@ -1144,7 +1152,7 @@ def _finalize(
             _maybe_emit_rubric_gate(vault_root, run_id, record.spec, binding, units, run_context)
     # The md-master is a DRAFT until attestation; assemble it now so it exists for the
     # gate ledger and attestation hash even while decisions are pending.
-    _assemble(vault_root, run_id, state, run_context)
+    _assemble(vault_root, run_id, state, run_context, now)
     matter = run_context.manifest.matter_config
     if decisions.open_by_taxonomy(vault_root, run_id, matter, "hard-human"):
         if state.status != "needs_decisions":

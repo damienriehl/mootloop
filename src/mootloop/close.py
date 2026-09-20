@@ -72,6 +72,7 @@ from mootloop.models.oracles import PersonaOracleAnswerKey
 from mootloop.models.panels import PanelReport
 from mootloop.models.pipeline import ResolvedPipeline
 from mootloop.models.production import ProductionSuggestionBundle, ProductionSuggestionReview
+from mootloop.models.replay import PreparedReplay
 from mootloop.models.requests import RequestSet
 from mootloop.models.task import TaskAdapterConfig
 from mootloop.models.taskspec import TaskSpec, TaskSpecLock
@@ -356,6 +357,10 @@ MATTER_SCOPED_STORES: tuple[MatterScopedStore, ...] = (
 # Concrete `VersionedModel`s that are deliberately NOT matter-scoped-purgeable, each
 # with the reason the invariant records instead of demanding a store.
 EXEMPT_MODELS: dict[type[VersionedModel], str] = {
+    PreparedReplay: (
+        "Caller-supplied portable replay input, never persisted by the service; accepted "
+        "responses enter the registered run journal and document master stores."
+    ),
     DemoCatalog: "Reviewed public release projection, never an active matter store.",
     DemoDescriptor: "Public catalog metadata, contains no confidential matter data.",
     DemoSnapshot: "Reviewed public work-product projection, stored outside active vaults.",

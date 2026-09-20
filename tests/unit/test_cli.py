@@ -87,9 +87,7 @@ def test_matter_worker_cli_uses_worker_compose_default(
     assert captured["compose_file"] == Path("docker-compose.worker.yaml")
 
 
-def test_close_uses_trusted_local_os_actor(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_close_uses_trusted_local_os_actor(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, object] = {}
 
     def fake_close(*args: object, **kwargs: object) -> SimpleNamespace:
@@ -679,10 +677,7 @@ def test_cite_check_enqueues_hosted_interactive_job(tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 0, result.output
-    assert result.output == (
-        "queued cite:northfield-widgets-v-granite-supply:"
-        "cite-check\n"
-    )
+    assert result.output == ("queued cite:northfield-widgets-v-granite-supply:cite-check\n")
     [item] = Queue(matters_root).snapshot()
     assert item.lane == "interactive"
     assert item.kind == "citation_propositions"
@@ -700,9 +695,7 @@ def test_judge_profile_enqueues_hosted_interactive_job(tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 0, result.output
-    assert result.output == (
-        "queued judge-profile:northfield-widgets-v-granite-supply\n"
-    )
+    assert result.output == ("queued judge-profile:northfield-widgets-v-granite-supply\n")
     [item] = Queue(matters_root).snapshot()
     assert item.lane == "interactive"
     assert item.kind == "judge_profile"
@@ -757,3 +750,14 @@ def test_research_list_and_fulfill(tmp_path: Path) -> None:
     # queue now shows no open requests
     relist = runner.invoke(app, ["research", "list", str(vault)])
     assert "No open research requests." in relist.output
+
+
+def test_drive_requires_one_explicit_generation_method(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["run", "drive", str(tmp_path), "example"])
+    assert result.exit_code == 1
+    assert "exactly one" in result.output
+    result = runner.invoke(
+        app, ["run", "drive", str(tmp_path), "example", "--fake", "--replay", "replay.json"]
+    )
+    assert result.exit_code == 1
+    assert "exactly one" in result.output

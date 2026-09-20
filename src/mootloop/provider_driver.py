@@ -259,14 +259,19 @@ def assemble(
     run_id: str,
     state: RunState,
     run_context: RunContext,
+    now: str = "",
 ) -> Path:
     """Write the markdown deliverable with one fenced anchor per request."""
     from mootloop import orchestrator
 
     binding = run_context.binding
+    if binding.config.input_family == "document":
+        from mootloop.export.document import build_document_master
+
+        return build_document_master(vault_root, run_id, now, run_context=run_context)
     units = run_context.task_units
     facts = run_context.facts
-    title = "Document Draft" if binding.config.input_family == "document" else "Discovery Responses"
+    title = "Discovery Responses"
     lines = [
         f"# {title} — {binding.config.task}",
         "",
