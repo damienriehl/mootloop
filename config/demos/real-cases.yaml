@@ -1,242 +1,303 @@
 schema_version: '1.0'
-publication_policy: Private filings are linked, not redistributed wholesale. Source
-  packets stay outside the checkout. Assertion-level editorial review is required.
+publication_policy: Private filings are linked, not redistributed wholesale. Source packets stay outside
+  the checkout. Assertion-level editorial review is required.
 sources:
 - id: musk-motion
   url: https://www.courthousenews.com/wp-content/uploads/2025/02/musk-vs-altman-motion-preliminary-injunction.pdf
   sha256: cdbb5ad5c2e9a6594196034bcc419736c49c9fcb71df7145e8092141dadb9522
   bytes: 1030342
   pages: 36
+  eligibility: pre_cutoff_candidate
 - id: musk-opposition
   url: https://www.courthousenews.com/wp-content/uploads/2025/02/musk-vs-altman-reply-motion-preliminary-injunction.pdf
   sha256: 38e04137ecc21fb9815ecbf34de9e0b952e584dbb784067e63102111592326c6
   bytes: 313362
   pages: 33
+  eligibility: pre_cutoff_candidate
 - id: fox-opening
   url: https://www.justsecurity.org/wp-content/uploads/2023/03/fox-news-opening-brief-in-support-of-motion-for-summary-judgement-january-17-2023.pdf
   sha256: d4d47d1fcba6f7309b25cc44746030b4f6045a7306d2cb691665843c29aff96f
   bytes: 1078853
   pages: 38
+  eligibility: pre_cutoff_candidate
 - id: dominion-reply
   url: https://www.justsecurity.org/wp-content/uploads/2023/03/Dominion-reply-brief-support-of-motion-for-summary-judgement-against-fox-news-february-20-2022.pdf
   sha256: 8a83e94bc9a0e45e2399a89f18b6d3e26ef79919303ce77a90ac997ae6f16b76
   bytes: 836489
   pages: 128
+  eligibility: pre_cutoff_candidate
 - id: epic-opening
   url: https://cdn.ca9.uscourts.gov/datastore/general/2022/10/20/21-16506-First-brief-on-cross-appeal.pdf
   sha256: a76671751ff8c1848effc936091f7b1d8b72cf6db164b6f3a854cd720bf39619
   bytes: 536466
   pages: 91
+  eligibility: pre_cutoff_candidate
 - id: epic-reply
   url: https://cdn.ca9.uscourts.gov/datastore/general/2022/10/20/21-16506-brief-on-cross-appeal.pdf
   sha256: fb0dfc74a8a9d84ce9d427ad0bceea6c44504e27eab9e4223f090ff6c2c88ae2
   bytes: 1042595
   pages: 136
+  eligibility: pre_cutoff_candidate
 - id: google-oracle-merits
   url: https://www.supremecourt.gov/DocketPDF/18/18-956/132891/20200212180251262_200208a%20Resp%20Brief%20for%20efiling.pdf
   sha256: 4623b8df907833bb381badc8e92fb73d04f1f2accf087ad86a264dfcb706db90
   bytes: 478197
   pages: 70
+  eligibility: pre_cutoff_candidate
 - id: google-oracle-supplement
   url: https://www.supremecourt.gov/DocketPDF/18/18-956/149667/20200807132108693_2020.08.07%20Oracle%20Supplemental%20Brief.pdf
   sha256: a2650d0f69ef825eb464b98dc77f0c6e6d7b20cc388c11bbbc2d168df3a8e1e8
   bytes: 58820
   pages: 11
+  eligibility: pre_cutoff_candidate
 - id: google-us
   url: https://www.justice.gov/sites/default/files/briefs/2020/02/20/18-956bsacunitedstates.pdf
   sha256: 68e175b40a5a2e5324b77afeefa18a1caba0d40106f52a41e1e460e4de193b24
   bytes: 334861
   pages: 40
+  eligibility: pre_cutoff_candidate
 - id: tesla-opening
   url: https://courts.delaware.gov/supreme/oralarguments/download.aspx?id=5546
   sha256: 7a3d607cce5d3a0a4a0d9cd63b906a9b42c97836cdaf51cceed57545986d2edf
   bytes: 504039
   pages: 63
+  eligibility: pre_cutoff_candidate
 - id: tesla-answer
   url: https://courts.delaware.gov/supreme/oralarguments/download.aspx?id=5556
   sha256: 9887412df0d5dda492377c3ed6cb09c7b5069ae38c562683f4fa3fabcb90ca40
   bytes: 729643
   pages: 154
+  eligibility: pre_cutoff_candidate
 - id: tesla-trial
   url: https://cases.justia.com/delaware/court-of-chancery/2024-c-a-no-2018-0408-ksjm.pdf?ts=1706652091
   sha256: 01f92f06ffe86a277e41ea1abb4714e765f854ed4c549270691df8e53ac7a84c
   bytes: 1207486
   pages: 201
+  eligibility: pre_cutoff_candidate
 - id: epic-trial
   url: https://regmedia.co.uk/2021/09/10/epic-v-apple.pdf
   sha256: 8184f404453e8a71c2dbbda2a21d30984715ae49804c950bfe78717741071487
   bytes: 986939
   pages: 185
+  eligibility: pre_cutoff_candidate
 - id: epic-us
   url: https://cdn.ca9.uscourts.gov/datastore/general/2022/10/20/21-16506-Amicus-brief-by-United-States-of-America.pdf
   sha256: 1d5ba58d28db04b81e6054b8254bd6c8cd5c4c9603464fd099b6397afc0f8f07
   bytes: 985793
   pages: 48
+  eligibility: pre_cutoff_candidate
 - id: fox-network-reply
   url: https://deadline.com/wp-content/uploads/2023/03/25-FNN-SJ-Reply-Brief.pdf
   sha256: 456cedfe337688022be2fc473ec49d7feb4fdede6e322f0ab4aed40cae6c1c95
   bytes: 1946686
   pages: 91
+  eligibility: pre_cutoff_candidate
 - id: dominion-opening
   url: https://int.nyt.com/data/documenttools/redacted-documents-in-dominion-fox-news-case/dca5e3880422426f/full.pdf
   sha256: 461dae0955612933e0dd3bf18793278b9bdacb079437ddae6495103aa6fa465c
   bytes: 31267478
   pages: 192
+  eligibility: pre_cutoff_candidate
 - id: dominion-opposition
   url: https://int.nyt.com/data/documenttools/dominion-fox-news/54e33f20f7fb6e8d/full.pdf
   sha256: fb6a69a530f91cdd14ee7fd24ddbe7e92b3c73d79d35ed47fea00307b7162cae
   bytes: 36951373
   pages: 212
+  eligibility: pre_cutoff_candidate
 - id: musk-fac
   url: https://storage.courtlistener.com/recap/gov.uscourts.cand.433688/gov.uscourts.cand.433688.32.0.pdf
   sha256: 9c3a6593e229d9b3595703a2706cfd8ab5619dc258789039ffc29bacc8b86a84
   bytes: 1626245
   pages: 107
+  eligibility: pre_cutoff_candidate
 - id: musk-fac-ex2
   url: https://storage.courtlistener.com/recap/gov.uscourts.cand.433688/gov.uscourts.cand.433688.32.2.pdf
   sha256: db801585ea295901f832612c1889a58f24ed537c84e7b63efe755bf6f224070a
   bytes: 211596
   pages: 2
+  eligibility: pre_cutoff_candidate
 - id: musk-fac-ex7
   url: https://storage.courtlistener.com/recap/gov.uscourts.cand.433688/gov.uscourts.cand.433688.32.7.pdf
   sha256: 3bc76c4903a2c67ad93b57a0f4827e7e8f00bda87bc9872259e5fda841738050
   bytes: 269787
   pages: 2
+  eligibility: pre_cutoff_candidate
 - id: musk-fac-ex8
   url: https://storage.courtlistener.com/recap/gov.uscourts.cand.433688/gov.uscourts.cand.433688.32.8.pdf
   sha256: 34cdca0a3e5d331c5f3603eaafb9543d47506c3ee81bbaf246d9ca82dbc8d4b7
   bytes: 184465
   pages: 3
+  eligibility: pre_cutoff_candidate
 - id: musk-fac-ex9
   url: https://storage.courtlistener.com/recap/gov.uscourts.cand.433688/gov.uscourts.cand.433688.32.9.pdf
   sha256: fe3deb48037813539faf7c4823fc55287b2afc98f18cfa46274ac9e1b3f4163c
   bytes: 174169
   pages: 2
+  eligibility: pre_cutoff_candidate
 - id: musk-fac-ex10
   url: https://storage.courtlistener.com/recap/gov.uscourts.cand.433688/gov.uscourts.cand.433688.32.10.pdf
   sha256: 9a535e09de45ed9cdf1b5e4ae6bd0f9339a94679819f5b11e06f344de81cf9fa
   bytes: 282838
   pages: 3
+  eligibility: pre_cutoff_candidate
 - id: musk-fac-ex13
   url: https://storage.courtlistener.com/recap/gov.uscourts.cand.433688/gov.uscourts.cand.433688.32.13.pdf
   sha256: ab576f9129b9c5d253fa2baa473159453a15279989a034193df4a812deb06c15
   bytes: 233874
   pages: 3
+  eligibility: pre_cutoff_candidate
 - id: musk-fac-ex14
   url: https://storage.courtlistener.com/recap/gov.uscourts.cand.433688/gov.uscourts.cand.433688.32.14.pdf
   sha256: 9e2345dccb6dd725bc0ae836ece91c7c695839aea8637745cf5273bde62ad3d9
   bytes: 262858
   pages: 7
+  eligibility: pre_cutoff_candidate
 - id: musk-fac-ex17
   url: https://storage.courtlistener.com/recap/gov.uscourts.cand.433688/gov.uscourts.cand.433688.32.17.pdf
   sha256: 088debdda64a277c6c3ef8677dbde32fca601ad0b2a4ffa2eb28051409f12a47
   bytes: 365154
   pages: 5
+  eligibility: pre_cutoff_candidate
 - id: musk-fac-ex22
   url: https://storage.courtlistener.com/recap/gov.uscourts.cand.433688/gov.uscourts.cand.433688.32.22.pdf
   sha256: ca11ed7ea443bf70998cc2405423c24b8471e868ca0da125956b3beec59b76e4
   bytes: 1227788
   pages: 23
+  eligibility: pre_cutoff_candidate
 - id: musk-outcome
   url: https://www.courthousenews.com/wp-content/uploads/2025/03/musk-vs-altman-order-denying-motion-preliminary-injunction.pdf
   sha256: cf743e86c3761d81acc90beda9d5e40117117c5a815f8ada9e743e8cc8b4dc52
   bytes: 291383
   pages: 16
+  eligibility: outcome_only
 - id: google-petitioner-merits
   url: https://www.supremecourt.gov/DocketPDF/18/18-956/127663/20200106172508533_18-956%20ts.pdf
   sha256: b0259b7e9ca1f996293c3e1011972577e24d975a0acb56700d739448843547df
   bytes: 239098
   pages: 71
+  eligibility: pre_cutoff_candidate
 - id: google-petitioner-supplement
   url: https://www.supremecourt.gov/DocketPDF/18/18-956/149676/20200807133211961_Google%20Supplemental%20Letter%20Brief.pdf
   sha256: 607e91d7ecf25cd816080c4df2e1a626b7e60e978445f7df5f934d6c8dc5c6c3
   bytes: 329627
   pages: 11
+  eligibility: pre_cutoff_candidate
 - id: google-lower-opinions
   url: https://www.supremecourt.gov/DocketPDF/18/18-956/81532/20190124110518443_Google%20cert%20petition%20appendix.pdf
   sha256: 1c248823b955b7ade02aa5b3d06889c8265fa3e38eead1ea6dd94bc8913f7e76
   bytes: 1163665
   pages: 303
+  eligibility: pre_cutoff_candidate
 - id: tesla-brief-5548
   url: https://courts.delaware.gov/supreme/oralarguments/download.aspx?id=5548
   sha256: 06e5ad89accfe8a0e77ae1e17ce0a0a397de82cde39e617c7f69ec03872f7af0
   bytes: 534961
   pages: 67
+  eligibility: pre_cutoff_candidate
 - id: tesla-brief-5549
   url: https://courts.delaware.gov/supreme/oralarguments/download.aspx?id=5549
   sha256: 0cfbcbb603a5923a0ff5f388b90de5c108ade9ed51ae5b15097d1d46edd2f88f
   bytes: 614911
   pages: 40
+  eligibility: pre_cutoff_candidate
 - id: tesla-brief-5557
   url: https://courts.delaware.gov/supreme/oralarguments/download.aspx?id=5557
   sha256: 1ff965354a32e8caf7640fd1ce39c11087debaaa505a1b945d9b0b31290050c9
   bytes: 476392
   pages: 23
+  eligibility: pre_cutoff_candidate
 - id: tesla-brief-5558
   url: https://courts.delaware.gov/supreme/oralarguments/download.aspx?id=5558
   sha256: a2db986666f3b10d70105900dc1288634cc2327a945d5781d61980f864984da3
   bytes: 301019
   pages: 38
+  eligibility: pre_cutoff_candidate
 - id: tesla-brief-5559
   url: https://courts.delaware.gov/supreme/oralarguments/download.aspx?id=5559
   sha256: 0d0305676bfc5c8f9cef14bdd2a4cf760df2abd57b347b2f382ba665e3f202be
   bytes: 581811
   pages: 36
+  eligibility: pre_cutoff_candidate
 - id: epic-apple-response
   url: https://appliedantitrust.com/16_foreclosure/cases_private/epic_apple2020/2_9cir/epic_9cir_brief_opp2021_03_24.pdf
   sha256: 95ff5d4d46379680019f2e797ef41717e117be51162c5d4ff97b1ac1645b5a76
   bytes: 949050
   pages: 135
+  eligibility: pre_cutoff_candidate
 - id: google-petitioner-reply
   url: https://www.supremecourt.gov/DocketPDF/18/18-956/137903/20200311194254554_18-956%20rb.pdf
   sha256: fe0cdfaf2e8bfc5d65c304a82645346d72a0174ced7799df9c50051ee9a875f0
   bytes: 259766
   pages: 29
+  eligibility: pre_cutoff_candidate
 - id: tesla-ratification
   url: https://courts.delaware.gov/Opinions/Download.aspx?id=372420
   sha256: 975ff260102d30ee66b5c4ebbdbc75e7f0b32a7b7054648d130d66d9aa486a64
   bytes: 675804
   pages: 103
+  eligibility: pre_cutoff_candidate
+- id: dominion-outcome
+  url: https://courts.delaware.gov/Opinions/Download.aspx?id=345820
+  sha256: 6e78988a3a41e3651c574626755f3f9820d42a4c49fc3029c10ddf1547ac11bb
+  bytes: 1136293
+  pages: 130
+  eligibility: outcome_only
+- id: epic-outcome
+  url: https://cdn.ca9.uscourts.gov/datastore/opinions/2023/04/24/21-16506.pdf
+  sha256: 7713ce17c07fa78527f056b5a501b667955eaaca1a79bcc4d4c1d445cb4aec35
+  bytes: 490519
+  pages: 91
+  eligibility: outcome_only
+- id: google-outcome
+  url: https://www.supremecourt.gov/opinions/20pdf/593us1r26_f29g.pdf
+  sha256: 23827beee1980fe872d62c58a9711ba484bbdc73a9aeb0d7c2bcba8cc591c5bc
+  bytes: 495050
+  pages: 61
+  eligibility: outcome_only
+- id: tesla-outcome
+  url: https://cases.justia.com/delaware/supreme-court/2025-534-2024-10-11-and-12-2025.pdf?ts=1766179934
+  sha256: fe819ed3039734f954709609be5651ad5849322999e15067891512c0ee3ebb56
+  bytes: 446447
+  pages: 49
+  eligibility: outcome_only
 cases:
 - demo_id: musk-openai
   cutoff: '2025-02-03'
   source_prefixes:
   - musk-
-  publication_review: Required against the exact claims and artifact. Acquisition
-    does not establish legal correctness.
-  constraint: Use the donor-trust scope; the actual reply was not acquired. Do not
-    claim exhaustive briefing review.
+  publication_review: Required against the exact claims and artifact. Acquisition does not establish legal
+    correctness.
+  constraint: Use the donor-trust scope; the actual reply was not acquired. Do not claim exhaustive briefing
+    review.
 - demo_id: dominion-fox
   cutoff: '2023-03-21'
   source_prefixes:
   - fox-
   - dominion-
-  publication_review: Required against the exact claims and artifact. Acquisition
-    does not establish legal correctness.
-  constraint: Distinguish Fox Corporation and Fox News Network; quotations in briefs
-    remain party characterizations.
+  publication_review: Required against the exact claims and artifact. Acquisition does not establish legal
+    correctness.
+  constraint: Distinguish Fox Corporation and Fox News Network; quotations in briefs remain party characterizations.
 - demo_id: epic-apple
   cutoff: '2022-11-13'
   source_prefixes:
   - epic-
   - apple-
-  publication_review: Required against the exact claims and artifact. Acquisition
-    does not establish legal correctness.
-  constraint: Respect district findings and preserved appellate issues; no new trial
-    evidence.
+  publication_review: Required against the exact claims and artifact. Acquisition does not establish legal
+    correctness.
+  constraint: Respect district findings and preserved appellate issues; no new trial evidence.
 - demo_id: tesla-tornetta
   cutoff: '2025-10-14'
   source_prefixes:
   - tesla-
-  publication_review: Required against the exact claims and artifact. Acquisition
-    does not establish legal correctness.
-  constraint: Alternative remedial remand requires expressly hypothetical earlier
-    preservation unless actual preservation is proved.
+  publication_review: Required against the exact claims and artifact. Acquisition does not establish legal
+    correctness.
+  constraint: Alternative remedial remand requires expressly hypothetical earlier preservation unless
+    actual preservation is proved.
 - demo_id: google-oracle
   cutoff: '2020-10-06'
   source_prefixes:
   - google-
-  publication_review: Required against the exact claims and artifact. Acquisition
-    does not establish legal correctness.
-  constraint: Distinguish asserted licensing evidence from established record findings;
-    no later opinion in strategy inputs.
+  publication_review: Required against the exact claims and artifact. Acquisition does not establish legal
+    correctness.
+  constraint: Distinguish asserted licensing evidence from established record findings; no later opinion
+    in strategy inputs.
