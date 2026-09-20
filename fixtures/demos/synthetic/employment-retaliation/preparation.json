@@ -1,0 +1,161 @@
+{
+  "schema_version": "1.0",
+  "descriptor": {
+    "schema_version": "1.0",
+    "demo_id": "employment-retaliation",
+    "title": "Employment retaliation",
+    "introduction": "A fictional complaint tested against the record, adverse arguments and procedural limits.",
+    "collection": "synthetic",
+    "practice_area": "Employment",
+    "work_product": "Complaint",
+    "jurisdiction": "New York",
+    "court_level": "state-trial",
+    "task": "complaint"
+  },
+  "strategies": [
+    {
+      "strategy_id": "record-bounded",
+      "title": "Revise within the supplied record",
+      "input_ids": [
+        "work-product"
+      ],
+      "input_summary": "Every person, company and record is fictional. Jordan Vale worked as a quality technician for Keystone in Monroe County, New York, from 2023 until August 28, 2026. On August 12, Vale emailed supervisor Lee Park that three instrument-calibration certificates omitted failed pressure readings; Vale attached the raw readings and said shipping the tested devices could expose users to unsafe pressure. Park replied that shipment should proceed and directed Vale not to delay it. Vale objected internally again on August 15 and refused to sign a certificate reporting all tests passed. On August 20, Park removed Vale from testing duties; on August 28, Keystone terminated Vale, citing attendance. An April warning recorded two late arrivals. Payroll records show no further late arrival through August; the employer has not supplied its complete attendance system. A coworker recalls Park complaining that Vale was holding up shipments, but has not signed a statement. Vale seeks lost wages and reinstatement. No government report or public disclosure is alleged. The proposed complaint is prepared September 20, 2026; all events and documents are invented.",
+      "assumptions": [
+        "All parties, facts and record locators are fictional."
+      ],
+      "source_ids": [
+        "ny-retaliation"
+      ],
+      "outputs": {
+        "work-product": {
+          "initial": {
+            "response_text": "## Parties\nJordan Vale sues Keystone.\n\n## Jurisdiction\nNew York is the forum.\n\n## Allegations\nKeystone fired Vale shortly after a safety complaint, proving retaliation. Vale will prove an actual violation of every relevant safety law.\n\n## Claims\nKeystone violated Labor Law 740 because any firing after a complaint is unlawful.\n\n## Relief\nVale demands reinstatement and all possible damages without limitation.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "ny-retaliation"
+            ],
+            "attorney_gate_items": [
+              "Verify factual support, authority, procedural posture and relief before any use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted legal demonstration; no independent model or attorney approval."
+          },
+          "revised": {
+            "response_text": "## Parties\n1. Plaintiff Jordan Vale is a former quality technician who worked for defendant Keystone Test Systems, Inc. in Monroe County. Defendant employed Vale during the events below. All allegations form a fictional pleading exercise.\n\n## Jurisdiction\n2. This action invokes New York Labor Law 740. Venue is proposed in Monroe County, where Vale worked and the alleged conduct occurred. Counsel must verify the parties’ legal identities, venue facts and procedural requirements before filing. The alleged August 2026 termination is within the supplied statute’s two-year action period as of this September 2026 draft.\n\n## Allegations\n3. On August 12, Vale emailed supervisor Lee Park raw pressure readings showing failed tests omitted from three calibration certificates. Vale identified a risk that devices shipped with inaccurate certificates could expose users to unsafe pressure.\n4. Park directed that shipment proceed. Vale renewed the objection on August 15 and declined to sign a certificate stating that all tests passed. Vale alleges a reasonable belief that the described practice created the substantial, specific public danger identified in those communications. No unidentified regulation is alleged as an established violation.\n5. On August 20, Park removed Vale from testing duties. Keystone terminated Vale on August 28 and cited attendance. Vale acknowledges an April warning for two late arrivals; the supplied payroll records show no subsequent late arrival, although the complete attendance system remains to be obtained.\n6. The sequence, Park’s knowledge of the objections, removal from testing and the supplied attendance evidence support an inference of retaliatory motive. Vale does not allege that timing alone proves causation. The coworker’s reported recollection remains an investigative lead and is not pleaded here as a confirmed quotation.\n\n## Claims\n7. Vale incorporates paragraphs 1–6 and alleges that the internal disclosures and refusal described above were protected conduct under Labor Law 740(2), and that Keystone took the identified adverse actions because of that conduct. The claim concerns internal objections; it does not rely on a fictional public-body report.\n8. Keystone may contend that attendance or another independent reason caused the termination. Vale disputes that explanation based on the currently supplied records and seeks discovery of attendance criteria, decision communications and comparable disciplinary decisions. Vale retains the burden of supporting the claim and its causal allegations.\n\n## Relief\n9. Vale requests relief available on the claim as proved, including appropriate reinstatement or other authorized employment relief, lost compensation and benefits, and allowable costs and fees. Additional monetary or equitable relief must be supported under the statute and record; this draft does not assert an automatic entitlement or a damages amount.\n10. Counsel must verify records, factual support, service, pleading form and available remedies before use. This document is an unfiled draft and contains no attorney signature or approval.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "ny-retaliation"
+            ],
+            "attorney_gate_items": [
+              "Verify factual support, authority, procedural posture and relief before any use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted legal demonstration; no independent model or attorney approval."
+          },
+          "critique": {
+            "verdict": "revise",
+            "critiques": [
+              "Timing supports an inference, not conclusive causation; acknowledge the documented April attendance warning and investigate the complete attendance record.",
+              "Plead the factual basis for reasonable belief and the specific protected internal objection; do not promise proof of an actual violation or invent an unidentified safety rule.",
+              "Separate firsthand documents from the unconfirmed coworker account and request only supported remedies. Do not add a government report that never occurred."
+            ],
+            "instructions": [
+              "Use the actual procedural standard and supplied record.",
+              "Revise the work product and requested relief to address each stated objection without assuming new evidence."
+            ],
+            "self_assessment": "A scripted adverse reading, not an actual opponent submission."
+          },
+          "assessment": {
+            "disposition": "revise",
+            "reasons": [
+              "The revision makes the protected internal conduct and causal inference inspectable without claiming that chronology establishes liability. The attendance defense remains material and could defeat the claim if fuller records support it. The pleading can proceed as a draft, but no result is predicted and the coworker lead requires investigation."
+            ],
+            "limitations": [
+              "Fictional record and agent-authored scripts.",
+              "No attorney approval, independent model evaluation or outcome probability."
+            ],
+            "self_assessment": "Preserve the adverse conclusion and uncertainty."
+          },
+          "initial_rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 1,
+                "evidence": "Timing supports an inference, not conclusive causation; acknowledge the documented April attendance warning and investigate the complete attendance record."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 1,
+                "evidence": "Plead the factual basis for reasonable belief and the specific protected internal objection; do not promise proof of an actual violation or invent an unidentified safety rule."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 1,
+                "evidence": "Separate firsthand documents from the unconfirmed coworker account and request only supported remedies. Do not add a government report that never occurred."
+              }
+            ],
+            "overall_notes": "Prepared qualitative rubric illustration; these scores are not win probabilities or attorney approval.",
+            "self_assessment": "Unresolved weaknesses remain visible, including any failed threshold."
+          },
+          "rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 4,
+                "evidence": "The revision makes the protected internal conduct and causal inference inspectable without claiming that chronology establishes liability. The attendance defense remains material and could defeat the claim if fuller records support it. The pleading can proceed as a draft, but no result is predicted and the coworker lead requires investigation."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 4,
+                "evidence": "The revised record section distinguishes supplied facts, assumptions and missing evidence."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 4,
+                "evidence": "Separate firsthand documents from the unconfirmed coworker account and request only supported remedies. Do not add a government report that never occurred. The revision now addresses this limitation explicitly."
+              }
+            ],
+            "overall_notes": "Prepared qualitative rubric illustration; these scores are not win probabilities or attorney approval.",
+            "self_assessment": "Unresolved weaknesses remain visible, including any failed threshold."
+          }
+        }
+      }
+    }
+  ],
+  "sources": [
+    {
+      "schema_version": "1.0",
+      "source_id": "ny-retaliation",
+      "title": "New York Labor Department Labor Law740 notice",
+      "url": "https://dol.ny.gov/system/files/documents/2022/02/ls740_1.pdf",
+      "available_on": "2026-09-20",
+      "filed_on": null,
+      "effective_on": null,
+      "retrieved_on": "2026-09-20",
+      "sha256": "81565b695a9d2210cf4e4acea72487606e9d81460273855ebc92192683a52af1",
+      "locator": "Statutory protections, employer notice, remedies",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Link to the acquired primary authority; local inputs contain concise original summaries, not wholesale source copies. Availability date records confirmed public availability at preparation."
+    }
+  ],
+  "claims": [
+    {
+      "claim": "New York Labor Law 740 protects specified disclosures or objections based on a reasonable belief of legal violation or substantial specific public danger; the current statute includes a two-year action period, defenses and remedies.",
+      "source_ids": [
+        "ny-retaliation"
+      ],
+      "locator": "Statutory protections, employer notice, remedies",
+      "classification": "law"
+    }
+  ],
+  "limitations": [
+    "All parties, events and record references are invented.",
+    "Prepared scripts are replayed without live model calls.",
+    "Authority review is bounded to this educational exercise; filing and attorney-approval gates remain unresolved."
+  ]
+}

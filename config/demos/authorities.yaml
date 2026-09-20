@@ -419,3 +419,14 @@ sources:
   redistribution_basis: Official statute read through the web tool; direct HTML retrieval
     returned403. Digest pins the preserved extracted text. Only original summaries
     and links redistributed.
+- schema_version: '1.0'
+  source_id: topanga
+  title: Topanga Assn. for a Scenic Community v. County of Los Angeles,11Cal.3d506(1974)
+  url: https://scocal.stanford.edu/opinion/topanga-assn-scenic-community-v-county-los-angeles-27785/
+  available_on: '2026-09-20'
+  retrieved_on: '2026-09-20'
+  sha256: f4c601674177bc93687899cf8dfd4918c1ca8c9b17d429f4d532a806b627a430
+  locator: 'Pages514–517: findings, evidence and reviewable agency reasoning'
+  classification: law
+  redistribution: link-only
+  redistribution_basis: Linked court opinion; only a concise original summary redistributed.

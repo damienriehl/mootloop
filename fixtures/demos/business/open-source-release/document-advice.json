@@ -3,7 +3,7 @@
   "input_id": "advice",
   "task": "business-advice",
   "represented_side": "In-house counsel to the fictional business",
-  "jurisdiction": "U.S. copyright law; Apache-2.0 and MIT licenses",
+  "jurisdiction": "U.S. copyright",
   "court_level": "advisory",
   "cutoff": "2026-09-20",
   "strategy_id": "reviewed-advice",

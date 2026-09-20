@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "request_type": "interrogatory",
+  "set_number": 1,
+  "title": "Fictional first interrogatory set",
+  "items": [
+    {
+      "request_id": "ROG-1",
+      "set_number": 1,
+      "number": 1,
+      "text": "Identify the cause of the late June 2026 shipment and each person with knowledge of that cause.",
+      "source_doc": "synthetic-served-set"
+    }
+  ]
+}

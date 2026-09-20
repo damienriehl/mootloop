@@ -101,10 +101,12 @@ def _text(record: TurnRecord) -> str:
 
 
 def _stage(
-    kind: Literal["initial", "critique", "revised", "assessment"], records: list[TurnRecord]
+    kind: Literal["initial", "critique", "revised", "assessment"],
+    records: list[TurnRecord],
+    expected_units: set[str],
 ) -> DemoStage:
-    if not records:
-        raise PublicationError(f"missing recorded {kind} stage")
+    if not records or {str(record.spec.request_id) for record in records} != expected_units:
+        raise PublicationError(f"missing recorded {kind} stage for one or more units")
     return DemoStage(
         kind=kind,
         title=kind.title(),
@@ -197,6 +199,19 @@ def prepare_demo(
             )
             if document.strategy_id != strategy.strategy_id:
                 raise PublicationError("authored strategy does not match document strategy")
+            descriptor = preparation.descriptor
+            if document.jurisdiction != descriptor.jurisdiction:
+                raise PublicationError("document jurisdiction does not match the demo")
+            level = descriptor.court_level.rsplit("-", 1)[-1]
+            if document.court_level != level:
+                raise PublicationError("document court level does not match the demo")
+            if descriptor.cutoff is not None and document.cutoff != descriptor.cutoff:
+                raise PublicationError("document cutoff does not match the demo")
+            if (
+                descriptor.represented_side is not None
+                and document.represented_side != descriptor.represented_side
+            ):
+                raise PublicationError("document represented side does not match the demo")
             if {unit.unit_id for unit in document.units} - strategy.outputs.keys():
                 raise PublicationError("missing authored document unit")
     strategies = []
@@ -218,7 +233,7 @@ def prepare_demo(
             document_input_refs=list(strategy.input_ids) if strategy.input_ids else None,
         )
         state = run_with_provider(vault, run_id, AuthoredProvider(strategy), NOW)
-        if state.status != "finished" or state.discarded:
+        if state.status not in {"finished", "needs_decisions"} or state.discarded:
             raise PublicationError(f"authored workflow failed: {state.status}; {state.discarded}")
         context = load_run_context(vault, run_id)
         counts: dict[tuple[str, str], int] = {}
@@ -271,7 +286,7 @@ def prepare_demo(
         state = run_with_provider(
             vault, replay_id, ReplayProvider(vault, replay_id, replay_path), NOW
         )
-        if state.status != "finished" or state.discarded:
+        if state.status not in {"finished", "needs_decisions"} or state.discarded:
             raise PublicationError("prepared replay failed to reproduce complete stages")
         records = list(state.completed_turns.values())
         operative = [
@@ -297,11 +312,17 @@ def prepare_demo(
                 assumptions=strategy.assumptions,
                 source_ids=strategy.source_ids,
                 stages=(
-                    _stage("initial", [r for r in records if r.spec.stage == "associate_draft"]),
                     _stage(
-                        "critique", [r for r in records if r.spec.output_schema_name == "critique"]
+                        "initial",
+                        [r for r in records if r.spec.stage == "associate_draft"],
+                        set(strategy.outputs),
                     ),
-                    _stage("revised", operative),
+                    _stage(
+                        "critique",
+                        [r for r in records if r.spec.output_schema_name == "critique"],
+                        set(strategy.outputs),
+                    ),
+                    _stage("revised", operative, set(strategy.outputs)),
                     _stage(
                         "assessment",
                         [
@@ -309,6 +330,7 @@ def prepare_demo(
                             for r in records
                             if r.spec.output_schema_name in {"narrative_assessment", "judge"}
                         ],
+                        set(strategy.outputs),
                     ),
                 ),
                 gate_state=DemoGateState(

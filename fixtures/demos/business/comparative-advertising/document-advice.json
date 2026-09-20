@@ -3,7 +3,7 @@
   "input_id": "advice",
   "task": "business-advice",
   "represented_side": "In-house counsel to the fictional business",
-  "jurisdiction": "U.S. federal law and New York",
+  "jurisdiction": "New York / U.S. federal",
   "court_level": "advisory",
   "cutoff": "2026-09-20",
   "strategy_id": "reviewed-advice",

@@ -1,0 +1,54 @@
+{
+  "schema_version": "1.0",
+  "input_id": "work-product",
+  "task": "motion",
+  "represented_side": "Prairie Press Works, Inc.",
+  "jurisdiction": "Texas",
+  "court_level": "trial",
+  "cutoff": "2026-09-20",
+  "strategy_id": "record-bounded",
+  "assumptions": [
+    "All parties, facts and record locators are fictional."
+  ],
+  "preservation_constraints": [
+    "Use only the supplied fictional record and the stated procedural assumptions; do not invent evidence, authority or preservation."
+  ],
+  "units": [
+    {
+      "unit_id": "work-product",
+      "title": "Product liability",
+      "instructions": "Draft Summary-judgment motion for Prairie Press Works, Inc.. Apply the supplied record, preserve adverse evidence, identify missing support and request only procedurally available relief.",
+      "issues": [
+        "Commercial sale is not the statutory definition of a safer alternative design; address feasibility when the product left control.",
+        "Chen’s report and the electrical-input specification supply contrary evidence. No exclusion order allows you simply to ignore them.",
+        "Guard removal may support a causation defense but does not automatically eliminate a design claim about foreseeable access. Narrow relief or acknowledge that summary judgment may fail."
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "source_id": "scenario",
+      "text": "All parties, exhibits and procedural events are fictional. Alex Rowan alleges that a 2022 Prairie industrial press lacked an interlocked access guard and caused a hand injury in June 2025. The federal case is in the Northern District of Texas, with Texas substantive law assumed applicable and discovery complete for this exercise. ExhibitA is the manufacturing specification showing a fixed bolted guard and available electrical input for a stop interlock in 2022. ExhibitB is plaintiff engineer Chen’s report proposing an interlocked access guard, estimating an $85 component cost and describing a pre-2022 prototype test; Chen has not supplied a complete production-cost analysis. ExhibitC is defense engineer Moss’s report that the proposed guard could interfere with maintenance access and that no production-unit test is in the packet. ExhibitD is Rowan’s testimony that the fixed guard was removed by a supervisor before the accident. The parties dispute causation, feasibility and effect on utility. No court has excluded either report. Prairie wants summary judgment on all claims solely because the alternative design was never sold on this model.",
+      "sha256": "5e921ba0076997e021445ba1d99d9fed0bedab1bec809227981a70da599fad46",
+      "available_on": "2026-09-20",
+      "classification": "hypothetical",
+      "public": true
+    },
+    {
+      "source_id": "tx-products",
+      "text": "Authority summary: Texas CPRC 82.005 sets safer-alternative-design and producing-cause requirements, including feasible risk reduction without substantial utility impairment.",
+      "sha256": "4a8caf7894b2faaecff5e52492ab728e82063695d10d746eb3b57f1594937fdd",
+      "available_on": "2026-09-20",
+      "classification": "record",
+      "public": true
+    },
+    {
+      "source_id": "frcp",
+      "text": "Authority summary: Federal Rule 56 requires no genuine dispute of material fact for judgment as a matter of law; supported competing evidence cannot be resolved merely by choosing the movant’s expert.",
+      "sha256": "c297ed5a71705adb52f5871e7bcfd8f4a2634009c9398794b7ed9c1b54275355",
+      "available_on": "2026-09-20",
+      "classification": "record",
+      "public": true
+    }
+  ]
+}

@@ -1,0 +1,455 @@
+{
+  "schema_version": "1.0",
+  "descriptor": {
+    "schema_version": "1.0",
+    "demo_id": "supplier-discovery",
+    "title": "Supplier contract dispute",
+    "introduction": "A fictional supplier replaces blanket denials and vague objections with specific discovery responses, while preserving unresolved review gates.",
+    "collection": "synthetic",
+    "practice_area": "Commercial contracts",
+    "work_product": "Discovery responses",
+    "jurisdiction": "Minnesota",
+    "court_level": "state-trial",
+    "task": "discovery-responses"
+  },
+  "strategies": [
+    {
+      "strategy_id": "specific-responses",
+      "title": "Replace blanket positions with specific responses",
+      "input_ids": [],
+      "input_summary": "Every entity, record and procedural event is fictional. Northfield Widgets sues Granite Supply in Rice County, Minnesota over a 2026 supply contract. Granite represents the defendant’s side. The agreement required 500 housings by June 1,2026; the delivery ledger records 400 on June 1 and 100 on June 4. A maintenance log records a furnace shutdown on May 30 and restart on June 2. Operations manager Avery Stone and dispatcher Robin Lake handled production and delivery. No record supplied establishes an agreed extension or a contractual excuse. The parties began this supply relationship in January 2026. Northfield’s requests seek the cause and knowledgeable people, all communications with Northfield and every affiliate from 2010 to the present, and admission that 500 housings were not delivered by June 1. Granite has identified Stone’s and Lake’s email accounts and the delivery ledger; counsel has not completed collection, privilege review or a search of older archives. September 27,2026 is a proposed first-production date subject to counsel approval. The claim concerns late delivery, not an unrelated civil-rights statute. These are original authored scenario facts, not independently verified witness evidence.",
+      "assumptions": [
+        "The facts are invented author-provided scenario inputs; fact acceptance is preparation status, not attorney verification."
+      ],
+      "source_ids": [
+        "mn-rule-33",
+        "mn-rule-34",
+        "mn-rule-36"
+      ],
+      "outputs": {
+        "ROG-1": {
+          "initial": {
+            "response_text": "Interrogatory No.1: Identify the cause of the late June 2026 shipment and each person with knowledge of that cause. Answer: Delays were outside Granite’s control. Northfield already knows the relevant people.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario"
+            ],
+            "attorney_gate_items": [
+              "Confirm witness support, collection scope and any required verification before service."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Scripted discovery example; no attorney approval or service-ready verification."
+          },
+          "revised": {
+            "response_text": "Interrogatory No.1: Identify the cause of the late June 2026 shipment and each person with knowledge of that cause.\n\nAnswer: The supplied maintenance log records a furnace shutdown on May 30 and restart on June 2. The delivery ledger records 400 housings on June 1 and 100 on June 4 against a 500-housing June 1 deadline. Operations manager Avery Stone has production knowledge; dispatcher Robin Lake has delivery knowledge. The current records identify the shutdown as the production interruption, but Granite has not established a contractual excuse or agreed extension. Granite will verify these facts with the identified witnesses and supplement as required; it does not rely on Northfield’s presumed knowledge to omit the answer.\n\nReview note: This draft is not a signed or verified interrogatory response. Witness confirmation and the required verification remain outstanding.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario"
+            ],
+            "attorney_gate_items": [
+              "Confirm witness support, collection scope and any required verification before service."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Scripted discovery example; no attorney approval or service-ready verification."
+          },
+          "critique": {
+            "verdict": "revise",
+            "critiques": [
+              "A furnace interruption is not automatically a contractual excuse; the packet contains no agreed extension.",
+              "Identify Stone and Lake rather than shifting the response burden to the requester.",
+              "Distinguish supplied records from unconfirmed witness accounts and preserve verification requirements."
+            ],
+            "instructions": [
+              "Replace the unsupported position with the request-specific revised response.",
+              "Preserve the factual and attorney-review limitations."
+            ],
+            "self_assessment": "Prepared adverse review, not actual opposing counsel."
+          },
+          "assessment": {
+            "disposition": "revise",
+            "reasons": [
+              "The revised response narrows the dispute but remains unverified and unapproved for service."
+            ],
+            "limitations": [
+              "Fictional scenario; no court ruling or attorney approval."
+            ],
+            "self_assessment": "Educational analysis only."
+          },
+          "initial_rubric": {
+            "scores": [
+              {
+                "criterion_id": "objection-defensible",
+                "score": 1,
+                "evidence": "A furnace interruption is not automatically a contractual excuse; the packet contains no agreed extension."
+              },
+              {
+                "criterion_id": "answer-completeness",
+                "score": 1,
+                "evidence": "A furnace interruption is not automatically a contractual excuse; the packet contains no agreed extension."
+              },
+              {
+                "criterion_id": "strategic-coherence",
+                "score": 1,
+                "evidence": "A furnace interruption is not automatically a contractual excuse; the packet contains no agreed extension."
+              },
+              {
+                "criterion_id": "fact-grounding-quality",
+                "score": 1,
+                "evidence": "A furnace interruption is not automatically a contractual excuse; the packet contains no agreed extension."
+              }
+            ],
+            "overall_notes": "Prepared scoring of this scripted response, not legal approval.",
+            "self_assessment": "Initial defects require revision."
+          },
+          "rubric": {
+            "scores": [
+              {
+                "criterion_id": "objection-defensible",
+                "score": 4,
+                "evidence": "The revision identifies the supplied record, answers the request and explicitly retains the unresolved review described in this response."
+              },
+              {
+                "criterion_id": "answer-completeness",
+                "score": 4,
+                "evidence": "The revision identifies the supplied record, answers the request and explicitly retains the unresolved review described in this response."
+              },
+              {
+                "criterion_id": "strategic-coherence",
+                "score": 4,
+                "evidence": "The revision identifies the supplied record, answers the request and explicitly retains the unresolved review described in this response."
+              },
+              {
+                "criterion_id": "fact-grounding-quality",
+                "score": 4,
+                "evidence": "The revision identifies the supplied record, answers the request and explicitly retains the unresolved review described in this response."
+              }
+            ],
+            "overall_notes": "Prepared scoring of this scripted response, not legal approval.",
+            "self_assessment": "Factual and human review remain open."
+          },
+          "judge": {
+            "rulings": [],
+            "self_assessment": "Prepared judicial-style assessment: The response now supplies a concrete cause and people but cannot establish a legal excuse or replace witness verification."
+          }
+        },
+        "RFP-1": {
+          "initial": {
+            "response_text": "Granite objects that the request is broad and burdensome and will produce relevant nonprivileged documents at a later time. No further description of withheld materials is supplied in this initial draft.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario"
+            ],
+            "attorney_gate_items": [
+              "Confirm witness support, collection scope and any required verification before service."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Scripted discovery example; no attorney approval or service-ready verification."
+          },
+          "revised": {
+            "response_text": "Response: Granite objects specifically to the 2010-to-present scope and undefined affiliates insofar as they reach unrelated entities and years before this supply relationship began in January 2026. The current packet contains no basis tying those earlier years or every affiliate to the shipment dispute. Granite proposes to search Stone’s and Lake’s email accounts and the identified transaction records for communications about this 2026 supply relationship and shipment. It will not search the excluded pre-relationship years or unrelated-affiliate material under that proposed scope; potentially responsive material outside that scope is being withheld from the proposed search on the stated objection.\n\nGranite proposes a first production of responsive, nonprivileged material by September 27,2026, subject to counsel’s confirmation of collection and review. Production is not represented as complete. Counsel should confer about affiliate identity, custodians and any earlier communications that Northfield can connect to the dispute, and identify any privilege withholding with the specificity the governing rules require. No blanket claim of privilege or completed search is made.",
+            "objections": [
+              {
+                "basis": "scope and relevance",
+                "text": "The request reaches 2010-to-present communications and undefined affiliates although the supplied relationship began in January 2026; earlier or unrelated material needs a demonstrated connection to this dispute."
+              }
+            ],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario"
+            ],
+            "attorney_gate_items": [
+              "Confirm witness support, collection scope and any required verification before service."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Scripted discovery example; no attorney approval or service-ready verification."
+          },
+          "critique": {
+            "verdict": "revise",
+            "critiques": [
+              "Specify which period and entities are disputed and why, rather than objecting generically.",
+              "Explain the collection you will perform and what the scope objection excludes.",
+              "Do not imply that collection, privilege review or production is already complete; make the proposed date conditional."
+            ],
+            "instructions": [
+              "Replace the unsupported position with the request-specific revised response.",
+              "Preserve the factual and attorney-review limitations."
+            ],
+            "self_assessment": "Prepared adverse review, not actual opposing counsel."
+          },
+          "assessment": {
+            "disposition": "revise",
+            "reasons": [
+              "The revised response narrows the dispute but remains unverified and unapproved for service."
+            ],
+            "limitations": [
+              "Fictional scenario; no court ruling or attorney approval."
+            ],
+            "self_assessment": "Educational analysis only."
+          },
+          "initial_rubric": {
+            "scores": [
+              {
+                "criterion_id": "objection-defensible",
+                "score": 1,
+                "evidence": "Specify which period and entities are disputed and why, rather than objecting generically."
+              },
+              {
+                "criterion_id": "answer-completeness",
+                "score": 1,
+                "evidence": "Specify which period and entities are disputed and why, rather than objecting generically."
+              },
+              {
+                "criterion_id": "strategic-coherence",
+                "score": 1,
+                "evidence": "Specify which period and entities are disputed and why, rather than objecting generically."
+              },
+              {
+                "criterion_id": "fact-grounding-quality",
+                "score": 1,
+                "evidence": "Specify which period and entities are disputed and why, rather than objecting generically."
+              }
+            ],
+            "overall_notes": "Prepared scoring of this scripted response, not legal approval.",
+            "self_assessment": "Initial defects require revision."
+          },
+          "rubric": {
+            "scores": [
+              {
+                "criterion_id": "objection-defensible",
+                "score": 4,
+                "evidence": "The revision identifies the supplied record, answers the request and explicitly retains the unresolved review described in this response."
+              },
+              {
+                "criterion_id": "answer-completeness",
+                "score": 4,
+                "evidence": "The revision identifies the supplied record, answers the request and explicitly retains the unresolved review described in this response."
+              },
+              {
+                "criterion_id": "strategic-coherence",
+                "score": 4,
+                "evidence": "The revision identifies the supplied record, answers the request and explicitly retains the unresolved review described in this response."
+              },
+              {
+                "criterion_id": "fact-grounding-quality",
+                "score": 4,
+                "evidence": "The revision identifies the supplied record, answers the request and explicitly retains the unresolved review described in this response."
+              }
+            ],
+            "overall_notes": "Prepared scoring of this scripted response, not legal approval.",
+            "self_assessment": "Factual and human review remain open."
+          },
+          "judge": {
+            "rulings": [
+              {
+                "objection_basis": "scope and relevance",
+                "would_objection_survive": true,
+                "reasoning": "A demonstrated relevance boundary could support narrowing, but the requester may identify earlier records or affiliates connected to the dispute. This prepared assessment is conditional, not a court ruling.",
+                "persuasion_notes": "Explain the proposed search and exclusions, confer about concrete connections, and retain the possibility of a broader search."
+              }
+            ],
+            "self_assessment": "Prepared judicial-style assessment: The narrowed search position requires a genuine scope conference and support; the court could require additional custodians, periods or affiliate records."
+          }
+        },
+        "RFA-1": {
+          "initial": {
+            "response_text": "Denied. Granite fully complied with every delivery obligation, and Northfield has no damages.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario"
+            ],
+            "attorney_gate_items": [
+              "Confirm witness support, collection scope and any required verification before service."
+            ],
+            "rfa_disposition": "deny",
+            "self_assessment": "Scripted discovery example; no attorney approval or service-ready verification."
+          },
+          "revised": {
+            "response_text": "Qualified admission: Granite admits that it did not deliver all 500 housings by June 1,2026. The supplied ledger records 400 delivered on June 1 and the remaining 100 on June 4. This admission addresses the requested delivery fact. It does not admit an unstated damages amount, reject a defense not resolved by the request, or establish that the delivery failure was legally excused. Granite withdraws the initial blanket denial and the unsupported assertion that Northfield has no damages.\n\nReview note: Counsel must approve the precise admission disposition before service; the prepared run leaves that decision open.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario"
+            ],
+            "attorney_gate_items": [
+              "Confirm witness support, collection scope and any required verification before service."
+            ],
+            "rfa_disposition": "qualify",
+            "self_assessment": "Scripted discovery example; no attorney approval or service-ready verification."
+          },
+          "critique": {
+            "verdict": "revise",
+            "critiques": [
+              "The delivery ledger contradicts a blanket denial:100 of 500 arrived after the stated deadline.",
+              "Admit or qualify the actual requested fact without inventing a damages concession or a no-damages defense.",
+              "Retain the attorney’s disposition decision; the scripted revision cannot authorize service."
+            ],
+            "instructions": [
+              "Replace the unsupported position with the request-specific revised response.",
+              "Preserve the factual and attorney-review limitations."
+            ],
+            "self_assessment": "Prepared adverse review, not actual opposing counsel."
+          },
+          "assessment": {
+            "disposition": "revise",
+            "reasons": [
+              "The revised response narrows the dispute but remains unverified and unapproved for service."
+            ],
+            "limitations": [
+              "Fictional scenario; no court ruling or attorney approval."
+            ],
+            "self_assessment": "Educational analysis only."
+          },
+          "initial_rubric": {
+            "scores": [
+              {
+                "criterion_id": "denial-meets-substance",
+                "score": 1,
+                "evidence": "The delivery ledger contradicts a blanket denial:100 of 500 arrived after the stated deadline."
+              },
+              {
+                "criterion_id": "objection-defensible",
+                "score": 1,
+                "evidence": "The delivery ledger contradicts a blanket denial:100 of 500 arrived after the stated deadline."
+              },
+              {
+                "criterion_id": "answer-completeness",
+                "score": 1,
+                "evidence": "The delivery ledger contradicts a blanket denial:100 of 500 arrived after the stated deadline."
+              },
+              {
+                "criterion_id": "strategic-coherence",
+                "score": 1,
+                "evidence": "The delivery ledger contradicts a blanket denial:100 of 500 arrived after the stated deadline."
+              },
+              {
+                "criterion_id": "fact-grounding-quality",
+                "score": 1,
+                "evidence": "The delivery ledger contradicts a blanket denial:100 of 500 arrived after the stated deadline."
+              }
+            ],
+            "overall_notes": "Prepared scoring of this scripted response, not legal approval.",
+            "self_assessment": "Initial defects require revision."
+          },
+          "rubric": {
+            "scores": [
+              {
+                "criterion_id": "denial-meets-substance",
+                "score": 4,
+                "evidence": "The revision identifies the supplied record, answers the request and explicitly retains the unresolved review described in this response."
+              },
+              {
+                "criterion_id": "objection-defensible",
+                "score": 4,
+                "evidence": "The revision identifies the supplied record, answers the request and explicitly retains the unresolved review described in this response."
+              },
+              {
+                "criterion_id": "answer-completeness",
+                "score": 4,
+                "evidence": "The revision identifies the supplied record, answers the request and explicitly retains the unresolved review described in this response."
+              },
+              {
+                "criterion_id": "strategic-coherence",
+                "score": 4,
+                "evidence": "The revision identifies the supplied record, answers the request and explicitly retains the unresolved review described in this response."
+              },
+              {
+                "criterion_id": "fact-grounding-quality",
+                "score": 4,
+                "evidence": "The revision identifies the supplied record, answers the request and explicitly retains the unresolved review described in this response."
+              }
+            ],
+            "overall_notes": "Prepared scoring of this scripted response, not legal approval.",
+            "self_assessment": "Factual and human review remain open."
+          },
+          "judge": {
+            "rulings": [],
+            "self_assessment": "Prepared judicial-style assessment: The qualified admission tracks the supplied delivery ledger. Any binding admission still requires counsel’s review; this script does not resolve the open disposition gate."
+          }
+        }
+      }
+    }
+  ],
+  "sources": [
+    {
+      "schema_version": "1.0",
+      "source_id": "mn-rule-33",
+      "title": "Minnesota Rule of Civil Procedure33",
+      "url": "https://www.revisor.mn.gov/court_rules/cp/id/33/",
+      "available_on": "2026-09-20",
+      "filed_on": null,
+      "effective_on": null,
+      "retrieved_on": "2026-09-20",
+      "sha256": "cee23e5baf760b6312c8dc18039131b061a19b98e26d40f459206cb957d7d80b",
+      "locator": "Rule33: response and objection requirements",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Link to primary court rule; original concise summaries only."
+    },
+    {
+      "schema_version": "1.0",
+      "source_id": "mn-rule-34",
+      "title": "Minnesota Rule of Civil Procedure34",
+      "url": "https://www.revisor.mn.gov/court_rules/cp/id/34/",
+      "available_on": "2026-09-20",
+      "filed_on": null,
+      "effective_on": null,
+      "retrieved_on": "2026-09-20",
+      "sha256": "7fc303cfd3275ac413ec16775f3f49b9c28aa93e947e7b16cca2d02905fd73ef",
+      "locator": "Rule34: response and objection requirements",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Link to primary court rule; original concise summaries only."
+    },
+    {
+      "schema_version": "1.0",
+      "source_id": "mn-rule-36",
+      "title": "Minnesota Rule of Civil Procedure36",
+      "url": "https://www.revisor.mn.gov/court_rules/cp/id/36/",
+      "available_on": "2026-09-20",
+      "filed_on": null,
+      "effective_on": null,
+      "retrieved_on": "2026-09-20",
+      "sha256": "018ec27dac1047c8a4c8118b87b3065314c0c3b819a4314f9b2b8530d337bc68",
+      "locator": "Rule36: response and objection requirements",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Link to primary court rule; original concise summaries only."
+    }
+  ],
+  "claims": [
+    {
+      "claim": "Minnesota Rule 33 governs interrogatory answers, including separate responses and repetition of the interrogatory before its answer.",
+      "source_ids": [
+        "mn-rule-33"
+      ],
+      "locator": "Rule33: response and objection requirements",
+      "classification": "law"
+    },
+    {
+      "claim": "Minnesota Rule 34 governs production requests and specific responses; state the search/production scope and any objection rather than obscure what will be withheld.",
+      "source_ids": [
+        "mn-rule-34"
+      ],
+      "locator": "Rule34: response and objection requirements",
+      "classification": "law"
+    },
+    {
+      "claim": "Minnesota Rule 36 requires an admission response that fairly addresses the matter, with an appropriate qualification or reasonable inquiry where required.",
+      "source_ids": [
+        "mn-rule-36"
+      ],
+      "locator": "Rule36: response and objection requirements",
+      "classification": "law"
+    }
+  ],
+  "limitations": [
+    "All facts, parties and served requests are fictional.",
+    "Fact inputs have no external witness provenance and remain subject to verification.",
+    "Prepared scripts and judicial-style comments are not actual court rulings.",
+    "Attorney decisions, citations and approval remain unresolved."
+  ]
+}

@@ -56,3 +56,17 @@ def test_preparation_rejects_unlisted_operational_file(tmp_path):
             fixture, tmp_path / "work", tmp_path / "output", revision="r1", software_revision="test"
         )
     assert not (tmp_path / "work").exists()
+
+
+def test_preparation_rejects_jurisdiction_mismatch_before_run(tmp_path):
+    fixture = tmp_path / "fixture"
+    shutil.copytree(FIXTURE, fixture)
+    path = fixture / "document-advice.json"
+    document = json.loads(path.read_text())
+    document["jurisdiction"] = "Wrong jurisdiction"
+    path.write_text(json.dumps(document))
+    with pytest.raises(PublicationError, match="jurisdiction"):
+        prepare_demo(
+            fixture, tmp_path / "work", tmp_path / "output", revision="r1", software_revision="test"
+        )
+    assert not (tmp_path / "work").exists()

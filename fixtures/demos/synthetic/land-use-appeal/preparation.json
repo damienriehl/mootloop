@@ -1,0 +1,185 @@
+{
+  "schema_version": "1.0",
+  "descriptor": {
+    "schema_version": "1.0",
+    "demo_id": "land-use-appeal",
+    "title": "Land-use dispute",
+    "introduction": "A fictional appellate brief tested against the record, adverse arguments and procedural limits.",
+    "collection": "synthetic",
+    "practice_area": "Property and land use",
+    "work_product": "Appellate brief",
+    "jurisdiction": "California",
+    "court_level": "state-appellate",
+    "task": "appellate-brief"
+  },
+  "strategies": [
+    {
+      "strategy_id": "record-bounded",
+      "title": "Revise within the supplied record",
+      "input_ids": [
+        "work-product"
+      ],
+      "input_summary": "All entities, local rules, page references and proceedings are fictional. Ridge Nursery sought a county conditional-use permit for a plant greenhouse. The assumed applicable ordinance requires findings on traffic safety and compatibility; no fundamental vested right is asserted. At the administrative hearing, Ridge submitted a traffic memorandum at administrative record(AR)40–46 proposing timed delivery windows. A neighbor described a blind driveway curve at AR 70–72. The county’s resolution at AR 100–101 denied the permit using only the ordinance’s conclusions, with no explanation of which traffic or compatibility facts it found or why delivery conditions were inadequate. Ridge objected to missing findings at AR 95 and renewed that issue in its superior-court writ petition at clerk’s transcript(CT)20–24. The superior court denied relief, stating at CT 80 that the neighbor evidence could support denial without identifying findings in the resolution. A timely appeal from that final judgment is assumed for this exercise. Ridge now has a new traffic survey, prepared after judgment, that was not in the administrative record.",
+      "assumptions": [
+        "All parties, facts and record locators are fictional."
+      ],
+      "source_ids": [
+        "ca-writ",
+        "topanga"
+      ],
+      "outputs": {
+        "work-product": {
+          "initial": {
+            "response_text": "## Issues\nThe county’s permit denial was wrong.\n\n## Preservation\nRidge objected below.\n\n## Standard Of Review\nThe appellate court should decide which traffic evidence is best.\n\n## Argument\nA new survey proves the road is safe and defeats the neighbor.\n\n## Relief\nOrder immediate issuance of the permit.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "ca-writ",
+              "topanga"
+            ],
+            "attorney_gate_items": [
+              "Verify factual support, authority, procedural posture and relief before any use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted legal demonstration; no independent model or attorney approval."
+          },
+          "revised": {
+            "response_text": "## Issues\nWhether the writ judgment should be reversed because the county’s resolution failed to disclose findings that connect the admitted traffic and compatibility evidence to denial, preventing meaningful review. Ridge seeks reconsideration on a lawful explanation, not an appellate selection of its preferred traffic expert.\n\n## Preservation\nRidge raised the missing-findings objection at AR 95 and in the writ petition at CT 20–24. The resolution appears at AR 100–101 and the trial court’s reasoning at CT 80. Those are supplied fictional record anchors. The postjudgment survey is excluded from this argument; no exception permitting its use or preserved request for additional evidence is assumed. Timeliness and the final-judgment posture are stipulated solely for this exercise and require verification in any actual matter.\n\n## Standard Of Review\nCCP 1094.5 distinguishes review of findings, evidentiary support and agency discretion. With no fundamental vested right asserted here, Ridge frames the evidentiary issue under substantial-evidence review, not free reweighing. The primary challenge is instead the legal adequacy of the explanation necessary for that review. Topanga requires a discernible connection between evidence, findings and decision, while recognizing deference to supported administrative findings.\n\n## Argument\nThe traffic memorandum proposed timed deliveries; the neighbor described a blind curve. Either account may matter, and Ridge does not claim that its memorandum automatically prevails. The defect is that the resolution merely repeats traffic-safety and compatibility conclusions without saying what facts were found, how the delivery proposal was evaluated, or which reason supports denial. On this assumed record the reviewing court must supply its own route from competing evidence to outcome.\nThe county’s strongest response is that the resolution and record, read together and with appropriate deference, sufficiently reveal the basis for its action. Ridge must meet that response by pointing to the actual absence of explanatory findings, not a demand for ideal drafting or a finding on every evidentiary detail. If the full resolution incorporates a reasoned staff report omitted from this packet, Ridge’s premise may fail. The supplied resolution contains no such incorporation.\nThe superior court’s statement that neighbor evidence could support denial does not itself establish the findings the agency made. Remand would let the county articulate and reconsider its own reasoning within its lawful discretion. It would not resolve whether the greenhouse should ultimately receive a permit.\n\n## Relief\nReverse the writ judgment and direct appropriate relief setting aside the inadequately explained decision and returning the matter for lawful agency reconsideration under CCP 1094.5. Do not direct permit issuance on this packet. The county could again deny the permit with adequate findings and support. Counsel must confirm the complete record, precise standard, preservation and remedy before filing.",
+            "objections": [],
+            "candidate_citations": [],
+            "fact_ids_used": [
+              "scenario",
+              "ca-writ",
+              "topanga"
+            ],
+            "attorney_gate_items": [
+              "Verify factual support, authority, procedural posture and relief before any use."
+            ],
+            "rfa_disposition": null,
+            "self_assessment": "Agent-authored scripted legal demonstration; no independent model or attorney approval."
+          },
+          "critique": {
+            "verdict": "revise",
+            "critiques": [
+              "A new postjudgment survey cannot simply enter an appeal confined to the administrative record; identify a lawful, preserved route or leave it out.",
+              "Distinguish inadequacy of findings from reweighing the traffic evidence. A neighbor’s adverse account cannot be ignored.",
+              "The requested permit command displaces county discretion; explain a limited remand and the possibility of the same denial with adequate findings."
+            ],
+            "instructions": [
+              "Use the actual procedural standard and supplied record.",
+              "Revise the work product and requested relief to address each stated objection without assuming new evidence."
+            ],
+            "self_assessment": "A scripted adverse reading, not an actual opponent submission."
+          },
+          "assessment": {
+            "disposition": "revise",
+            "reasons": [
+              "The revised findings challenge has a more coherent appellate target than asking the court to credit new evidence. It could produce remand without a permit, and could fail if the full record adequately discloses the agency’s reasoning or an independent preserved basis sustains judgment. The new survey remains outside this simulated appeal."
+            ],
+            "limitations": [
+              "Fictional record and agent-authored scripts.",
+              "No attorney approval, independent model evaluation or outcome probability."
+            ],
+            "self_assessment": "Preserve the adverse conclusion and uncertainty."
+          },
+          "initial_rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 1,
+                "evidence": "A new postjudgment survey cannot simply enter an appeal confined to the administrative record; identify a lawful, preserved route or leave it out."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 1,
+                "evidence": "Distinguish inadequacy of findings from reweighing the traffic evidence. A neighbor’s adverse account cannot be ignored."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 1,
+                "evidence": "The requested permit command displaces county discretion; explain a limited remand and the possibility of the same denial with adequate findings."
+              }
+            ],
+            "overall_notes": "Prepared qualitative rubric illustration; these scores are not win probabilities or attorney approval.",
+            "self_assessment": "Unresolved weaknesses remain visible, including any failed threshold."
+          },
+          "rubric": {
+            "scores": [
+              {
+                "criterion_id": "task-analysis",
+                "score": 4,
+                "evidence": "The revised findings challenge has a more coherent appellate target than asking the court to credit new evidence. It could produce remand without a permit, and could fail if the full record adequately discloses the agency’s reasoning or an independent preserved basis sustains judgment. The new survey remains outside this simulated appeal."
+              },
+              {
+                "criterion_id": "record-grounding",
+                "score": 4,
+                "evidence": "The revised record section distinguishes supplied facts, assumptions and missing evidence."
+              },
+              {
+                "criterion_id": "adversarial-response",
+                "score": 4,
+                "evidence": "The requested permit command displaces county discretion; explain a limited remand and the possibility of the same denial with adequate findings. The revision now addresses this limitation explicitly."
+              }
+            ],
+            "overall_notes": "Prepared qualitative rubric illustration; these scores are not win probabilities or attorney approval.",
+            "self_assessment": "Unresolved weaknesses remain visible, including any failed threshold."
+          }
+        }
+      }
+    }
+  ],
+  "sources": [
+    {
+      "schema_version": "1.0",
+      "source_id": "ca-writ",
+      "title": "California Code of Civil Procedure1094.5",
+      "url": "https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=CCP&sectionNum=1094.5.",
+      "available_on": "2026-09-20",
+      "filed_on": null,
+      "effective_on": null,
+      "retrieved_on": "2026-09-20",
+      "sha256": "ed0a91aef1b5c5acb951914cdfed157c0110b7b0423aafa5bb1924fb59550a99",
+      "locator": "Subsections(b), (c), (e), (f)",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Link to the acquired primary authority; local inputs contain concise original summaries, not wholesale source copies. Availability date records confirmed public availability at preparation."
+    },
+    {
+      "schema_version": "1.0",
+      "source_id": "topanga",
+      "title": "Topanga Assn. for a Scenic Community v. County of Los Angeles,11Cal.3d506(1974)",
+      "url": "https://scocal.stanford.edu/opinion/topanga-assn-scenic-community-v-county-los-angeles-27785/",
+      "available_on": "2026-09-20",
+      "retrieved_on": "2026-09-20",
+      "sha256": "f4c601674177bc93687899cf8dfd4918c1ca8c9b17d429f4d532a806b627a430",
+      "locator": "Pages514–517: findings, evidence and reviewable agency reasoning",
+      "classification": "law",
+      "redistribution": "link-only",
+      "redistribution_basis": "Linked court opinion; only a concise original summary redistributed."
+    }
+  ],
+  "claims": [
+    {
+      "claim": "CCP 1094.5 addresses evidentiary/findings review and remand, preserving legally vested agency discretion; the applicable evidentiary standard depends on the right and proceeding.",
+      "source_ids": [
+        "ca-writ"
+      ],
+      "locator": "Subsections(b), (c), (e), (f)",
+      "classification": "law"
+    },
+    {
+      "claim": "Topanga requires reviewable agency findings connecting evidence to decision, with reasonable doubts resolved in favor of agency findings; it does not require courts to speculate about an unstated path.",
+      "source_ids": [
+        "topanga"
+      ],
+      "locator": "Pages514–517: findings, evidence and reviewable agency reasoning",
+      "classification": "law"
+    }
+  ],
+  "limitations": [
+    "All parties, events and record references are invented.",
+    "Prepared scripts are replayed without live model calls.",
+    "Authority review is bounded to this educational exercise; filing and attorney-approval gates remain unresolved."
+  ]
+}

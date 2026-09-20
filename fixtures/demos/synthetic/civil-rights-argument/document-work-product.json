@@ -1,0 +1,54 @@
+{
+  "schema_version": "1.0",
+  "input_id": "work-product",
+  "task": "oral-argument",
+  "represented_side": "Morgan Hale",
+  "jurisdiction": "Seventh Circuit",
+  "court_level": "appellate",
+  "cutoff": "2026-09-20",
+  "strategy_id": "record-bounded",
+  "assumptions": [
+    "All parties, facts and record locators are fictional."
+  ],
+  "preservation_constraints": [
+    "Use only the supplied fictional record and the stated procedural assumptions; do not invent evidence, authority or preservation."
+  ],
+  "units": [
+    {
+      "unit_id": "work-product",
+      "title": "Civil-rights claim",
+      "instructions": "Draft Oral-argument preparation and Q&A for Morgan Hale. Apply the supplied record, preserve adverse evidence, identify missing support and request only procedurally available relief.",
+      "issues": [
+        "Do not accuse a witness of lying or ask the appellate court to choose credibility; identify the supported favorable version and what the camera cannot show.",
+        "Separate the factual-error argument from the clearly-established-law requirement at the incident date. Tolan alone may not supply a fact-specific right.",
+        "Offer responsive concessions and a limited disposition, including what happens if the panel can affirm on an independent legal basis."
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "source_id": "scenario",
+      "text": "All people, quotations and record references are fictional. In an Illinois federal civil-rights case, Morgan Hale alleges excessive force during a May 2023 porch encounter. Hale testified at deposition pages 18–22 that both hands were visible and empty, Hale stood still after an instruction, and Officer Ellis struck Hale before any warning of force. Ellis testified at pages 30–34 that Hale reached toward a waistband and advanced. A nearby camera captures the sidewalk but not Hale’s hands or the porch; audio is indistinct. The district court entered final summary judgment for Ellis on qualified-immunity grounds, relying on a statement that Hale advanced with a concealed hand. Hale’s opposition, pages 7–10, cited the conflicting sworn testimony and disputed the video’s coverage. The appeal challenges that factual treatment. The packet supplies Tolan v. Cotton on summary-judgment methodology but does not establish a sufficiently analogous clearly-established-law authority for the May 2023 incident. The exercise assumes appellate jurisdiction and preservation but does not assume that correcting the facts defeats qualified immunity.",
+      "sha256": "69ea8ba19c8d422dd8993f61794e543388e21642e5cc120fd5df6073bc8db078",
+      "available_on": "2026-09-20",
+      "classification": "hypothetical",
+      "public": true
+    },
+    {
+      "source_id": "tolan",
+      "text": "Authority summary: Tolan v. Cotton requires proper treatment of supported factual disputes in qualified-immunity summary judgment; correcting that error does not itself resolve every immunity element.",
+      "sha256": "11728a1bda61daee667ddc49095c10742b127fb25a3b2a4c01e26260575ec7cf",
+      "available_on": "2026-09-20",
+      "classification": "record",
+      "public": true
+    },
+    {
+      "source_id": "frcp",
+      "text": "Authority summary: Rule 56 distinguishes genuine material factual disputes from permissible judgment as a matter of law; credibility cannot be decided merely by preferring the moving witness.",
+      "sha256": "95ce3f193a5661134491af83817b9c47deeca5bb2dfe789ec650b22daae2efc0",
+      "available_on": "2026-09-20",
+      "classification": "record",
+      "public": true
+    }
+  ]
+}

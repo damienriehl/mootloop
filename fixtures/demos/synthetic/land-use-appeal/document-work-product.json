@@ -1,0 +1,54 @@
+{
+  "schema_version": "1.0",
+  "input_id": "work-product",
+  "task": "appellate-brief",
+  "represented_side": "Ridge Nursery LLC",
+  "jurisdiction": "California",
+  "court_level": "appellate",
+  "cutoff": "2026-09-20",
+  "strategy_id": "record-bounded",
+  "assumptions": [
+    "All parties, facts and record locators are fictional."
+  ],
+  "preservation_constraints": [
+    "Use only the supplied fictional record and the stated procedural assumptions; do not invent evidence, authority or preservation."
+  ],
+  "units": [
+    {
+      "unit_id": "work-product",
+      "title": "Land-use dispute",
+      "instructions": "Draft Appellate brief for Ridge Nursery LLC. Apply the supplied record, preserve adverse evidence, identify missing support and request only procedurally available relief.",
+      "issues": [
+        "A new postjudgment survey cannot simply enter an appeal confined to the administrative record; identify a lawful, preserved route or leave it out.",
+        "Distinguish inadequacy of findings from reweighing the traffic evidence. A neighbor’s adverse account cannot be ignored.",
+        "The requested permit command displaces county discretion; explain a limited remand and the possibility of the same denial with adequate findings."
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "source_id": "scenario",
+      "text": "All entities, local rules, page references and proceedings are fictional. Ridge Nursery sought a county conditional-use permit for a plant greenhouse. The assumed applicable ordinance requires findings on traffic safety and compatibility; no fundamental vested right is asserted. At the administrative hearing, Ridge submitted a traffic memorandum at administrative record(AR)40–46 proposing timed delivery windows. A neighbor described a blind driveway curve at AR 70–72. The county’s resolution at AR 100–101 denied the permit using only the ordinance’s conclusions, with no explanation of which traffic or compatibility facts it found or why delivery conditions were inadequate. Ridge objected to missing findings at AR 95 and renewed that issue in its superior-court writ petition at clerk’s transcript(CT)20–24. The superior court denied relief, stating at CT 80 that the neighbor evidence could support denial without identifying findings in the resolution. A timely appeal from that final judgment is assumed for this exercise. Ridge now has a new traffic survey, prepared after judgment, that was not in the administrative record.",
+      "sha256": "4f847f69d7d5a5c51fec45be9ed27e4bf1625f862d0b225306eb18e135a5b5d8",
+      "available_on": "2026-09-20",
+      "classification": "hypothetical",
+      "public": true
+    },
+    {
+      "source_id": "ca-writ",
+      "text": "Authority summary: CCP 1094.5 addresses evidentiary/findings review and remand, preserving legally vested agency discretion; the applicable evidentiary standard depends on the right and proceeding.",
+      "sha256": "74f64b4cccef80a9de7300edc028d2f7c09927e439d7e9bfb02037a9104193a6",
+      "available_on": "2026-09-20",
+      "classification": "record",
+      "public": true
+    },
+    {
+      "source_id": "topanga",
+      "text": "Authority summary: Topanga requires reviewable agency findings connecting evidence to decision, with reasonable doubts resolved in favor of agency findings; it does not require courts to speculate about an unstated path.",
+      "sha256": "59b80b790caa493c94ae3fe7f610a2b9e212ae93c0a6eaf15367495fece07578",
+      "available_on": "2026-09-20",
+      "classification": "record",
+      "public": true
+    }
+  ]
+}

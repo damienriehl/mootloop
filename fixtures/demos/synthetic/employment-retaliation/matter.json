@@ -1,0 +1,29 @@
+{
+  "schema_version": "1.0",
+  "matter_id": "2026-09-20-employment-retaliation",
+  "caption": {
+    "court_name": "Supreme Court of the State of New York, Monroe County",
+    "case_number": "FICTIONAL-DEMO",
+    "county": "NY"
+  },
+  "jurisdiction": {
+    "state": "NY",
+    "forum": "state"
+  },
+  "parties": [
+    {
+      "name": "Jordan Vale",
+      "role": "plaintiff"
+    },
+    {
+      "name": "Keystone Test Systems, Inc.",
+      "role": "defendant"
+    }
+  ],
+  "our_side": "plaintiff",
+  "retention": {
+    "retention_class": "public-fictional-demo"
+  },
+  "pipeline_strategy": "thin-full",
+  "run_mode": "autonomous"
+}
