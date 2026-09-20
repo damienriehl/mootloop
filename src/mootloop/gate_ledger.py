@@ -10,15 +10,18 @@ Phase 7's export reads ``export_ready`` and refuses unless it is true.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 from mootloop import attest
 from mootloop.context import load_run_context
 from mootloop.decisions import DecisionStore
-from mootloop.journal import load_state, read_events
-from mootloop.models.events import GateEvaluated
-from mootloop.orchestrator import operative_draft_turn_ids
+from mootloop.journal import fold, read_events
+from mootloop.models.events import GateEvaluated, JournalEvent, RunState
+from mootloop.models.run import DraftOutput
+from mootloop.orchestrator import operative_draft_records
+from mootloop.output_review import decision_revision_requirements
 from mootloop.vault import atomic_write_text, safe_vault_path
 
 # Per-request turn gates, in report order, plus the run-level gates. Degeneracy and
@@ -41,7 +44,7 @@ def _worse(a: str, b: str) -> str:
 
 
 def _turn_gate_status(
-    vault_root: Path | str, run_id: str
+    events: Sequence[JournalEvent], state: RunState, operative_turn: Mapping[str, str]
 ) -> tuple[dict[str, dict[str, str]], dict[str, dict[str, str]], str]:
     """Fold per-request turn-gate statuses and the run-level citation status.
 
@@ -61,12 +64,10 @@ def _turn_gate_status(
     worst was. The journal's ``GateEvaluated`` events are append-only and untouched;
     nothing is erased, only the gating decision changes.
     """
-    state = load_state(vault_root, run_id)
-    operative_turn = operative_draft_turn_ids(vault_root, run_id)
     per_turn: dict[str, dict[str, str]] = {}
     worst: dict[str, dict[str, str]] = {}
     citation_status = "pending"  # never verified -> blocks (plan H8, fail closed)
-    for event in read_events(vault_root, run_id):
+    for event in events:
         if not isinstance(event, GateEvaluated):
             continue
         gate = event.result.gate
@@ -123,8 +124,14 @@ class GateLedgerDoc:
 
 def build_ledger(vault_root: Path | str, run_id: str) -> GateLedgerDoc:
     """Assemble the gate-ledger document (pure; no writes)."""
-    per_request, superseded, citation_status = _turn_gate_status(vault_root, run_id)
     run_context = load_run_context(vault_root, run_id)
+    events = read_events(vault_root, run_id)
+    state = fold(events)
+    records = operative_draft_records(run_id, run_context, state)
+    operative_turn = {
+        str(item.request_id): record.spec.turn_id for item, record in records if record is not None
+    }
+    per_request, superseded, citation_status = _turn_gate_status(events, state, operative_turn)
     units = run_context.units
     configured_turn_gates = tuple(
         gate for gate in TURN_GATES if gate in run_context.binding.config.gates
@@ -132,7 +139,19 @@ def build_ledger(vault_root: Path | str, run_id: str) -> GateLedgerDoc:
     blocking_turn_gates = tuple(
         gate for gate in BLOCKING_TURN_GATES if gate in configured_turn_gates
     )
-    open_decisions = DecisionStore(vault_root, run_id).list_open()
+    decisions = DecisionStore(vault_root, run_id).list_all()
+    revisions = decision_revision_requirements(
+        decisions,
+        {
+            str(item.request_id): DraftOutput.model_validate(record.output) if record else None
+            for item, record in records
+        },
+    )
+    open_decisions = [
+        decision
+        for decision in decisions
+        if decision.status == "open" or str(decision.decision_id) in revisions
+    ]
     open_by_request: dict[str, int] = {}
     request_less_open = 0
     for decision in open_decisions:
@@ -152,9 +171,7 @@ def build_ledger(vault_root: Path | str, run_id: str) -> GateLedgerDoc:
         recorded = per_request.get(rid, {})
         row = {gate: recorded.get(gate, "pending") for gate in configured_turn_gates}
         row["citations"] = citation_status
-        row["decisions"] = (
-            "fail" if (open_by_request.get(rid, 0) or request_less_open) else "pass"
-        )
+        row["decisions"] = "fail" if (open_by_request.get(rid, 0) or request_less_open) else "pass"
         row["attestation"] = attestation_status
         gates[rid] = row
 
@@ -165,6 +182,7 @@ def build_ledger(vault_root: Path | str, run_id: str) -> GateLedgerDoc:
         citation_status,
         blocking_turn_gates,
     )
+    blockers.extend(f"decision_revision:{decision_id}" for decision_id in revisions)
     return GateLedgerDoc(
         run_id=run_id,
         export_ready=ready,

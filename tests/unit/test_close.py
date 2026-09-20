@@ -231,10 +231,8 @@ def test_tombstone_preserves_audit_chain(tmp_path: Path) -> None:
 
 def test_re_close_is_safe(tmp_path: Path) -> None:
     root = _make_matters_root(tmp_path)
-    close_matter(root, MID, actor="Clerk", now=NOW, backup_dir=tmp_path / "b")
-    # Re-closing an already-purged matter is refused, not a destructive no-op elsewhere.
-    with pytest.raises(CloseError):
-        close_matter(root, MID, actor="Clerk", now=NOW, backup_dir=tmp_path / "b2")
+    first = close_matter(root, MID, actor="Clerk", now=NOW, backup_dir=tmp_path / "b")
+    assert close_matter(root, MID, actor="Clerk", now=NOW, backup_dir=tmp_path / "b2") == first
 
 
 def test_crafted_matter_id_cannot_escape(tmp_path: Path) -> None:

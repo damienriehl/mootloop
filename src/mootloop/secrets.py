@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import fcntl
 import os
 import re
 import secrets as _secrets
@@ -17,6 +18,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from mootloop.errors import BackupError
+from mootloop.vault import atomic_write_text, fsync_file_and_parent
 
 SECRETS_FILE = Path.home() / ".mootloop" / "secrets.env"
 
@@ -83,6 +85,7 @@ def load_secret(key: str, *, secrets_file: Path = SECRETS_FILE) -> str | None:
 
     Returns ``None`` if unset (callers fail closed — a missing token means the check
     stays ``pending``, never a false ``verified``). Never logs the value.
+    Historical duplicate file entries retain their last value; reads never rewrite them.
     """
     from_file = _read_secrets_file(secrets_file).get(key)
     if from_file:
@@ -123,12 +126,11 @@ def load_or_create_signing_key(
     minted before a restart stay verifiable. The value is registered for redaction and
     never logged.
     """
-    existing = load_secret(key, secrets_file=secrets_file)
+    existing = _load_stable_key(key, secrets_file=secrets_file)
     if existing:
         register_secret(existing)
         return existing
-    value = _secrets.token_urlsafe(32)
-    _persist_secret(key, value, secrets_file=secrets_file)
+    value = _create_secret_once(key, lambda: _secrets.token_urlsafe(32), secrets_file=secrets_file)
     register_secret(value)
     return value
 
@@ -142,15 +144,51 @@ def load_or_create_backup_key(key: str = BACKUP_KEY, *, secrets_file: Path = SEC
     and never logged. On the hosted box the secrets mount is read-only, so the key must be
     pre-seeded — this derive path never fires there (an existing value is always found).
     """
-    existing = load_secret(key, secrets_file=secrets_file)
+    existing = _load_stable_key(key, secrets_file=secrets_file)
     if existing:
         register_secret(existing)
         return _decode_backup_key(existing)
-    raw = os.urandom(_BACKUP_KEY_BYTES)
-    value = base64.urlsafe_b64encode(raw).decode("ascii")
-    _persist_secret(key, value, secrets_file=secrets_file)
+    value = _create_secret_once(
+        key,
+        lambda: base64.urlsafe_b64encode(os.urandom(_BACKUP_KEY_BYTES)).decode("ascii"),
+        secrets_file=secrets_file,
+    )
     register_secret(value)
-    return raw
+    return _decode_backup_key(value)
+
+
+def _load_stable_key(key: str, *, secrets_file: Path) -> str | None:
+    existing = load_secret(key, secrets_file=secrets_file)
+    if not existing:
+        return None
+    # Preseeded read-only mounts need no lock creation. An existing creation lock means
+    # a writer may have renamed its key file but not yet committed the directory entry.
+    lock_path = secrets_file.with_name(secrets_file.name + ".lock")
+    try:
+        fd = os.open(lock_path, os.O_RDONLY)
+    except FileNotFoundError:
+        return existing
+    with os.fdopen(fd, "rb") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_SH)
+        if secrets_file.exists():
+            fsync_file_and_parent(secrets_file)
+        return load_secret(key, secrets_file=secrets_file)
+
+
+def _create_secret_once(key: str, generate: Callable[[], str], *, secrets_file: Path) -> str:
+    secrets_file.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    lock_path = secrets_file.with_name(secrets_file.name + ".lock")
+    fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+    with os.fdopen(fd, "a+b") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        existing = load_secret(key, secrets_file=secrets_file)
+        if existing:
+            if secrets_file.exists():
+                fsync_file_and_parent(secrets_file)
+            return existing
+        value = generate()
+        _persist_secret(key, value, secrets_file=secrets_file)
+        return value
 
 
 def _decode_backup_key(value: str) -> bytes:
@@ -165,10 +203,11 @@ def _decode_backup_key(value: str) -> bytes:
 
 def _persist_secret(key: str, value: str, *, secrets_file: Path) -> None:
     secrets_file.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    fd = os.open(secrets_file, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
-    with os.fdopen(fd, "a", encoding="utf-8") as handle:
-        handle.write(f"{key}={value}\n")
-    os.chmod(secrets_file, 0o600)
+    text = secrets_file.read_text(encoding="utf-8") if secrets_file.exists() else ""
+    if text and not text.endswith("\n"):
+        text += "\n"
+    atomic_write_text(secrets_file, text + f"{key}={value}\n")
+    fsync_file_and_parent(secrets_file)
 
 
 def redact(text: str, *, extra: tuple[str, ...] = ()) -> str:

@@ -32,7 +32,8 @@ from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from mootloop.engine.queue import Queue
-from mootloop.errors import BackupError, LockHeldError
+from mootloop.errors import BackupError, LockHeldError, MatterConfigError, VaultBoundaryError
+from mootloop.privacy import seed_canary
 from mootloop.secrets import load_or_create_backup_key
 from mootloop.vault import (
     MATTER_YAML,
@@ -40,8 +41,11 @@ from mootloop.vault import (
     _real,
     detect_sync_folder,
     enclosing_git_repo,
+    fsync_file_and_parent,
     load_matter,
+    preflight_vault_location,
     validate_id,
+    vault_creation_lock,
 )
 
 _BACKUP_LOCK_RUN_ID = "backup"
@@ -138,6 +142,7 @@ def _heartbeating_backup_lock(
         raise BackupError("backup heartbeat interval must be positive")
     if held_lock is not None and _real(held_lock.vault_root) != _real(Path(vault_root)):
         raise BackupError("held backup lock belongs to a different matter vault")
+
     @contextmanager
     def acquire() -> Iterator[RunLock]:
         if held_lock is not None:
@@ -188,9 +193,10 @@ def _snapshot_tar(
 ) -> None:
     """Write the lock-consistent tar.gz to ``out`` (staging excluded). Fails closed."""
     try:
-        with _heartbeating_backup_lock(vault_root, held_lock=held_lock), tarfile.open(
-            out, "w:gz"
-        ) as tar:
+        with (
+            _heartbeating_backup_lock(vault_root, held_lock=held_lock),
+            tarfile.open(out, "w:gz") as tar,
+        ):
             tar.add(
                 str(vault_root),
                 arcname=matter_id,
@@ -312,26 +318,39 @@ def restore_matter(
         tar_bytes = None
 
     root = Path(dest_matters_root)
-    root.mkdir(parents=True, exist_ok=True)
+    try:
+        preflight_vault_location(root)
+    except VaultBoundaryError as exc:
+        raise BackupError("restore destination failed vault-location preflight") from exc
 
     with _open_archive(src, tar_bytes) as tar:
         members = tar.getmembers()
         matter_id = _archive_matter_id(members, src)
         target = root / matter_id
-        if target.exists() and any(target.iterdir()) and not overwrite:
-            raise BackupError(
-                f"refusing to restore over non-empty vault {target}; pass overwrite=True"
-            )
-        staging = Path(tempfile.mkdtemp(dir=str(root), prefix=f".restore-{matter_id}-"))
         try:
-            _safe_extract(tar, members, staging)
-            extracted = staging / matter_id
-            _assert_restored_vault(extracted, matter_id, src)
-            if target.exists():
-                _rmtree(target)
-            os.replace(extracted, target)
-        finally:
-            _rmtree(staging)
+            preflight_vault_location(target)
+        except VaultBoundaryError as exc:
+            raise BackupError("restore target failed vault-location preflight") from exc
+        with vault_creation_lock(target):
+            if target.exists() and (not target.is_dir() or any(target.iterdir())) and not overwrite:
+                raise BackupError(
+                    f"refusing to restore over non-empty vault {target}; pass overwrite=True"
+                )
+            staging = Path(tempfile.mkdtemp(dir=str(root), prefix=f".restore-{matter_id}-"))
+            try:
+                _safe_extract(tar, members, staging)
+                extracted = staging / matter_id
+                _assert_restored_vault(extracted, matter_id, src)
+                seed_canary(extracted, matter_id)
+                if overwrite and target.exists():
+                    _rmtree(target)
+                try:
+                    os.replace(extracted, target)
+                except OSError as exc:
+                    raise BackupError(f"could not publish restored vault {target}") from exc
+                fsync_file_and_parent(target)
+            finally:
+                _rmtree(staging)
 
     return target
 
@@ -380,6 +399,12 @@ def _assert_restored_vault(extracted: Path, matter_id: str, archive: Path) -> No
         raise BackupError(f"backup archive {archive} did not restore a {matter_id} vault")
     if not (extracted / MATTER_YAML).is_file():
         raise BackupError(f"restored vault {extracted} is missing {MATTER_YAML}")
+    try:
+        matter = load_matter(extracted)
+    except MatterConfigError as exc:
+        raise BackupError("restored vault has invalid matter configuration") from exc
+    if matter.matter_id != matter_id:
+        raise BackupError("restored directory and matter configuration identity disagree")
 
 
 def _rmtree(path: Path) -> None:

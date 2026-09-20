@@ -23,6 +23,7 @@ from pathlib import Path
 
 from mootloop import attest, gate_ledger
 from mootloop.context import load_run_context, load_run_corpus
+from mootloop.errors import ExportError
 from mootloop.export import deliverables_dir, docx_render, residue
 from mootloop.export.audit import build_audit_log
 from mootloop.export.master import (
@@ -113,7 +114,16 @@ def _export_run_locked(
     run_context = load_run_context(vault_root, run_id)
     load_run_corpus(vault_root, run_context)
     if attest.sealed_export_state(vault_root, run_id).status == "valid":
+        ready, blockers = gate_ledger.export_ready(vault_root, run_id)
+        if not ready and not force_draft:
+            raise ExportError(
+                "The sealed export no longer satisfies the export gates: "
+                f"{', '.join(blockers)}. Preserve this reviewed generation and prepare "
+                "a revised response for attorney review in a new run."
+            )
         existing = _existing_sealed_result(vault_root, run_id)
+        existing.export_ready = ready
+        existing.blockers = blockers
         if not force_draft:
             return existing
         return _render_draft_from_sealed(existing, reference_doc)

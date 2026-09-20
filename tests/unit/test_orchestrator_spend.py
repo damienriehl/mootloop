@@ -91,9 +91,7 @@ def test_replayed_completed_turn_books_new_spend_but_never_double_books(
     run_id = start_run(vault, "discovery-responses", NOW, run_id="spend-0003")
     provider = FakeLLMProvider()
     spec = plan_next(vault, run_id)[0]
-    turn: RawTurnResult = provider.run_turn(
-        spec, assemble_prompt(vault, run_id, spec.turn_id)
-    )
+    turn: RawTurnResult = provider.run_turn(spec, assemble_prompt(vault, run_id, spec.turn_id))
 
     first = record_turn(
         vault, run_id, spec.turn_id, turn.text, USAGE, NOW, provider_call_id="call-1"
@@ -108,8 +106,19 @@ def test_replayed_completed_turn_books_new_spend_but_never_double_books(
     assert load_state(vault, run_id).total_spend_usd == EXPECTED_USD * 2
 
     # Replaying the exact same provider call books nothing further.
-    record_turn(
-        vault, run_id, spec.turn_id, turn.text, USAGE, NOW, provider_call_id="call-2"
-    )
+    record_turn(vault, run_id, spec.turn_id, turn.text, USAGE, NOW, provider_call_id="call-2")
     assert load_state(vault, run_id).total_spend_usd == EXPECTED_USD * 2
     assert len(_spend_events(vault, run_id)) == 2
+
+
+def test_success_after_discard_meters_identical_usage_without_call_id(tmp_path: Path) -> None:
+    vault = _build_single_request_vault(tmp_path)
+    run_id = start_run(vault, "discovery-responses", NOW, run_id="legacy-retry")
+    spec = plan_next(vault, run_id)[0]
+    record_turn(vault, run_id, spec.turn_id, "not json", USAGE, NOW)
+    spec = plan_next(vault, run_id)[0]
+    result = FakeLLMProvider().run_turn(spec, assemble_prompt(vault, run_id, spec.turn_id))
+    record_turn(vault, run_id, spec.turn_id, result.text, USAGE, NOW)
+    assert load_state(vault, run_id).total_spend_usd == EXPECTED_USD * 2
+    record_turn(vault, run_id, spec.turn_id, result.text, USAGE, NOW)
+    assert load_state(vault, run_id).total_spend_usd == EXPECTED_USD * 2

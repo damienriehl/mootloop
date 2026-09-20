@@ -7,8 +7,10 @@ read — unreadable file, symlink, or binary — is itself a finding.
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
+import re
 import secrets
 import stat
 import subprocess
@@ -24,7 +26,13 @@ from mootloop.errors import OutboundPrivacyError
 from mootloop.models.common import PublicText
 from mootloop.runtime import RUNTIME_MODE_ENV, RuntimeMode
 from mootloop.secrets import SECRETS_FILE
-from mootloop.vault import CANARY_FILE, safe_vault_path
+from mootloop.vault import (
+    CANARY_FILE,
+    atomic_write_text,
+    fsync_file_and_parent,
+    safe_vault_path,
+    validate_id,
+)
 
 CANARY_PREFIX = "MOOTLOOP-CANARY-"
 DEFAULT_REGISTRY = Path.home() / ".mootloop" / "canaries.json"
@@ -65,18 +73,33 @@ def _empty_registry() -> dict[str, Any]:
 def load_registry(registry_path: Path | str | None = None) -> dict[str, Any]:
     """Load the canary/denylist registry. Missing file → empty registry."""
     path = Path(registry_path) if registry_path is not None else _default_registry()
-    if not path.is_file():
+    try:
+        mode = path.lstat().st_mode
+    except FileNotFoundError:
         return _empty_registry()
-    data = json.loads(path.read_text(encoding="utf-8"))
-    registry = _empty_registry()
-    if isinstance(data, dict):
-        canaries = data.get("canaries")
-        if isinstance(canaries, dict):
-            registry["canaries"] = canaries
-        denylist = data.get("denylist")
-        if isinstance(denylist, list):
-            registry["denylist"] = denylist
-    return registry
+    except OSError as exc:
+        raise OutboundPrivacyError("canary registry is not readable") from exc
+    if not stat.S_ISREG(mode):
+        raise OutboundPrivacyError("canary registry must be a regular file")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise OutboundPrivacyError("canary registry must contain valid readable JSON") from exc
+    return _validate_registry(data)
+
+
+def _validate_registry(data: Any) -> dict[str, Any]:
+    if not isinstance(data, dict):
+        raise OutboundPrivacyError("canary registry must be a JSON object")
+    canaries = data.get("canaries")
+    denylist = data.get("denylist")
+    if not isinstance(canaries, dict) or not all(
+        isinstance(key, str) and isinstance(value, str) for key, value in canaries.items()
+    ):
+        raise OutboundPrivacyError("canary registry has invalid canaries")
+    if not isinstance(denylist, list) or not all(isinstance(value, str) for value in denylist):
+        raise OutboundPrivacyError("canary registry has invalid denylist")
+    return {"canaries": canaries, "denylist": denylist}
 
 
 def _load_hosted_outbound_registry(
@@ -96,22 +119,34 @@ def _load_hosted_outbound_registry(
         raise OutboundPrivacyError(
             "hosted outbound policy requires a readable valid canary registry"
         ) from exc
-    if not isinstance(data, dict):
-        raise OutboundPrivacyError("hosted canary registry must be a JSON object")
-    canaries = data.get("canaries")
-    denylist = data.get("denylist")
-    if not isinstance(canaries, dict) or not all(
-        isinstance(key, str) and isinstance(value, str) for key, value in canaries.items()
-    ):
-        raise OutboundPrivacyError("hosted canary registry has invalid canaries")
-    if not isinstance(denylist, list) or not all(isinstance(value, str) for value in denylist):
-        raise OutboundPrivacyError("hosted canary registry has invalid denylist")
-    return {"canaries": canaries, "denylist": denylist}
+    try:
+        return _validate_registry(data)
+    except OutboundPrivacyError as exc:
+        raise OutboundPrivacyError(f"hosted {exc}") from exc
 
 
 def _save_registry(registry: dict[str, Any], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(registry, indent=2, sort_keys=True), encoding="utf-8")
+    atomic_write_text(path, json.dumps(registry, indent=2, sort_keys=True))
+    fsync_file_and_parent(path)
+
+
+def register_canary(token: str, matter_id: str, registry_path: Path | str | None = None) -> None:
+    """Durably bind a validated token without losing other processes' registrations."""
+    validate_id(matter_id, kind="matter_id")
+    if re.fullmatch(re.escape(f"{CANARY_PREFIX}{matter_id}-") + r"[0-9a-f]{32}", token) is None:
+        raise OutboundPrivacyError("canary token is malformed or has the wrong matter identity")
+    path = Path(registry_path) if registry_path is not None else _default_registry()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(path.with_name(path.name + ".lock"), os.O_RDWR | os.O_CREAT, 0o600)
+    with os.fdopen(fd, "a+b") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        registry = load_registry(path)
+        existing = registry["canaries"].get(token)
+        if existing is not None and existing != matter_id:
+            raise OutboundPrivacyError("canary registry has a conflicting matter identity")
+        registry["canaries"][token] = matter_id
+        _save_registry(registry, path)
 
 
 # --- canary seeding ---------------------------------------------------------
@@ -123,14 +158,15 @@ def seed_canary(
     registry_path: Path | str | None = None,
 ) -> str:
     """Write ``<vault>/.canary`` and register token -> matter_id. Returns the token."""
-    token = f"{CANARY_PREFIX}{matter_id}-{secrets.token_hex(16)}"
     canary_path = safe_vault_path(vault_root, CANARY_FILE)
-    canary_path.write_text(token + "\n", encoding="utf-8")
-
-    reg_path = Path(registry_path) if registry_path is not None else _default_registry()
-    registry = load_registry(reg_path)
-    registry["canaries"][token] = matter_id
-    _save_registry(registry, reg_path)
+    token = (
+        canary_path.read_text(encoding="utf-8").strip()
+        if canary_path.exists()
+        else f"{CANARY_PREFIX}{matter_id}-{secrets.token_hex(16)}"
+    )
+    register_canary(token, matter_id, registry_path)
+    atomic_write_text(canary_path, token + "\n")
+    fsync_file_and_parent(canary_path)
     return token
 
 

@@ -28,6 +28,18 @@ function turnCompleted(persona: string, turnId: string): RunEvent {
 }
 
 describe("SSE reducer (synthetic events)", () => {
+  it("rebuilds totals when a reconnect replays the journal from run_started", () => {
+    const replay: RunEvent[] = [
+      { kind: "run_started", run_id: "r1", matter_id: "m1", task: "discovery", rubric_version: "v1", config_digest: "abc", mode: "autonomous" },
+      turnCompleted("associate", "t1"),
+      { kind: "spend_recorded", turn_id: "t1", input_tokens: 10, cache_read: 0, cache_write: 0, output_tokens: 5, model: "sonnet", usd_equiv: 0.2, billing_mode: "subscription" },
+      { kind: "run_finished", status: "finished" },
+    ];
+    const once = reduceRunEvents(replay);
+    expect(reduceRunEvents(replay, once)).toEqual(once);
+    expect(reduceRunEvents(replay, reduceRunEvents(replay.slice(0, 3)))).toEqual(once);
+  });
+
   it("folds a full lifecycle into correct timeline state", () => {
     const events: RunEvent[] = [
       { kind: "run_started", run_id: "r1", matter_id: "m1", task: "discovery", rubric_version: "v1", config_digest: "abc", mode: "autonomous" },

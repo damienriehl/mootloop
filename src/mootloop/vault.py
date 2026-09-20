@@ -351,23 +351,44 @@ def create_vault(
 
     validate_id(matter.matter_id, kind="matter_id")
     preflight_vault_location(vault_root, allow_sync_folder=allow_sync_folder)
-    root = Path(vault_root)
-    if root.exists() and any(root.iterdir()):
-        raise VaultBoundaryError(f"refusing to create vault: {root} exists and is non-empty")
-    root.mkdir(parents=True, exist_ok=True)
-
-    for subdir in VAULT_TREE:
-        safe_vault_path(root, *subdir.split("/")).mkdir(parents=True, exist_ok=True)
-
-    matter_path = safe_vault_path(root, MATTER_YAML)
-    payload = matter.model_dump(mode="json")
-    matter_path.write_text(
-        yaml.safe_dump(payload, sort_keys=True, default_flow_style=False),
-        encoding="utf-8",
-    )
-
-    seed_canary(root, matter.matter_id, registry_path=registry_path)
+    root = _real(vault_root)
+    with vault_creation_lock(root):
+        if root.exists() and (not root.is_dir() or any(root.iterdir())):
+            raise VaultBoundaryError(f"refusing to create vault: {root} exists and is non-empty")
+        with tempfile.TemporaryDirectory(dir=root.parent, prefix=".create-") as temporary:
+            staging = Path(temporary) / "vault"
+            staging.mkdir()
+            for subdir in VAULT_TREE:
+                safe_vault_path(staging, *subdir.split("/")).mkdir(parents=True, exist_ok=True)
+            matter_path = safe_vault_path(staging, MATTER_YAML)
+            atomic_write_text(
+                matter_path,
+                yaml.safe_dump(matter.model_dump(mode="json"), sort_keys=True),
+            )
+            seed_canary(staging, matter.matter_id, registry_path=registry_path)
+            try:
+                os.replace(staging, root)
+            except OSError as exc:
+                raise VaultBoundaryError(f"could not publish new vault {root}") from exc
+            fsync_file_and_parent(root)
     return root
+
+
+@contextlib.contextmanager
+def vault_creation_lock(vault_path: Path | str) -> Iterator[None]:
+    """Serialize create/restore/close outside the replaceable vault directory.
+
+    Acquire before RunLock when both are needed. The sibling lock is permanent: removing
+    it would allow waiters on the old inode to race a new owner of the replacement inode.
+    Callers perform their location preflight before acquiring this lock.
+    """
+    root = _real(vault_path)
+    root.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = root.parent / f".create-{root.name}.lock"
+    fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+    with os.fdopen(fd, "a+b") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        yield
 
 
 def _is_git_marker(dot_git: Path) -> bool:
