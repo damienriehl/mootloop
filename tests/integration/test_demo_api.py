@@ -48,10 +48,12 @@ def test_corruption_and_missing_catalog_never_fall_back(public_client, monkeypat
     assert client.get("/api/demos").status_code == 503
 
 
-def test_pages_redirect_csp_and_deep_links(public_client):
+def test_pages_csp_and_deep_links(public_client):
     client, _ = public_client
-    assert client.get("/", follow_redirects=False).headers["location"] == "/demos/"
-    for path in ("/demos/", "/demos/epic-apple", "/legacy"):
+    home = client.get("/", follow_redirects=False)
+    assert home.status_code == 200
+    assert "Put your argument" in home.text
+    for path in ("/", "/demos/", "/demos/epic-apple", "/legacy"):
         response = client.get(path)
         assert response.status_code == 200
         assert "script-src 'self'" in response.headers["content-security-policy"]

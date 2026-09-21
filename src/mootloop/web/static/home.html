@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="MootLoop puts legal work through drafting, opposing review and revision, with a human attorney on the loop. Explore 20 prepared demos or install locally." />
+    <meta property="og:title" content="MootLoop — Put your argument to the test" />
+    <meta property="og:description" content="Explore how legal work changes when it is challenged. Twenty prepared demos, open source, and a workflow you can run locally." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://mootloop.org/" />
+    <link rel="canonical" href="https://mootloop.org/" />
+    <title>MootLoop — Put your argument to the test</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/home.css" />
+  </head>
+  <body class="home">
+    <a class="home-skip" href="#content">Skip to content</a>
+    <header class="home-header">
+      <a class="home-brand" href="/" aria-label="MootLoop home">MootLoop<span aria-hidden="true" class="loop-mark">↻</span></a>
+      <nav aria-label="Main">
+        <a href="/demos/">Demo library</a>
+        <a href="#workflow">How it works</a>
+        <a href="https://github.com/damienriehl/mootloop">GitHub</a>
+        <a class="nav-local" href="#local">Use locally</a>
+      </nav>
+    </header>
+    <main id="content" tabindex="-1">
+      <section class="home-hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <h1 id="hero-title">Put your argument<br class="desktop-break" /> to the test.</h1>
+          <p class="hero-intro">An open-source legal AI workflow for drafting, challenging and refining legal work. Six simulated personas test the work from different sides, with a human attorney on the loop.</p>
+          <div class="home-actions">
+            <a class="home-button" href="/demos/">Explore the demos</a>
+            <a class="home-text-link" href="#local">Run MootLoop locally</a>
+          </div>
+          <p class="hero-note">20 prepared examples. No account or API key needed to explore.</p>
+        </div>
+        <figure class="argument-loop">
+          <figcaption>A look inside the loop <span>Workflow illustration</span></figcaption>
+          <ol>
+            <li class="loop-draft"><span class="loop-role">Draft</span><p>Make the strongest case<br />for your position.</p></li>
+            <li class="loop-challenge"><span class="loop-role">Challenge</span><p>What would opposing counsel<br />attack first?</p></li>
+            <li class="loop-revise"><span class="loop-role">Revise</span><p>Address the weakness.<br />Show what changed.</p></li>
+          </ol>
+          <div class="loop-return"><span aria-hidden="true">↻</span> Assess, refine, review again.</div>
+          <p class="loop-human">Professional judgment stays with the attorney.</p>
+        </figure>
+      </section>
+
+      <section class="home-demos" id="demos" aria-labelledby="demos-title">
+        <div class="section-heading">
+          <div><h2 id="demos-title">Start with a question that interests you.</h2><p>Follow the draft, the challenge and the revision. See the reasoning and the unresolved issues along the way.</p></div>
+          <a href="/demos/">Browse all 20 demos</a>
+        </div>
+        <div class="demo-collections">
+          <article class="collection">
+            <div class="collection-top"><span class="collection-symbol" aria-hidden="true">§</span><span>5 fictional matters</span></div>
+            <h3><a href="/demos/?collection=synthetic">Fictional litigation</a></h3>
+            <p>Explore complaints, motions, discovery and oral argument across state and federal trial and appellate settings.</p>
+            <span class="collection-invitation" aria-hidden="true">Explore litigation demos</span>
+          </article>
+          <article class="collection">
+            <div class="collection-top"><span class="collection-symbol" aria-hidden="true">⇄</span><span>5 public-record cases</span></div>
+            <h3><a href="/demos/?collection=public-record">What if counsel took a different path?</a></h3>
+            <p>Compare alternative strategies in high-profile cases, including Musk v. Altman and OpenAI. Examine how a different approach might have mattered.</p>
+            <span class="collection-invitation" aria-hidden="true">Explore historical counterfactuals</span>
+          </article>
+          <article class="collection">
+            <div class="collection-top"><span class="collection-symbol" aria-hidden="true">?</span><span>10 business questions</span></div>
+            <h3><a href="/demos/?collection=business">Ask in-house counsel</a></h3>
+            <p>Work through the questions business teams bring to their lawyers: supplier agreements, employment, data use and other everyday decisions.</p>
+            <span class="collection-invitation" aria-hidden="true">Explore business counsel demos</span>
+          </article>
+        </div>
+        <p class="demo-context">These are prepared educational scripts, not live model runs or attorney-approved advice. Real-case alternatives are hypothetical, not predictions of what a court would have done.</p>
+      </section>
+
+      <section class="home-workflow" id="workflow" aria-labelledby="workflow-title">
+        <div class="workflow-heading"><h2 id="workflow-title">More than a first draft.</h2><p>Six personas take different roles in the review. You can inspect the work as it moves through the loop.</p></div>
+        <ol class="workflow-steps">
+          <li><h3>Draft and review</h3><p>The Associate develops the work. The Partner reviews its support, framing and completeness.</p></li>
+          <li><h3>Test the other side</h3><p>Opposing-Counsel Associate and Partner challenge the position and expose weaknesses.</p></li>
+          <li><h3>Revise and assess</h3><p>The drafting team responds. The Judge and Rubric Judge assess the work against the task's criteria.</p></li>
+        </ol>
+        <div class="human-review"><h3>A human attorney on the loop.</h3><p>Professional judgment has an explicit place in the workflow. Privilege decisions, admission dispositions and attorney attestation remain human responsibilities.</p></div>
+      </section>
+
+      <section class="home-features" aria-labelledby="features-title">
+        <h2 id="features-title">See the work behind the answer.</h2>
+        <div class="feature-grid">
+          <div><h3>Trace the revisions</h3><p>Read drafts, opposing critiques and revised work together. Examine how the response to a challenge changes the result.</p></div>
+          <div><h3>Inspect the gates</h3><p>See rubric results, unresolved support and citation issues, and decisions that still need attorney review.</p></div>
+          <div><h3>Replay an example</h3><p>Download a demo's inputs and replay its prepared workflow locally, without live model calls.</p></div>
+          <div><h3>Build on open source</h3><p>Inspect task adapters, persona workflows, budget controls and audit trails. Extend the project for your own experiments.</p></div>
+        </div>
+      </section>
+
+      <section class="home-audience" aria-labelledby="audience-title">
+        <h2 id="audience-title">For people who work with the law.<br />And people who want to understand it.</h2>
+        <dl>
+          <div><dt>Lawyers</dt><dd>Explore how a position holds up under opposing review.</dd></div>
+          <div><dt>Law students</dt><dd>Compare arguments and study the choices behind a revision.</dd></div>
+          <div><dt>In-house counsel &amp; legal operations</dt><dd>Follow business questions through a structured review process.</dd></div>
+          <div><dt>Developers</dt><dd>Study an open-source legal multi-agent workflow and its controls.</dd></div>
+          <div><dt>Anyone curious about the law</dt><dd>See how a legal question can lead to competing arguments.</dd></div>
+        </dl>
+      </section>
+
+      <section class="home-local" id="local" aria-labelledby="local-title">
+        <div><h2 id="local-title">Explore here.<br />Make it your own locally.</h2><p>The public site is a read-only viewer. To replay examples or work with your own materials, install MootLoop on your computer.</p><p>Start with Python 3.12 and <a href="https://docs.astral.sh/uv/">uv</a>. The local-use guide walks through installation, demo downloads and replay commands.</p><a class="home-button" href="https://github.com/damienriehl/mootloop/blob/main/docs/demos/local-use.md">Read the local-use guide</a></div>
+        <div class="local-source"><h3>Get the source</h3><pre aria-label="Installation commands"><code>git clone https://github.com/damienriehl/mootloop.git
+cd mootloop
+uv sync
+uv run mootloop --help</code></pre><p>Keep matter files outside the repository and background-sync folders. Prepared replays require no provider key; other workflows have their own setup requirements.</p><div class="source-links"><a href="https://github.com/damienriehl/mootloop">MootLoop repository</a><a href="https://github.com/damienriehl/mootloop/tree/main/src/mootloop">Python core</a><a href="https://github.com/damienriehl/mootloop/tree/main/frontend">Application UI</a></div></div>
+      </section>
+    </main>
+    <footer class="home-footer"><a class="home-brand" href="/">MootLoop</a><p>Draft. Challenge. Refine.</p><nav aria-label="Footer"><a href="/demos/">Demo library</a><a href="https://github.com/damienriehl/mootloop/blob/main/LICENSE">MIT license</a><a href="/legacy">Original demo</a></nav></footer>
+  </body>
+</html>

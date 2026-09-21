@@ -38,6 +38,25 @@ def test_health_needs_no_vault(monkeypatch: pytest.MonkeyPatch) -> None:
     assert body["status"] == "ok" and "version" in body
 
 
+def test_homepage_survives_missing_release(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(PUBLIC_ENV, "/nonexistent")
+    client = TestClient(app)
+    response = client.get("/", follow_redirects=False)
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert 'href="/demos/"' in response.text
+    for collection in ("synthetic", "public-record", "business"):
+        assert f'href="/demos/?collection={collection}"' in response.text
+    assert 'href="#local"' in response.text
+    assert "https://github.com/damienriehl/mootloop" in response.text
+    assert "<script" not in response.text
+    assert "<form" not in response.text
+    assert "frame-ancestors 'none'" in response.headers["content-security-policy"]
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert client.get("/api/demos").status_code == 503
+    assert client.get("/ready").status_code == 503
+
+
 def test_matter_is_sanitized(client: TestClient) -> None:
     body = client.get("/api/matter").json()
     assert body["matter_id"] == "northfield-widgets-v-granite-supply"

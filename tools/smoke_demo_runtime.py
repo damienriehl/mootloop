@@ -39,6 +39,10 @@ def main() -> None:
         )
     assert len(json.loads(get("/api/requests"))) == 18
     assert b"Demo library" in get("/demos/")
+    home = get("/")
+    assert b"Put your argument" in home
+    assert b'href="/demos/?collection=business"' in home
+    assert b".home-hero" in get("/static/home.css")
     for module in (
         "mootloop.vault",
         "mootloop.orchestrator",

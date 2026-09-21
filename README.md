@@ -1,5 +1,7 @@
 # MootLoop
 
+[Visit MootLoop](https://mootloop.org/) · [Explore the demos](https://mootloop.org/demos/) · [Use locally](docs/demos/local-use.md)
+
 **Agentic law firm simulator.** Six runnable personas — Associate, Partner,
 Opposing-Counsel Associate, Opposing-Counsel Partner, Judge, and Rubric Judge —
 draft, attack, and adjudicate legal work product through rubric-gated loops. A human
