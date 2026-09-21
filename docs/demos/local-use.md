@@ -80,7 +80,7 @@ MOOTLOOP_PUBLIC_ROOT=/tmp/mootloop-public \
   uv run uvicorn mootloop.web.app:app --host 127.0.0.1 --port 8000
 ```
 
-Open `http://127.0.0.1:8000/demos/`. `/legacy` serves the original fictional discovery
+Open `http://127.0.0.1:8000/` for the homepage or `/demos/` for the library. `/legacy` serves the original fictional discovery
 example. A missing or corrupt projection fails closed; the server never falls back
 to a local matter vault. The archive contains reviewed public projections and
 permitted local inputs, not the private filings' wholesale source PDFs.

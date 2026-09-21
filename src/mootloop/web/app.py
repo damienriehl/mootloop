@@ -10,7 +10,6 @@ from fastapi.responses import (
     FileResponse,
     JSONResponse,
     PlainTextResponse,
-    RedirectResponse,
     Response,
 )
 from fastapi.staticfiles import StaticFiles
@@ -148,8 +147,8 @@ def legacy_view(view: str) -> JsonValue:
 
 
 @app.get("/", include_in_schema=False)
-def index() -> RedirectResponse:
-    return RedirectResponse("/demos/", status_code=307)
+def index() -> FileResponse:
+    return FileResponse(_STATIC_DIR / "home.html", media_type="text/html")
 
 
 @app.get("/legacy", include_in_schema=False)
