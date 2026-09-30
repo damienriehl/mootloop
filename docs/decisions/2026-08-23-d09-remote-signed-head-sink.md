@@ -2,7 +2,14 @@
 
 Date prepared: 2026-08-23
 
-Status: awaiting two-account AWS architecture and retention approval
+Status: D-09P A approved by Damien on 2026-09-30; implementation and operator provisioning pending
+
+September 30 disposition: the two-account AWS architecture and seven-year Compliance
+retention are approved. The original approval request below is retained as historical
+context and no longer represents an unanswered provider/retention choice. Operator
+account provisioning, credentials, and pre-spend cost review remain separate gates.
+See `docs/plans/2026-09-30-feat-d09-two-account-integrity-ledger-plan.md` for the
+implementation plan. This approval does not extend to FD6-01 or real-matter use.
 
 This packet completes the concrete follow-up required by D-09. It authorizes no
 remote write and contains no credentials, protected matter identifiers, or matter
