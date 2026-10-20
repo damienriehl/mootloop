@@ -5,6 +5,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [react()],
   test: {
+    maxWorkers: 2,
     environment: "jsdom",
     globals: true,
     setupFiles: ["./vitest.setup.ts"],
